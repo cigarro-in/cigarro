@@ -2,5 +2,5 @@
 https://www.cigarro.in/* https://cigarro.in/:splat 301
 http://www.cigarro.in/* https://cigarro.in/:splat 301
 
-# Handle SPA routing - redirect all non-file requests to index.html
+# Handle SPA routing - exclude assets and API routes
 /* /index.html 200
