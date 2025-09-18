@@ -1,5 +1,2 @@
 # Cloudflare Pages redirects for SPA routing
 /*    /index.html   200
-
-# Force HTTPS (if not already handled by Cloudflare)
-http://cigarro.pages.dev/*  https://cigarro.pages.dev/:splat  301!
