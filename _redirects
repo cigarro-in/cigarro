@@ -1,0 +1,6 @@
+# Redirect www to non-www (canonical domain)
+https://www.cigarro.in/* https://cigarro.in/:splat 301
+http://www.cigarro.in/* https://cigarro.in/:splat 301
+
+# Handle SPA routing - redirect all non-file requests to index.html
+/* /index.html 200

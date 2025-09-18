@@ -3,12 +3,13 @@ export function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
   
-  // Handle SPA routing - redirect all non-file requests to index.html
-  if (!url.pathname.includes('.') && !url.pathname.startsWith('/api/')) {
+  // Only handle SPA routing for specific cases, let _redirects handle the rest
+  // This prevents redirect loops
+  if (url.pathname === '/' || (!url.pathname.includes('.') && !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/_'))) {
     return new Response(null, {
-      status: 302,
+      status: 200,
       headers: {
-        Location: '/index.html'
+        'Content-Type': 'text/html',
       }
     });
   }
