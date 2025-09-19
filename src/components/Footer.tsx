@@ -1,5 +1,5 @@
 import React from 'react';
-import { Instagram, Twitter, Facebook, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -40,7 +40,7 @@ const Footer = () => {
             
             {/* Menu Links */}
             <div className="lg:col-span-6">
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 gap-8">
                 {/* Products Column */}
                 <div>
                   <h4 className="suptitle text-dark mb-4">Products</h4>
@@ -60,25 +60,6 @@ const Footer = () => {
                   </div>
                 </div>
                 
-                {/* Services Column */}
-                <div>
-                  <h4 className="suptitle text-dark mb-4">Services</h4>
-                  <div className="space-y-3">
-                    <a href="/trade" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Trading Platform
-                    </a>
-                    <a href="/authentication" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Authentication
-                    </a>
-                    <a href="/storage" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Premium Storage
-                    </a>
-                    <a href="/consultation" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Expert Consultation
-                    </a>
-                  </div>
-                </div>
-                
                 {/* Company Column */}
                 <div>
                   <h4 className="suptitle text-dark mb-4">Company</h4>
@@ -89,11 +70,14 @@ const Footer = () => {
                     <a href="/contact" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Contact
                     </a>
-                    <a href="/careers" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Careers
+                    <a href="/privacy" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Privacy Policy
                     </a>
-                    <a href="/press" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Press
+                    <a href="/terms" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Terms of Service
+                    </a>
+                    <a href="/shipping" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Shipping Policy
                     </a>
                   </div>
                 </div>
@@ -101,45 +85,13 @@ const Footer = () => {
             </div>
           </div>
           
-          {/* Social Networks */}
-          <div className="text-center mb-12">
-            <div className="flex justify-center space-x-6">
-              <a href="#" className="w-11 h-11 bg-transparent border border-dark/20 rounded-full flex items-center justify-center hover:bg-dark hover:text-creme-light transition-all duration-300">
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-11 h-11 bg-transparent border border-dark/20 rounded-full flex items-center justify-center hover:bg-dark hover:text-creme-light transition-all duration-300">
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-11 h-11 bg-transparent border border-dark/20 rounded-full flex items-center justify-center hover:bg-dark hover:text-creme-light transition-all duration-300">
-                <Facebook className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
           
           {/* Bottom Bar */}
           <div className="border-t border-coyote pt-6">
-            <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
-              {/* Logo */}
-              <div className="flex items-center space-x-6">
-                <div className="text-2xl font-serif font-normal text-dark">Cigarro</div>
-                <div className="w-16 h-16 bg-dark/5 rounded-lg flex items-center justify-center">
-                  <div className="text-xs font-medium text-dark">PREMIUM</div>
-                </div>
-              </div>
-              
+            <div className="text-center">
               {/* Copyright */}
-              <div className="text-coyote text-sm leading-relaxed px-6">
-                © 2025 Cigarro Premium Marketplace. All rights reserved.
-              </div>
-              
-              {/* Legal Links */}
-              <div className="flex space-x-6">
-                <a href="/privacy" className="text-dark hover:text-canyon transition-colors text-sm">
-                  Privacy Policy
-                </a>
-                <a href="/terms" className="text-dark hover:text-canyon transition-colors text-sm">
-                  Terms of Service
-                </a>
+              <div className="text-coyote text-base leading-relaxed">
+                © 2025 Cigarro. All rights reserved.
               </div>
             </div>
           </div>

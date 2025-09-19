@@ -19,6 +19,8 @@ const Header = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [isMiniCartOpen, setIsMiniCartOpen] = useState(false);
+  const [autoShowTimeout, setAutoShowTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -227,6 +229,35 @@ const Header = () => {
     fetchAllProducts();
   }, []);
 
+  // Listen for cart item added events to auto-show mini cart
+  useEffect(() => {
+    const handleCartItemAdded = () => {
+      // Clear any existing timeout
+      if (autoShowTimeout) {
+        clearTimeout(autoShowTimeout);
+      }
+      
+      // Show mini cart immediately
+      setIsMiniCartOpen(true);
+      
+      // Set timeout to hide after 3 seconds
+      const timeout = setTimeout(() => {
+        setIsMiniCartOpen(false);
+      }, 3000);
+      
+      setAutoShowTimeout(timeout);
+    };
+
+    window.addEventListener('cartItemAdded', handleCartItemAdded);
+    
+    return () => {
+      window.removeEventListener('cartItemAdded', handleCartItemAdded);
+      if (autoShowTimeout) {
+        clearTimeout(autoShowTimeout);
+      }
+    };
+  }, [autoShowTimeout]);
+
   // Focus search input when search opens
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
@@ -291,18 +322,25 @@ const Header = () => {
           {/* Cart */}
           <div 
             className="relative"
-            onMouseEnter={() => setIsMiniCartOpen(true)}
+            onMouseEnter={() => {
+              // Clear auto-hide timeout when hovering
+              if (autoShowTimeout) {
+                clearTimeout(autoShowTimeout);
+                setAutoShowTimeout(null);
+              }
+              setIsMiniCartOpen(true);
+            }}
             onMouseLeave={() => setIsMiniCartOpen(false)}
           >
-            <a 
-              href="/cart"
+            <button 
               className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote transition-colors duration-300 hover:bg-creme-light"
+              onClick={() => setIsMiniCartOpen(!isMiniCartOpen)}
             >
               <ShoppingBag className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
               <span className="ml-[max(10px,calc(100vw*14/1440))] inline-block text-white font-sans font-medium rounded-full text-center bg-dark text-[clamp(13px,calc(100vw*13/1440),16px)] leading-[clamp(25px,calc(100vw*32/1440),32px)] tracking-tight w-[min(32px,max(25px,calc(100vw*32/1440)))] h-[min(32px,max(25px,calc(100vw*32/1440)))]">
                 {totalItems || 0}
               </span>
-            </a>
+            </button>
             
             {/* Mini Cart */}
             <MiniCart 
@@ -313,12 +351,19 @@ const Header = () => {
 
           {/* Authentication - Now rightmost */}
           {user ? (
-            <div className="relative group">
-              <button className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote rounded-tr-md rounded-br-md transition-colors duration-300 hover:bg-creme-light">
+            <div 
+              className="relative"
+              onMouseEnter={() => setIsUserDropdownOpen(true)}
+              onMouseLeave={() => setIsUserDropdownOpen(false)}
+            >
+              <button 
+                className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote rounded-tr-md rounded-br-md transition-colors duration-300 hover:bg-creme-light"
+                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+              >
                 <User className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
               </button>
               {/* User Dropdown */}
-              <div className="absolute right-0 top-full mt-2 w-56 bg-creme border border-coyote rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+              <div className={`absolute right-0 top-full mt-2 w-56 bg-creme border border-coyote rounded-md shadow-lg transition-all duration-300 z-50 ${isUserDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <div className="p-4 border-b border-coyote">
                   <p className="font-medium text-dark text-lg">{user.name}</p>
                   <p className="text-coyote text-sm">{user.email}</p>
@@ -434,13 +479,10 @@ const Header = () => {
                 About
               </span>
               <a href="/about" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
-                Our Heritage
+                About Us
               </a>
-              <a href="/craftsmanship" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
-                Craftsmanship
-              </a>
-              <a href="/sustainability" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
-                Sustainability
+              <a href="/blog" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
+                Journal
               </a>
               <a href="/contact" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
                 Contact

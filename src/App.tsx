@@ -6,9 +6,8 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import { FeaturedProducts } from './components/FeaturedProducts';
 import { BrandHeritage } from './components/BrandHeritage';
-import { ProductShowcase } from './components/ProductShowcase';
+import { ProductShowcase } from './components/ProductCard';
 import { CategoriesGrid } from './components/CategoriesGrid';
-import { ContactSupport } from './components/ContactSupport';
 import { BlogSection } from './components/BlogSection';
 import { BreadcrumbNav } from './components/BreadcrumbNav';
 import { PageTransition } from './components/PageTransition';
@@ -31,6 +30,13 @@ const ProductsPage = lazy(() => import('./components/ProductsPage').then(m => ({
 const CategoryPage = lazy(() => import('./components/CategoryPage').then(m => ({ default: m.CategoryPage })));
 const LegalPage = lazy(() => import('./components/LegalPage').then(m => ({ default: m.LegalPage })));
 const WishlistPage = lazy(() => import('./components/WishlistPage').then(m => ({ default: m.WishlistPage })));
+const BlogsPage = lazy(() => import('./components/BlogsPage').then(m => ({ default: m.BlogsPage })));
+const BlogPost = lazy(() => import('./components/BlogsPage').then(m => ({ default: m.BlogPost })));
+const ContactPage = lazy(() => import('./components/ContactPage').then(m => ({ default: m.ContactPage })));
+const AboutPage = lazy(() => import('./components/AboutPage').then(m => ({ default: m.AboutPage })));
+const TermsPage = lazy(() => import('./components/TermsPage').then(m => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('./components/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
+const ShippingPage = lazy(() => import('./components/ShippingPage').then(m => ({ default: m.ShippingPage })));
 
 // Loading component for better UX during transitions
 function LoadingSpinner() {
@@ -52,7 +58,6 @@ function HomePage() {
       <BrandHeritage />
       <ProductShowcase />
       <CategoriesGrid />
-      <ContactSupport />
       <BlogSection />
     </>
   );
@@ -131,8 +136,13 @@ function AppContent() {
                 <Route path="/category/:category/:brand" element={<CategoryPage />} />
                 <Route path="/brand/:slug" element={<CategoryPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
-                <Route path="/privacy" element={<LegalPage />} />
-                <Route path="/terms" element={<LegalPage />} />
+                <Route path="/blog" element={<BlogsPage />} />
+                <Route path="/blog/:slug" element={<BlogPost />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/shipping" element={<ShippingPage />} />
                 {/* Catch-all route for broken links */}
                 <Route path="*" element={<HomePage />} />
               </Routes>

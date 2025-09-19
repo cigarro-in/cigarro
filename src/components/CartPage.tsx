@@ -53,7 +53,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100 }}
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
+      className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-coyote/20"
     >
       <div className="p-6">
         <div className="flex items-center space-x-4">
@@ -74,7 +74,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
                 {item.name}
               </h3>
             </Link>
-            <p className="text-sm text-gray-600 mt-1">{item.brand}</p>
+            <p className="text-sm text-dark/70 mt-1">{item.brand}</p>
             <p className="text-xl font-bold text-dark mt-2">₹{formatIndianPrice(item.price)}</p>
           </div>
 
@@ -112,10 +112,10 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
         </div>
 
         {/* Subtotal for this item */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="mt-4 pt-4 border-t border-coyote/20">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Subtotal:</span>
-            <span className="text-lg font-semibold text-dark">₹{formatIndianPrice(item.price * item.quantity)}</span>
+            <span className="text-sm text-dark/70">Subtotal:</span>
+            <span className="text-lg font-medium text-dark">₹{formatIndianPrice(item.price * item.quantity)}</span>
           </div>
         </div>
       </div>
@@ -124,27 +124,27 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
 };
 
 const EmptyCart: React.FC = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="text-center py-16"
-  >
-    <div className="max-w-md mx-auto">
-      <div className="w-24 h-24 bg-creme-light rounded-full flex items-center justify-center mx-auto mb-6">
-        <ShoppingBag className="w-12 h-12 text-gray-400" />
-      </div>
-      <h2 className="text-2xl font-serif text-dark mb-4">Your Cart is Empty</h2>
-      <p className="text-gray-600 mb-8 leading-relaxed">
-        Discover our premium collection and start adding products to your cart.
-      </p>
-      <Link to="/products">
-        <Button className="bg-dark text-white hover:bg-canyon transition-colors duration-200 px-8 py-3">
-          Start Shopping
-          <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
-        </Button>
-      </Link>
-    </div>
-  </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-16"
+            >
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 bg-creme-light rounded-full flex items-center justify-center mx-auto mb-6">
+                  <ShoppingBag className="w-12 h-12 text-coyote" />
+                </div>
+                <h2 className="medium-title text-dark mb-4">Your Cart is Empty</h2>
+                <p className="text text-dark/70 mb-8 leading-relaxed">
+                  Discover our premium collection and start adding products to your cart.
+                </p>
+                <Link to="/products">
+                  <Button className="bg-dark text-creme-light hover:bg-canyon transition-colors duration-300 px-8 py-3">
+                    Start Shopping
+                    <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
 );
 
 export default function CartPage() {
@@ -160,37 +160,19 @@ export default function CartPage() {
         <meta name="description" content="Review your items before checkout" />
       </Helmet>
 
-      <div className="min-h-screen bg-creme">
-        {/* Header */}
+      <div className="min-h-screen bg-creme pt-24 pb-12">
         <div className="main-container">
-          <div className="py-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-8"
-            >
-              <h1 className="main-title text-dark mb-4">
-                Shopping Cart
-                {totalItems > 0 && (
-                  <span className="text-canyon"> ({totalItems} {totalItems === 1 ? 'item' : 'items'})</span>
-                )}
-              </h1>
-              <div className="w-16 h-0.5 bg-canyon mx-auto"></div>
-            </motion.div>
-
-            {/* Breadcrumb */}
-            <nav className="flex items-center justify-center space-x-2 text-sm text-dark/60 mb-8">
-              <Link to="/" className="hover:text-dark transition-colors">Home</Link>
-              <span>/</span>
-              <Link to="/products" className="hover:text-dark transition-colors">Products</Link>
-              <span>/</span>
-              <span>Cart</span>
-            </nav>
+          {/* Page Header */}
+          <div className="text-center mb-12">
+            <h1 className="main-title text-dark mb-6 max-w-4xl mx-auto">
+              Shopping Cart
+              {totalItems > 0 && (
+                <span className="text-canyon"> ({totalItems} {totalItems === 1 ? 'item' : 'items'})</span>
+              )}
+            </h1>
           </div>
-        </div>
 
         {/* Content */}
-        <div className="main-container pb-16">
           {items.length === 0 ? (
             <EmptyCart />
           ) : (
@@ -200,7 +182,7 @@ export default function CartPage() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="space-y-4"
+                  className="space-y-6"
                 >
                   <AnimatePresence mode="popLayout">
                     {items.map((item, index) => (
@@ -218,7 +200,7 @@ export default function CartPage() {
                 {/* Continue Shopping */}
                 <div className="mt-8">
                   <Link to="/products">
-                    <Button variant="outline" className="border-dark text-dark hover:bg-dark hover:text-white">
+                    <Button variant="outline" className="border-coyote text-dark hover:bg-dark hover:text-creme-light transition-colors duration-300">
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Continue Shopping
                     </Button>
@@ -231,39 +213,39 @@ export default function CartPage() {
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="bg-white rounded-lg shadow-md p-6 sticky top-8"
+                  className="bg-white rounded-xl shadow-lg p-6 sticky top-8 border border-coyote/20"
                 >
-                  <h2 className="text-xl font-semibold text-dark mb-6 flex items-center">
-                    <Package className="w-5 h-5 mr-2" />
+                  <h2 className="font-medium text-dark text-lg mb-6 flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-canyon" />
                     Order Summary
                   </h2>
 
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Subtotal ({totalItems} items)</span>
-                      <span className="font-semibold text-dark">₹{formatIndianPrice(totalPrice)}</span>
+                      <span className="text-dark/70">Subtotal ({totalItems} items)</span>
+                      <span className="font-medium text-dark">₹{formatIndianPrice(totalPrice)}</span>
                     </div>
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Shipping</span>
-                      <span className="text-green-600 font-medium">Free</span>
+                      <span className="text-dark/70">Shipping</span>
+                      <span className="text-canyon font-medium">Free</span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Tax</span>
-                      <span className="text-gray-600">Calculated at checkout</span>
+                      <span className="text-dark/70">Tax</span>
+                      <span className="text-dark/70">Calculated at checkout</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-200 pt-4 mb-6">
+                  <div className="border-t border-coyote/20 pt-4 mb-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold text-dark">Total</span>
+                      <span className="text-lg font-medium text-dark">Total</span>
                       <span className="text-xl font-bold text-dark">₹{formatIndianPrice(totalPrice)}</span>
                     </div>
                   </div>
 
                   <Button 
-                    className="w-full bg-dark text-white hover:bg-canyon transition-colors duration-200 py-3 text-lg"
+                    className="w-full bg-canyon text-creme-light hover:bg-dark transition-colors duration-300 py-3 text-lg font-medium"
                     disabled={isLoading}
                     onClick={() => {
                       if (user) {
@@ -279,7 +261,7 @@ export default function CartPage() {
 
                   {/* Security Badge */}
                   <div className="mt-4 text-center">
-                    <p className="text-xs text-gray-500 flex items-center justify-center">
+                    <p className="text-xs text-dark/60 flex items-center justify-center">
                       <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                       </svg>

@@ -266,6 +266,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Update UI immediately
     setItems(newItems);
     
+    // Dispatch event to auto-show mini cart
+    window.dispatchEvent(new CustomEvent('cartItemAdded'));
+    
     // Save in background
     try {
       if (!user) {

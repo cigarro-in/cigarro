@@ -14,7 +14,6 @@ const formatIndianPrice = (priceINR: number): string => {
 
 export function FeaturedProducts() {
   const { addToCart, isLoading } = useCart();
-  const { isWishlisted, toggleWishlist } = useWishlist();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -86,10 +85,10 @@ export function FeaturedProducts() {
   }
 
   return (
-    <section className="py-12 bg-creme min-h-screen flex items-center">
-      <div className="w-full max-w-none px-4">
+    <section className="py-16 bg-creme min-h-screen flex items-center">
+      <div className="w-full">
         {/* Section Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-12 px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -103,26 +102,28 @@ export function FeaturedProducts() {
           </motion.div>
         </div>
 
-        {/* Products Grid - Using new ProductCard component */}
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Products Grid - Full Width with Custom Layout */}
+        <div className="w-[90%] mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full">
             {featuredProducts.slice(0, 3).map((product, index) => (
-              <ProductCard
+              <div 
                 key={product.id}
-                product={product}
-                variant={index === 1 ? 'featured' : 'default'} // Make center product featured
-                onAddToCart={handleAddToCart}
-                onToggleWishlist={toggleWishlist}
-                isWishlisted={isWishlisted(product.id)}
-                isLoading={isLoading}
-                index={index}
-              />
+                className={`${index === 1 ? 'scale-110 z-10' : 'flex-1'}`}
+              >
+                <ProductCard
+                  product={product}
+                  variant={index === 1 ? 'featured' : 'default'} // Make center product featured
+                  onAddToCart={handleAddToCart}
+                  isLoading={isLoading}
+                  index={index}
+                />
+              </div>
             ))}
           </div>
         </div>
 
         {/* View All Button */}
-        <div className="text-center mt-8">
+        <div className="text-center mt-12 px-4">
           <Link 
             to="/products" 
             className="btn-primary inline-flex items-center px-8 py-3"

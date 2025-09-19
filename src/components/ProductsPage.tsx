@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../utils/supabase/client';
 import { Product } from '../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from './ProductCard';
 import { Button } from './ui/button';
-import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, List, Search } from 'lucide-react';
+import { Checkbox } from './ui/checkbox';
+import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Search } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
 import { useWishlist } from '../hooks/useWishlist';
 import { formatINR } from '../utils/currency';
@@ -36,7 +38,7 @@ export function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('name');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -53,11 +55,9 @@ export function ProductsPage() {
   const [selectedPriceRange, setSelectedPriceRange] = useState<string[]>([]);
   
   // Loading states
-  const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   const { addToCart, isLoading: cartLoading } = useCart();
-  const { isWishlisted, toggleWishlist } = useWishlist();
 
   const productsPerPage = 12;
   
@@ -120,33 +120,15 @@ export function ProductsPage() {
   useEffect(() => {
     const sections: FilterSection[] = [
       {
-        id: 'styles',
-        name: 'STYLES',
-        items: ['Pendant Light', 'Multi Light', 'Wall Mount', 'Ceiling Light', 'Stone', 'Linear', 'Free-Standing', 'Built-in', 'Objects', 'Tala bulbs'],
-        isExpanded: filterSections.find(s => s.id === 'styles')?.isExpanded ?? false
-      },
-      {
-        id: 'moods',
-        name: 'MOODS',
-        items: ['Minimalist', 'Contemporary', 'Scandinavian', 'Organic', 'Post Modern', 'Farmhouse', 'Luxe'],
-        isExpanded: filterSections.find(s => s.id === 'moods')?.isExpanded ?? false
-      },
-      {
-        id: 'collections',
-        name: 'COLLECTIONS',
-        items: ['Stone', 'Pivoine', 'Onyx', 'Coquelicot', 'Danoise', 'Flora', 'Nomad', 'Luxe', 'Nopal', 'Linear', 'Quick Ship', 'Classics', 'Chrome', 'Hospitality', 'Outdoor'],
-        isExpanded: filterSections.find(s => s.id === 'collections')?.isExpanded ?? true
-      },
-      {
-        id: 'rooms',
-        name: 'ROOMS',
-        items: ['Living Room', 'Kitchen', 'Dining room', 'Bathroom', 'Bedroom', 'Entrance Hall', 'Corridor', 'Exterior', 'Staircase'],
-        isExpanded: filterSections.find(s => s.id === 'rooms')?.isExpanded ?? false
+        id: 'categories',
+        name: 'CATEGORIES',
+        items: categories.map(c => c.name),
+        isExpanded: filterSections.find(s => s.id === 'categories')?.isExpanded ?? true
       },
       {
         id: 'brands',
         name: 'BRANDS',
-        items: brands.map(b => `${b.brand} (${b.count})`),
+        items: brands.map(b => b.brand),
         isExpanded: filterSections.find(s => s.id === 'brands')?.isExpanded ?? false
       },
       {
@@ -172,12 +154,6 @@ export function ProductsPage() {
         name: 'PRICE RANGE',
         items: ['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', '₹2000 - ₹5000', 'Above ₹5000'],
         isExpanded: filterSections.find(s => s.id === 'price-range')?.isExpanded ?? false
-      },
-      {
-        id: 'quick-ship',
-        name: 'QUICK SHIP',
-        items: ['Quick ship'],
-        isExpanded: filterSections.find(s => s.id === 'quick-ship')?.isExpanded ?? false
       }
     ].filter(section => section.items.length > 0); // Only show sections with items
     
@@ -262,9 +238,7 @@ export function ProductsPage() {
   };
 
   const fetchProducts = async () => {
-    setIsFilterLoading(true);
     try {
-      console.log('Fetching products...');
       let query = supabase
         .from('products')
         .select(`
@@ -283,6 +257,7 @@ export function ProductsPage() {
 
       // Apply category filter
       if (selectedCategories.length > 0) {
+        // For categories with nested relationships, we need to use the correct syntax
         query = query.in('product_categories.categories.name', selectedCategories);
       }
 
@@ -330,6 +305,7 @@ export function ProductsPage() {
         }
       }
 
+
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
@@ -337,13 +313,11 @@ export function ProductsPage() {
         throw error;
       }
       
-      console.log('Products loaded:', data?.length || 0);
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');
     } finally {
-      setIsFilterLoading(false);
       setIsLoading(false); // Add this line to fix the loading issue
     }
   };
@@ -357,7 +331,6 @@ export function ProductsPage() {
     }
   };
 
-
   const toggleFilterSection = (sectionId: string) => {
     setFilterSections(prev => 
       prev.map(section => 
@@ -370,28 +343,13 @@ export function ProductsPage() {
 
   const handleFilterChange = (filterType: string, value: string, checked: boolean) => {
     switch (filterType) {
-      case 'styles':
+      case 'categories':
         setSelectedCategories(prev => 
           checked ? [...prev, value] : prev.filter(item => item !== value)
         );
         break;
-      case 'moods':
-        setSelectedBrands(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'collections':
-        setSelectedOrigins(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'rooms':
-        setSelectedStrengths(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
       case 'brands':
-        setSelectedPackSizes(prev => 
+        setSelectedBrands(prev => 
           checked ? [...prev, value] : prev.filter(item => item !== value)
         );
         break;
@@ -415,12 +373,20 @@ export function ProductsPage() {
           checked ? [...prev, value] : prev.filter(item => item !== value)
         );
         break;
-      case 'quick-ship':
-        setSelectedPriceRange(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
+      default:
         break;
     }
+  };
+
+  const resetAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedBrands([]);
+    setSelectedOrigins([]);
+    setSelectedStrengths([]);
+    setSelectedPackSizes([]);
+    setSelectedPriceRange([]);
+    setSearchQuery('');
+    setCurrentPage(1);
   };
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -464,7 +430,7 @@ export function ProductsPage() {
         <meta name="description" content="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands." />
       </Helmet>
 
-      <div className="min-h-screen bg-creme">
+      <div className="min-h-screen bg-creme pb-16">
         {/* Main Title - Exact Inspiration Style */}
         <div className="main-container">
           <div className="title-wrapper text-center py-16">
@@ -473,11 +439,14 @@ export function ProductsPage() {
         </div>
 
         {/* Product Count and View Options - Exact Inspiration Style */}
-        <div className="main-container mb-8">
+        <div className="main-container mb-8 pl-4">
           <div className="flex justify-between items-center">
-            <div className="text-dark font-sans font-medium text-lg uppercase tracking-wide">
-              {sortedProducts.length} PRODUCTS
-            </div>
+            <button
+              onClick={resetAllFilters}
+              className="bg-dark text-creme-light hover:bg-canyon transition-all duration-300 font-medium text-sm uppercase tracking-wide px-4 py-2 rounded-full"
+            >
+              Show Everything
+            </button>
             <div className="flex items-center gap-4">
               <span className="text-dark font-sans font-medium text-lg uppercase tracking-wide">VIEW</span>
               <div className="flex gap-2">
@@ -488,10 +457,10 @@ export function ProductsPage() {
                   <Grid3X3 className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-dark text-creme-light' : 'bg-creme-light text-dark border border-coyote'}`}
+                  onClick={() => setViewMode('two-col')}
+                  className={`p-2 rounded ${viewMode === 'two-col' ? 'bg-dark text-creme-light' : 'bg-creme-light text-dark border border-coyote'}`}
                 >
-                  <List className="w-5 h-5" />
+                  <Grid2X2 className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -513,13 +482,13 @@ export function ProductsPage() {
 
           <div className="flex gap-8">
             {/* Desktop Sidebar - Filters */}
-            <div className="hidden lg:block w-80 flex-shrink-0">
+            <div className="hidden lg:block w-72 flex-shrink-0 pl-4">
               <div className="space-y-0">
                 {filterSections.map((section, index) => (
-                  <div key={section.id} className={`${index > 0 ? 'border-t border-coyote/30 pt-6' : ''}`}>
+                  <div key={section.id} className={`${index > 0 ? 'border-t border-coyote/30 pt-4' : ''}`}>
                     <button
                       onClick={() => toggleFilterSection(section.id)}
-                      className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-4"
+                      className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-2"
                     >
                       <span>{section.name}</span>
                       {section.isExpanded ? (
@@ -530,22 +499,14 @@ export function ProductsPage() {
                     </button>
                     
                     {section.isExpanded && (
-                      <div className="space-y-2">
+                      <div className="space-y-1 pb-3">
                         {section.items.map((item, itemIndex) => {
-                          // Extract brand name from "Brand (count)" format
-                          const displayValue = section.id === 'brands' ? item.split(' (')[0] : item;
                           const isChecked = (() => {
                             switch (section.id) {
-                              case 'styles':
+                              case 'categories':
                                 return selectedCategories.includes(item);
-                              case 'moods':
-                                return selectedBrands.includes(item);
-                              case 'collections':
-                                return selectedOrigins.includes(item);
-                              case 'rooms':
-                                return selectedStrengths.includes(item);
                               case 'brands':
-                                return selectedPackSizes.includes(displayValue);
+                                return selectedBrands.includes(item);
                               case 'origins':
                                 return selectedOrigins.includes(item);
                               case 'strengths':
@@ -554,22 +515,26 @@ export function ProductsPage() {
                                 return selectedPackSizes.includes(item);
                               case 'price-range':
                                 return selectedPriceRange.includes(item);
-                              case 'quick-ship':
-                                return selectedPriceRange.includes(item);
                               default:
                                 return false;
                             }
                           })();
 
                           return (
-                            <label key={itemIndex} className="flex items-center cursor-pointer">
-                              <input
-                                type="checkbox"
+                            <label 
+                              key={itemIndex} 
+                              htmlFor={`${section.id}-${itemIndex}`}
+                              className="flex items-center space-x-3 cursor-pointer hover:bg-creme/30 rounded-md p-1 -m-1 transition-colors"
+                            >
+                              <Checkbox
+                                id={`${section.id}-${itemIndex}`}
                                 checked={isChecked}
-                                onChange={(e) => handleFilterChange(section.id, displayValue, e.target.checked)}
-                                className="mr-3 w-4 h-4 text-dark border-coyote rounded focus:ring-dark"
+                                onCheckedChange={(checked: boolean) => handleFilterChange(section.id, item, !!checked)}
+                                className="border-coyote/30 data-[state=checked]:bg-canyon data-[state=checked]:border-canyon"
                               />
-                              <span className="text-dark font-sans text-base">{item}</span>
+                              <span className="text-dark font-sans text-base">
+                                {item}
+                              </span>
                             </label>
                           );
                         })}
@@ -594,12 +559,12 @@ export function ProductsPage() {
                     </button>
                   </div>
                   
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {filterSections.map((section, index) => (
-                      <div key={section.id} className={`${index > 0 ? 'border-t border-coyote/30 pt-6' : ''}`}>
+                      <div key={section.id} className={`${index > 0 ? 'border-t border-coyote/30 pt-4' : ''}`}>
                         <button
                           onClick={() => toggleFilterSection(section.id)}
-                          className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-4"
+                          className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-2"
                         >
                           <span>{section.name}</span>
                           {section.isExpanded ? (
@@ -610,21 +575,14 @@ export function ProductsPage() {
                         </button>
                         
                         {section.isExpanded && (
-                          <div className="space-y-2">
+                          <div className="space-y-1 pb-3">
                             {section.items.map((item, itemIndex) => {
-                              const displayValue = section.id === 'brands' ? item.split(' (')[0] : item;
                               const isChecked = (() => {
                                 switch (section.id) {
-                                  case 'styles':
+                                  case 'categories':
                                     return selectedCategories.includes(item);
-                                  case 'moods':
-                                    return selectedBrands.includes(item);
-                                  case 'collections':
-                                    return selectedOrigins.includes(item);
-                                  case 'rooms':
-                                    return selectedStrengths.includes(item);
                                   case 'brands':
-                                    return selectedPackSizes.includes(displayValue);
+                                    return selectedBrands.includes(item);
                                   case 'origins':
                                     return selectedOrigins.includes(item);
                                   case 'strengths':
@@ -633,22 +591,26 @@ export function ProductsPage() {
                                     return selectedPackSizes.includes(item);
                                   case 'price-range':
                                     return selectedPriceRange.includes(item);
-                                  case 'quick-ship':
-                                    return selectedPriceRange.includes(item);
                                   default:
                                     return false;
                                 }
                               })();
 
                               return (
-                                <label key={itemIndex} className="flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
+                                <label 
+                                  key={itemIndex} 
+                                  htmlFor={`mobile-${section.id}-${itemIndex}`}
+                                  className="flex items-center space-x-3 cursor-pointer hover:bg-creme/30 rounded-md p-1 -m-1 transition-colors"
+                                >
+                                  <Checkbox
+                                    id={`mobile-${section.id}-${itemIndex}`}
                                     checked={isChecked}
-                                    onChange={(e) => handleFilterChange(section.id, displayValue, e.target.checked)}
-                                    className="mr-3 w-4 h-4 text-dark border-coyote rounded focus:ring-dark"
+                                    onCheckedChange={(checked: boolean) => handleFilterChange(section.id, item, !!checked)}
+                                    className="border-coyote/30 data-[state=checked]:bg-canyon data-[state=checked]:border-canyon"
                                   />
-                                  <span className="text-dark font-sans text-base">{item}</span>
+                                  <span className="text-dark font-sans text-base">
+                                    {item}
+                                  </span>
                                 </label>
                               );
                             })}
@@ -663,15 +625,6 @@ export function ProductsPage() {
 
             {/* Products Grid */}
           <div className="flex-1 relative">
-            {/* Subtle loading overlay */}
-            {isFilterLoading && (
-              <div className="absolute inset-0 bg-creme/50 backdrop-blur-sm z-10 flex items-center justify-center">
-                <div className="bg-white rounded-lg p-4 shadow-lg flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-dark"></div>
-                  <span className="text-dark font-sans text-sm">Filtering products...</span>
-                </div>
-              </div>
-            )}
 
             {paginatedProducts.length === 0 ? (
               <div className="text-center py-16">
@@ -680,20 +633,38 @@ export function ProductsPage() {
                 <p className="text-dark/80 mb-8">We couldn't find any products matching your criteria.</p>
               </div>
             ) : (
-              <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'space-y-4'}`}>
-                {paginatedProducts.map((product, index) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    variant={viewMode === 'list' ? 'list' : 'default'}
-                    onAddToCart={handleAddToCart}
-                    onToggleWishlist={toggleWishlist}
-                    isWishlisted={isWishlisted(product.id)}
-                    isLoading={cartLoading}
-                    index={index}
-                  />
-                ))}
-              </div>
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'grid grid-cols-1 sm:grid-cols-2 gap-6'}`}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  key={`products-${selectedCategories.join(',')}-${selectedBrands.join(',')}-${selectedOrigins.join(',')}-${selectedStrengths.join(',')}-${selectedPackSizes.join(',')}-${selectedPriceRange.join(',')}-${searchQuery}-${currentPage}`}
+                >
+                  {paginatedProducts.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -30 }}
+                      transition={{ 
+                        duration: 0.4, 
+                        delay: index * 0.08,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      <ProductCard
+                        product={product}
+                        variant="default"
+                        onAddToCart={handleAddToCart}
+                        isLoading={cartLoading}
+                        index={index}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </AnimatePresence>
             )}
 
             {/* Pagination */}

@@ -63,3 +63,4 @@ CREATE TRIGGER update_user_wishlists_updated_at_trigger
     BEFORE UPDATE ON public.user_wishlists
     FOR EACH ROW
     EXECUTE FUNCTION public.update_user_wishlists_updated_at();
+

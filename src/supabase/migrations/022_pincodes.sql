@@ -99,3 +99,4 @@ WHERE is_servicable = true;
 
 -- Grant access to the view
 GRANT SELECT ON pincode_lookup TO anon, authenticated;
+

@@ -384,3 +384,4 @@ export class RateLimiter {
 // Export rate limiter instance for common use cases
 export const authRateLimiter = new RateLimiter(5, 15 * 60 * 1000); // 5 attempts per 15 minutes
 export const apiRateLimiter = new RateLimiter(100, 60 * 1000); // 100 requests per minute
+

@@ -9,8 +9,8 @@ const Hero = () => {
       id: 0,
       suptitle: "Platinum Collection - Coming Soon - 18/12/25",
       title: "Premium. Luxury. Two worlds that meet in perfect harmony.",
-      image: "/images/inspiration/DSC01551-2_1.webp",
-      mobileImage: "/images/inspiration/DSC01551-2.webp",
+      image: "/images/Jawan1.jpg",
+      mobileImage: "/images/Jawan1.jpg",
       smallImage: "/images/inspiration/cover-1.webp",
       button: null
     },

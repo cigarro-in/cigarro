@@ -71,15 +71,10 @@ export function BlogSection() {
     <section className="py-12 bg-creme min-h-screen flex items-center">
       <div className="main-container w-full">
         {/* Section Header */}
-        <div className="text-center mb-12">
-          <div className="suptitle text-canyon mb-6">From Our Journal</div>
-          <h2 className="medium-title text-dark mb-8 max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="main-title text-dark mb-6 max-w-4xl mx-auto">
             Stories of Craftsmanship & Heritage
           </h2>
-          <p className="text text-dark/80 max-w-3xl mx-auto leading-relaxed">
-            Dive deep into the world of premium tobacco with our curated articles covering everything 
-            from traditional craftsmanship to modern innovations and lifestyle insights.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
