@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from './button';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageSelectorModal } from './ImageSelectorModal';
+
 interface ImageUploadProps {
   imageUrl: string | null;
   onImageUrlChange: (url: string | null) => void;
+  showSelector?: boolean;
+  title?: string;
+  description?: string;
 }
 
-export function ImageUpload({ imageUrl, onImageUrlChange }: ImageUploadProps) {
+export function ImageUpload({ 
+  imageUrl, 
+  onImageUrlChange, 
+  showSelector = false, 
+  title, 
+  description 
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [showSelectorModal, setShowSelectorModal] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
@@ -72,31 +84,65 @@ export function ImageUpload({ imageUrl, onImageUrlChange }: ImageUploadProps) {
             alt="Uploaded image"
             className="w-full max-h-96 object-contain rounded-md"
           />
-          <Button
-            variant="destructive"
-            size="sm"
-            className="absolute top-2 right-2"
-            onClick={() => onImageUrlChange(null)}
-          >
-            <X className="w-4 h-4" />
-          </Button>
+          <div className="absolute top-2 right-2 flex gap-2">
+            {showSelector && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowSelectorModal(true)}
+                title="Change image"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => onImageUrlChange(null)}
+              title="Remove image"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="w-full max-h-96 border-2 border-dashed border-border/20 rounded-md flex items-center justify-center">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              disabled={uploading}
-              className="hidden"
-            />
-            <div className="flex flex-col items-center space-y-2 text-muted-foreground">
-              <Upload className="w-8 h-8" />
-              <span>{uploading ? 'Uploading...' : 'Upload an image'}</span>
-            </div>
-          </label>
+          {showSelector ? (
+            <Button
+              variant="outline"
+              onClick={() => setShowSelectorModal(true)}
+              className="h-full w-full flex flex-col items-center space-y-2"
+            >
+              <ImageIcon className="w-8 h-8" />
+              <span>Select or Upload Image</span>
+            </Button>
+          ) : (
+            <label className="cursor-pointer h-full w-full flex items-center justify-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={uploading}
+                className="hidden"
+              />
+              <div className="flex flex-col items-center space-y-2 text-muted-foreground">
+                <Upload className="w-8 h-8" />
+                <span>{uploading ? 'Uploading...' : 'Upload an image'}</span>
+              </div>
+            </label>
+          )}
         </div>
+      )}
+
+      {showSelector && (
+        <ImageSelectorModal
+          open={showSelectorModal}
+          onOpenChange={setShowSelectorModal}
+          onImageSelect={onImageUrlChange}
+          currentImageUrl={imageUrl}
+          title={title}
+          description={description}
+        />
       )}
     </div>
   );

@@ -2,18 +2,29 @@ import { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from './button';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { ImageSelectorModal } from './ImageSelectorModal';
 
 interface ImageUploadProps {
   imageUrls: string[];
   onImageUrlsChange: (urls: string[]) => void;
+  showSelector?: boolean;
+  title?: string;
+  description?: string;
 }
 
-export function MultipleImageUpload({ imageUrls, onImageUrlsChange }: ImageUploadProps) {
+export function MultipleImageUpload({ 
+  imageUrls, 
+  onImageUrlsChange, 
+  showSelector = false, 
+  title, 
+  description 
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [showSelectorModal, setShowSelectorModal] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
@@ -86,6 +97,15 @@ export function MultipleImageUpload({ imageUrls, onImageUrlsChange }: ImageUploa
     onImageUrlsChange(newImageUrls);
   };
 
+  const handleImageSelect = (imageUrl: string) => {
+    if (imageUrls.length >= 10) {
+      toast.error('Maximum 10 images allowed');
+      return;
+    }
+    onImageUrlsChange([...imageUrls, imageUrl]);
+    setShowSelectorModal(false);
+  };
+
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) {
       return;
@@ -148,26 +168,47 @@ export function MultipleImageUpload({ imageUrls, onImageUrlsChange }: ImageUploa
               {provided.placeholder}
               {imageUrls.length < 10 && (
                 <div className="w-20 h-20 border-2 border-dashed border-border/20 rounded-md flex items-center justify-center flex-shrink-0">
-                  <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      disabled={uploading}
-                      className="hidden"
-                      multiple
-                    />
-                    <div className="flex flex-col items-center space-y-1 text-muted-foreground">
-                      <Upload className="w-6 h-6" />
-                      <span className="text-xs">{uploading ? 'Uploading...' : 'Add'}</span>
-                    </div>
-                  </label>
+                  {showSelector ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowSelectorModal(true)}
+                      className="w-full h-full flex flex-col items-center justify-center p-0"
+                    >
+                      <ImageIcon className="w-6 h-6" />
+                      <span className="text-xs">Select</span>
+                    </Button>
+                  ) : (
+                    <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        disabled={uploading}
+                        className="hidden"
+                        multiple
+                      />
+                      <div className="flex flex-col items-center space-y-1 text-muted-foreground">
+                        <Upload className="w-6 h-6" />
+                        <span className="text-xs">{uploading ? 'Uploading...' : 'Add'}</span>
+                      </div>
+                    </label>
+                  )}
                 </div>
               )}
             </div>
           )}
         </Droppable>
       </DragDropContext>
+
+      {showSelector && (
+        <ImageSelectorModal
+          open={showSelectorModal}
+          onOpenChange={setShowSelectorModal}
+          onImageSelect={handleImageSelect}
+          title={title || "Select Product Image"}
+          description={description || "Choose an image from your library or upload a new one"}
+        />
+      )}
     </div>
   );
 }

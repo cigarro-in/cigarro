@@ -13,6 +13,7 @@ import { formatINR } from '../utils/currency';
 import { searchProductsEnhanced } from '../utils/search';
 import { SearchResult } from '../types/variants';
 import Fuse from 'fuse.js';
+import { getProductImageUrl } from '../utils/supabase/storage';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -541,12 +542,12 @@ const Header = () => {
                             {/* Product Image */}
                             <div className="flex-shrink-0">
                               <img
-                                src={result.gallery_images?.[0] || '/images/inspiration/product-placeholder.webp'}
+                                src={getProductImageUrl(result.gallery_images?.[0])}
                                 alt={result.name}
                                 className="w-16 h-16 rounded-lg object-cover bg-white"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  target.src = "/images/inspiration/product-placeholder.webp";
+                                  target.src = getProductImageUrl();
                                 }}
                               />
                             </div>

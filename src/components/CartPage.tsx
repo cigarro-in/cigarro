@@ -9,6 +9,7 @@ import { formatINR } from '../utils/currency';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { AuthDialog } from './AuthDialog';
+import { getProductImageUrl } from '../utils/supabase/storage';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -60,7 +61,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
           {/* Product Image */}
           <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-creme-light rounded-lg overflow-hidden flex-shrink-0">
             <img
-              src={!imageError ? (item.gallery_images?.[0] || '/images/inspiration/product-placeholder.webp') : '/images/inspiration/product-placeholder.webp'}
+              src={!imageError ? getProductImageUrl(item.gallery_images?.[0]) : getProductImageUrl()}
               alt={item.name}
               onError={() => setImageError(true)}
               className="w-full h-full object-cover"

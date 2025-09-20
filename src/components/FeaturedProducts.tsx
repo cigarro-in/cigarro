@@ -22,50 +22,16 @@ export function FeaturedProducts() {
 
   const fetchFeaturedProducts = async () => {
     try {
-      const { data: sectionData, error: sectionError } = await supabase
-        .from('homepage_sections')
-        .select('id')
-        .eq('slug', 'featured-collection')
-        .single();
-
-      if (sectionError) throw sectionError;
-      if (!sectionData) return;
-
-      const { data: categoryLinkData, error: categoryLinkError } = await supabase
-        .from('homepage_section_categories')
-        .select('category_id')
-        .eq('section_id', sectionData.id);
-
-      if (categoryLinkError) throw categoryLinkError;
-      const categoryIds = categoryLinkData.map(link => link.category_id);
-      if (categoryIds.length === 0) return;
-
-      const { data: productCategoryData, error: productCategoryError } = await supabase
-        .from('product_categories')
-        .select('product_id, order')
-        .in('category_id', categoryIds);
-
-      if (productCategoryError) throw productCategoryError;
-      
-      const orderedProductIds = productCategoryData
-        .sort((a, b) => a.order - b.order)
-        .map(link => link.product_id);
-
-      if (orderedProductIds.length === 0) return;
-
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
-        .in('id', orderedProductIds)
+        .eq('is_featured', true)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
         .limit(3);
 
       if (productsError) throw productsError;
-
-      const sortedProducts = orderedProductIds
-        .map(id => products?.find(p => p.id === id))
-        .filter(Boolean) as Product[];
-
-      setFeaturedProducts(sortedProducts);
+      setFeaturedProducts(products || []);
     } catch (error) {
       console.error('Error fetching featured products:', error);
     }

@@ -1,7 +1,50 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { getBrandHeritageImageUrl } from '../utils/supabase/storage';
+import { supabase } from '../utils/supabase/client';
 
 export function BrandHeritage() {
+  const [sectionData, setSectionData] = useState({
+    title: 'Our Heritage',
+    subtitle: 'Crafting Excellence Since 1847',
+    description: 'For over two centuries, our master craftsmen have perfected the art of tobacco curation, selecting only the finest leaves from the most prestigious plantations around the world.',
+    backgroundImage: getBrandHeritageImageUrl('DSC07229_FULL_1.webp'),
+    buttonText: 'Learn More',
+    buttonUrl: '/about'
+  });
+
+  useEffect(() => {
+    loadSectionData();
+  }, []);
+
+  const loadSectionData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('section_configurations')
+        .select('*')
+        .eq('section_name', 'brand_heritage')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading brand heritage data:', error);
+        return;
+      }
+
+      if (data) {
+        setSectionData({
+          title: data.title || 'Our Heritage',
+          subtitle: data.subtitle || 'Crafting Excellence Since 1847',
+          description: data.description || 'For over two centuries, our master craftsmen have perfected the art of tobacco curation, selecting only the finest leaves from the most prestigious plantations around the world.',
+          backgroundImage: data.background_image ? getBrandHeritageImageUrl(data.background_image) : getBrandHeritageImageUrl('DSC07229_FULL_1.webp'),
+          buttonText: data.button_text || 'Learn More',
+          buttonUrl: data.button_url || '/about'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading brand heritage data:', error);
+    }
+  };
+
   return (
     <section className="py-12 bg-creme min-h-screen flex items-center">
       <div className="w-full max-w-none px-4">
@@ -15,17 +58,16 @@ export function BrandHeritage() {
             className="space-y-8"
           >
             <div>
-              <div className="suptitle text-canyon mb-6">Our Heritage</div>
+              <div className="suptitle text-canyon mb-6">{sectionData.title}</div>
               <h2 className="medium-title text-dark mb-8">
-                Crafting Excellence Since 1847
+                {sectionData.subtitle}
               </h2>
               <div className="w-16 h-1 bg-canyon mb-8"></div>
             </div>
 
             <div className="space-y-6 text text-dark/80 leading-relaxed">
               <p className="text-lg text-dark">
-                For over two centuries, our master craftsmen have perfected the art of tobacco curation, 
-                selecting only the finest leaves from the most prestigious plantations around the world.
+                {sectionData.description}
               </p>
               
               <p>
@@ -77,8 +119,8 @@ export function BrandHeritage() {
             </div>
 
             <div className="pt-8">
-              <a href="/about" className="btn-primary inline-flex items-center">
-                Our Story
+              <a href={sectionData.buttonUrl} className="btn-primary inline-flex items-center">
+                {sectionData.buttonText}
               </a>
             </div>
           </motion.div>
@@ -93,7 +135,7 @@ export function BrandHeritage() {
           >
             <div className="relative group">
               <img 
-                src="/images/inspiration/DSC07229_FULL_1.webp" 
+                src={sectionData.backgroundImage} 
                 alt="Tobacco craftsmanship"
                 className="w-full aspect-[4/5] object-cover rounded-lg group-hover:scale-105 transition-transform duration-700"
               />

@@ -116,15 +116,25 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (error: any) {
-      // Sanitized error messages for production
-      if (error?.message?.includes('Password should be at least')) {
+      // Enhanced error handling for better user experience
+      const errorMessage = error?.message || '';
+      
+      if (errorMessage.includes('Password should be at least')) {
         toast.error('Password must be at least 6 characters long');
-      } else if (error?.message?.includes('Database error saving new user') || 
-                 error?.message?.includes('Email address already in use')) {
+      } else if (errorMessage.includes('Email address already in use') || 
+                 errorMessage.includes('User already registered')) {
         toast.error('This email is already registered. Please sign in instead.');
+      } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
+        toast.error('Please enter a valid email address. Try using a real email format like user@example.com');
+      } else if (errorMessage.includes('SignUp not allowed for new users')) {
+        toast.error('New user registration is currently disabled. Please contact support.');
+      } else if (errorMessage.includes('Only an email address is accepted as an email') || 
+                 errorMessage.includes('Email address') && errorMessage.includes('invalid')) {
+        toast.error('Please use a valid email address. Avoid generic test emails.');
       } else {
-        // Generic error message to prevent information disclosure
-        toast.error('Failed to create account. Please try again.');
+        // Log the full error for debugging while showing a generic message
+        console.error('Signup error details:', error);
+        toast.error('Failed to create account. Please try again or contact support.');
       }
     } finally {
       setIsLoading(false);

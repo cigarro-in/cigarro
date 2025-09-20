@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatINR } from '../utils/currency';
 import { AuthDialog } from './AuthDialog';
+import { getProductImageUrl } from '../utils/supabase/storage';
 
 interface MiniCartProps {
   isVisible: boolean;
@@ -78,7 +79,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                         {/* Product Image */}
                         <div className="mini-cart__product-image-container flex-shrink-0">
                           <img
-                            src={item.gallery_images?.[0] || item.image || '/images/inspiration/product-placeholder.webp'}
+                            src={getProductImageUrl(item.gallery_images?.[0] || item.image)}
                             alt={item.name}
                             className="mini-cart__product-image w-[68px] h-[71px] rounded-[5px] bg-white block object-cover"
                           />

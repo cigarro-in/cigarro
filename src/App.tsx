@@ -2,6 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AgeVerification } from './components/AgeVerification';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import { FeaturedProducts } from './components/FeaturedProducts';
@@ -22,7 +23,7 @@ import { supabase } from './utils/supabase/client';
 const CheckoutPage = lazy(() => import('./components/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
 const UPIPaymentPage = lazy(() => import('./components/UPIPaymentPage').then(m => ({ default: m.UPIPaymentPage })));
 const CartPage = lazy(() => import('./components/CartPage'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboardNew').then(m => ({ default: m.AdminDashboardNew })));
 const OrdersPage = lazy(() => import('./components/OrdersPage').then(m => ({ default: m.OrdersPage })));
 const ProductPage = lazy(() => import('./components/ProductPage').then(m => ({ default: m.ProductPage })));
 const CollectionsPage = lazy(() => import('./components/CollectionsPage').then(m => ({ default: m.CollectionsPage })));
@@ -157,14 +158,16 @@ function AppContent() {
 
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <WishlistProvider>
-          <CartProvider>
-            <AppContent />
-          </CartProvider>
-        </WishlistProvider>
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <AppContent />
+            </CartProvider>
+          </WishlistProvider>
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }

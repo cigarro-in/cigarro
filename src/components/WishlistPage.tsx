@@ -8,6 +8,7 @@ import { Product, useCart } from '../hooks/useCart';
 import { useWishlist } from '../hooks/useWishlist';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
+import { getProductImageUrl } from '../utils/supabase/storage';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -57,7 +58,7 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
           {/* Product Image */}
           <div className="relative w-32 h-32 flex-shrink-0">
             <img
-              src={!imageError ? (product.gallery_images?.[0] || '/images/inspiration/product-placeholder.webp') : '/images/inspiration/product-placeholder.webp'}
+              src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
               alt={product.name}
               onError={() => setImageError(true)}
               className="w-full h-full object-cover"
@@ -115,7 +116,7 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
     >
       <div className="relative">
         <img
-          src={!imageError ? (product.gallery_images?.[0] || '/images/inspiration/product-placeholder.webp') : '/images/inspiration/product-placeholder.webp'}
+          src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
           alt={product.name}
           onError={() => setImageError(true)}
           className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"

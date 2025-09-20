@@ -1,0 +1,31 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://cigarro.in/sitemap.xml
+
+# Disallow admin areas
+Disallow: /admin
+Disallow: /admin/*
+
+# Disallow API endpoints
+Disallow: /api/*
+
+# Disallow private areas
+Disallow: /checkout
+Disallow: /payment
+Disallow: /orders
+
+# Allow important pages
+Allow: /
+Allow: /products
+Allow: /categories
+Allow: /about
+Allow: /contact
+Allow: /blog
+Allow: /privacy
+Allow: /terms
+Allow: /shipping
+
+# Crawl delay (optional)
+Crawl-delay: 1

@@ -37,6 +37,51 @@
   --color-ring: var(--color-canyon);
 }
 
+/* Utility Classes */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Remove number input arrows and default values */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]:placeholder-shown {
+  color: transparent;
+}
+
+/* Make dropdowns non-transparent */
+[data-radix-select-content] {
+  background-color: var(--color-creme) !important;
+  border-color: var(--color-coyote) !important;
+}
+
+[data-radix-select-item] {
+  background-color: var(--color-creme) !important;
+}
+
+[data-radix-select-item][data-highlighted] {
+  background-color: var(--color-coyote) !important;
+}
+
+[data-radix-select-trigger] {
+  background-color: var(--color-creme) !important;
+  border-color: var(--color-coyote) !important;
+}
+
+
 /* Font Face Declarations - Exact from Inspiration */
 @font-face {
   font-family: 'DM-Sans';

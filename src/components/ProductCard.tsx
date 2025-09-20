@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useCart, Product } from '../hooks/useCart';
+import { useWishlist } from '../hooks/useWishlist';
 import { toast } from 'sonner';
 import { supabase } from '../utils/supabase/client';
 import { Link } from 'react-router-dom';
+import { Heart } from 'lucide-react';
+import { getProductImageUrl, getLifestyleImageUrl } from '../utils/supabase/storage';
+import { ProductShowcaseGrid } from './ProductShowcaseGrid';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -25,6 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   variant = 'default'
 }) => {
   const [imageError, setImageError] = useState(false);
+  const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -35,16 +40,42 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  const handleWishlistToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await toggleWishlist(product.id);
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+    }
+  };
+
 
   return (
-    <div className="group bg-creme-light rounded-lg shadow-lg border border-coyote/20 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+    <div className="group bg-creme-light rounded-lg shadow-lg border border-coyote/20 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative">
+      {/* Wishlist Button - Outside Link */}
+      <button
+        onClick={handleWishlistToggle}
+        disabled={wishlistLoading}
+        className="absolute top-3 right-3 z-10 p-2 bg-creme-light/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-creme-light transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed group/wishlist"
+        aria-label={isWishlisted(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+      >
+        <Heart
+          className={`w-5 h-5 transition-all duration-300 ${
+            isWishlisted(product.id)
+              ? 'fill-canyon text-canyon'
+              : 'text-dark group-hover/wishlist:text-canyon'
+          }`}
+          strokeWidth={1.5}
+        />
+      </button>
 
       <Link to={`/product/${product.slug}`} className="block relative">
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden bg-creme/20">
           <img
             className="w-full h-full object-cover transition-all duration-500"
-            src={!imageError ? (product.gallery_images?.[0] || '/images/inspiration/product-placeholder.webp') : '/images/inspiration/product-placeholder.webp'}
+            src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
           />
@@ -85,6 +116,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
 export function ProductShowcase() {
   const { addToCart, isLoading } = useCart();
+  const { wishlistItems, isWishlisted, toggleWishlist } = useWishlist();
   const [showcaseProducts, setShowcaseProducts] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -95,16 +127,14 @@ export function ProductShowcase() {
     try {
       const { data: products, error } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at, is_showcase, showcase_order')
         .eq('is_active', true)
-        .order('rating', { ascending: false })
-        .limit(6);
+        .eq('is_showcase', true)
+        .order('showcase_order', { ascending: true })
+        .limit(7); // 7 products for the organic layout
 
       if (error) throw error;
-
-      if (products && products.length > 0) {
-        setShowcaseProducts(products); // 6 products for 2x3 grid
-      }
+      setShowcaseProducts(products || []);
     } catch (error) {
       console.error('Error fetching showcase products:', error);
     }
@@ -136,61 +166,25 @@ export function ProductShowcase() {
           </div>
         </div>
 
-        {/* Main Content - Split Layout with 2:3 ratio */}
+        {/* Product Showcase Grid */}
         <div className="w-[90%] mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-            
-            {/* Left Side - Lifestyle Image (2/5 of width) */}
-            <div className="relative lg:col-span-2">
-              <div className="relative aspect-[3/4.2] rounded-xl overflow-hidden bg-creme/20 shadow-2xl">
-                <img
-                  src="/images/inspiration/lifestyle-bath-essentials.webp"
-                  alt="Premium Tobacco Lifestyle"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/inspiration/DSC01551-2_1.webp";
-                  }}
-                />
-                
-                {/* Overlay Text */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end">
-                  <div className="p-8 text-white">
-                    <h3 className="text-3xl font-serif font-normal mb-4">PREMIUM TOBACCO</h3>
-                    <p className="text-lg leading-relaxed opacity-90">
-                      Discover a range of premium tobacco products - designed to elevate your smoking experience to a luxury retreat.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <ProductShowcaseGrid
+            products={showcaseProducts}
+            onAddToCart={handleAddToCart}
+            onToggleWishlist={toggleWishlist}
+            wishlist={new Set(wishlistItems)}
+            isLoading={isLoading}
+          />
+        </div>
 
-            {/* Right Side - Product Grid (3/5 of width) */}
-            <div className="lg:col-span-3">
-              {/* Product Grid - 3x2 (3 columns, 2 rows) */}
-              <div className="grid grid-cols-3 gap-4">
-                {showcaseProducts.slice(0, 6).map((product, index) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    onAddToCart={handleAddToCart}
-                    isLoading={isLoading}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* View All Button - Centered in entire section */}
-          <div className="flex justify-center mt-12">
-            <Link
-              to="/products"
-              className="btn-primary inline-flex items-center px-8 py-3"
-            >
-              View All
-            </Link>
-          </div>
+        {/* View All Button - Centered in entire section */}
+        <div className="flex justify-center mt-12">
+          <Link
+            to="/products"
+            className="btn-primary inline-flex items-center px-8 py-3"
+          >
+            View All
+          </Link>
         </div>
       </div>
     </section>

@@ -33,6 +33,9 @@ import { SiteSettingsPage } from './SiteSettingsPage';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { ProductVariant, ProductCombo, Discount } from '../types/variants';
 import { formatINR } from '../utils/currency';
+import HomepageManager from './admin/HomepageManager';
+import { AssetManager } from './admin/AssetManager';
+import { BlogManager } from './admin/BlogManager';
 
 interface Product {
   id: string;
@@ -162,7 +165,6 @@ export function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [homepageSections, setHomepageSections] = useState<HomepageSection[]>([]);
   const [categoryProductsOrder, setCategoryProductsOrder] = useState<CategoryProduct[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
@@ -216,7 +218,6 @@ export function AdminDashboard() {
     fetchOrders();
     fetchCustomers();
     fetchCategories();
-    fetchHomepageSections();
     fetchVariants();
     fetchCombos();
     fetchDiscounts();
@@ -377,7 +378,7 @@ export function AdminDashboard() {
       const userIds = profilesData.map(profile => profile.id);
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('user_id, total_decimal, total, created_at, status')
+        .select('user_id, total, created_at, status')
         .in('user_id', userIds);
 
       if (ordersError) {
@@ -432,14 +433,6 @@ export function AdminDashboard() {
     }
   };
 
-  const fetchHomepageSections = async () => {
-    const { data, error } = await supabase.from('homepage_sections').select('*');
-    if (error) {
-      toast.error('Failed to fetch homepage sections');
-    } else {
-      setHomepageSections(data || []);
-    }
-  };
 
   // Fetch functions for variants, combos, and discounts
   const fetchVariants = async () => {
@@ -563,7 +556,6 @@ export function AdminDashboard() {
     description: '',
     image: '',
     image_alt_text: '',
-    section_ids: [] as string[],
   });
 
   const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
@@ -766,30 +758,7 @@ export function AdminDashboard() {
 
     if (!categoryId) return;
 
-    // Manage homepage section links
-    const { error: deleteSectionLinksError } = await supabase
-      .from('homepage_section_categories')
-      .delete()
-      .eq('category_id', categoryId);
 
-    if (deleteSectionLinksError) {
-      toast.error('Failed to update homepage sections');
-      return;
-    }
-
-    if (categoryForm.section_ids.length > 0) {
-      const { error: insertSectionLinksError } = await supabase
-        .from('homepage_section_categories')
-        .insert(categoryForm.section_ids.map(section_id => ({
-          category_id: categoryId,
-          section_id,
-        })));
-
-      if (insertSectionLinksError) {
-        toast.error('Failed to update homepage sections');
-        return;
-      }
-    }
 
     // Update product order within the category
     if (categoryProductsOrder.length > 0) {
@@ -821,7 +790,6 @@ export function AdminDashboard() {
       description: '',
       image: '',
       image_alt_text: '',
-      section_ids: [],
     });
     setCategoryProductsOrder([]); // Clear ordered products state
   };
@@ -1362,7 +1330,7 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-9 lg:w-auto lg:flex bg-secondary">
+          <TabsList className="grid w-full grid-cols-12 lg:w-auto lg:flex bg-secondary">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="variants">
@@ -1377,12 +1345,24 @@ export function AdminDashboard() {
               <Percent className="w-4 h-4 mr-2" />
               Discounts
             </TabsTrigger>
+            <TabsTrigger value="homepage">
+              <Crown className="w-4 h-4 mr-2" />
+              Homepage
+            </TabsTrigger>
+            <TabsTrigger value="blog">
+              <FileText className="w-4 h-4 mr-2" />
+              Blog
+            </TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="w-4 h-4 mr-2" />
               Settings
+            </TabsTrigger>
+            <TabsTrigger value="assets">
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Assets
             </TabsTrigger>
           </TabsList>
 
@@ -1739,7 +1719,13 @@ export function AdminDashboard() {
                     <TabsContent value="media" className="space-y-4 py-4">
                       <div>
                         <Label>Product Images</Label>
-                        <MultipleImageUpload imageUrls={productForm.gallery_images} onImageUrlsChange={(urls) => setProductForm(prev => ({ ...prev, gallery_images: urls }))} />
+                        <MultipleImageUpload 
+                          imageUrls={productForm.gallery_images} 
+                          onImageUrlsChange={(urls) => setProductForm(prev => ({ ...prev, gallery_images: urls }))}
+                          showSelector={true}
+                          title="Select Product Images"
+                          description="Choose images from your library or upload new ones"
+                        />
                         <p className="text-xs text-muted-foreground mt-2">The first image will be the main product image. You can drag to reorder.</p>
                       </div>
                       <div>
@@ -3324,29 +3310,6 @@ export function AdminDashboard() {
                       />
                     </div>
                     <div>
-                      <Label>Homepage Sections</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {homepageSections.map(section => (
-                          <div key={section.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`section-${section.id}`}
-                              checked={categoryForm.section_ids.includes(section.id)}
-                              onCheckedChange={(checked: boolean) => {
-                                const sectionId = section.id;
-                                setCategoryForm(prev => {
-                                  const newSectionIds = checked
-                                    ? [...prev.section_ids, sectionId]
-                                    : prev.section_ids.filter(id => id !== sectionId);
-                                  return { ...prev, section_ids: newSectionIds };
-                                });
-                              }}
-                            />
-                            <Label htmlFor={`section-${section.id}`}>{section.title}</Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
                       <Label>Products in Category (Drag to Reorder)</Label>
                       <DragDropContext onDragEnd={onDragEnd}>
                         <Droppable droppableId="products-in-category">
@@ -3395,7 +3358,6 @@ export function AdminDashboard() {
                           description: '',
                           image: '',
                           image_alt_text: '',
-                          section_ids: [],
                         });
                         setCategoryProductsOrder([]); // Clear ordered products state
                       }}
@@ -3514,15 +3476,6 @@ export function AdminDashboard() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 setEditingCategory(category);
-                                const { data: sectionData, error: sectionError } = await supabase
-                                  .from('homepage_section_categories')
-                                  .select('section_id')
-                                  .eq('category_id', category.id);
-                                
-                                if (sectionError) {
-                                  toast.error('Failed to fetch category sections');
-                                  return;
-                                }
 
                                 // Fetch products associated with this category, including their order
                                 const { data: categoryWithProducts, error: categoryProductsError } = await supabase
@@ -3570,7 +3523,6 @@ export function AdminDashboard() {
                                     description: category.description,
                                     image: category.image,
                                     image_alt_text: category.image_alt_text,
-                                    section_ids: sectionData.map(s => s.section_id),
                                   });
                                 setShowCategoryDialog(true);
                               }}
@@ -4097,9 +4049,26 @@ export function AdminDashboard() {
             </Dialog>
           </TabsContent>
 
+          {/* Homepage Tab */}
+          <TabsContent value="homepage">
+            <HomepageManager />
+          </TabsContent>
+
+          {/* Blog Tab */}
+          <TabsContent value="blog">
+            <BlogManager />
+          </TabsContent>
+
           {/* Settings Tab */}
           <TabsContent value="settings">
             <SiteSettingsPage />
+          </TabsContent>
+
+          {/* Assets Tab */}
+          <TabsContent value="assets">
+            <AssetManager 
+              mode="manage"
+            />
           </TabsContent>
         </Tabs>
 

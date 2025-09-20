@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
           
         if (profileError) {
-          console.warn('Profile fetch error:', profileError);
+          logger.warn('Profile fetch error:', profileError);
           // If profile doesn't exist, create a basic user object from session
           setUser({
             id: session.user.id,
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
           
         if (profileError) {
-          console.warn('Profile fetch error after signin:', profileError);
+          logger.warn('Profile fetch error after signin:', profileError);
           // If profile doesn't exist, create it
           const newUser = {
             id: data.user.id,
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             
           if (insertError) {
-            console.error('Failed to create profile on sign-in:', insertError);
+            logger.error('Failed to create profile on sign-in:', insertError);
             // Even if creation fails, set user from auth data
             setUser(newUser);
           } else {
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      logger.error('Sign in error:', error);
       // Pass the error message through for better handling in the UI
       throw new Error(error?.message || 'Failed to sign in');
     }
@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
           let newUser: User;
           if (profileError) {
-            console.warn('Profile fetch error after signup:', profileError);
+            logger.warn('Profile fetch error after signup:', profileError);
             // Use the data we have from signup
             newUser = {
               id: data.user!.id,
@@ -180,17 +180,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const shouldTransfer = await shouldTransferGuestData(newUser.id);
             if (shouldTransfer) {
-              console.log('Transferring guest data to new user account');
+              logger.info('Transferring guest data to new user account');
               await transferGuestDataToUser(newUser.id);
             }
           } catch (error) {
-            console.error('Error during guest data transfer:', error);
+            logger.error('Error during guest data transfer:', error);
             // Don't throw error as user account creation was successful
           }
         }, 1500); // Increased timeout slightly
       }
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      logger.error('Sign up error:', error);
       // Pass the error message through for better handling in the UI
       throw new Error(error?.message || 'Failed to create account');
     }
@@ -202,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       setUser(null);
     } catch (error) {
-      console.error('Sign out error:', error);
+      logger.error('Sign out error:', error);
     }
   };
 

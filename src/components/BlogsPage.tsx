@@ -2,154 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
+import { getBlogImageUrl } from '../utils/supabase/storage';
+import { supabase } from '../utils/supabase/client';
+import { BlogPost } from '../types/blog';
 
-interface BlogPost {
-  id: string;
-  title: string;
-  excerpt: string;
-  content: string;
-  image: string;
-  author: string;
-  date: string;
-  readTime: string;
-  category: string;
-  slug: string;
-  tags: string[];
-}
-
-// Mock blog data - in real app, this would come from your CMS/database
-const blogPosts: BlogPost[] = [
-  {
-    id: '1',
-    title: 'The Art of Cuban Cigar Rolling: A Master\'s Journey',
-    excerpt: 'Discover the centuries-old traditions and meticulous craftsmanship that goes into creating the world\'s finest Cuban cigars.',
-    content: `
-      <p>The art of Cuban cigar rolling is a tradition that has been passed down through generations, combining centuries of knowledge with the skilled hands of master torcedores. In the heart of Havana, where the humid air carries the sweet aroma of aging tobacco, these artisans continue to create some of the world's most sought-after cigars.</p>
-      
-      <p>Each cigar is a testament to the torcedor's expertise, requiring years of training to master the delicate balance of wrapper, binder, and filler leaves. The process begins with the selection of premium tobacco leaves, each chosen for its specific characteristics and flavor profile.</p>
-      
-      <p>The rolling technique itself is a dance of precision and artistry. The torcedor must maintain consistent pressure while rolling, ensuring the cigar has the perfect draw and burn characteristics. This attention to detail is what sets Cuban cigars apart from all others.</p>
-      
-      <p>From the initial leaf selection to the final quality inspection, every step in the Cuban cigar-making process reflects a commitment to excellence that has made these cigars legendary among connoisseurs worldwide.</p>
-    `,
-    image: '/images/inspiration/DSC07634-Edit_1.webp',
-    author: 'Carlos Rodriguez',
-    date: '2024-01-15',
-    readTime: '8 min read',
-    category: 'Craftsmanship',
-    slug: 'art-of-cuban-cigar-rolling',
-    tags: ['Cuban', 'Craftsmanship', 'Tradition', 'Cigars']
-  },
-  {
-    id: '2',
-    title: 'Understanding Tobacco Terroir: How Climate Shapes Flavor',
-    excerpt: 'Explore how different growing regions around the world influence the unique characteristics and flavor profiles of premium tobacco.',
-    content: `
-      <p>Just as wine grapes reflect their terroir, tobacco plants absorb the unique characteristics of their growing environment. The soil composition, climate, altitude, and even the angle of sunlight all contribute to the final flavor profile of premium tobacco.</p>
-      
-      <p>In the Dominican Republic, the rich volcanic soil and consistent tropical climate produce tobacco with bold, earthy notes. Nicaraguan tobacco, grown in the shadow of active volcanoes, develops a distinctive peppery spice that has become highly prized among cigar enthusiasts.</p>
-      
-      <p>Connecticut's broadleaf tobacco, grown under shade cloths, develops the smooth, creamy characteristics that make it perfect for premium cigar wrappers. Meanwhile, the high-altitude regions of Ecuador produce wrapper leaves with exceptional elasticity and subtle sweetness.</p>
-      
-      <p>Understanding these regional differences allows us to appreciate the complexity and diversity of tobacco flavors, and helps explain why certain growing regions have become synonymous with specific taste profiles.</p>
-    `,
-    image: '/images/inspiration/DSC04514-Edit_1.webp',
-    author: 'Maria Santos',
-    date: '2024-01-12',
-    readTime: '6 min read',
-    category: 'Education',
-    slug: 'tobacco-terroir-climate-flavor',
-    tags: ['Terroir', 'Climate', 'Flavor', 'Education']
-  },
-  {
-    id: '3',
-    title: 'The Perfect Pairing: Cigars and Fine Spirits',
-    excerpt: 'Learn the art of pairing premium cigars with whiskey, rum, and other fine spirits to enhance your tasting experience.',
-    content: `
-      <p>The art of pairing cigars with spirits is about finding complementary flavors that enhance both the cigar and the drink. The key is understanding how different spirits interact with tobacco's natural oils and flavors.</p>
-      
-      <p>Single malt Scotch whiskies, with their smoky, peaty characteristics, pair beautifully with full-bodied cigars. The smoke from both creates a harmonious blend that intensifies the experience. Aged rums, with their caramel and vanilla notes, complement medium-bodied cigars with natural sweetness.</p>
-      
-      <p>Cognac and brandy offer a different approach, with their fruity, floral notes providing a counterpoint to the earthiness of tobacco. The high alcohol content helps cleanse the palate between draws, allowing you to fully appreciate the cigar's evolving flavors.</p>
-      
-      <p>When pairing, consider the strength of both the cigar and the spirit. A delicate Connecticut-wrapped cigar might be overwhelmed by a powerful Islay Scotch, while a full-bodied Nicaraguan cigar could overpower a light, floral gin.</p>
-    `,
-    image: '/images/inspiration/DSC05471_1.webp',
-    author: 'James Mitchell',
-    date: '2024-01-10',
-    readTime: '5 min read',
-    category: 'Lifestyle',
-    slug: 'cigar-spirit-pairing-guide',
-    tags: ['Pairing', 'Spirits', 'Lifestyle', 'Whiskey']
-  },
-  {
-    id: '4',
-    title: 'Vintage Tobacco: The Beauty of Aged Blends',
-    excerpt: 'Delve into the world of aged tobacco and discover how time transforms flavor, creating some of the most sought-after blends.',
-    content: `
-      <p>Aging tobacco is an art form that requires patience, expertise, and the perfect conditions. Like fine wine, tobacco improves with age, developing complex flavors and smoother characteristics that cannot be achieved through any other process.</p>
-      
-      <p>The aging process begins immediately after harvest, as the tobacco leaves undergo fermentation. This natural process breaks down harsh compounds and develops the rich, complex flavors that define premium tobacco. The leaves are carefully monitored and rotated to ensure even aging.</p>
-      
-      <p>Temperature and humidity control are crucial during aging. Too much moisture can lead to mold, while too little can cause the leaves to become brittle. The ideal conditions allow the tobacco to slowly transform, developing the smooth, mellow characteristics that connoisseurs prize.</p>
-      
-      <p>Some of the most sought-after cigars are made with tobacco that has been aged for five, ten, or even twenty years. These vintage blends offer a smoking experience that cannot be replicated, with flavors that have been refined and perfected over decades.</p>
-    `,
-    image: '/images/inspiration/Eucalyptus_2025-05-29-142724_oydb_1.webp',
-    author: 'Elena Vasquez',
-    date: '2024-01-08',
-    readTime: '7 min read',
-    category: 'Heritage',
-    slug: 'vintage-tobacco-aged-blends',
-    tags: ['Vintage', 'Aging', 'Heritage', 'Blends']
-  },
-  {
-    id: '5',
-    title: 'The Science of Cigar Storage: Creating the Perfect Environment',
-    excerpt: 'Learn the essential principles of cigar storage to maintain optimal flavor, humidity, and aging conditions for your collection.',
-    content: `
-      <p>Proper cigar storage is essential for maintaining the quality and flavor of your collection. The key factors are temperature, humidity, and air circulation, all of which must be carefully balanced to create the perfect aging environment.</p>
-      
-      <p>Ideal storage conditions maintain a temperature between 65-70°F (18-21°C) and relative humidity between 65-70%. These conditions allow the tobacco to age gracefully while preventing mold growth and maintaining the cigar's structural integrity.</p>
-      
-      <p>Humidors are the traditional choice for cigar storage, using Spanish cedar to help regulate humidity and impart subtle flavors. Modern electric humidors offer precise climate control, while coolers can be converted into effective storage solutions for larger collections.</p>
-      
-      <p>Regular monitoring and maintenance are crucial. Use calibrated hygrometers to track humidity levels, and rotate your cigars regularly to ensure even aging. With proper care, your cigars will continue to improve over time, developing the complex flavors that make premium tobacco so special.</p>
-    `,
-    image: '/images/inspiration/Primer-LA_Escalier_Pivoine_B-1_1.webp',
-    author: 'David Chen',
-    date: '2024-01-05',
-    readTime: '6 min read',
-    category: 'Education',
-    slug: 'cigar-storage-perfect-environment',
-    tags: ['Storage', 'Humidity', 'Education', 'Collection']
-  },
-  {
-    id: '6',
-    title: 'The History of Premium Cigars: From Columbus to Today',
-    excerpt: 'Trace the fascinating journey of cigars from their discovery by Christopher Columbus to their current status as symbols of luxury and sophistication.',
-    content: `
-      <p>The story of premium cigars begins with Christopher Columbus's arrival in the New World in 1492. The explorer and his crew were the first Europeans to encounter tobacco, observing the native peoples smoking rolled tobacco leaves in a practice that would eventually spread across the globe.</p>
-      
-      <p>By the 16th century, tobacco had reached Europe, where it quickly gained popularity among the aristocracy. The first cigar factories were established in Spain, using tobacco imported from the Caribbean colonies. These early cigars were crude by today's standards, but they established the foundation for the industry.</p>
-      
-      <p>The 19th century saw the golden age of cigar making, with Cuba emerging as the world's premier producer. The island's unique climate and soil conditions, combined with generations of expertise, created cigars of unparalleled quality that became symbols of luxury and sophistication.</p>
-      
-      <p>Today, premium cigars continue to be handcrafted using traditional methods, with master torcedores passing their skills down through generations. The industry has expanded globally, but the commitment to quality and craftsmanship remains unchanged, ensuring that each cigar represents the pinnacle of the tobacco art.</p>
-    `,
-    image: '/images/inspiration/DSC01551-2_1.webp',
-    author: 'Isabella Martinez',
-    date: '2024-01-03',
-    readTime: '9 min read',
-    category: 'Heritage',
-    slug: 'history-premium-cigars-columbus-today',
-    tags: ['History', 'Heritage', 'Cuba', 'Tradition']
-  }
-];
 
 
 export function BlogsPage() {
-  const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>(blogPosts);
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadBlogPosts();
+  }, []);
+
+  const loadBlogPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select(`
+          *,
+          author:profiles(name, email),
+          category:blog_categories(name, color),
+          tags:blog_post_tags(
+            tag:blog_tags(name, color)
+          )
+        `)
+        .eq('status', 'published')
+        .order('published_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedPosts = data?.map(post => ({
+        ...post,
+        tags: post.tags?.map((t: any) => t.tag) || []
+      })) || [];
+
+      setPosts(formattedPosts);
+    } catch (error) {
+      console.error('Error loading blog posts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   return (
@@ -164,10 +59,19 @@ export function BlogsPage() {
 
 
 
-        {/* Blog Posts Grid */}
-        {filteredPosts.length > 0 ? (
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading blog posts...</p>
+            </div>
+          </div>
+        ) : (
+          /* Blog Posts Grid */
+          posts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredPosts.map((post, index) => (
+              {posts.map((post, index) => (
               <motion.article
                 key={post.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -183,7 +87,7 @@ export function BlogsPage() {
                     {/* Article Image */}
                     <div className="relative aspect-[16/10] overflow-hidden">
                       <img
-                        src={post.image}
+                        src={post.featured_image || getBlogImageUrl('placeholder.webp')}
                         alt={post.title}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
@@ -191,7 +95,7 @@ export function BlogsPage() {
                       {/* Category Badge */}
                       <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm text-dark px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1">
                         <Tag className="w-3 h-3" />
-                        <span>{post.category}</span>
+                        <span>{post.category?.name || 'Uncategorized'}</span>
                       </div>
 
                       {/* Hover Overlay */}
@@ -208,15 +112,15 @@ export function BlogsPage() {
                       <div className="flex items-center space-x-4 text-dark/60 text-sm mb-4">
                         <div className="flex items-center space-x-1">
                           <User className="w-4 h-4" />
-                          <span>{post.author}</span>
+                          <span>{post.author?.name || 'Unknown Author'}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(post.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="w-4 h-4" />
-                          <span>{post.readTime}</span>
+                          <span>{post.reading_time ? `${post.reading_time} min read` : 'Unknown'}</span>
                         </div>
                       </div>
 
@@ -232,15 +136,15 @@ export function BlogsPage() {
 
                       {/* Tags */}
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {post.tags.slice(0, 3).map(tag => (
+                        {post.tags?.slice(0, 3).map((tag, index) => (
                           <span
-                            key={tag}
+                            key={index}
                             className="px-2 py-1 bg-creme-light text-dark text-xs rounded-full"
                           >
-                            {tag}
+                            {tag.name}
                           </span>
                         ))}
-                        {post.tags.length > 3 && (
+                        {post.tags && post.tags.length > 3 && (
                           <span className="px-2 py-1 bg-creme-light text-dark text-xs rounded-full">
                             +{post.tags.length - 3}
                           </span>
@@ -267,6 +171,7 @@ export function BlogsPage() {
               No blog articles are available at the moment.
             </p>
           </div>
+          )
         )}
       </div>
     </div>
@@ -278,18 +183,82 @@ export function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const foundPost = blogPosts.find(p => p.slug === slug);
-    if (foundPost) {
-      setPost(foundPost);
-      // Find related posts (same category, excluding current post)
-      const related = blogPosts
-        .filter(p => p.category === foundPost.category && p.id !== foundPost.id)
-        .slice(0, 3);
-      setRelatedPosts(related);
+    if (slug) {
+      loadBlogPost(slug);
     }
   }, [slug]);
+
+  const loadBlogPost = async (postSlug: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select(`
+          *,
+          author:profiles(name, email),
+          category:blog_categories(name, color),
+          tags:blog_post_tags(
+            tag:blog_tags(name, color)
+          )
+        `)
+        .eq('slug', postSlug)
+        .eq('status', 'published')
+        .single();
+
+      if (error) throw error;
+
+      const formattedPost = {
+        ...data,
+        tags: data.tags?.map((t: any) => t.tag) || []
+      };
+
+      setPost(formattedPost);
+
+      // Load related posts
+      if (data.category_id) {
+        const { data: relatedData, error: relatedError } = await supabase
+          .from('blog_posts')
+          .select(`
+            *,
+            author:profiles(name, email),
+            category:blog_categories(name, color),
+            tags:blog_post_tags(
+              tag:blog_tags(name, color)
+            )
+          `)
+          .eq('category_id', data.category_id)
+          .eq('status', 'published')
+          .neq('id', data.id)
+          .order('published_at', { ascending: false })
+          .limit(3);
+
+        if (!relatedError && relatedData) {
+          const formattedRelated = relatedData.map(post => ({
+            ...post,
+            tags: post.tags?.map((t: any) => t.tag) || []
+          }));
+          setRelatedPosts(formattedRelated);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading blog post:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-creme pt-24 pb-12 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -314,7 +283,7 @@ export function BlogPost() {
           <div className="flex items-center space-x-2 mb-4">
             <Tag className="w-4 h-4 text-canyon" />
             <span className="text-canyon font-medium uppercase tracking-wider text-sm">
-              {post.category}
+              {post.category?.name || 'Uncategorized'}
             </span>
           </div>
 
@@ -327,22 +296,22 @@ export function BlogPost() {
           <div className="flex items-center space-x-6 text-dark/60 text-sm mb-8">
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4" />
-              <span>{post.author}</span>
+              <span>{post.author?.name || 'Unknown Author'}</span>
             </div>
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4" />
-              <span>{new Date(post.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+              <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="w-4 h-4" />
-              <span>{post.readTime}</span>
+              <span>{post.reading_time ? `${post.reading_time} min read` : 'Unknown'}</span>
             </div>
           </div>
 
           {/* Featured Image */}
           <div className="relative aspect-[16/9] overflow-hidden rounded-xl mb-8">
             <img
-              src={post.image}
+              src={post.featured_image || getBlogImageUrl('placeholder.webp')}
               alt={post.title}
               className="w-full h-full object-cover"
             />
@@ -360,12 +329,12 @@ export function BlogPost() {
           <div className="mt-12 pt-8 border-t border-coyote/20">
             <h3 className="text-dark font-medium mb-4">Tags</h3>
             <div className="flex flex-wrap gap-2">
-              {post.tags.map(tag => (
+              {post.tags?.map((tag, index) => (
                 <span
-                  key={tag}
+                  key={index}
                   className="px-3 py-1 bg-creme-light text-dark text-sm rounded-full"
                 >
-                  {tag}
+                  {tag.name}
                 </span>
               ))}
             </div>
@@ -393,14 +362,14 @@ export function BlogPost() {
                       {/* Article Image */}
                       <div className="relative aspect-[16/10] overflow-hidden">
                         <img
-                          src={relatedPost.image}
+                          src={relatedPost.featured_image || getBlogImageUrl('placeholder.webp')}
                           alt={relatedPost.title}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                         
                         {/* Category Badge */}
                         <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-dark px-2 py-1 rounded-full text-xs font-medium">
-                          {relatedPost.category}
+                          {relatedPost.category?.name || 'Uncategorized'}
                         </div>
 
                         {/* Hover Overlay */}
@@ -417,15 +386,15 @@ export function BlogPost() {
                         <div className="flex items-center space-x-3 text-dark/60 text-xs mb-3">
                           <div className="flex items-center space-x-1">
                             <User className="w-3 h-3" />
-                            <span>{relatedPost.author}</span>
+                            <span>{relatedPost.author?.name || 'Unknown Author'}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-3 h-3" />
-                            <span>{new Date(relatedPost.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                            <span>{relatedPost.published_at ? new Date(relatedPost.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not published'}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="w-3 h-3" />
-                            <span>{relatedPost.readTime}</span>
+                            <span>{relatedPost.reading_time ? `${relatedPost.reading_time} min read` : 'Unknown'}</span>
                           </div>
                         </div>
 
