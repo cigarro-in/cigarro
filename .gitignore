@@ -176,6 +176,14 @@ Thumbs.db
 
 # Supabase
 .supabase/
+supabase/.temp/
+
+# Additional sensitive files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # Vercel
 .vercel

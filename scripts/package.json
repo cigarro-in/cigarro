@@ -1,0 +1,26 @@
+{
+  "name": "cigarro-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for Cigarro marketplace",
+  "private": true,
+  "main": "upload-pincodes.js",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "scripts": {
+    "upload": "node upload-pincodes.js",
+    "upload-pincodes": "node upload-pincodes.js",
+    "start": "node upload-pincodes.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "keywords": [
+    "pincodes",
+    "upload",
+    "supabase",
+    "cigarro"
+  ],
+  "author": "Cigarro Team",
+  "license": "MIT"
+}

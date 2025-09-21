@@ -71,13 +71,17 @@ export const validatePhone = (phone: string, countryCode: string = '+91'): Valid
   }
   
   // Remove all non-digit characters for validation
-  const digits = sanitized.replace(/\D/g, '');
+  let digits = sanitized.replace(/\D/g, '');
   
   // Country-specific validation
   switch (countryCode) {
     case '+91': // India
-      if (!/^\d{10}$/.test(digits)) {
-        return { isValid: false, error: 'Please enter a valid 10-digit Indian phone number' };
+      // Accept variants like +91XXXXXXXXXX or 0XXXXXXXXXX by normalizing to last 10 digits
+      if (digits.length >= 10) {
+        digits = digits.slice(-10);
+      }
+      if (!/^[6-9]\d{9}$/.test(digits)) {
+        return { isValid: false, error: 'Please enter a valid 10-digit Indian mobile number (starts with 6-9)' };
       }
       break;
     case '+1': // US/Canada
@@ -96,7 +100,8 @@ export const validatePhone = (phone: string, countryCode: string = '+91'): Valid
       }
   }
   
-  return { isValid: true, sanitizedValue: `${countryCode} ${digits}` };
+  // Return digits only; the UI and inserts will attach country code separately.
+  return { isValid: true, sanitizedValue: digits };
 };
 
 /**

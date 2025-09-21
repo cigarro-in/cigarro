@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, CreditCard, MapPin, Package, CheckCircle, Crown, Shield, Navigation, Plus, Truck, Clock, Zap, ArrowLeft, Smartphone, Monitor, Copy, RefreshCw, Mail, MessageSquare, Tag, Percent, ExternalLink } from 'lucide-react';
+import { Lock, CreditCard, MapPin, Package, CheckCircle, Crown, Shield, Navigation, Plus, Truck, Clock, Zap, ArrowLeft, Smartphone, Monitor, Copy, RefreshCw, Mail, MessageSquare, Tag, Percent, ExternalLink, Pencil, Trash2, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { formatINR } from '../utils/currency';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../utils/discounts';
 import { AuthDialog } from './AuthDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../utils/validation';
 import QRCode from 'qrcode';
 
@@ -41,8 +42,13 @@ export function CheckoutPage() {
   const [countryCode, setCountryCode] = useState('+91');
   const [showAddressSelection, setShowAddressSelection] = useState(false);
   const [isNewAddress, setIsNewAddress] = useState(true);
+  const [showSaveSuggestion, setShowSaveSuggestion] = useState(false);
+  const [isAddressComplete, setIsAddressComplete] = useState(false);
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
   const addressesLoadedRef = useRef(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [isAddressSectionCollapsed, setIsAddressSectionCollapsed] = useState(true);
+  const [isOrderProcessing, setIsOrderProcessing] = useState(false);
   
   // Discount-related state
   const [couponCode, setCouponCode] = useState('');
@@ -81,13 +87,13 @@ export function CheckoutPage() {
 
   // Auto-show auth dialog for non-authenticated users after a brief delay to prevent flicker
   useEffect(() => {
-    if (!user && !authLoading) {
+    if (!user && !authLoading && !isOrderProcessing && !orderComplete) {
       const timer = setTimeout(() => {
         setShowAuthDialog(true);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, isOrderProcessing, orderComplete]);
 
   // Load saved addresses and preload QR code on component mount
   useEffect(() => {
@@ -305,6 +311,17 @@ export function CheckoutPage() {
     if (!hasInitializedForm) {
       setHasInitializedForm(true);
     }
+    
+    // Mark as new address when user modifies form
+    if (field !== 'email' && !editingAddressId) {
+      setIsNewAddress(true);
+      setSelectedSavedAddress('');
+    }
+    
+    // Check if address is complete and suggest saving (debounced)
+    setTimeout(() => {
+      checkAddressCompleteness();
+    }, 100);
   };
 
   const validateForm = () => {
@@ -413,73 +430,125 @@ export function CheckoutPage() {
           const { latitude, longitude } = position.coords;
           setCurrentLocationData({ lat: latitude, lng: longitude });
           
-          // Use a free reverse geocoding service
+          // Use a free reverse geocoding service with better error handling
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=en`,
+            {
+              headers: {
+                'User-Agent': 'Cigarro-Checkout/1.0'
+              }
+            }
           );
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
           const data = await response.json();
           
           if (data && data.address) {
             const addr = data.address;
-            const fullAddress = data.display_name;
             
-            // Extract address components
-            const houseNumber = addr.house_number || '';
-            const road = addr.road || addr.street || '';
-            const suburb = addr.suburb || addr.neighbourhood || '';
-            const city = addr.city || addr.town || addr.village || addr.municipality || '';
-            const state = addr.state || '';
+            // Extract address components with better fallbacks
+            const houseNumber = addr.house_number || addr.building || '';
+            const road = addr.road || addr.street || addr.pedestrian || addr.path || '';
+            const suburb = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '';
+            const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+            const state = addr.state || addr.province || addr.region || '';
             const pincode = addr.postcode || '';
             
-            // Build address string
-            const addressParts = [houseNumber, road, suburb].filter(Boolean);
-            const formattedAddress = addressParts.join(', ');
+            // Build a more comprehensive address string
+            const addressParts = [];
+            if (houseNumber) addressParts.push(houseNumber);
+            if (road) addressParts.push(road);
+            if (suburb && suburb !== city) addressParts.push(suburb);
+            
+            const formattedAddress = addressParts.length > 0 
+              ? addressParts.join(', ')
+              : data.display_name?.split(',')[0] || 'Current Location';
             
             // Update form data and clear validation errors
             setFormData(prev => ({
               ...prev,
-              address: formattedAddress || fullAddress,
-              city: city,
-              state: state,
-              pincode: pincode
+              address: formattedAddress,
+              city: city || prev.city,
+              state: state || prev.state,
+              pincode: pincode || prev.pincode
             }));
             
             // Clear validation errors for auto-filled fields
             setValidationErrors(prev => ({
               ...prev,
               address: '',
-              city: '',
-              state: '',
-              pincode: ''
+              city: city ? '' : prev.city,
+              state: state ? '' : prev.state,
+              pincode: pincode ? '' : prev.pincode
             }));
+            
+            // Mark as new address since location was detected
+            setIsNewAddress(true);
+            setSelectedSavedAddress('');
+            setEditingAddressId(null);
+            
+            // Check address completeness after filling
+            setTimeout(() => {
+              checkAddressCompleteness();
+            }, 100);
             
             toast.success('Location detected and address filled!');
           } else {
-            toast.error('Unable to get address from location');
+            toast.error('Unable to get detailed address from location. Please fill manually.');
           }
         } catch (error) {
           console.error('Error getting address from coordinates:', error);
-          toast.error('Unable to get address from location');
+          // Subtle error message for network issues
+          toast.info('Location detected, but address details need manual entry. Please complete the form.', {
+            duration: 5000,
+            style: {
+              background: 'hsl(var(--muted))',
+              color: 'hsl(var(--muted-foreground))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '8px',
+              fontSize: '14px',
+              padding: '12px 16px'
+            }
+          });
         }
         setIsLoadingLocation(false);
       },
       (error) => {
         console.log('Geolocation error (handled gracefully):', error);
-        let errorMessage = 'Unable to get your location';
+        let errorMessage = 'Unable to access location';
+        let description = 'Please try again or fill manually';
         if (error.code === 1) { // PERMISSION_DENIED
-          errorMessage = 'Location permission denied. Please enable location access in your browser settings and try again.';
+          errorMessage = 'Location access needed';
+          description = 'Enable location in browser settings for auto-fill';
         } else if (error.code === 2) { // POSITION_UNAVAILABLE
-          errorMessage = 'Location service unavailable. Please check your internet connection and try again.';
+          errorMessage = 'Location unavailable';
+          description = 'Check your connection and try again';
         } else if (error.code === 3) { // TIMEOUT
-          errorMessage = 'Location request timed out. Please try again with a stronger internet connection.';
+          errorMessage = 'Location timeout';
+          description = 'Request took too long - try again';
         }
-        toast.info(errorMessage);
+        
+        // Subtle informative toast
+        toast.info(`${errorMessage} • ${description}`, {
+          duration: 4000,
+          style: {
+            background: 'hsl(var(--muted))',
+            color: 'hsl(var(--muted-foreground))',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: '8px',
+            fontSize: '14px',
+            padding: '12px 16px'
+          }
+        });
         setIsLoadingLocation(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000
+        timeout: 20000, // Increased timeout
+        maximumAge: 300000 // 5 minutes cache
       }
     );
   };
@@ -487,10 +556,8 @@ export function CheckoutPage() {
   const saveCurrentLocationAddress = async (addressData: any) => {
     if (!user) return;
     
-    // Ensure phone number includes country code when saving
-    const phoneWithCountryCode = addressData.phone.startsWith('+') 
-      ? addressData.phone 
-      : `${countryCode} ${addressData.phone}`;
+    // Store digits-only local number; DB trigger will normalize further as needed
+    const phoneDigits = String(addressData.phone).replace(/\D/g, '');
     
     const { error } = await supabase
       .from('saved_addresses')
@@ -498,7 +565,7 @@ export function CheckoutPage() {
         user_id: user.id,
         label: 'Current Location',
         full_name: addressData.fullName,
-        phone: phoneWithCountryCode,
+        phone: phoneDigits,
         address: addressData.address,
         user_provided_address: addressData.userProvidedAddress || addressData.address,
         city: addressData.city,
@@ -515,6 +582,8 @@ export function CheckoutPage() {
       toast.success('Address saved successfully!');
     } else {
       console.error('Error saving address:', error);
+      // @ts-ignore - supabase error typing
+      toast.error(error?.message || 'Failed to save address');
     }
   };
 
@@ -525,7 +594,14 @@ export function CheckoutPage() {
         ...prev,
         fullName: address.full_name,
         email: prev.email, // Keep current email
-        phone: address.phone?.replace(/^\+91\s*/, '') || '', // Remove +91 prefix if present
+        // Normalize to digits-only. For India, use last 10 digits if length > 10
+        phone: (() => {
+          const digits = String(address.phone || '').replace(/\D/g, '');
+          if ((address.country || '').toLowerCase().startsWith('in') && digits.length >= 10) {
+            return digits.slice(-10);
+          }
+          return digits;
+        })(),
         address: address.address,
         city: address.city,
         state: address.state,
@@ -535,6 +611,12 @@ export function CheckoutPage() {
       setSelectedSavedAddress(addressId);
       setIsNewAddress(false);
       setShowAddressSelection(false);
+      setShowSaveSuggestion(false); // Hide save suggestion when selecting existing address
+      setEditingAddressId(null); // Clear editing state
+      
+      // Clear validation errors since we're using a saved address
+      setValidationErrors({});
+      
       // Don't set hasInitializedForm here - allow users to click saved addresses anytime
     }
   };
@@ -567,6 +649,7 @@ export function CheckoutPage() {
 
   const editSavedAddress = (addressId: string) => {
     selectSavedAddress(addressId);
+    setEditingAddressId(addressId);
     // Clear selection to show that we're editing
     setSelectedSavedAddress('');
   };
@@ -592,45 +675,153 @@ export function CheckoutPage() {
     }
   };
 
-  const checkForDuplicateAddress = async () => {
+  const checkForDuplicateAddress = async (excludeId?: string) => {
     if (!user) return false;
     
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('address', formData.address)
-      .eq('pincode', formData.pincode)
-      .limit(1);
-    
-    if (error) {
-      console.error('Error checking for duplicates:', error);
+    try {
+      let query = supabase
+        .from('saved_addresses')
+        .select('id, label')
+        .eq('user_id', user.id)
+        .eq('address', formData.address.trim())
+        .eq('pincode', formData.pincode.trim());
+      
+      if (excludeId) {
+        query = query.neq('id', excludeId);
+      }
+      
+      const { data, error } = await query.limit(1);
+      
+      if (error) {
+        console.error('Error checking for duplicates:', error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error in duplicate check:', error);
       return false;
     }
-    
-    return data && data.length > 0;
   };
 
   const saveAddressOnOrderSuccess = async () => {
     if (!user) return;
     
+    // Only save if it's a new address and form is complete
+    if (!isNewAddress || !isAddressComplete) {
+      console.log('Skipping address save - not new or incomplete');
+      return;
+    }
+    
     // Check for duplicates first
-    const isDuplicate = await checkForDuplicateAddress();
-    if (isDuplicate) return;
+    const isDuplicate = await checkForDuplicateAddress(editingAddressId || undefined);
+    if (isDuplicate) {
+      console.log('Address already exists, skipping save');
+      return;
+    }
     
     try {
-      // Ensure phone number includes country code when saving
-      const phoneWithCountryCode = formData.phone.startsWith('+') 
-        ? formData.phone 
-        : `${countryCode} ${formData.phone}`;
+      // Store digits-only local number; DB trigger will normalize further as needed
+      const phoneDigits = String(formData.phone).replace(/\D/g, '');
+      
+      // Generate smart label for the address
+      const addressLabel = generateSmartLabel();
+      
+      // Check existing addresses to understand the constraint situation
+      const { data: existingAddresses } = await supabase
+        .from('addresses')
+        .select('id, is_primary')
+        .eq('user_id', user.id);
+      
+      console.log('Existing addresses:', existingAddresses);
+      
+      // Determine if this should be primary based on existing addresses
+      const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
+      const shouldBePrimary = !hasPrimary;
+      
+      console.log('Should be primary:', shouldBePrimary, 'Has primary:', hasPrimary);
+      
+      // With the fixed constraint, we can now properly set is_primary
+      const addressData = {
+        user_id: user.id,
+        label: addressLabel,
+        recipient_name: formData.fullName.trim(),
+        phone: phoneDigits,
+        address_line_1: formData.address.trim(),
+        city: formData.city.trim(),
+        state: formData.state.trim(),
+        postal_code: formData.pincode.trim(),
+        country: formData.country,
+        latitude: currentLocationData?.lat,
+        longitude: currentLocationData?.lng,
+        is_primary: shouldBePrimary // Set based on whether user has existing primary
+      };
       
       const { error } = await supabase
+        .from('addresses')
+        .insert(addressData);
+      
+      if (!error) {
+        console.log('Address saved successfully on order completion');
+        toast.success(`Address saved as "${addressLabel}" for future orders`);
+        // Reload addresses to update the UI
+        await loadSavedAddresses(true);
+      } else {
+        console.error('Failed to save address:', error);
+        // The constraint is fundamentally broken - let's skip auto-save for now
+        console.log('Skipping auto-save due to constraint issues');
+      }
+    } catch (error) {
+      console.error('Error saving address on order success:', error);
+    }
+  };
+
+  // Check if address is complete and should suggest saving
+  const checkAddressCompleteness = () => {
+    const isComplete = Boolean(formData.fullName && 
+                      formData.phone && 
+                      formData.address && 
+                      formData.city && 
+                      formData.state && 
+                      formData.pincode && 
+                      formData.pincode.length === 6);
+    
+    setIsAddressComplete(isComplete);
+    
+    // Show save suggestion immediately if address is complete and not already saved
+    if (isComplete && isNewAddress && !showSaveSuggestion) {
+      setShowSaveSuggestion(true);
+    } else if (!isComplete && showSaveSuggestion) {
+      setShowSaveSuggestion(false);
+    }
+  };
+
+  const saveCurrentAddress = async (customLabel?: string) => {
+    if (!user) return;
+    
+    // Check for duplicates
+    const isDuplicate = await checkForDuplicateAddress();
+    if (isDuplicate) {
+      toast.info('This address is already saved');
+      setShowSaveSuggestion(false);
+      return;
+    }
+    
+    // Store digits-only local number; DB trigger will normalize further as needed
+    const phoneDigits = String(formData.phone).replace(/\D/g, '');
+    
+    // Smart label generation
+    const existingEditing = editingAddressId ? savedAddresses.find(a => a.id === editingAddressId) : null;
+    const addressLabel = customLabel || existingEditing?.label || generateSmartLabel();
+    
+    if (editingAddressId) {
+      // Update existing address
+      const { error } = await supabase
         .from('saved_addresses')
-        .insert({
-          user_id: user.id,
-          label: 'Order Address',
+        .update({
+          label: addressLabel,
           full_name: formData.fullName,
-          phone: phoneWithCountryCode,
+          phone: phoneDigits,
           address: formData.address,
           user_provided_address: formData.address,
           city: formData.city,
@@ -639,56 +830,94 @@ export function CheckoutPage() {
           country: formData.country,
           latitude: currentLocationData?.lat,
           longitude: currentLocationData?.lng,
-          is_default: savedAddresses.length === 0 // Set as default if it's the first address
-        });
-      
+        })
+        .eq('id', editingAddressId)
+        .eq('user_id', user.id);
       if (!error) {
-        console.log('Address saved successfully on order completion');
+        toast.success('Address updated');
+        setShowSaveSuggestion(false);
+        setIsNewAddress(false);
+        setEditingAddressId(null);
+        loadSavedAddresses(true);
+      } else {
+        console.error('Failed to update address:', error);
+        // @ts-ignore - supabase error typing
+        toast.error(error?.message || 'Failed to update address');
       }
-    } catch (error) {
-      console.error('Error saving address on order success:', error);
+      return;
+    }
+
+    // Check existing addresses to understand the constraint situation
+    const { data: existingAddresses } = await supabase
+      .from('addresses')
+      .select('id, is_primary')
+      .eq('user_id', user.id);
+    
+    console.log('Existing addresses for manual save:', existingAddresses);
+    
+    // Determine if this should be primary based on existing addresses
+    const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
+    const shouldBePrimary = !hasPrimary;
+    
+    console.log('Manual save - Should be primary:', shouldBePrimary, 'Has primary:', hasPrimary);
+    
+    // With the fixed constraint, we can now properly set is_primary
+    const addressData = {
+      user_id: user.id,
+      label: addressLabel,
+      recipient_name: formData.fullName,
+      phone: phoneDigits,
+      address_line_1: formData.address,
+      city: formData.city,
+      state: formData.state,
+      postal_code: formData.pincode,
+      country: formData.country,
+      latitude: currentLocationData?.lat,
+      longitude: currentLocationData?.lng,
+      is_primary: shouldBePrimary // Set based on whether user has existing primary
+    };
+    
+    const { error } = await supabase
+      .from('addresses')
+      .insert(addressData);
+    
+    if (!error) {
+      toast.success(`Address saved as "${addressLabel}"`);
+      setShowSaveSuggestion(false);
+      setIsNewAddress(false);
+      setEditingAddressId(null);
+      loadSavedAddresses(true);
+    } else {
+      console.error('Failed to save address:', error);
+      // @ts-ignore - supabase error typing
+      toast.error(`Failed to save address: ${error?.message || 'Unknown error'}`);
     }
   };
 
-  const saveCurrentAddress = async () => {
-    if (!user || !validateForm()) return;
+  // Generate smart label based on address content
+  const generateSmartLabel = () => {
+    const address = formData.address.toLowerCase();
+    const city = formData.city.trim();
     
-    // Check for duplicates
-    const isDuplicate = await checkForDuplicateAddress();
-    if (isDuplicate) {
-      toast.info('This address is already saved');
-      return;
+    // Check for work-related keywords
+    if (address.includes('office') || address.includes('company') || address.includes('corporate') || 
+        address.includes('business') || address.includes('workplace') || address.includes('work')) {
+      return 'Work';
     }
     
-    // Ensure phone number includes country code when saving
-    const phoneWithCountryCode = formData.phone.startsWith('+') 
-      ? formData.phone 
-      : `${countryCode} ${formData.phone}`;
-    
-    const { error } = await supabase
-      .from('saved_addresses')
-      .insert({
-        user_id: user.id,
-        label: 'Home',
-        full_name: formData.fullName,
-        phone: phoneWithCountryCode,
-        address: formData.address,
-        user_provided_address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode,
-        country: formData.country,
-        latitude: currentLocationData?.lat,
-        longitude: currentLocationData?.lng,
-        is_default: false
-      });
-    
-    if (!error) {
-      toast.success('Address saved successfully');
-      loadSavedAddresses(true); // Skip auto-fill when saving current address
-    } else {
-      toast.error('Failed to save address');
+    // Check for home-related keywords
+    if (address.includes('home') || address.includes('house') || address.includes('residence') ||
+        address.includes('apartment') || address.includes('flat')) {
+      return 'Home';
     }
+    
+    // Check for other common locations
+    if (address.includes('hotel') || address.includes('guest')) {
+      return 'Hotel';
+    }
+    
+    // Default to city name or generic label
+    return city || 'My Address';
   };
 
   // Don't auto-save at payment step, just generate QR code
@@ -734,7 +963,7 @@ export function CheckoutPage() {
       const transactionId = `TXN${Date.now().toString().slice(-8)}`;
       console.log('Generated transaction ID:', transactionId);
       
-      // Create order in database (UUID will be auto-generated, display_order_id will be auto-generated via trigger)
+      // Create order in database (UUID and display_order_id will be auto-generated via triggers)
       const orderData = {
         user_id: user.id,
         status: 'placed',
@@ -795,26 +1024,35 @@ export function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      // Save address if it's new and user wants to save it
-      if (isNewAddress && user) {
+      // Always try to save address on successful order (with duplicate prevention)
+      if (user) {
         await saveAddressOnOrderSuccess();
       }
 
-      // Clear cart
-      await clearCart();
-
+      // Set order as complete first to prevent navigation issues
       setCompletedOrder(order);
       setOrderComplete(true);
+      
+      // Clear cart after setting order complete
+      await clearCart();
+      
       toast.success(`Order #${order.display_order_id} confirmed! Your order is now being processed.`);
       
-      // Redirect to orders page after 5 seconds
-      setTimeout(() => {
-        navigate('/orders');
-      }, 5000);
+      // Preload important pages in background for better UX
+      const preloadPages = ['/cart', '/orders', '/products'];
+      preloadPages.forEach(page => {
+        const preloadLink = document.createElement('link');
+        preloadLink.rel = 'prefetch';
+        preloadLink.href = page;
+        document.head.appendChild(preloadLink);
+      });
+      
+      // No automatic redirect - let user choose where to go
 
     } catch (error) {
       console.error('Failed to process order:', error);
       toast.error('Failed to process order. Please contact support.');
+      setIsOrderProcessing(false);
     } finally {
       setIsProcessingPayment(false);
     }
@@ -846,6 +1084,8 @@ export function CheckoutPage() {
     if (!validateForm()) {
       return;
     }
+
+    setIsOrderProcessing(true);
 
     // Generate transaction ID for UPI reference
     const transactionId = `TXN${Date.now().toString().slice(-8)}`;
@@ -888,9 +1128,21 @@ export function CheckoutPage() {
                 <span className="font-serif-premium text-xl text-accent">{formatINR(completedOrder?.total)}</span>
               </div>
             </div>
-            <Button onClick={() => navigate('/')} className="bg-accent text-accent-foreground hover:bg-accent/90">
-              Continue Shopping
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                onClick={() => navigate('/orders')} 
+                className="bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                View My Orders
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/')}
+                className="border-accent text-accent hover:bg-accent/10"
+              >
+                Continue Shopping
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -959,190 +1211,204 @@ export function CheckoutPage() {
             {currentStep === 1 && (
               <Card className="glass-card border-border/20">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 font-serif-premium">
-                    <MapPin className="w-5 h-5 text-accent" />
-                    <span>Shipping Information</span>
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center space-x-2 font-serif-premium">
+                      <MapPin className="w-5 h-5 text-accent" />
+                      <span>Shipping Information</span>
+                    </CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Address Selection Section */}
-                  {savedAddresses.length > 0 && !showAddressSelection && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="font-sans-premium">Delivery Address</Label>
+                  {/* Saved Addresses Section */}
+                  {savedAddresses.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <Label className="font-sans-premium text-sm">Saved Addresses</Label>
+                          {isAddressSectionCollapsed && (
+                            <span className="text-xs text-muted-foreground mt-1">
+                              {(() => {
+                                const currentAddress = savedAddresses.find(addr => 
+                                  addr.address === formData.address && addr.city === formData.city
+                                ) || savedAddresses.find(addr => addr.is_default);
+                                return currentAddress ? `Using: ${currentAddress.label}` : 'Primary address loaded';
+                              })()}
+                            </span>
+                          )}
+                        </div>
                         <Button
-                          variant="outline"
+                          type="button"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setShowAddressSelection(true);
-                            setIsNewAddress(true);
-                          }}
-                          className="text-xs"
+                          onClick={() => setIsAddressSectionCollapsed(!isAddressSectionCollapsed)}
+                          className="h-8 px-2 text-xs"
                         >
-                          Change Address
+                          {isAddressSectionCollapsed ? (
+                            <><ChevronDown className="w-4 h-4 mr-1" />Change Address</>
+                          ) : (
+                            <><ChevronUp className="w-4 h-4 mr-1" />Hide Addresses</>
+                          )}
                         </Button>
                       </div>
-                      
-                      {/* Show current selected address */}
-                      <div className="p-4 rounded-lg border border-accent bg-accent/10 mb-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-sans-premium font-medium text-sm">
-                              {formData.fullName} 
-                              {savedAddresses.find(addr => addr.full_name === formData.fullName && addr.address === formData.address)?.is_default && (
-                                <Badge variant="secondary" className="ml-2 text-xs">Primary</Badge>
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{formData.address}</p>
-                            <p className="text-xs text-muted-foreground">{formData.city}, {formData.state} - {formData.pincode}</p>
-                            <p className="text-xs text-muted-foreground">{formData.phone}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <Separator className="my-4" />
-                    </div>
-                  )}
-
-                  {/* Address Selection Modal */}
-                  {showAddressSelection && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="font-sans-premium">Choose Address</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowAddressSelection(false)}
-                          className="text-xs"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 gap-3 mb-4">
-                        {/* New Address Option */}
-                        <div
-                          onClick={() => {
-                            setIsNewAddress(true);
-                            setFormData(prev => ({
-                              ...prev,
-                              address: '',
-                              city: '',
-                              state: '',
-                              pincode: '',
-                              country: 'India'
-                            }));
-                          }}
-                          className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                            isNewAddress
-                              ? 'border-accent bg-accent/10'
-                              : 'border-border/20 hover:border-accent/50'
-                          }`}
-                        >
-                          <p className="font-sans-premium font-medium text-sm">+ Add New Address</p>
-                          <p className="text-xs text-muted-foreground">Enter a new delivery address</p>
-                        </div>
-
-                        {/* Existing Addresses */}
-                        {savedAddresses.map((address) => (
-                          <div
-                            key={address.id}
-                            className={`p-4 rounded-lg border transition-colors ${
-                              selectedSavedAddress === address.id
-                                ? 'border-accent bg-accent/10'
-                                : 'border-border/20 hover:border-accent/50'
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-sans-premium font-medium text-sm">{address.full_name}</p>
-                                    {address.is_default && (
-                                      <Badge variant="secondary" className="text-xs">Primary</Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground line-clamp-2">{address.address}</p>
-                                  <p className="text-xs text-muted-foreground">{address.city}, {address.state}</p>
-                                  <p className="text-xs text-muted-foreground">PIN: {address.pincode}</p>
-                                </div>
-                                {address.latitude && address.longitude && (
-                                  <Navigation className="w-3 h-3 text-accent flex-shrink-0" />
-                                )}
-                              </div>
-                              <div className="flex gap-2 pt-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
+                      {!isAddressSectionCollapsed && (
+                        <>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            {savedAddresses.map((address) => {
+                              const isSelected = selectedSavedAddress === address.id;
+                              return (
+                                <div
+                                  key={address.id}
+                                  className={`relative group p-3 rounded-lg border text-left transition-all duration-200 glass-card cursor-pointer ${
+                                    address.is_default ? 'border-l-4 border-l-accent' : ''
+                                  } ${isSelected ? 'border-accent bg-accent/10 ring-2 ring-accent/30' : 'border-border/20 hover:border-accent/50 hover:bg-accent/5'}`}
                                   onClick={() => selectSavedAddress(address.id)}
-                                  className="flex-1 text-xs h-7"
                                 >
-                                  Use This
-                                </Button>
-                                {!address.is_default && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setPrimaryAddress(address.id)}
-                                    className="text-xs h-7 px-2"
-                                  >
-                                    Set Primary
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => deleteSavedAddress(address.id)}
-                                  className="text-xs h-7 px-2 text-red-600 hover:text-red-700"
-                                >
-                                  Delete
-                                </Button>
-                              </div>
-                            </div>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium font-sans-premium flex items-center gap-2">
+                                        <span className="truncate">{address.label}</span>
+                                        {address.is_default && (
+                                          <Badge variant="secondary" className="text-[10px] flex-shrink-0">Primary</Badge>
+                                        )}
+                                      </div>
+                                      <div className="text-muted-foreground text-xs line-clamp-2">
+                                        {address.address}, {address.city}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); editSavedAddress(address.id); }}
+                                        className="p-1 rounded hover:bg-muted"
+                                        aria-label="Edit address"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-foreground/80" />
+                                      </button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="p-1 rounded hover:bg-muted"
+                                            aria-label="Delete address"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                          </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete address?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This action cannot be undone. This will permanently delete the selected address.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => deleteSavedAddress(address.id)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
-                      </div>
-                      <Separator className="my-4" />
+                          <Separator className="my-4" />
+                        </>
+                      )}
                     </div>
                   )}
 
-                  {/* Current Location Button */}
-                  <div className="flex gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={getCurrentLocation}
-                      disabled={isLoadingLocation}
-                      className="flex-1"
-                    >
-                      <Navigation className="w-4 h-4 mr-2" />
-                      {isLoadingLocation ? 'Getting Location...' : 'Use Current Location'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={saveCurrentAddress}
-                      className="flex-none"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Save Address
-                    </Button>
-                  </div>
-
-                  {/* Form Fields - Show when no address selected or when adding new address */}
-                  {(savedAddresses.length === 0 || showAddressSelection || isNewAddress) && (
-                    <div>
-                    <Label htmlFor="fullName" className="font-sans-premium">Full Name *</Label>
-                      <Input
-                      id="fullName"
-                      value={formData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
-                      className={`mt-1 bg-input-background ${validationErrors.fullName ? 'border-red-500' : 'border-border/20'}`}
-                    />
-                    {validationErrors.fullName && (
-                      <p className="text-red-500 text-sm mt-1">{validationErrors.fullName}</p>
-                    )}
-                  </div>
+                  {/* Smart Save Suggestion */}
+                  {showSaveSuggestion && isAddressComplete && isNewAddress && !editingAddressId && (
+                    <div className="p-3 rounded-lg bg-accent/10 border border-accent/20 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-foreground font-sans-premium">
+                            Save this address for faster checkout?
+                          </span>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowSaveSuggestion(false)}
+                            className="h-7 px-2 text-xs hover:bg-muted"
+                          >
+                            Not now
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => saveCurrentAddress()}
+                            className="h-7 px-2 text-xs text-accent-foreground"
+                          >
+                            Save Address
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   )}
+            
+
+            {/* Current Location & Make Primary Buttons Row */}
+            <div className="flex gap-3 items-center">
+              <Button
+                type="button"
+                variant="default"
+                onClick={getCurrentLocation}
+                disabled={isLoadingLocation}
+                className="flex-1 text-accent-foreground"
+              >
+                <Navigation className="w-4 h-4 mr-2" />
+                {isLoadingLocation ? 'Getting Location...' : 'Use Current Location'}
+              </Button>
+              {editingAddressId && (
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => saveCurrentAddress()}
+                  className="flex-1 text-accent-foreground"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Save Changes
+                </Button>
+              )}
+              {(() => {
+                const activeId = editingAddressId || selectedSavedAddress;
+                const active = savedAddresses.find(a => a.id === activeId);
+                if (active && !active.is_default) {
+                  return (
+                    <Button
+                      type="button"
+                      variant="default"
+                      onClick={() => setPrimaryAddress(active.id)}
+                      className="flex-1 text-accent-foreground"
+                    >
+                      <Star className="w-4 h-4 mr-2" />
+                      Make Primary
+                    </Button>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+                {/* Address Form Fields */}
+                <div>
+                  <Label htmlFor="fullName" className="font-sans-premium">Full Name *</Label>
+                  <Input
+                    id="fullName"
+                    value={formData.fullName}
+                    onChange={(e) => handleInputChange('fullName', e.target.value)}
+                    className={`mt-1 bg-input-background ${validationErrors.fullName ? 'border-red-500' : 'border-border/20'}`}
+                  />
+                  {validationErrors.fullName && (
+                    <p className="text-red-500 text-sm mt-1">{validationErrors.fullName}</p>
+                  )}
+                </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1354,7 +1620,8 @@ export function CheckoutPage() {
                           setCurrentStep(2);
                         }
                       }}
-                      className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                      variant="default"
+                      className="flex-1 text-accent-foreground"
                     >
                       Continue to Review
                     </Button>
@@ -1439,7 +1706,8 @@ export function CheckoutPage() {
                     </Button>
                     <Button 
                       onClick={() => handleStepChange(3)}
-                      className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                      variant="default"
+                      className="flex-1 text-accent-foreground"
                     >
                       Proceed to Payment
                     </Button>
@@ -1477,7 +1745,8 @@ export function CheckoutPage() {
                             const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             window.location.href = upiURL;
                           }}
-                          className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                          variant="default"
+                          className="w-full text-accent-foreground"
                         >
                           <Smartphone className="w-4 h-4 mr-2" />
                           Open UPI App

@@ -124,3 +124,4 @@ export function getBrandHeritageImageUrl(imagePath?: string): string {
   // If it's a relative path, assume it's in the brand-heritage bucket
   return getStorageUrl('brand-heritage', imagePath);
 }
+

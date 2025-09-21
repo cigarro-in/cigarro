@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react';
 import { 
-  Eye, 
-  Truck, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Package, 
   CreditCard,
   MapPin,
   Phone,
@@ -88,13 +82,10 @@ export function OrdersManager() {
     try {
       setLoading(true);
       
-      // Fetch orders with customer profiles
+      // Fetch orders directly (customer info is stored in shipping fields)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          profiles!orders_user_id_fkey(name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -103,10 +94,7 @@ export function OrdersManager() {
       const orderIds = ordersData?.map(order => order.id) || [];
       const { data: orderItemsData, error: itemsError } = await supabase
         .from('order_items')
-        .select(`
-          *,
-          products(name, brand, gallery_images)
-        `)
+        .select('*')
         .in('order_id', orderIds);
 
       if (itemsError) throw itemsError;
@@ -114,15 +102,16 @@ export function OrdersManager() {
       // Combine orders with their items
       const ordersWithItems = ordersData?.map(order => ({
         ...order,
-        customerName: order.profiles?.name || 'Unknown Customer',
-        customerEmail: order.profiles?.email || '',
+        customerName: order.shipping_name || 'Unknown Customer',
+        customerEmail: order.payment_link_email || '',
+        customerPhone: order.shipping_phone || '',
         items: orderItemsData?.filter(item => item.order_id === order.id).map(item => ({
           id: item.id,
-          name: item.products?.name || 'Unknown Product',
-          brand: item.products?.brand || '',
+          name: item.product_name || 'Unknown Product',
+          brand: item.product_brand || '',
           quantity: item.quantity,
-          price: item.price,
-          image: item.products?.gallery_images?.[0]
+          price: item.product_price,
+          image: item.product_image
         })) || []
       })) || [];
 
@@ -164,8 +153,9 @@ export function OrdersManager() {
     try {
       const updateData: any = {
         payment_verified: verified,
-        payment_verified_at: new Date().toISOString(),
-        payment_verified_by: 'admin' // You might want to use actual admin user ID
+        payment_verified_at: new Date().toISOString()
+        // Note: payment_verified_by field removed to avoid UUID constraint error
+        // TODO: Implement proper admin user ID tracking if needed
       };
 
       if (verified === 'REJECTED' && reason) {
@@ -212,8 +202,10 @@ export function OrdersManager() {
       key: 'display_order_id',
       label: 'Order ID',
       sortable: true,
-      render: (id: string) => (
-        <div className="font-mono text-sm font-medium">#{id}</div>
+      render: (id: string, order: Order) => (
+        <div className="font-mono text-sm font-medium">
+          #{getOrderNumber(order)}
+        </div>
       )
     },
     {
@@ -277,28 +269,16 @@ export function OrdersManager() {
     }
   ];
 
-  const actions = [
-    {
-      label: 'View Details',
-      icon: Eye,
-      onClick: (order: Order) => setShowOrderDetails(order.id)
-    },
-    {
-      label: 'Ship Order',
-      icon: Truck,
-      onClick: (order: Order) => setShowShippingModal(order.id)
-    },
-    {
-      label: 'Mark as Processing',
-      icon: Clock,
-      onClick: (order: Order) => handleStatusUpdate(order.id, 'processing')
-    },
-    {
-      label: 'Mark as Delivered',
-      icon: CheckCircle,
-      onClick: (order: Order) => handleStatusUpdate(order.id, 'delivered')
-    }
-  ];
+  const handleRowClick = (order: Order) => {
+    setShowOrderDetails(order.id);
+  };
+
+  const getOrderNumber = (order: Order) => {
+    // With the new migration, display_order_id should always be populated
+    // Fallback logic kept for safety during transition period
+    return order.display_order_id || 
+      new Date(order.created_at).getTime().toString().slice(-6).padStart(6, '0');
+  };
 
   const filters = [
     {
@@ -339,12 +319,12 @@ export function OrdersManager() {
         title="Order Management"
         data={orders}
         columns={columns}
-        actions={actions}
         searchPlaceholder="Search orders..."
         filters={filters}
         loading={loading}
         selectedItems={selectedOrders}
         onSelectionChange={setSelectedOrders}
+        onRowClick={handleRowClick}
       />
 
       {/* Order Details Modal */}
@@ -352,7 +332,7 @@ export function OrdersManager() {
         <StandardModal
           isOpen={!!showOrderDetails}
           onClose={() => setShowOrderDetails(null)}
-          title={`Order #${selectedOrder.display_order_id}`}
+          title={`Order #${getOrderNumber(selectedOrder)}`}
           size="lg"
         >
           <OrderDetails 
@@ -369,7 +349,7 @@ export function OrdersManager() {
         <StandardModal
           isOpen={!!showShippingModal}
           onClose={() => setShowShippingModal(null)}
-          title={`Ship Order #${shippingOrder.display_order_id}`}
+          title={`Ship Order #${getOrderNumber(shippingOrder)}`}
           size="md"
         >
           <ShippingModal

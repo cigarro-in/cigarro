@@ -316,6 +316,11 @@ export function ProductsManager() {
             fetchProducts();
           }}
           onCancel={() => setShowProductModal(false)}
+          onDelete={() => {
+            setShowProductModal(false);
+            fetchProducts();
+            toast.success('Product deleted successfully');
+          }}
         />
       </StandardModal>
     </div>

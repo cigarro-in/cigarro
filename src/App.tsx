@@ -55,10 +55,15 @@ function HomePage() {
   return (
     <>
       <Hero />
+      <div className="h-8"></div> {/* Spacer */}
       <FeaturedProducts />
+      <div className="h-8"></div> {/* Spacer */}
       <BrandHeritage />
+      <div className="h-8"></div> {/* Spacer */}
       <ProductShowcase />
+      <div className="h-8"></div> {/* Spacer */}
       <CategoriesGrid />
+      <div className="h-8"></div> {/* Spacer */}
       <BlogSection />
     </>
   );

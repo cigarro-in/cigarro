@@ -21,9 +21,9 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Switch } from '../ui/switch';
 import { Badge } from '../ui/badge';
-import { HeroSectionManager } from './modals/HeroSectionManager';
-import { FeaturedProductsManager } from './modals/FeaturedProductsManager';
-import { BrandHeritageManager } from './modals/BrandHeritageManager';
+import { EnhancedHeroSectionManager } from './modals/EnhancedHeroSectionManager';
+import { ImprovedFeaturedProductsManager } from './modals/ImprovedFeaturedProductsManager';
+import { EnhancedBrandHeritageManager } from './modals/EnhancedBrandHeritageManager';
 import { ProductShowcaseManager } from './modals/ProductShowcaseManager';
 import { CategoriesGridManager } from './modals/CategoriesGridManager';
 import { BlogSectionManager } from './modals/BlogSectionManager';
@@ -372,7 +372,7 @@ export default function HomepageManager() {
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={component.is_enabled}
-                      onCheckedChange={(checked) => toggleComponent(component.id, checked)}
+                      onCheckedChange={(checked: boolean) => toggleComponent(component.id, checked)}
                       disabled={isSaving}
                     />
                     <Badge variant={component.is_enabled ? "default" : "secondary"}>
@@ -387,17 +387,17 @@ export default function HomepageManager() {
       </Card>
 
       {/* Modals */}
-      <HeroSectionManager 
+      <EnhancedHeroSectionManager 
         open={showHeroManager} 
         onOpenChange={setShowHeroManager}
         onUpdate={loadHomepageData}
       />
-      <FeaturedProductsManager 
+      <ImprovedFeaturedProductsManager 
         open={showFeaturedManager} 
         onOpenChange={setShowFeaturedManager}
         onUpdate={loadHomepageData}
       />
-      <BrandHeritageManager 
+      <EnhancedBrandHeritageManager 
         open={showBrandHeritageManager} 
         onOpenChange={setShowBrandHeritageManager}
         onUpdate={loadHomepageData}

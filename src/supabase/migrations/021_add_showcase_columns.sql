@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_products_showcase_order ON public.products(showca
 
 -- Create index for is_showcase for better performance
 CREATE INDEX IF NOT EXISTS idx_products_is_showcase ON public.products(is_showcase) WHERE is_showcase = TRUE;
+

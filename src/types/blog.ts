@@ -94,3 +94,4 @@ export interface BlogComment {
   created_at: string;
   updated_at: string;
 }
+

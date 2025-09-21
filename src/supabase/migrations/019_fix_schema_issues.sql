@@ -121,3 +121,4 @@ END $$;
 
 -- 6. Refresh the schema cache
 NOTIFY pgrst, 'reload schema';
+

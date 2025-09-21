@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { 
   Package, 
   MapPin, 
@@ -14,8 +15,21 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Separator } from '../../ui/separator';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
 import { formatINR } from '../../../utils/currency';
 import { ImageWithFallback } from '../../figma/ImageWithFallback';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../ui/alert-dialog';
 
 interface OrderDetailsProps {
   order: any;
@@ -25,6 +39,17 @@ interface OrderDetailsProps {
 }
 
 export function OrderDetails({ order, onStatusUpdate, onPaymentVerification, onClose }: OrderDetailsProps) {
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const handleRejectPayment = () => {
+    if (rejectionReason.trim()) {
+      onPaymentVerification(order.id, 'REJECTED', rejectionReason);
+      setShowRejectModal(false);
+      setRejectionReason('');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered': return 'text-green-600';
@@ -125,8 +150,8 @@ export function OrderDetails({ order, onStatusUpdate, onPaymentVerification, onC
         <CardContent>
           <div className="space-y-4">
             {order.items.map((item: any, index: number) => (
-              <div key={index} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                <div className="w-16 h-16 bg-white rounded-lg overflow-hidden">
+              <div key={index} className="flex items-center space-x-4 p-3 bg-gray-100 rounded-lg border">
+                <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden">
                   {item.image ? (
                     <ImageWithFallback
                       src={item.image}
@@ -276,10 +301,7 @@ export function OrderDetails({ order, onStatusUpdate, onPaymentVerification, onC
             </Button>
             <Button 
               variant="destructive"
-              onClick={() => {
-                const reason = prompt('Reason for rejection:');
-                if (reason) onPaymentVerification(order.id, 'REJECTED', reason);
-              }}
+              onClick={() => setShowRejectModal(true)}
             >
               <XCircle className="mr-2 h-4 w-4" />
               Reject Payment
@@ -291,6 +313,45 @@ export function OrderDetails({ order, onStatusUpdate, onPaymentVerification, onC
           Close
         </Button>
       </div>
+
+      {/* Payment Rejection Modal */}
+      <AlertDialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please provide a reason for rejecting this payment. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="rejection-reason">Rejection Reason</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Enter the reason for payment rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowRejectModal(false);
+              setRejectionReason('');
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRejectPayment}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={!rejectionReason.trim()}
+            >
+              Reject Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

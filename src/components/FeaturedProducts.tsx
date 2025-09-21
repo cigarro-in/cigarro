@@ -15,9 +15,18 @@ const formatIndianPrice = (priceINR: number): string => {
 export function FeaturedProducts() {
   const { addToCart, isLoading } = useCart();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [sectionConfig, setSectionConfig] = useState({
+    title: 'Curated Selection of Premium Tobacco',
+    subtitle: 'Featured Products',
+    description: 'Discover our handpicked selection of premium tobacco products',
+    button_text: 'View All Products',
+    button_url: '/products',
+    is_enabled: true
+  });
 
   useEffect(() => {
     fetchFeaturedProducts();
+    fetchSectionConfig();
   }, []);
 
   const fetchFeaturedProducts = async () => {
@@ -27,13 +36,38 @@ export function FeaturedProducts() {
         .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
         .eq('is_featured', true)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
+        .order('featured_order', { ascending: true })
         .limit(3);
 
       if (productsError) throw productsError;
       setFeaturedProducts(products || []);
     } catch (error) {
       console.error('Error fetching featured products:', error);
+    }
+  };
+
+  const fetchSectionConfig = async () => {
+    try {
+      const { data: config, error } = await supabase
+        .from('section_configurations')
+        .select('title, subtitle, description, button_text, button_url, is_enabled')
+        .eq('section_name', 'featured_products')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (config) {
+        setSectionConfig({
+          title: config.title || 'Curated Selection of Premium Tobacco',
+          subtitle: config.subtitle || 'Featured Products',
+          description: config.description || 'Discover our handpicked selection of premium tobacco products',
+          button_text: config.button_text || 'View All Products',
+          button_url: config.button_url || '/products',
+          is_enabled: config.is_enabled !== false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching section config:', error);
     }
   };
 
@@ -46,7 +80,7 @@ export function FeaturedProducts() {
     }
   };
 
-  if (featuredProducts.length === 0) {
+  if (!sectionConfig.is_enabled || featuredProducts.length === 0) {
     return null;
   }
 
@@ -62,7 +96,7 @@ export function FeaturedProducts() {
             transition={{ duration: 0.8 }}
           >
             <h2 className="medium-title text-dark mb-4 w-full">
-              Curated Selection of Premium Tobacco
+              {sectionConfig.title}
             </h2>
             <div className="w-16 h-0.5 bg-canyon mx-auto"></div>
           </motion.div>
@@ -72,7 +106,7 @@ export function FeaturedProducts() {
         <div className="w-[90%] mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full">
             {featuredProducts.slice(0, 3).map((product, index) => (
-              <div 
+              <div
                 key={product.id}
                 className={`${index === 1 ? 'scale-110 z-10' : 'flex-1'}`}
               >
@@ -88,13 +122,13 @@ export function FeaturedProducts() {
           </div>
         </div>
 
-        {/* View All Button */}
-        <div className="text-center mt-12 px-4">
-          <Link 
-            to="/products" 
+        {/* View All Button - Centered below products */}
+        <div className="text-center mt-16 px-4">
+          <Link
+            to={sectionConfig.button_url}
             className="btn-primary inline-flex items-center px-8 py-3"
           >
-            View All Products
+            {sectionConfig.button_text}
           </Link>
         </div>
       </div>

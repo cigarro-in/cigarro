@@ -233,3 +233,4 @@ WHERE
 INSERT INTO public.section_configurations (section_name, title, subtitle, description, is_enabled) VALUES
 ('blog_section', 'Latest from Our Blog', 'Stories, Tips & Insights', 'Stay updated with the latest news, stories, and insights from the world of premium tobacco.', TRUE)
 ON CONFLICT (section_name) DO NOTHING;
+

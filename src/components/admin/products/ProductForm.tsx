@@ -48,6 +48,7 @@ interface ProductFormProps {
   isActive?: boolean;
   onSave: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }
 
 interface ProductFormData {
@@ -72,7 +73,7 @@ interface ProductFormData {
   variants: ProductVariant[];
 }
 
-export function ProductForm({ product, isActive = true, onSave, onCancel }: ProductFormProps) {
+export function ProductForm({ product, isActive = true, onSave, onCancel, onDelete }: ProductFormProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     slug: '',
@@ -221,6 +222,79 @@ export function ProductForm({ product, isActive = true, onSave, onCancel }: Prod
       toast.error('Failed to save product');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!product || !onDelete) return;
+    
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${product.name}"? This will also delete all variants and cannot be undone.`
+    );
+    
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    try {
+      // Delete all variants first
+      const { error: variantsError } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', product.id);
+
+      if (variantsError) throw variantsError;
+
+      // Delete the product
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', product.id);
+
+      if (productError) throw productError;
+
+      toast.success('Product deleted successfully');
+      onDelete();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Failed to delete product');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteVariant = async (variantId: string, variantName: string) => {
+    if (!variantId) {
+      // Remove from local state if it's a new variant
+      setFormData(prev => ({
+        ...prev,
+        variants: prev.variants.filter((_, i) => i !== formData.variants.findIndex(v => v.name === variantName))
+      }));
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the variant "${variantName}"? This cannot be undone.`
+    );
+    
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('id', variantId);
+
+      if (error) throw error;
+
+      setFormData(prev => ({
+        ...prev,
+        variants: prev.variants.filter(v => v.id !== variantId)
+      }));
+
+      toast.success('Variant deleted successfully');
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      toast.error('Failed to delete variant');
     }
   };
 
@@ -477,12 +551,7 @@ export function ProductForm({ product, isActive = true, onSave, onCancel }: Prod
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setFormData(prev => ({
-                              ...prev,
-                              variants: prev.variants.filter((_, i) => i !== index)
-                            }));
-                          }}
+                          onClick={() => handleDeleteVariant(variant.id || '', variant.name)}
                           className="text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -671,15 +740,34 @@ export function ProductForm({ product, isActive = true, onSave, onCancel }: Prod
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end space-x-3 pt-6 border-t border-coyote">
-        <Button type="button" variant="outline" onClick={onCancel} className="border-coyote text-dark hover:bg-coyote/20">
-          <X className="mr-2 h-4 w-4" />
-          Cancel
-        </Button>
-        <Button type="submit" disabled={loading} className="bg-canyon hover:bg-canyon/90 text-creme">
-          <Save className="mr-2 h-4 w-4" />
-          {loading ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
-        </Button>
+      <div className="flex justify-between pt-6 border-t border-coyote">
+        {/* Delete button - only show when editing existing product */}
+        <div>
+          {product && onDelete && (
+            <Button 
+              type="button" 
+              variant="destructive" 
+              onClick={handleDeleteProduct}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {loading ? 'Deleting...' : 'Delete Product'}
+            </Button>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex space-x-3">
+          <Button type="button" variant="outline" onClick={onCancel} className="border-coyote text-dark hover:bg-coyote/20">
+            <X className="mr-2 h-4 w-4" />
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading} className="bg-canyon hover:bg-canyon/90 text-creme">
+            <Save className="mr-2 h-4 w-4" />
+            {loading ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
+          </Button>
+        </div>
       </div>
     </form>
   );

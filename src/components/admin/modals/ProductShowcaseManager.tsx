@@ -22,7 +22,7 @@ import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Switch } from '../../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { Badge } from '../../ui/badge';
 import { Alert, AlertDescription } from '../../ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table';
@@ -41,7 +41,7 @@ interface Product {
   gallery_images?: string[];
   is_active: boolean;
   is_showcase: boolean;
-  showcase_order?: number;
+  showcase_order?: number | null;
 }
 
 interface Category {
@@ -64,6 +64,11 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sectionConfig, setSectionConfig] = useState({
+    title: 'Discover Our Most Celebrated Collections',
+    background_image: '' as string | null,
+    is_enabled: true
+  });
 
   useEffect(() => {
     if (open) {
@@ -74,7 +79,7 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [productsResult, categoriesResult] = await Promise.all([
+      const [productsResult, categoriesResult, configResult] = await Promise.all([
         supabase
           .from('products')
           .select('id, name, slug, price, gallery_images, is_active, is_showcase, showcase_order')
@@ -82,7 +87,12 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
         supabase
           .from('categories')
           .select('id, name, slug')
-          .order('name')
+          .order('name'),
+        supabase
+          .from('section_configurations')
+          .select('title, background_image, is_enabled')
+          .eq('section_name', 'product_showcase')
+          .single()
       ]);
 
       if (productsResult.error) throw productsResult.error;
@@ -90,6 +100,17 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
 
       setProducts(productsResult.data || []);
       setCategories(categoriesResult.data || []);
+      
+      // Load section configuration
+      if (configResult.data) {
+        setSectionConfig({
+          title: configResult.data.title || 'Discover Our Most Celebrated Collections',
+          background_image: configResult.data.background_image || '',
+          is_enabled: configResult.data.is_enabled !== false
+        });
+      } else if (configResult.error && configResult.error.code !== 'PGRST116') {
+        console.error('Error loading section config:', configResult.error);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
@@ -176,6 +197,33 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
     }
   };
 
+  const handleSaveSectionConfig = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('section_configurations')
+        .upsert({
+          section_name: 'product_showcase',
+          title: sectionConfig.title,
+          background_image: sectionConfig.background_image,
+          is_enabled: sectionConfig.is_enabled,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'section_name'
+        });
+
+      if (error) throw error;
+
+      toast.success('Section configuration saved successfully');
+      onUpdate();
+    } catch (error) {
+      console.error('Error saving section config:', error);
+      toast.error('Failed to save section configuration');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const showcaseProducts = products.filter(p => p.is_showcase).sort((a, b) => (a.showcase_order || 0) - (b.showcase_order || 0));
 
   return (
@@ -186,6 +234,9 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
             <Monitor className="h-5 w-5" />
             Product Showcase Management
           </DialogTitle>
+          <DialogDescription>
+            Manage which products appear in the Product Showcase section on your homepage. Select specific products, reorder them, and configure the section content.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -207,37 +258,46 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
                   <Label htmlFor="section_title">Section Title</Label>
                   <Input
                     id="section_title"
-                    value="Discover Our Most Celebrated Collections"
+                    value={sectionConfig.title}
+                    onChange={(e) => setSectionConfig(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Enter section title"
-                    readOnly
                   />
                 </div>
-                <div>
-                  <Label htmlFor="section_subtitle">Section Subtitle</Label>
-                  <Input
-                    id="section_subtitle"
-                    value=""
-                    placeholder="Enter section subtitle (optional)"
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="section_enabled"
+                    checked={sectionConfig.is_enabled}
+                    onCheckedChange={(checked: boolean) => setSectionConfig(prev => ({ ...prev, is_enabled: checked }))}
                   />
+                  <Label htmlFor="section_enabled">Enable Section</Label>
                 </div>
               </div>
               <div>
-                <Label>Background Image (Optional)</Label>
+                <Label>Featured Image</Label>
                 <div className="space-y-2">
                   <ImageUpload
-                    imageUrl=""
-                    onImageUrlChange={(url) => {
-                      // Handle background image change
-                      console.log('Background image changed:', url);
+                    imageUrl={sectionConfig.background_image}
+                    onImageUrlChange={(url: string | null) => {
+                      setSectionConfig(prev => ({ ...prev, background_image: url || '' }));
                     }}
                     showSelector={true}
-                    title="Select Background Image"
-                    description="Choose a background image for the product showcase section"
+                    title="Select Featured Image"
+                    description="Choose a featured image for the first column of the product showcase section"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Upload a background image for the product showcase section
+                    This image will be displayed in the first column of the showcase section. Recommended size: 800x1000px
                   </p>
                 </div>
+              </div>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleSaveSectionConfig}
+                  disabled={isSaving}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  {isSaving ? 'Saving...' : 'Save Section Settings'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -385,7 +445,7 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
                       <div className="flex items-center justify-between">
                         <Switch
                           checked={product.is_showcase}
-                          onCheckedChange={(checked) => handleToggleShowcase(product.id, checked)}
+                          onCheckedChange={(checked: boolean) => handleToggleShowcase(product.id, checked)}
                         />
                         <Button
                           variant="outline"
@@ -413,7 +473,15 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-between gap-2">
+            <Button 
+              onClick={handleSaveSectionConfig}
+              disabled={isSaving}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Saving...' : 'Save All Changes'}
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               <X className="h-4 w-4 mr-2" />
               Close
