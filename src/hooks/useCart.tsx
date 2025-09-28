@@ -7,7 +7,7 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  brand: string;
+  brand: string; // Made required again since we added it back to database
   price: number;
   description: string;
   is_active: boolean;
@@ -134,7 +134,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           id: product.id,
           name: product.name,
           slug: product.slug,
-          brand: product.brand,
+          brand: product.brand || 'Premium', // Default brand if null
           price: product.price,
           description: product.description,
           is_active: product.is_active,
@@ -407,7 +407,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       id: combo.id,
       name: combo.name,
       slug: combo.slug,
-      brand: 'Combo',
+      brand: 'Combo', // Default brand for combos
       price: combo.combo_price,
       description: combo.description || '',
       is_active: combo.is_active,

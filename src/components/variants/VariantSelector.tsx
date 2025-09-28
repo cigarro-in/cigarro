@@ -21,8 +21,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   basePrice,
   productName
 }) => {
-  const [hoveredVariant, setHoveredVariant] = useState<ProductVariant | null>(null);
-
   // Group variants by type
   const variantsByType = variants.reduce((acc, variant) => {
     if (!acc[variant.variant_type]) {
@@ -42,149 +40,62 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const getVariantTypeLabel = (type: string): string => {
     switch (type) {
       case 'packaging':
-        return 'Packaging';
+        return 'Type';
       case 'color':
         return 'Color';
       case 'size':
         return 'Size';
+      case 'weight':
+        return 'Weight';
+      case 'strength':
+        return 'Strength';
       default:
-        return 'Options';
+        return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
 
-  const getVariantDisplayPrice = (variant: ProductVariant): string => {
-    if (variant.price === basePrice) {
-      return formatINR(variant.price);
-    }
-    
-    const difference = variant.price - basePrice;
-    const sign = difference > 0 ? '+' : '';
-    return `${formatINR(variant.price)} (${sign}${formatINR(Math.abs(difference))})`;
-  };
-
-  const getVariantSavings = (variant: ProductVariant): string | null => {
-    if (variant.price < basePrice) {
-      const savings = basePrice - variant.price;
-      return `Save ${formatINR(savings)}`;
-    }
-    return null;
+  const isVariantAvailable = (variant: ProductVariant): boolean => {
+    return variant.stock ? variant.stock > 0 : (variant.stock_quantity ? variant.stock_quantity > 0 : true);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {Object.entries(variantsByType).map(([type, typeVariants]) => (
-        <div key={type} className="space-y-3">
-          <h4 className="text-sm font-medium text-foreground">
+        <div key={type} className="space-y-4">
+          <h3 className="text-sm uppercase tracking-widest text-dark/60 font-medium">
             {getVariantTypeLabel(type)}
-          </h4>
+          </h3>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="flex flex-wrap gap-3">
             {typeVariants.map((variant) => {
               const isSelected = selectedVariant?.id === variant.id;
-              const isHovered = hoveredVariant?.id === variant.id;
-              const savings = getVariantSavings(variant);
+              const isAvailable = isVariantAvailable(variant);
               
               return (
-                <Card
+                <button
                   key={variant.id}
-                  className={`cursor-pointer transition-all duration-200 ${
-                    isSelected
-                      ? 'ring-2 ring-accent bg-accent/5'
-                      : 'hover:ring-1 hover:ring-accent/50 hover:bg-accent/5'
-                  }`}
-                  onClick={() => onVariantSelect(variant)}
-                  onMouseEnter={() => setHoveredVariant(variant)}
-                  onMouseLeave={() => setHoveredVariant(null)}
+                  onClick={() => isAvailable && onVariantSelect(variant)}
+                  disabled={!isAvailable}
+                  className={`
+                    px-6 py-3 rounded-full text-sm font-medium transition-all duration-300
+                    ${isSelected
+                      ? 'bg-dark text-creme shadow-md'
+                      : isAvailable
+                        ? 'bg-creme-light border border-coyote/30 text-dark hover:border-dark/40 hover:shadow-sm'
+                        : 'bg-creme-light border border-coyote/20 text-dark/30 cursor-not-allowed line-through'
+                    }
+                  `}
                 >
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      {/* Variant Name */}
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-medium text-foreground">
-                          {variant.variant_name}
-                        </h5>
-                        {savings && (
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                            {savings}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {/* Price */}
-                      <div className="text-lg font-semibold text-accent">
-                        {getVariantDisplayPrice(variant)}
-                      </div>
-                      
-                      {/* SKU */}
-                      {variant.sku && (
-                        <div className="text-xs text-muted-foreground font-mono">
-                          SKU: {variant.sku}
-                        </div>
-                      )}
-                      
-                      {/* Weight */}
-                      {variant.weight && (
-                        <div className="text-xs text-muted-foreground">
-                          Weight: {variant.weight}g
-                        </div>
-                      )}
-                      
-                      {/* Selection Indicator */}
-                      {isSelected && (
-                        <div className="flex items-center gap-1 text-xs text-accent">
-                          <div className="w-2 h-2 bg-accent rounded-full"></div>
-                          Selected
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                  {variant.variant_name}
+                  {!isAvailable && (
+                    <span className="ml-2 text-xs">(Out of stock)</span>
+                  )}
+                </button>
               );
             })}
           </div>
         </div>
       ))}
-      
-      {/* Variant Details */}
-      {selectedVariant && (
-        <div className="mt-6 p-4 bg-muted/20 rounded-lg border border-border/20">
-          <h4 className="font-medium text-foreground mb-2">
-            Selected: {selectedVariant.variant_name}
-          </h4>
-          
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Price:</span>
-              <span className="ml-2 font-semibold text-accent">
-                {formatINR(selectedVariant.price)}
-              </span>
-            </div>
-            
-            {selectedVariant.weight && (
-              <div>
-                <span className="text-muted-foreground">Weight:</span>
-                <span className="ml-2">{selectedVariant.weight}g</span>
-              </div>
-            )}
-            
-            {selectedVariant.sku && (
-              <div>
-                <span className="text-muted-foreground">SKU:</span>
-                <span className="ml-2 font-mono text-xs">{selectedVariant.sku}</span>
-              </div>
-            )}
-            
-            {selectedVariant.dimensions && (
-              <div>
-                <span className="text-muted-foreground">Dimensions:</span>
-                <span className="ml-2">
-                  {selectedVariant.dimensions.length} × {selectedVariant.dimensions.width} × {selectedVariant.dimensions.height} cm
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

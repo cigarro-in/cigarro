@@ -390,3 +390,21 @@ export class RateLimiter {
 export const authRateLimiter = new RateLimiter(5, 15 * 60 * 1000); // 5 attempts per 15 minutes
 export const apiRateLimiter = new RateLimiter(100, 60 * 1000); // 100 requests per minute
 
+/**
+ * Sanitizer object for admin interfaces
+ */
+export const sanitizer = {
+  sanitizeText: (text: string) => sanitizeString(text, 255),
+  sanitizeUrl: (url: string) => sanitizeString(url, 500),
+  html: (text: string) => sanitizeString(text.replace(/[<>\"'&]/g, ''), 1000),
+  slug: (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim()
+      .slice(0, 100);
+  }
+};
+

@@ -96,6 +96,22 @@ class AuditLogger {
   }
 
   /**
+   * Log admin action for compliance
+   */
+  async logAction(resource: string, action: string, resourceId: string, oldData?: any, newData?: any): Promise<void> {
+    await this.logEvent({
+      action: `${resource}_${action}`,
+      resource,
+      resource_id: resourceId,
+      details: {
+        old_data: oldData,
+        new_data: newData
+      },
+      severity: 'medium'
+    });
+  }
+
+  /**
    * Log error for monitoring
    */
   async logError(error: Error, context?: Record<string, any>): Promise<void> {

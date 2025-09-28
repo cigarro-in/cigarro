@@ -3,8 +3,8 @@ import { Upload, Image as ImageIcon, X, Plus } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Card, CardContent } from './card';
-import { ImageUpload } from './ImageUpload';
-import { AssetManager } from '../admin/AssetManager';
+import { ImageUploadCore } from './ImageUploadCore';
+import { AssetManager } from '../../admin/modules/assets/AssetManager';
 
 interface ImageSelectorModalProps {
   open: boolean;
@@ -33,10 +33,14 @@ export function ImageSelectorModal({
     setMode(null);
   };
 
-  const handleUploadComplete = (imageUrl: string) => {
-    setUploadedImageUrl(imageUrl);
-    onImageSelect(imageUrl);
-    onOpenChange(false);
+  const handleUploadComplete = (imageUrl: string | null) => {
+    if (imageUrl) {
+      setUploadedImageUrl(imageUrl);
+      onImageSelect(imageUrl);
+      onOpenChange(false);
+    } else {
+      setUploadedImageUrl(null);
+    }
     setMode(null);
   };
 
@@ -108,6 +112,7 @@ export function ImageSelectorModal({
                     </p>
                   </div>
                   <Button 
+                    type="button"
                     variant="outline" 
                     size="sm"
                     onClick={() => handleImageSelect(currentImageUrl)}
@@ -122,24 +127,24 @@ export function ImageSelectorModal({
           // Upload Mode
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
-              <Button variant="ghost" size="sm" onClick={handleBack}>
+              <Button type="button" variant="ghost" size="sm" onClick={handleBack}>
                 <X className="h-4 w-4 mr-1" />
                 Back
               </Button>
               <h3 className="font-semibold">Upload New Image</h3>
             </div>
             
-            <ImageUpload
+            <ImageUploadCore
               imageUrl={uploadedImageUrl}
               onImageUrlChange={handleUploadComplete}
             />
             
             {uploadedImageUrl && (
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleBack}>
+                <Button type="button" variant="outline" onClick={handleBack}>
                   Cancel
                 </Button>
-                <Button onClick={() => handleImageSelect(uploadedImageUrl)}>
+                <Button type="button" onClick={() => handleImageSelect(uploadedImageUrl)}>
                   Use This Image
                 </Button>
               </div>
@@ -149,7 +154,7 @@ export function ImageSelectorModal({
           // Select Mode
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
-              <Button variant="ghost" size="sm" onClick={handleBack}>
+              <Button type="button" variant="ghost" size="sm" onClick={handleBack}>
                 <X className="h-4 w-4 mr-1" />
                 Back
               </Button>
@@ -166,7 +171,7 @@ export function ImageSelectorModal({
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={handleClose}>
+          <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
         </div>

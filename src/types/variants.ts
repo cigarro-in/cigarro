@@ -4,11 +4,11 @@ export interface ProductVariant {
   id: string;
   product_id: string;
   variant_name: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'other';
+  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
   variant_description?: string;
-  sku: string;
   price: number;
-  stock_quantity?: number;
+  stock: number;
+  stock_quantity?: number; // Keep for backward compatibility
   weight?: number;
   dimensions?: {
     length: number;
@@ -17,9 +17,11 @@ export interface ProductVariant {
   };
   is_active: boolean;
   sort_order: number;
+  // New schema supports variant_images table; keep images for backward compat
+  images?: VariantImage[];
+  variant_images?: VariantImage[];
   created_at: string;
   updated_at: string;
-  images: VariantImage[];
   products?: {
     id: string;
     name: string;
@@ -68,6 +70,16 @@ export interface ComboItem {
   variant?: ProductVariant;
 }
 
+// Minimal Product type for references in combos and elsewhere
+export interface Product {
+  id: string;
+  name: string;
+  slug?: string;
+  brand: string; // Made required again since we added it back to database
+  price?: number;
+  gallery_images?: string[];
+}
+
 export interface Discount {
   id: string;
   name: string;
@@ -105,7 +117,7 @@ export interface SearchResult {
   id: string;
   name: string;
   slug: string;
-  brand: string;
+  brand: string; // Made required again since we added it back to database
   description?: string;
   base_price: number;
   gallery_images: string[];
@@ -131,7 +143,7 @@ export interface CartItemWithVariant {
   id: string;
   name: string;
   slug: string;
-  brand: string;
+  brand: string; // Made required again since we added it back to database
   price: number;
   description: string;
   is_active: boolean;
@@ -168,7 +180,7 @@ export interface ProductWithVariants {
   id: string;
   name: string;
   slug: string;
-  brand: string;
+  brand: string; // Made required again since we added it back to database
   price: number;
   description: string;
   is_active: boolean;
@@ -241,8 +253,7 @@ export interface SearchQueryParse {
 // Admin interfaces for management
 export interface VariantFormData {
   variant_name: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'other';
-  sku: string;
+  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
   price: number;
   weight?: number;
   dimensions?: {
@@ -252,7 +263,6 @@ export interface VariantFormData {
   };
   is_active: boolean;
   sort_order: number;
-  images: File[];
 }
 
 export interface ComboFormData {

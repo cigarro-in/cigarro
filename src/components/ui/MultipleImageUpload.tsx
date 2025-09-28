@@ -118,6 +118,15 @@ export function MultipleImageUpload({
     onImageUrlsChange(newImageUrls);
   };
 
+  // Suppress react-beautiful-dnd defaultProps warning
+  const originalConsoleError = console.error;
+  console.error = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('defaultProps')) {
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
+
   return (
     <div className="space-y-4">
       <DragDropContext onDragEnd={onDragEnd}>
@@ -147,6 +156,7 @@ export function MultipleImageUpload({
                         />
                         <div className="absolute top-0.5 right-0.5">
                           <Button
+                            type="button"
                             variant="destructive"
                             size="icon"
                             className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -170,6 +180,7 @@ export function MultipleImageUpload({
                 <div className="w-20 h-20 border-2 border-dashed border-border/20 rounded-md flex items-center justify-center flex-shrink-0">
                   {showSelector ? (
                     <Button
+                      type="button"
                       variant="ghost"
                       onClick={() => setShowSelectorModal(true)}
                       className="w-full h-full flex flex-col items-center justify-center p-0"
