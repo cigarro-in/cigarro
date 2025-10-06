@@ -65,7 +65,7 @@ interface Category {
 interface CategoryFormData {
   name: string;
   description: string;
-  image_url: string;
+  image_url: string | null;
   image_alt_text: string;
   parent_id: string;
   is_active: boolean;
@@ -97,7 +97,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: '',
-    image_url: '',
+    image_url: null,
     image_alt_text: '',
     parent_id: 'none',
     is_active: true,
@@ -628,7 +628,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                 <TableHead className="w-12">
                   <Checkbox
                     checked={selectedCategories.length === filteredCategories.length}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       if (checked) {
                         setSelectedCategories(filteredCategories.map(c => c.id));
                       } else {
@@ -651,7 +651,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   <TableCell>
                     <Checkbox
                       checked={selectedCategories.includes(category.id)}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={(checked: boolean) => {
                         if (checked) {
                           setSelectedCategories(prev => [...prev, category.id]);
                         } else {
@@ -794,8 +794,11 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  error={formErrors.name}
+                  className={formErrors.name ? 'border-red-500' : ''}
                 />
+                {formErrors.name && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -805,15 +808,18 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  error={formErrors.description}
+                  className={formErrors.description ? 'border-red-500' : ''}
                 />
+                {formErrors.description && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.description}</p>
+                )}
               </div>
 
               <div>
                 <Label htmlFor="parent_id">Parent Category</Label>
                 <Select 
                   value={formData.parent_id} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, parent_id: value }))}
+                  onValueChange={(value: string) => setFormData(prev => ({ ...prev, parent_id: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent category (optional)" />
@@ -839,9 +845,8 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
               <EnhancedImageUpload
                 imageUrl={formData.image_url}
                 onImageUrlChange={(url) => setFormData(prev => ({ ...prev, image_url: url }))}
-                label="Category Image"
-                folder="categories"
-                help="Upload or select an image for this category"
+                title="Category Image"
+                description="Upload or select an image for this category"
                 aspectRatio="square"
               />
 
@@ -886,7 +891,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   <Switch
                     id="is_active"
                     checked={formData.is_active}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_active: checked }))}
                   />
                 </div>
 
@@ -895,7 +900,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   <Switch
                     id="is_featured"
                     checked={formData.is_featured}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_featured: checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_featured: checked }))}
                   />
                 </div>
               </div>

@@ -74,7 +74,7 @@ const Hero = () => {
   }
 
   return (
-    <div className="pt-[var(--gutter)] pb-[var(--gutter)] relative h-screen flex items-center overflow-hidden">
+    <div className="pt-4 pb-4 sm:pt-8 sm:pb-8 relative h-screen flex items-center overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 left-10 w-2 h-2 bg-sunflower rounded-full animate-pulse opacity-60"></div>
@@ -83,11 +83,11 @@ const Hero = () => {
         <div className="absolute bottom-20 right-20 w-1.5 h-1.5 bg-canyon rounded-full animate-pulse opacity-60" style={{ animationDelay: '0.5s' }}></div>
       </div>
 
-      <div className="main-container h-full relative z-10">
+      <div className="container mx-auto px-4 h-full relative z-10">
         <div className="relative h-full">
           <div className="relative h-full">
             <div className="relative h-full">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-[var(--gutter)] h-full" id={`header-slider__slide-${currentSlide}`}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-16 h-full" id={`header-slider__slide-${currentSlide}`}>
                 
                 {/* Big Image */}
                 <div className="relative bg-transparent overflow-hidden rounded-lg h-full">
@@ -160,25 +160,22 @@ const Hero = () => {
                 
                 {/* Content */}
                 <div className="flex flex-col justify-between h-full">
-                  <div className="pt-16 pb-8 lg:pb-16 fade-in">
+                  <div className="pt-8 pb-4 sm:pt-16 sm:pb-8 lg:pb-16 fade-in">
                     {currentSlideData.suptitle && (
-                      <div className="suptitle text-canyon overflow-hidden w-full mb-5">
-                        <p className="suptitle">{currentSlideData.suptitle}</p>
+                      <div className="suptitle text-canyon overflow-hidden w-full mb-3 sm:mb-5">
+                        <p className="suptitle text-sm sm:text-base lg:text-lg">{currentSlideData.suptitle}</p>
                       </div>
                     )}
-                    <div className="mb-16 lg:mb-8">
-                      <h2 className="medium-title w-full leading-tight">{currentSlideData.title}</h2>
+                    <div className="mb-8 sm:mb-16 lg:mb-8">
+                      <h2 className="medium-title w-full leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">{currentSlideData.title}</h2>
                     </div>
                     {currentSlideData.button_text && currentSlideData.button_url && (
-                      <a 
-                        href={currentSlideData.button_url} 
-                        className="inline-block font-sans font-normal text-creme-light bg-dark border-none rounded-full text-center relative min-w-[90px] no-underline overflow-hidden cursor-pointer uppercase tracking-wide text-[clamp(14px,calc(100vw*14/1440),20px)] leading-[1.71] px-[max(15px,calc(100vw*25/1440))] py-[clamp(8px,calc(100vw*12/1440),15px)] transition-all duration-500 delay-300 lg:absolute lg:bottom-32 hover:bg-creme-light hover:text-dark"
+                      <a
+                        href={currentSlideData.button_url}
+                        className="inline-block font-sans font-normal text-creme-light bg-dark border-none rounded-full text-center relative min-w-[90px] no-underline overflow-hidden cursor-pointer uppercase tracking-wide text-sm sm:text-base leading-[1.71] px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4 transition-all duration-500 delay-300 lg:absolute lg:bottom-32 hover:bg-creme-light hover:text-dark"
                         target="_self"
                       >
-                        <span className="block transition-transform duration-500 py-2 lg:py-4">
-                          {currentSlideData.button_text}
-                        </span>
-                        <span className="absolute left-0 w-full h-full flex flex-col justify-center items-center">
+                        <span className="block transition-transform duration-500 py-1 sm:py-2 lg:py-4">
                           {currentSlideData.button_text}
                         </span>
                       </a>
@@ -202,6 +199,7 @@ const Hero = () => {
                 </div>
               </div>
             </div>
+          </div>
 
             {/* Navigation Arrows */}
             <div className="hidden lg:flex absolute right-0 bottom-72 z-10 space-x-1">
@@ -246,7 +244,6 @@ const Hero = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

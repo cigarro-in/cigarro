@@ -100,9 +100,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button
                 onClick={handleAddToCart}
                 disabled={isLoading}
-                className="bg-dark text-creme-light hover:bg-canyon transition-all duration-300 font-medium text-xs uppercase tracking-wide px-3 py-1.5 rounded-full disabled:opacity-50"
+                className="bg-dark text-creme-light hover:bg-canyon transition-all duration-300 font-medium text-xs uppercase tracking-wide px-3 py-1.5 rounded-full disabled:opacity-50 min-w-[80px] sm:min-w-[100px]"
               >
-                {isLoading ? 'Adding...' : 'Add to Cart'}
+                {isLoading ? 'Adding...' : 'Add'}
               </button>
             )}
           </div>

@@ -77,6 +77,8 @@
             "type-check": "tsc --noEmit",
             "lint": "echo 'Linting not configured'",
             "test": "echo 'Tests not configured'",
-            "build:analyze": "vite build --mode analyze"
+            "build:analyze": "vite build --mode analyze",
+            "generate-sitemap": "node --loader ts-node/esm src/scripts/generate-complete-sitemap.ts",
+            "seo": "npm run generate-sitemap"
       }
 }

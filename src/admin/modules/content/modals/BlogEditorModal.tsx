@@ -38,7 +38,7 @@ export function BlogEditorModal({
     excerpt: '',
     content: '',
     featured_image: '',
-    status: 'draft' as 'draft' | 'published',
+    status: 'draft' as 'draft' | 'published' | 'archived',
     is_featured: false,
     is_pinned: false,
     category_id: '',
@@ -60,7 +60,7 @@ export function BlogEditorModal({
         excerpt: post.excerpt || '',
         content: post.content || '',
         featured_image: post.featured_image || '',
-        status: post.status,
+        status: post.status as 'draft' | 'published' | 'archived',
         is_featured: post.is_featured,
         is_pinned: post.is_pinned,
         category_id: post.category_id || 'none',
@@ -288,7 +288,7 @@ export function BlogEditorModal({
                       ) : null;
                     })}
                   </div>
-                  <Select onValueChange={(value) => {
+                  <Select onValueChange={(value: string) => {
                     if (!selectedTags.includes(value)) {
                       setSelectedTags(prev => [...prev, value]);
                     }
@@ -368,7 +368,7 @@ export function BlogEditorModal({
                 <Label>Category</Label>
                 <Select
                   value={formData.category_id}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
+                  onValueChange={(value: string) => setFormData(prev => ({ ...prev, category_id: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
@@ -389,7 +389,7 @@ export function BlogEditorModal({
                   <Label>Featured Post</Label>
                   <Switch
                     checked={formData.is_featured}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_featured: checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_featured: checked }))}
                   />
                 </div>
 
@@ -397,7 +397,7 @@ export function BlogEditorModal({
                   <Label>Pinned Post</Label>
                   <Switch
                     checked={formData.is_pinned}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_pinned: checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_pinned: checked }))}
                   />
                 </div>
               </div>
