@@ -2,5 +2,10 @@
 https://www.cigarro.in/* https://cigarro.in/:splat 301
 http://www.cigarro.in/* https://cigarro.in/:splat 301
 
+# SEO files - serve directly
+/sitemap.xml /sitemap.xml 200
+/robots.txt /robots.txt 200
+/llms.txt /llms.txt 200
+
 # Handle SPA routing - exclude assets and API routes
 /* /index.html 200
