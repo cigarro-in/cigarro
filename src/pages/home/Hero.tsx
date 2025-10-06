@@ -75,13 +75,6 @@ const Hero = () => {
 
   return (
     <div className="pt-4 pb-4 sm:pt-8 sm:pb-8 relative h-screen flex items-center overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-sunflower rounded-full animate-pulse opacity-60"></div>
-        <div className="absolute top-40 right-32 w-1 h-1 bg-canyon rounded-full animate-pulse opacity-40" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-32 left-40 w-3 h-3 bg-sunflower rounded-full animate-pulse opacity-50" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-20 right-20 w-1.5 h-1.5 bg-canyon rounded-full animate-pulse opacity-60" style={{ animationDelay: '0.5s' }}></div>
-      </div>
 
       <div className="container mx-auto px-4 h-full relative z-10">
         <div className="relative h-full">
