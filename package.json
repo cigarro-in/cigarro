@@ -68,12 +68,15 @@
             "@types/node": "^20.10.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "terser": "^5.44.0",
+            "tsx": "^4.19.2",
             "vite": "^6.3.6"
       },
       "scripts": {
             "dev": "vite",
             "build": "npm run build:copy-seo && vite build",
             "build:copy-seo": "cp sitemap.xml public/sitemap.xml && cp llms.txt public/llms.txt && cp robots.txt public/robots.txt && cp _redirects public/_redirects && cp _headers public/_headers",
+            "build:dynamic-sitemap": "npm run generate-sitemap && npm run build:copy-seo && vite build",
+            "generate-sitemap": "tsx src/scripts/generate-sitemap.ts",
             "preview": "vite preview",
             "type-check": "tsc --noEmit",
             "lint": "echo 'Linting not configured'",

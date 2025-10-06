@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
   
   <!-- Homepage -->
   <url>
@@ -9,7 +10,7 @@
     <priority>1.0</priority>
   </url>
   
-  <!-- Main Pages -->
+  <!-- Main Shopping Pages -->
   <url>
     <loc>https://cigarro.in/products</loc>
     <changefreq>daily</changefreq>
@@ -28,6 +29,7 @@
     <priority>0.8</priority>
   </url>
   
+  <!-- Content Pages -->
   <url>
     <loc>https://cigarro.in/blog</loc>
     <changefreq>daily</changefreq>
@@ -46,7 +48,7 @@
     <priority>0.6</priority>
   </url>
   
-  <!-- Legal Pages -->
+  <!-- Legal & Policy Pages -->
   <url>
     <loc>https://cigarro.in/privacy</loc>
     <changefreq>yearly</changefreq>
@@ -63,6 +65,58 @@
     <loc>https://cigarro.in/shipping</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
+  </url>
+  
+  <!-- Sample Product Pages (Replace with dynamic generation) -->
+  <url>
+    <loc>https://cigarro.in/product/marlboro-red</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://cigarro.in/product/camel-blue</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Sample Category Pages -->
+  <url>
+    <loc>https://cigarro.in/category/premium-cigarettes</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://cigarro.in/category/light-cigarettes</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Sample Brand Pages -->
+  <url>
+    <loc>https://cigarro.in/brands/marlboro</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://cigarro.in/brands/camel</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Sample Blog Posts -->
+  <url>
+    <loc>https://cigarro.in/blog/premium-cigarette-guide</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://cigarro.in/blog/cigarette-storage-tips</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
   
 </urlset>
