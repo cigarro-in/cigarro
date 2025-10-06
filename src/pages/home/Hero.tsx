@@ -59,7 +59,7 @@ const Hero = () => {
 
   if (isLoading) {
     return (
-      <div className="pt-[var(--gutter)] pb-[var(--gutter)] relative h-screen flex items-center overflow-hidden">
+      <div className="pt-[var(--gutter)] pb-[var(--gutter)] relative min-h-[100dvh] flex items-center overflow-hidden">
         <div className="main-container h-full relative z-10">
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dark"></div>
@@ -74,7 +74,7 @@ const Hero = () => {
   }
 
   return (
-    <div className="pt-4 pb-4 sm:pt-8 sm:pb-8 relative h-screen flex items-center overflow-hidden">
+    <div className="pt-4 pb-4 sm:pt-8 sm:pb-8 relative min-h-[100dvh] flex items-center overflow-hidden">
 
       <div className="container mx-auto px-4 h-full relative z-10">
         <div className="relative h-full">

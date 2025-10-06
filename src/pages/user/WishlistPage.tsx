@@ -31,11 +31,15 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
   viewMode 
 }, ref) => {
   const [imageError, setImageError] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleRemove = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onRemove(product.id);
+  const handleRemove = async () => {
+    try {
+      await onRemove(product.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      toast.error('Failed to remove item');
+    }
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
@@ -44,114 +48,97 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
     onAddToCart(product);
   };
 
-  if (viewMode === 'list') {
-    return (
-      <motion.div
-        ref={ref}
-        layout
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, x: -100 }}
-        className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
-      >
-        <div className="flex">
-          {/* Product Image */}
-          <div className="relative w-32 h-32 flex-shrink-0">
-            <img
-              src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
-              alt={product.name}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover"
-            />
-            <button
-              onClick={handleRemove}
-              className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors duration-200"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Product Info */}
-          <div className="flex-1 p-4 flex flex-col justify-between">
-            <div>
-              <Link to={`/product/${product.slug}`}>
-                <h3 className="text-lg font-semibold text-dark hover:text-canyon transition-colors duration-200 line-clamp-2">
-                  {product.name}
-                </h3>
-              </Link>
-              <p className="text-sm text-gray-600 mt-1">{product.brand}</p>
-              <p className="text-xl font-bold text-dark mt-2">₹{formatIndianPrice(product.price)}</p>
-            </div>
-            
-            <div className="flex items-center justify-between mt-4">
-              <Link
-                to={`/product/${product.slug}`}
-                className="text-canyon hover:text-dark transition-colors duration-200 font-medium"
-              >
-                View Details
-              </Link>
-              <Button
-                onClick={handleAddToCart}
-                disabled={isLoading}
-                className="bg-dark text-white hover:bg-canyon transition-colors duration-200"
-              >
-                {isLoading ? 'Adding...' : 'Add to Cart'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Grid view
+  // Cart-style horizontal card layout
   return (
     <motion.div
       ref={ref}
       layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden group"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -100 }}
+      className="bg-background border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200"
     >
-      <div className="relative">
-        <img
-          src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
-          alt={product.name}
-          onError={() => setImageError(true)}
-          className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        
-        {/* Remove button */}
-        <button
-          onClick={handleRemove}
-          className="absolute top-3 right-3 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors duration-200 opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
+      <div className="flex items-start gap-4">
+        {/* Product Image */}
+        <Link to={`/product/${product.slug}`} className="relative w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+          <img
+            src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
+            alt={product.name}
+            onError={() => setImageError(true)}
+            className="w-full h-full object-cover"
+          />
+        </Link>
 
-        {/* Quick Add to Cart */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        {/* Product Info */}
+        <div className="flex-1 min-w-0">
+          <Link to={`/product/${product.slug}`} className="group">
+            <h3 className="font-medium text-foreground group-hover:text-accent transition-colors duration-200 line-clamp-2 leading-tight">
+              {product.name}
+            </h3>
+          </Link>
+          <p className="text-sm text-muted-foreground mt-1">{product.brand}</p>
+          <p className="text-lg font-semibold text-foreground mt-2">₹{formatIndianPrice(product.price)}</p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col items-end gap-2">
+          {/* Add to Cart Button */}
           <Button
             onClick={handleAddToCart}
             disabled={isLoading}
-            className="w-full bg-white text-dark hover:bg-canyon hover:text-white transition-all duration-200"
+            size="sm"
+            className="whitespace-nowrap"
           >
             <ShoppingCart className="w-4 h-4 mr-2" />
-            {isLoading ? 'Adding...' : 'Add to Cart'}
+            Add to Cart
           </Button>
+
+          {/* Remove Button */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isLoading}
+            className="text-red-500 hover:text-red-600 transition-colors duration-200 p-2 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            title="Remove from wishlist"
+            aria-label="Remove item"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      <div className="p-4">
-        <Link to={`/product/${product.slug}`}>
-          <h3 className="text-lg font-semibold text-dark hover:text-canyon transition-colors duration-200 line-clamp-2 mb-2">
-            {product.name}
-          </h3>
-        </Link>
-        <p className="text-sm text-gray-600 mb-2">{product.brand}</p>
-        <p className="text-xl font-bold text-dark">₹{formatIndianPrice(product.price)}</p>
-      </div>
+      {/* Delete Confirmation */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-4 pt-4 border-t border-border bg-muted/50 rounded-lg p-4"
+          >
+            <p className="text-sm text-muted-foreground mb-3">
+              Remove "{product.name}" from your wishlist?
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleRemove}
+                className="flex-1"
+              >
+                Remove
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 });
@@ -162,18 +149,18 @@ const EmptyWishlist: React.FC = () => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="text-center py-16"
+    className="text-center py-16 px-4"
   >
     <div className="max-w-md mx-auto">
-      <div className="w-24 h-24 bg-creme-light rounded-full flex items-center justify-center mx-auto mb-6">
-        <Heart className="w-12 h-12 text-gray-400" />
+      <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+        <Heart className="w-12 h-12 text-muted-foreground" />
       </div>
-      <h2 className="text-2xl font-serif text-dark mb-4">Your Wishlist is Empty</h2>
-      <p className="text-gray-600 mb-8 leading-relaxed">
+      <h2 className="text-2xl font-serif text-foreground mb-4">Your Wishlist is Empty</h2>
+      <p className="text-muted-foreground mb-8 leading-relaxed">
         Discover our premium collection and save your favorite products to your wishlist for easy access later.
       </p>
       <Link to="/products">
-        <Button className="bg-dark text-white hover:bg-canyon transition-colors duration-200 px-8 py-3">
+        <Button className="px-8 py-3">
           Explore Products
           <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
         </Button>
@@ -185,7 +172,6 @@ const EmptyWishlist: React.FC = () => (
 export function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { addToCart, isLoading: cartLoading } = useCart();
   const { wishlistItems, toggleWishlist, clearWishlist: clearWishlistHook } = useWishlist();
 
@@ -270,7 +256,7 @@ export function WishlistPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-creme flex items-center justify-center">
+      <div className="min-h-screen bg-background md:bg-creme flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-dark"></div>
           <p className="text-dark mt-4 font-sans">Loading your wishlist...</p>
@@ -286,9 +272,16 @@ export function WishlistPage() {
         <meta name="description" content="Your saved favorite products from our premium collection." />
       </Helmet>
 
-      <div className="min-h-screen bg-creme">
-        {/* Header */}
-        <div className="main-container">
+      <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
+        {/* Mobile Header */}
+        <div className="md:hidden px-4 bg-background border-b border-border">
+          <div className="text-center">
+            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">My Wishlist</h1>
+          </div>
+        </div>
+
+        {/* Desktop Header - Preserved */}
+        <div className="hidden md:block main-container">
           <div className="py-16">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -307,27 +300,11 @@ export function WishlistPage() {
 
               {wishlistProducts.length > 0 && (
                 <div className="flex items-center gap-4">
-                  {/* View Mode Toggle */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 rounded ${viewMode === 'grid' ? 'bg-dark text-white' : 'bg-white text-dark border border-coyote'}`}
-                    >
-                      <Grid3X3 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`p-2 rounded ${viewMode === 'list' ? 'bg-dark text-white' : 'bg-white text-dark border border-coyote'}`}
-                    >
-                      <List className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Action Buttons */}
+                  {/* Action Buttons - Desktop only */}
                   <Button
                     onClick={shareWishlist}
                     variant="outline"
-                    className="border-dark text-dark hover:bg-dark hover:text-white"
+                    className="hidden md:inline-flex border-dark text-dark hover:bg-dark hover:text-white"
                   >
                     <Share2 className="w-4 h-4 mr-2" />
                     Share
@@ -336,7 +313,7 @@ export function WishlistPage() {
                   <Button
                     onClick={clearWishlist}
                     variant="outline"
-                    className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                    className="hidden md:inline-flex border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Clear All
@@ -359,15 +336,7 @@ export function WishlistPage() {
           {wishlistProducts.length === 0 ? (
             <EmptyWishlist />
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-                  : 'space-y-4'
-              }
-            >
+            <div className="space-y-4 max-w-3xl mx-auto">
               <AnimatePresence mode="popLayout">
                 {wishlistProducts.map((product) => (
                   <WishlistItem
@@ -376,11 +345,11 @@ export function WishlistPage() {
                     onRemove={removeFromWishlist}
                     onAddToCart={handleAddToCart}
                     isLoading={cartLoading}
-                    viewMode={viewMode}
+                    viewMode="list"
                   />
                 ))}
               </AnimatePresence>
-            </motion.div>
+            </div>
           )}
         </div>
 

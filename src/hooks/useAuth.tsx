@@ -23,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.error('Session check error:', error);
     } finally {
       setIsLoading(false);
+      setIsInitialized(true);
     }
   };
 

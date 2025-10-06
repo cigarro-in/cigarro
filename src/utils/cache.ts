@@ -16,8 +16,8 @@ class LocalCache {
     return LocalCache.instance;
   }
 
-  // Set cache with expiration time in milliseconds
-  set<T>(key: string, data: T, expiresIn: number = 5 * 60 * 1000): void {
+  // Set cache with expiration time in milliseconds (default 15 minutes)
+  set<T>(key: string, data: T, expiresIn: number = 15 * 60 * 1000): void {
     const item: CacheItem<T> = {
       data,
       timestamp: Date.now(),
@@ -107,30 +107,30 @@ export const CACHE_KEYS = {
   WISHLIST_ITEMS: 'wishlist_items'
 } as const;
 
-// Cache durations in milliseconds
+// Cache durations in milliseconds - More aggressive caching
 export const CACHE_DURATION = {
-  SHORT: 2 * 60 * 1000,      // 2 minutes
-  MEDIUM: 5 * 60 * 1000,     // 5 minutes  
-  LONG: 15 * 60 * 1000,      // 15 minutes
-  VERY_LONG: 60 * 60 * 1000  // 1 hour
+  SHORT: 5 * 60 * 1000,      // 5 minutes
+  MEDIUM: 15 * 60 * 1000,    // 15 minutes  
+  LONG: 30 * 60 * 1000,      // 30 minutes
+  VERY_LONG: 2 * 60 * 60 * 1000  // 2 hours
 } as const;
 
 export const cache = LocalCache.getInstance();
 
 // Helper functions for common cache operations
 export const cacheHelpers = {
-  // Cache products with medium duration
+  // Cache products with long duration
   setProducts: (products: any[]) => {
-    cache.set(CACHE_KEYS.PRODUCTS, products, CACHE_DURATION.MEDIUM);
+    cache.set(CACHE_KEYS.PRODUCTS, products, CACHE_DURATION.LONG);
   },
   
   getProducts: () => {
     return cache.get<any[]>(CACHE_KEYS.PRODUCTS);
   },
   
-  // Cache filter data with long duration
+  // Cache filter data with very long duration
   setFilterData: (data: any) => {
-    cache.set(CACHE_KEYS.FILTER_DATA, data, CACHE_DURATION.LONG);
+    cache.set(CACHE_KEYS.FILTER_DATA, data, CACHE_DURATION.VERY_LONG);
   },
   
   getFilterData: () => {
@@ -139,16 +139,16 @@ export const cacheHelpers = {
   
   // Cache individual product details
   setProductDetail: (slug: string, product: any) => {
-    cache.set(CACHE_KEYS.PRODUCT_DETAIL(slug), product, CACHE_DURATION.MEDIUM);
+    cache.set(CACHE_KEYS.PRODUCT_DETAIL(slug), product, CACHE_DURATION.LONG);
   },
   
   getProductDetail: (slug: string) => {
     return cache.get<any>(CACHE_KEYS.PRODUCT_DETAIL(slug));
   },
   
-  // Cache search results with short duration
+  // Cache search results with medium duration
   setSearchResults: (query: string, results: any[]) => {
-    cache.set(CACHE_KEYS.SEARCH_RESULTS(query), results, CACHE_DURATION.SHORT);
+    cache.set(CACHE_KEYS.SEARCH_RESULTS(query), results, CACHE_DURATION.MEDIUM);
   },
   
   getSearchResults: (query: string) => {

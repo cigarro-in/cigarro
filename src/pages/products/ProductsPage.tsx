@@ -37,6 +37,7 @@ export function ProductsPage() {
   const location = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
@@ -70,6 +71,8 @@ export function ProductsPage() {
   const urlSearchQuery = searchParams.get('search') || '';
 
   useEffect(() => {
+    if (!isInitialLoad) return; // Prevent multiple initial loads
+    
     const loadData = async () => {
       try {
         // Test database connection first
@@ -86,15 +89,18 @@ export function ProductsPage() {
             console.error('Database connection failed:', testError);
             toast.error('Database connection failed. Please check your configuration.');
             setIsLoading(false);
+            setIsInitialLoad(false);
             return;
           }
           
           console.log('Database connection successful');
         }
         await Promise.all([fetchProducts(), fetchFilterData()]);
+        setIsInitialLoad(false);
       } catch (error) {
         console.error('Error loading data:', error);
         setIsLoading(false);
+        setIsInitialLoad(false);
       }
     };
     
@@ -103,6 +109,7 @@ export function ProductsPage() {
       if (isLoading) {
         console.error('Loading timeout - setting loading to false');
         setIsLoading(false);
+        setIsInitialLoad(false);
         toast.error('Loading timeout. Please refresh the page.');
       }
     }, 10000); // 10 second timeout
@@ -110,16 +117,18 @@ export function ProductsPage() {
     loadData();
     
     return () => clearTimeout(timeoutId);
-  }, [urlSearchQuery]);
+  }, [urlSearchQuery, isInitialLoad]);
 
   // Refetch products when filters change (with debounce)
   useEffect(() => {
+    if (isInitialLoad) return; // Don't refetch during initial load
+    
     const timeoutId = setTimeout(() => {
       fetchProducts();
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [selectedCategories, selectedBrands, selectedOrigins, selectedStrengths, selectedPackSizes, selectedPriceRange]);
+  }, [selectedCategories, selectedBrands, selectedOrigins, selectedStrengths, selectedPackSizes, selectedPriceRange, isInitialLoad]);
 
   // Update filter sections when data is loaded (preserve expanded state) - Matching Luminaire Authentik structure
   useEffect(() => {
@@ -246,6 +255,18 @@ export function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
+      // Create cache key based on filters
+      const filterKey = `products_${selectedCategories.join(',')}_${selectedBrands.join(',')}_${selectedOrigins.join(',')}_${selectedStrengths.join(',')}_${selectedPackSizes.join(',')}_${selectedPriceRange.join(',')}_${urlSearchQuery}`;
+      
+      // Try to get from cache first
+      const cachedProducts = cache.get<Product[]>(filterKey);
+      if (cachedProducts && cachedProducts.length >= 0) {
+        console.log('Using cached products for:', filterKey);
+        setProducts(cachedProducts);
+        setIsLoading(false);
+        return;
+      }
+      
       let query = supabase
         .from('products')
         .select(`
@@ -302,7 +323,13 @@ export function ProductsPage() {
         throw error;
       }
       
-      setProducts(data || []);
+      const products = data || [];
+      setProducts(products);
+      
+      // Cache the results
+      cache.set(filterKey, products, CACHE_DURATION.MEDIUM);
+      console.log('Cached products for:', filterKey);
+      
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');
@@ -421,9 +448,10 @@ export function ProductsPage() {
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
         {/* Mobile Header */}
-        <div className="md:hidden pt-20 pb-4 px-4 bg-background border-b border-border">
-          <h1 className="text-foreground font-serif text-2xl font-normal">All Products</h1>
-          <p className="text-muted-foreground text-sm mt-1">{sortedProducts.length} products found</p>
+        <div className="md:hidden px-4 bg-background border-b border-border">
+          <div className="text-center">
+            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">Products</h1>
+          </div>
         </div>
 
         {/* Mobile Controls */}
@@ -654,7 +682,7 @@ export function ProductsPage() {
             )}
 
             {/* Products Grid */}
-          <div className="flex-1 relative">
+            <div className="flex-1 relative">
 
             {paginatedProducts.length === 0 ? (
               <div className="text-center py-16">
@@ -665,7 +693,7 @@ export function ProductsPage() {
             ) : (
               <AnimatePresence mode="wait">
                 <motion.div 
-                  className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'grid grid-cols-1 sm:grid-cols-2 gap-6'}`}
+                  className={`${viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6' : 'grid grid-cols-1 sm:grid-cols-2 gap-6'}`}
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -30 }}
@@ -696,10 +724,6 @@ export function ProductsPage() {
                 </motion.div>
               </AnimatePresence>
             )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 mt-12">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
@@ -751,16 +775,7 @@ export function ProductsPage() {
                 Next
               </button>
             </div>
-          )}
           </div>
-          </div>
-        </div>
-
-        {/* Floating Help Button */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <button className="w-14 h-14 bg-canyon text-creme-light rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
-            <span className="text-xl font-bold">?</span>
-          </button>
         </div>
       </div>
     </>

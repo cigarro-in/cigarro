@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -28,6 +28,94 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Mobile-only polished drop-to-cart animation
+  const animateDropToCart = () => {
+    try {
+      // Only on mobile (match Tailwind md: 768px)
+      if (typeof window === 'undefined' || window.innerWidth >= 768) return;
+
+      const cartTarget = document.getElementById('mobile-cart-target');
+      if (!cartTarget) return;
+
+      const targetRect = cartTarget.getBoundingClientRect();
+
+      // Determine base badge size (if present)
+      const badgeEl = cartTarget.querySelector('span');
+      let base = 20;
+      if (badgeEl) {
+        const br = badgeEl.getBoundingClientRect();
+        base = Math.round(Math.min(br.width, br.height)) || 20;
+      }
+
+      // Slightly bigger and taller than badge
+      const width = Math.round(base * 1.2);
+      const height = Math.round(width * 1.15); // taller oval
+
+      // Start just above the cart icon, horizontally centered
+      const startLeft = targetRect.left + (targetRect.width - width) / 2;
+      const startTop = targetRect.top - height - 14; // a bit higher above
+      const endLeft = targetRect.left + (targetRect.width - width) / 2;
+      const endTop = targetRect.top + (targetRect.height - height) / 2;
+
+      // Resolve dark theme color for outline from Tailwind 'text-dark'
+      const resolveDarkColor = () => {
+        try {
+          const probe = document.createElement('span');
+          probe.className = 'text-dark';
+          probe.style.position = 'fixed';
+          probe.style.visibility = 'hidden';
+          probe.textContent = '.';
+          document.body.appendChild(probe);
+          const color = getComputedStyle(probe).color || 'rgba(0,0,0,0.9)';
+          probe.remove();
+          return color;
+        } catch {
+          return 'rgba(0,0,0,0.9)';
+        }
+      };
+      const darkOutline = resolveDarkColor();
+
+      // Create circle with product image fill
+      const circle = document.createElement('div');
+      const imgUrl = !imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl();
+      circle.style.position = 'fixed';
+      circle.style.left = `${startLeft}px`;
+      circle.style.top = `${startTop}px`;
+      circle.style.width = `${width}px`;
+      circle.style.height = `${height}px`;
+      circle.style.borderRadius = '9999px';
+      circle.style.backgroundColor = darkOutline;
+      circle.style.backgroundImage = `url(${imgUrl})`;
+      circle.style.backgroundSize = 'cover';
+      circle.style.backgroundPosition = 'center';
+      circle.style.outline = `2px solid ${darkOutline}`;
+      circle.style.boxShadow = '0 6px 20px rgba(0,0,0,0.18)';
+      circle.style.zIndex = '2147483647';
+      circle.style.transform = 'translate3d(0,0,0)';
+      document.body.appendChild(circle);
+
+      const drop = circle.animate(
+        [
+          { transform: 'translateY(-8px) scale(0.95, 0.9)', opacity: 0.95 },
+          { left: `${endLeft}px`, top: `${endTop + 8}px`, transform: 'scale(1.08, 0.92)', opacity: 1 },
+          { left: `${endLeft}px`, top: `${endTop}px`, transform: 'scale(1)', opacity: 0 }
+        ],
+        { 
+          duration: 3000, // Slower, more dramatic fall
+          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', 
+          fill: 'forwards' 
+        });
+
+      drop.onfinish = () => {
+        circle.remove();
+        // Cart animation now triggers immediately on click
+      };
+    } catch (err) {
+      // Ignore animation errors silently
+    }
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -35,6 +123,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     if (onAddToCart) {
       onAddToCart(product);
       toast.success(`${product.name} added to cart`);
+      // trigger mobile-only drop-to-cart animation
+      animateDropToCart();
+      // trigger cart icon animation after 2 second delay
+      setTimeout(() => {
+        const cartTarget = document.getElementById('mobile-cart-target');
+        if (cartTarget) {
+          cartTarget.animate(
+            [
+              { transform: 'scale(1)' },
+              { transform: 'scale(1.15)' },
+              { transform: 'scale(1)' }
+            ],
+            { duration: 120, easing: 'ease-out' }
+          );
+        }
+      }, 350);
     }
   };
 
@@ -76,6 +180,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
+            ref={imgRef}
           />
         </div>
 

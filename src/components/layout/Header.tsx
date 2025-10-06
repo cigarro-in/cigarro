@@ -514,7 +514,6 @@ const Header = () => {
                     className="flex-1 bg-transparent text-dark placeholder:text-coyote text-lg focus:outline-none"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    autoFocus
                   />
                   {isSearching && <Loader2 className="w-5 h-5 text-coyote animate-spin" />}
                   <button 

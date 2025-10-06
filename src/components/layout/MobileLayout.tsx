@@ -33,7 +33,7 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
       />
 
       {/* Main Content with proper spacing for mobile */}
-      <div className="md:hidden pt-14 pb-16">
+      <div className="md:hidden">
         {children}
       </div>
 

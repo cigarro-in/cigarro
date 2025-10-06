@@ -43,6 +43,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { user } = useAuth();
 
   const totalItems = (items || []).reduce((sum, item) => sum + (item?.quantity || 0), 0);
@@ -53,13 +54,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Load cart on mount and when user changes
   useEffect(() => {
-    loadCart();
-  }, [user?.id]);
+    if (!isInitialized) {
+      loadCart();
+      setIsInitialized(true);
+    } else if (user?.id) {
+      loadCart(); // Only reload when user actually changes
+    }
+  }, [user?.id, isInitialized]);
 
-  // Also load cart on initial mount
-  useEffect(() => {
-    loadCart();
-  }, []);
+  // Remove duplicate initial mount effect
+  // useEffect(() => {
+  //   loadCart();
+  // }, []);
 
   // Listen for cart update events (from data transfer)
   useEffect(() => {

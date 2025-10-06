@@ -21,6 +21,7 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [isVisible, setIsVisible] = useState(false);
   const [formData, setFormData] = useState<{
     email: string;
     password: string;
@@ -32,6 +33,19 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
   });
 
   const { signIn, signUp } = useAuth();
+
+  // Prevent flicker by managing visibility
+  React.useEffect(() => {
+    if (open) {
+      setIsVisible(true);
+    } else {
+      // Delay hiding to allow exit animation
+      const timer = setTimeout(() => setIsVisible(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  if (!isVisible) return null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

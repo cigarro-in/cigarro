@@ -698,7 +698,7 @@ function ProductPage() {
         </div>
 
         {/* Mobile Sticky CTA Bar */}
-        <div className="md:hidden fixed bottom-20 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border p-4 safe-area-bottom">
+        <div className="md:hidden fixed bottom-16 left-0 right-0 z-[90] bg-background/95 backdrop-blur-sm border-t border-border p-4 safe-area-bottom">
           <div className="flex items-center gap-3">
             {/* Quantity Selector */}
             <div className="flex items-center border border-border rounded-lg">

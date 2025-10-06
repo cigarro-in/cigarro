@@ -270,19 +270,13 @@ export default function CartPage() {
         <meta name="description" content="Review your items before checkout" />
       </Helmet>
 
-      <div className="min-h-screen bg-background pt-20 pb-24">
+      <div className="min-h-[100dvh] bg-background pb-24">
         <div className="main-container px-4">
           {/* Page Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              Shopping Cart
-              {totalItems > 0 && (
-                <span className="text-accent ml-2">({totalItems} {totalItems === 1 ? 'item' : 'items'})</span>
-              )}
+          <div className="text-center mb-4">
+            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
+              My Cart
             </h1>
-            <p className="text-muted-foreground text-sm">
-              Review and modify your items before checkout
-            </p>
           </div>
 
           {/* Content */}
@@ -326,7 +320,7 @@ export default function CartPage() {
               </div>
 
               {/* Mobile Sticky Summary above bottom nav */}
-              <div className="lg:hidden sticky bottom-16 z-50 -mx-4 px-4 py-3 bg-background/95 backdrop-blur-sm border-t border-border">
+              <div className="lg:hidden sticky bottom-16 z-[90] -mx-4 px-4 py-3 bg-background/95 backdrop-blur-sm border-t border-border">
                 <CartSummary
                   totalPrice={totalPrice}
                   totalItems={totalItems}

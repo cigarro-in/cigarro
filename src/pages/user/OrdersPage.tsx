@@ -205,15 +205,11 @@ export function OrdersPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border/20 bg-background/95 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => navigate(-1)} className="p-2">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="font-serif-premium text-2xl text-foreground">Your Orders</h1>
-              <p className="text-muted-foreground">Track and manage your purchases</p>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-2 sm:pb-4">
+          <div className="text-center">
+            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
+              My Orders
+            </h1>
           </div>
         </div>
       </div>
@@ -389,7 +385,7 @@ export function OrdersPage() {
                       }`}></div>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span className={order.status === 'pending' ? 'text-accent font-medium' : ''}>Order Placed</span>
+                      <span className={order.status === 'placed' ? 'text-accent font-medium' : ''}>Order Placed</span>
                       <span className={order.status === 'processing' ? 'text-accent font-medium' : ''}>Confirmed</span>
                       <span className={order.status === 'shipped' ? 'text-accent font-medium' : ''}>Shipped</span>
                       <span className={order.status === 'delivered' ? 'text-accent font-medium' : ''}>Delivered</span>

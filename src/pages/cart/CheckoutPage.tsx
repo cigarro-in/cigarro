@@ -415,7 +415,7 @@ export function CheckoutPage() {
     }
   };
 
-  const getCurrentLocation = () => {
+  const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
     
     if (!navigator.geolocation) {
@@ -424,116 +424,108 @@ export function CheckoutPage() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          setCurrentLocationData({ lat: latitude, lng: longitude });
-          
-          // Use a free reverse geocoding service with better error handling
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=en`,
-            {
-              headers: {
-                'User-Agent': 'Cigarro-Checkout/1.0'
-              }
-            }
-          );
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          if (data && data.address) {
-            const addr = data.address;
-            
-            // Extract address components with better fallbacks
-            const houseNumber = addr.house_number || addr.building || '';
-            const road = addr.road || addr.street || addr.pedestrian || addr.path || '';
-            const suburb = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '';
-            const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
-            const state = addr.state || addr.province || addr.region || '';
-            const pincode = addr.postcode || '';
-            
-            // Build a more comprehensive address string
-            const addressParts = [];
-            if (houseNumber) addressParts.push(houseNumber);
-            if (road) addressParts.push(road);
-            if (suburb && suburb !== city) addressParts.push(suburb);
-            
-            const formattedAddress = addressParts.length > 0 
-              ? addressParts.join(', ')
-              : data.display_name?.split(',')[0] || 'Current Location';
-            
-            // Update form data and clear validation errors
-            setFormData(prev => ({
-              ...prev,
-              address: formattedAddress,
-              city: city || prev.city,
-              state: state || prev.state,
-              pincode: pincode || prev.pincode
-            }));
-            
-            // Clear validation errors for auto-filled fields
-            setValidationErrors(prev => ({
-              ...prev,
-              address: '',
-              city: city ? '' : prev.city,
-              state: state ? '' : prev.state,
-              pincode: pincode ? '' : prev.pincode
-            }));
-            
-            // Mark as new address since location was detected
-            setIsNewAddress(true);
-            setSelectedSavedAddress('');
-            setEditingAddressId(null);
-            
-            // Check address completeness after filling
-            setTimeout(() => {
-              checkAddressCompleteness();
-            }, 100);
-            
-            toast.success('Location detected and address filled!');
-          } else {
-            toast.error('Unable to get detailed address from location. Please fill manually.');
-          }
-        } catch (error) {
-          console.error('Error getting address from coordinates:', error);
-          // Subtle error message for network issues
-          toast.info('Location detected, but address details need manual entry. Please complete the form.', {
-            duration: 5000,
-            style: {
-              background: 'hsl(var(--muted))',
-              color: 'hsl(var(--muted-foreground))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-              fontSize: '14px',
-              padding: '12px 16px'
-            }
-          });
+    try {
+      // First check if we have permission
+      if ('permissions' in navigator) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        
+        if (permission.state === 'denied') {
+          toast.error('Location access denied. Please enable location permissions in your browser settings.');
+          setIsLoadingLocation(false);
+          return;
         }
-        setIsLoadingLocation(false);
-      },
-      (error) => {
-        console.log('Geolocation error (handled gracefully):', error);
-        let errorMessage = 'Unable to access location';
-        let description = 'Please try again or fill manually';
-        if (error.code === 1) { // PERMISSION_DENIED
-          errorMessage = 'Location access needed';
-          description = 'Enable location in browser settings for auto-fill';
-        } else if (error.code === 2) { // POSITION_UNAVAILABLE
-          errorMessage = 'Location unavailable';
-          description = 'Check your connection and try again';
-        } else if (error.code === 3) { // TIMEOUT
-          errorMessage = 'Location timeout';
-          description = 'Request took too long - try again';
+      }
+
+      // Request location with proper error handling
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 300000
+          }
+        );
+      });
+
+      const { latitude, longitude } = position.coords;
+      setCurrentLocationData({ lat: latitude, lng: longitude });
+      
+      // Use a free reverse geocoding service with better error handling
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=en`,
+          {
+            headers: {
+              'User-Agent': 'Cigarro-Checkout/1.0'
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        // Subtle informative toast
-        toast.info(`${errorMessage} • ${description}`, {
-          duration: 4000,
+        const data = await response.json();
+        
+        if (data && data.address) {
+          const addr = data.address;
+          
+          // Extract address components with better fallbacks
+          const houseNumber = addr.house_number || addr.building || '';
+          const road = addr.road || addr.street || addr.pedestrian || addr.path || '';
+          const suburb = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '';
+          const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+          const state = addr.state || addr.province || addr.region || '';
+          const pincode = addr.postcode || '';
+          
+          // Build a more comprehensive address string
+          const addressParts = [];
+          if (houseNumber) addressParts.push(houseNumber);
+          if (road) addressParts.push(road);
+          if (suburb && suburb !== city) addressParts.push(suburb);
+          
+          const formattedAddress = addressParts.length > 0 
+            ? addressParts.join(', ')
+            : data.display_name?.split(',')[0] || 'Current Location';
+          
+          // Update form data and clear validation errors
+          setFormData(prev => ({
+            ...prev,
+            address: formattedAddress,
+            city: city || prev.city,
+            state: state || prev.state,
+            pincode: pincode || prev.pincode
+          }));
+          
+          // Clear validation errors for auto-filled fields
+          setValidationErrors(prev => ({
+            ...prev,
+            address: '',
+            city: city ? '' : prev.city,
+            state: state ? '' : prev.state,
+            pincode: pincode ? '' : prev.pincode
+          }));
+          
+          // Mark as new address since location was detected
+          setIsNewAddress(true);
+          setSelectedSavedAddress('');
+          setEditingAddressId(null);
+          
+          // Check address completeness after filling
+          setTimeout(() => {
+            checkAddressCompleteness();
+          }, 100);
+          
+          toast.success('Location detected and address filled!');
+        } else {
+          toast.error('Unable to get detailed address from location. Please fill manually.');
+        }
+      } catch (error: any) {
+        console.error('Error getting address from coordinates:', error);
+        toast.info('Location detected, but address details need manual entry. Please complete the form.', {
+          duration: 5000,
           style: {
             background: 'hsl(var(--muted))',
             color: 'hsl(var(--muted-foreground))',
@@ -543,14 +535,38 @@ export function CheckoutPage() {
             padding: '12px 16px'
           }
         });
-        setIsLoadingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 20000, // Increased timeout
-        maximumAge: 300000 // 5 minutes cache
       }
-    );
+    } catch (error: any) {
+      console.log('Geolocation error (handled gracefully):', error);
+      let errorMessage = 'Unable to access location';
+      let description = 'Please try again or fill manually';
+      
+      if (error.code === 1) { // PERMISSION_DENIED
+        errorMessage = 'Location access needed';
+        description = 'Enable location in browser settings for auto-fill';
+      } else if (error.code === 2) { // POSITION_UNAVAILABLE
+        errorMessage = 'Location unavailable';
+        description = 'Check your connection and try again';
+      } else if (error.code === 3) { // TIMEOUT
+        errorMessage = 'Location timeout';
+        description = 'Request took too long - try again';
+      }
+      
+      toast.error(errorMessage, {
+        description,
+        duration: 4000,
+        style: {
+          background: 'hsl(var(--destructive))',
+          color: 'hsl(var(--destructive-foreground))',
+          border: '1px solid hsl(var(--destructive))',
+          borderRadius: '8px',
+          fontSize: '14px',
+          padding: '12px 16px'
+        }
+      });
+    } finally {
+      setIsLoadingLocation(false);
+    }
   };
 
   const saveCurrentLocationAddress = async (addressData: any) => {

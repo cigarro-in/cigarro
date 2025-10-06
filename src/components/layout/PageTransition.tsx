@@ -9,18 +9,15 @@ interface PageTransitionProps {
 const pageVariants = {
   initial: {
     opacity: 0,
-    y: 20,
-    scale: 0.98
+    y: 20
   },
   in: {
     opacity: 1,
-    y: 0,
-    scale: 1
+    y: 0
   },
   out: {
     opacity: 0,
-    y: -20,
-    scale: 1.02
+    y: -20
   }
 };
 
@@ -42,7 +39,7 @@ export function PageTransition({ children }: PageTransitionProps) {
         exit="out"
         variants={pageVariants}
         transition={pageTransition}
-        className="w-full"
+        className="w-full overflow-x-hidden"
       >
         {children}
       </motion.div>

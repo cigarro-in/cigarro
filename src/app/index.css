@@ -60,6 +60,11 @@
   padding-right: env(safe-area-inset-right);
 }
 
+/* Mobile Header - Prevent width shifts */
+header.mobile-header {
+  width: 100% !important;
+}
+
 /* Remove number input arrows and default values */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
