@@ -73,7 +73,7 @@
       "scripts": {
             "dev": "vite",
             "build": "npm run build:copy-seo && vite build",
-            "build:copy-seo": "copy sitemap.xml public\\sitemap.xml && copy llms.txt public\\llms.txt && copy robots.txt public\\robots.txt && copy _redirects public\\_redirects && copy _headers public\\_headers",
+            "build:copy-seo": "cp sitemap.xml public/sitemap.xml && cp llms.txt public/llms.txt && cp robots.txt public/robots.txt && cp _redirects public/_redirects && cp _headers public/_headers",
             "preview": "vite preview",
             "type-check": "tsc --noEmit",
             "lint": "echo 'Linting not configured'",
