@@ -228,15 +228,15 @@ const Hero = () => {
             </div>
 
             {/* Slide Indicators */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 lg:hidden">
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-10">
               {slides.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
+                  className={`h-3 rounded-full transition-all duration-300 ${
                     index === currentSlide 
-                      ? 'w-8 bg-dark' 
-                      : 'w-2 bg-dark/30 hover:bg-dark/60'
+                      ? 'w-8 bg-dark shadow-lg' 
+                      : 'w-3 bg-dark/40 hover:bg-dark/70 hover:scale-110'
                   }`}
                 />
               ))}

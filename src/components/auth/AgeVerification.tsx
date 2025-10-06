@@ -32,7 +32,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
       transition={{ duration: 0.6 }}
       className="fixed inset-0 z-50 bg-creme flex items-center justify-center p-4 sm:p-8"
     >
-      <div className="text-center max-w-md mx-auto w-full">
+      <div className="text-center max-w-md sm:max-w-lg lg:max-w-2xl mx-auto w-full">
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -130,11 +130,11 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
           </div>
 
           {/* Legal disclaimer */}
-          <div className="pt-6 sm:pt-8 border-t border-coyote/20 px-2">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 text-left">
-              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-coyote flex-shrink-0 mt-0.5" />
-              <div className="text-xs sm:text-sm">
-                <p className="text-coyote leading-relaxed mb-1 sm:mb-2">
+          <div className="pt-6 sm:pt-8 border-t border-coyote/20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 text-left">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-coyote flex-shrink-0 mt-0.5" />
+              <div className="text-sm sm:text-base lg:text-lg">
+                <p className="text-coyote leading-relaxed mb-2 sm:mb-3">
                   By continuing, you agree to our Terms of Service and Privacy Policy.
                 </p>
                 <p className="text-coyote/80 leading-relaxed">
