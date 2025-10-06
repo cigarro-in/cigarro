@@ -72,13 +72,11 @@
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build",
+            "build": "npm run build:copy-seo && vite build",
+            "build:copy-seo": "copy sitemap.xml public\\sitemap.xml && copy llms.txt public\\llms.txt && copy robots.txt public\\robots.txt",
             "preview": "vite preview",
             "type-check": "tsc --noEmit",
             "lint": "echo 'Linting not configured'",
             "test": "echo 'Tests not configured'",
-            "build:analyze": "vite build --mode analyze",
-            "generate-sitemap": "node --loader ts-node/esm src/scripts/generate-complete-sitemap.ts",
-            "seo": "npm run generate-sitemap"
+            "build:analyze": "vite build --mode analyze"
       }
-}
