@@ -274,7 +274,7 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 p-[max(10px,calc(100vw*10/1440))]">
+    <header className="hidden md:block fixed top-0 left-0 right-0 z-50 p-[max(10px,calc(100vw*10/1440))]">
       <div className="bg-creme border border-coyote rounded-md h-[50px] flex flex-wrap justify-between relative z-10">
         {/* Left Section - Menu */}
         <div className="flex flex-wrap">

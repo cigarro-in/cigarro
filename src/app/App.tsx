@@ -4,6 +4,7 @@ import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AgeVerification } from '../components/auth/AgeVerification';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import Header from '../components/layout/Header';
+import { MobileLayout } from '../components/layout/MobileLayout';
 import Hero from '../pages/home/Hero';
 import { FeaturedProducts } from '../pages/home/FeaturedProducts';
 import { BrandHeritage } from '../pages/company/BrandHeritage';
@@ -124,41 +125,91 @@ function AppContent() {
         <link rel="icon" type="image/svg+xml" href={siteSettings.favicon_url || '/vite.svg'} />
       </Helmet>
       <div className="min-h-screen bg-creme font-sans">
-        {isUserPage && <Header />}
-        {isUserPage && <BreadcrumbNav />}
-        <main>
-          <Suspense fallback={<LoadingSpinner />}>
-            <PageTransition>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/payment" element={<UPIPaymentPage />} />
-                <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
-                <Route path="/orders" element={<OrdersPage />} />
-                <Route path="/product/:slug" element={<ProductPage />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/collections" element={<CollectionsPage />} />
-                <Route path="/category/:slug" element={<CategoryPage />} />
-                <Route path="/category/:category/:brand" element={<CategoryPage />} />
-                <Route path="/brand/:slug" element={<CategoryPage />} />
-                <Route path="/wishlist" element={<WishlistPage />} />
-                <Route path="/blog" element={<BlogsPage />} />
-                <Route path="/blog/:slug" element={<BlogPost />} />
-                <Route path="/brands" element={<BrandsPage />} />
-                <Route path="/brands/:slug" element={<BrandPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms" element={<TermsPage />} />
-                <Route path="/shipping" element={<ShippingPage />} />
-                {/* Catch-all route for broken links */}
-                <Route path="*" element={<HomePage />} />
-              </Routes>
-            </PageTransition>
-          </Suspense>
-        </main>
-        {isUserPage && <Footer />}
+        {/* Desktop Layout */}
+        <div className="hidden md:block">
+          {isUserPage && <Header />}
+          {isUserPage && <BreadcrumbNav />}
+          <main>
+            <Suspense fallback={<LoadingSpinner />}>
+              <PageTransition>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/payment" element={<UPIPaymentPage />} />
+                  <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
+                  <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/product/:slug" element={<ProductPage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/collections" element={<CollectionsPage />} />
+                  <Route path="/category/:slug" element={<CategoryPage />} />
+                  <Route path="/category/:category/:brand" element={<CategoryPage />} />
+                  <Route path="/brand/:slug" element={<CategoryPage />} />
+                  <Route path="/wishlist" element={<WishlistPage />} />
+                  <Route path="/blog" element={<BlogsPage />} />
+                  <Route path="/blog/:slug" element={<BlogPost />} />
+                  <Route path="/brands" element={<BrandsPage />} />
+                  <Route path="/brands/:slug" element={<BrandPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/shipping" element={<ShippingPage />} />
+                  {/* Catch-all route for broken links */}
+                  <Route path="*" element={<HomePage />} />
+                </Routes>
+              </PageTransition>
+            </Suspense>
+          </main>
+          {isUserPage && <Footer />}
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="md:hidden">
+          {isUserPage ? (
+            <MobileLayout>
+              <Suspense fallback={<LoadingSpinner />}>
+                <PageTransition>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/cart" element={<CartPage />} />
+                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/payment" element={<UPIPaymentPage />} />
+                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/product/:slug" element={<ProductPage />} />
+                    <Route path="/products" element={<ProductsPage />} />
+                    <Route path="/collections" element={<CollectionsPage />} />
+                    <Route path="/category/:slug" element={<CategoryPage />} />
+                    <Route path="/category/:category/:brand" element={<CategoryPage />} />
+                    <Route path="/brand/:slug" element={<CategoryPage />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/blog" element={<BlogsPage />} />
+                    <Route path="/blog/:slug" element={<BlogPost />} />
+                    <Route path="/brands" element={<BrandsPage />} />
+                    <Route path="/brands/:slug" element={<BrandPage />} />
+                    <Route path="/contact" element={<ContactPage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/shipping" element={<ShippingPage />} />
+                    {/* Catch-all route for broken links */}
+                    <Route path="*" element={<HomePage />} />
+                  </Routes>
+                </PageTransition>
+              </Suspense>
+            </MobileLayout>
+          ) : (
+            <main>
+              <Suspense fallback={<LoadingSpinner />}>
+                <PageTransition>
+                  <Routes>
+                    <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
+                  </Routes>
+                </PageTransition>
+              </Suspense>
+            </main>
+          )}
+        </div>
       </div>
     </HelmetProvider>
   );

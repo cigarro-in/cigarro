@@ -3,8 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
-import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
+import { cache, cacheHelpers, CACHE_KEYS, CACHE_DURATION } from '../../utils/cache';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -12,6 +12,7 @@ import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Se
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { formatINR } from '../../utils/currency';
+import { Product } from '../../hooks/useCart';
 
 interface FilterSection {
   id: string;
@@ -72,20 +73,24 @@ export function ProductsPage() {
     const loadData = async () => {
       try {
         // Test database connection first
-        console.log('Testing database connection...');
-        const { data: testData, error: testError } = await supabase
-          .from('products')
-          .select('id')
-          .limit(1);
-        
-        if (testError) {
-          console.error('Database connection failed:', testError);
-          toast.error('Database connection failed. Please check your configuration.');
-          setIsLoading(false);
-          return;
+        // Skip DB connection test if we have cached data
+        const hasCachedData = cacheHelpers.getFilterData() !== null;
+        if (!hasCachedData) {
+          console.log('Testing database connection...');
+          const { data: testData, error: testError } = await supabase
+            .from('products')
+            .select('id')
+            .limit(1);
+          
+          if (testError) {
+            console.error('Database connection failed:', testError);
+            toast.error('Database connection failed. Please check your configuration.');
+            setIsLoading(false);
+            return;
+          }
+          
+          console.log('Database connection successful');
         }
-        
-        console.log('Database connection successful');
         await Promise.all([fetchProducts(), fetchFilterData()]);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -163,26 +168,28 @@ export function ProductsPage() {
 
   const fetchFilterData = async () => {
     try {
-      console.log('Fetching filter data...');
-      
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('id, name, slug')
-        .order('name');
-      
-      if (categoriesError) {
-        console.error('Categories error:', categoriesError);
-      } else {
-        console.log('Categories loaded:', categoriesData?.length || 0);
-        setCategories(categoriesData || []);
+      // Check cache first
+      const cachedFilterData = cacheHelpers.getFilterData();
+      if (cachedFilterData) {
+        console.log('Using cached filter data');
+        setCategories(cachedFilterData.categories || []);
+        setBrands(cachedFilterData.brands || []);
+        setOrigins(cachedFilterData.origins || []);
+        setStrengths(cachedFilterData.strengths || []);
+        setPackSizes(cachedFilterData.packSizes || []);
+        return;
       }
 
-      // Fetch brands with counts
-      const { data: brandsData } = await supabase
-        .from('products')
-        .select('brand')
-        .eq('is_active', true);
+      console.log('Fetching filter data...');
+      
+      // Fetch all filter data in parallel
+      const [categoriesResult, brandsResult] = await Promise.all([
+        supabase.from('categories').select('id, name, slug').order('name'),
+        supabase.from('products').select('brand').eq('is_active', true)
+      ]);
+
+      const categoriesData = categoriesResult.data || [];
+      const brandsData = brandsResult.data || [];
       
       if (brandsData) {
         const brandCounts = brandsData.reduce((acc: Record<string, number>, product) => {
@@ -412,16 +419,57 @@ export function ProductsPage() {
         <meta name="description" content="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands." />
       </Helmet>
 
-      <div className="min-h-screen bg-creme pb-16">
-        {/* Main Title - Exact Inspiration Style */}
-        <div className="main-container">
+      <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
+        {/* Mobile Header */}
+        <div className="md:hidden pt-20 pb-4 px-4 bg-background border-b border-border">
+          <h1 className="text-foreground font-serif text-2xl font-normal">All Products</h1>
+          <p className="text-muted-foreground text-sm mt-1">{sortedProducts.length} products found</p>
+        </div>
+
+        {/* Mobile Controls */}
+        <div className="md:hidden px-4 py-3 bg-background border-b border-border">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg text-foreground font-medium"
+            >
+              <span>Filters</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              >
+                <Grid3X3 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('two-col')}
+                className={`p-2 rounded-lg ${viewMode === 'two-col' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+              >
+                <Grid2X2 className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <button
+              onClick={resetAllFilters}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-sm"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Title - Preserved */}
+        <div className="hidden md:block main-container">
           <div className="title-wrapper text-center py-16">
             <h1 className="main-title">All our products</h1>
           </div>
         </div>
 
-        {/* Product Count and View Options - Exact Inspiration Style */}
-        <div className="main-container mb-8 pl-4">
+        {/* Desktop Product Count and View Options - Preserved */}
+        <div className="hidden md:block main-container mb-8 pl-4">
           <div className="flex justify-between items-center">
             <button
               onClick={resetAllFilters}

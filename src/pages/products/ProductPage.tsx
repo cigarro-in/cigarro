@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check, Heart, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
@@ -45,6 +45,13 @@ function ProductPage() {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showAddedFeedback, setShowAddedFeedback] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+  const [expandedSections, setExpandedSections] = useState({
+    description: true,
+    details: false,
+    shipping: false,
+    reviews: false
+  });
+  const [isInWishlist, setIsInWishlist] = useState(false);
   const { addToCart, addVariantToCart, addComboToCart, isLoading } = useCart();
 
   useEffect(() => {
@@ -213,6 +220,18 @@ function ProductPage() {
 
   const gallery = getCurrentImages();
 
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleWishlistToggle = () => {
+    setIsInWishlist(!isInWishlist);
+    toast.success(isInWishlist ? 'Removed from wishlist' : 'Added to wishlist');
+  };
+
   return (
     <>
       <Helmet>
@@ -220,9 +239,217 @@ function ProductPage() {
         <meta name="description" content={product?.meta_description || product?.description || 'Premium tobacco product'} />
       </Helmet>
       
-      <div className="min-h-screen bg-creme text-dark">
-        {/* True Full Width Container - No padding constraints */}
-        <div className="w-full">
+      <div className="min-h-screen bg-background md:bg-creme text-foreground md:text-dark pb-24 md:pb-0">
+        {/* Mobile Layout */}
+        <div className="md:hidden">
+          {/* Mobile Gallery - Swipeable 1:1 aspect */}
+          <div className="relative">
+            <div className="aspect-square bg-white overflow-hidden">
+              <ImageWithFallback
+                src={gallery[activeImage]}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+              
+              {/* Touch-friendly navigation */}
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all touch-manipulation"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={handleNextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all touch-manipulation"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+              
+              {/* Image counter */}
+              {gallery.length > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
+                  {activeImage + 1} / {gallery.length}
+                </div>
+              )}
+            </div>
+            
+            {/* Mobile thumbnail strip */}
+            {gallery.length > 1 && (
+              <div className="p-4 bg-background border-b border-border">
+                <div className="flex space-x-2 overflow-x-auto scrollbar-hide">
+                  {gallery.map((img, index) => (
+                    <button 
+                      key={index} 
+                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        activeImage === index 
+                          ? 'border-primary' 
+                          : 'border-transparent'
+                      }`}
+                      onClick={() => setActiveImage(index)}
+                    >
+                      <ImageWithFallback 
+                        src={img} 
+                        alt={`${product.name} thumbnail ${index + 1}`} 
+                        className="w-full h-full object-cover" 
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Product Info */}
+          <div className="p-4 space-y-6">
+            {/* Brand and Name */}
+            <div>
+              <p className="text-accent text-xs font-semibold uppercase tracking-wider font-sans mb-2">
+                {product.brand}
+              </p>
+              <h1 className="text-foreground font-serif text-2xl font-normal leading-tight mb-3">
+                {product.name}
+              </h1>
+              <div className="flex items-center justify-between">
+                <span className="text-foreground font-bold text-2xl font-sans">
+                  {formatINR(getCurrentPrice())}
+                </span>
+                <button
+                  onClick={handleWishlistToggle}
+                  className="p-2 rounded-full hover:bg-muted transition-colors touch-manipulation"
+                >
+                  <Heart className={`w-6 h-6 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Rating */}
+            {product.rating > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${i < Math.floor(product.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {product.rating} ({product.review_count} reviews)
+                </span>
+              </div>
+            )}
+
+            {/* Variants */}
+            {variants.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-medium text-foreground">Select Variant</h3>
+                <VariantSelector
+                  variants={variants}
+                  selectedVariant={selectedVariant}
+                  onVariantSelect={setSelectedVariant}
+                  basePrice={product.price}
+                  productName={product.name}
+                />
+              </div>
+            )}
+
+            {/* Collapsible Sections */}
+            <div className="space-y-4">
+              {/* Description */}
+              <div className="border border-border rounded-lg">
+                <button
+                  onClick={() => toggleSection('description')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+                >
+                  <span className="font-medium text-foreground">Description</span>
+                  {expandedSections.description ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </button>
+                {expandedSections.description && (
+                  <div className="px-4 pb-4">
+                    <p className="text-muted-foreground leading-relaxed">
+                      {product.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Details */}
+              <div className="border border-border rounded-lg">
+                <button
+                  onClick={() => toggleSection('details')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+                >
+                  <span className="font-medium text-foreground">Product Details</span>
+                  {expandedSections.details ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </button>
+                {expandedSections.details && (
+                  <div className="px-4 pb-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Origin:</span>
+                      <span className="text-foreground">{product.origin}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Pack Size:</span>
+                      <span className="text-foreground">{product.pack_size}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Stock:</span>
+                      <span className="text-foreground">{product.stock} available</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Shipping */}
+              <div className="border border-border rounded-lg">
+                <button
+                  onClick={() => toggleSection('shipping')}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+                >
+                  <span className="font-medium text-foreground">Shipping & Returns</span>
+                  {expandedSections.shipping ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </button>
+                {expandedSections.shipping && (
+                  <div className="px-4 pb-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Truck className="w-5 h-5 text-accent" />
+                      <div>
+                        <p className="text-foreground font-medium">Free Shipping</p>
+                        <p className="text-sm text-muted-foreground">On orders over ₹999</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Package className="w-5 h-5 text-accent" />
+                      <div>
+                        <p className="text-foreground font-medium">Easy Returns</p>
+                        <p className="text-sm text-muted-foreground">30-day return policy</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout - Preserved */}
+        <div className="hidden md:block w-full">
           <div className="px-8 py-16">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-24">
               {/* Large Image Gallery - More breathing room */}
@@ -467,6 +694,61 @@ function ProductPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Mobile Sticky CTA Bar */}
+        <div className="md:hidden fixed bottom-20 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border p-4 safe-area-bottom">
+          <div className="flex items-center gap-3">
+            {/* Quantity Selector */}
+            <div className="flex items-center border border-border rounded-lg">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="p-3 hover:bg-muted transition-colors touch-manipulation"
+                disabled={quantity <= 1}
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="px-4 py-3 min-w-[3rem] text-center font-medium">
+                {quantity}
+              </span>
+              <button
+                onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                className="p-3 hover:bg-muted transition-colors touch-manipulation"
+                disabled={quantity >= product.stock}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Add to Cart Button */}
+            <Button
+              onClick={handleAddToCart}
+              disabled={isAddingToCart || isLoading || product.stock === 0}
+              className="flex-1 h-12 text-base font-medium"
+            >
+              {showAddedFeedback ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Added!
+                </>
+              ) : isAddingToCart ? (
+                'Adding...'
+              ) : (
+                <>
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  Add to Cart • {formatINR(getCurrentPrice() * quantity)}
+                </>
+              )}
+            </Button>
+
+            {/* Wishlist Toggle */}
+            <button
+              onClick={handleWishlistToggle}
+              className="p-3 border border-border rounded-lg hover:bg-muted transition-colors touch-manipulation"
+            >
+              <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+            </button>
           </div>
         </div>
       </div>

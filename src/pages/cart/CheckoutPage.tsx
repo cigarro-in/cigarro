@@ -1152,56 +1152,8 @@ export function CheckoutPage() {
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex gap-16">
-          {/* Left Sidebar - Progress Steps */}
-          <div className="w-32 flex-shrink-0 pl-2">
-            <div className="fixed left-4 top-1/2 transform -translate-y-1/2 z-10">
-              <div className="flex flex-col items-center space-y-8">
-                {[
-                  { step: 1, label: 'Shipping', icon: MapPin },
-                  { step: 2, label: 'Review', icon: Package },
-                  { step: 3, label: 'Payment', icon: CreditCard }
-                ].map(({ step, label, icon: Icon }, index) => (
-                  <div key={step} className="flex flex-col items-center">
-                    <div 
-                      className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                        step <= currentStep 
-                          ? 'bg-accent border-accent text-accent-foreground shadow-lg' 
-                          : 'border-border text-muted-foreground bg-background'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="mt-2 text-center">
-                      <div 
-                        className={`font-sans-premium text-sm font-medium transition-colors ${
-                          step <= currentStep ? 'text-foreground' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {label}
-                      </div>
-                      {step < currentStep && (
-                        <div className="text-xs text-accent font-medium mt-1">✓ Done</div>
-                      )}
-                      {step === currentStep && (
-                        <div className="text-xs text-accent font-medium mt-1 animate-pulse">● Now</div>
-                      )}
-                    </div>
-                    {/* Connecting Line */}
-                    {index < 2 && (
-                      <div className="mt-4 mb-4">
-                        <div 
-                          className={`w-0.5 h-12 rounded-full transition-all duration-300 ${
-                            step < currentStep ? 'bg-accent shadow-sm' : 'bg-border'
-                          }`}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="flex justify-center">
+          {/* Removed Left Sidebar - Progress Steps for cleaner mobile experience */}
 
           {/* Main Content Area */}
           <div className="flex-1">
