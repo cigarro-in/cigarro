@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MobileHeader } from './MobileHeader';
 import { MobileMenu } from './MobileMenu';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -9,6 +10,7 @@ interface MobileLayoutProps {
 
 export const MobileLayout = ({ children }: MobileLayoutProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   const handleMenuToggle = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -17,6 +19,9 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
   const handleMenuClose = () => {
     setIsMobileMenuOpen(false);
   };
+
+  // Hide bottom nav on checkout page
+  const hideBottomNav = location.pathname === '/checkout';
 
   return (
     <>
@@ -37,8 +42,8 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
         {children}
       </div>
 
-      {/* Bottom Navigation */}
-      <MobileBottomNav />
+      {/* Bottom Navigation - Hidden on checkout */}
+      {!hideBottomNav && <MobileBottomNav />}
     </>
   );
 };

@@ -78,20 +78,58 @@ export function ProductShowcase() {
   }
 
   return (
-    <section className="py-16 bg-creme relative min-h-[700px]">
+    <section className="py-8 md:py-16 bg-creme relative">
       <div className="w-full">
         {/* Section Header */}
-        <div className="text-center mb-12 px-4">
+        <div className="text-center mb-6 md:mb-12 px-4">
           <div>
-            <h2 className="main-title text-dark mb-4">
+            <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl text-dark mb-2 md:mb-4">
               {sectionConfig.title}
             </h2>
-            <div className="w-16 h-0.5 bg-canyon mx-auto"></div>
+            <div className="w-12 md:w-16 h-0.5 bg-canyon mx-auto"></div>
           </div>
         </div>
 
-        {/* Product Showcase Layout */}
-        <div className="w-[90%] mx-auto px-4">
+        {/* Mobile: 3 columns (1 image + 2 products) x 3 rows */}
+        <div className="md:hidden px-4">
+          <div className="grid grid-cols-3 grid-rows-3 gap-2 auto-rows-fr">
+            {/* First Column - Image spanning 3 rows */}
+            <div className="row-span-3 row-start-1">
+              <div className="relative h-full rounded-lg overflow-hidden bg-creme/20">
+                {sectionConfig.background_image ? (
+                  <img
+                    src={sectionConfig.background_image}
+                    alt="Showcase Collection"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-canyon/20 to-dark/20 flex items-center justify-center">
+                    <div className="text-center text-dark/60">
+                      <div className="text-2xl mb-2">🏆</div>
+                      <p className="text-[10px] font-medium">Premium</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Products - 6 cards in 2 columns x 3 rows */}
+            {showcaseProducts.slice(0, 6).map((product, index) => (
+              <div key={product.id} className={index % 2 === 0 ? 'col-start-2' : 'col-start-3'}>
+                <ProductCard
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                  isLoading={isLoading}
+                  index={index}
+                  variant="default"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop: Original 2-column layout */}
+        <div className="hidden md:block w-[90%] mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 min-h-[500px]">
             {/* First Column (2/5 width) - Featured Image */}
             <div className="col-span-1 lg:col-span-2">
@@ -130,7 +168,7 @@ export function ProductShowcase() {
             <div className="col-span-1 lg:col-span-3">
               <div className="grid grid-rows-2 gap-6 h-full min-h-[500px]">
                 {/* First Row - 3 Products */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   {showcaseProducts.slice(0, 3).map((product, index) => (
                     <div key={product.id} className="h-full">
                       <ProductCard
@@ -145,7 +183,7 @@ export function ProductShowcase() {
                 </div>
 
                 {/* Second Row - 3 Products */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   {showcaseProducts.slice(3, 6).map((product, index) => (
                     <div key={product.id} className="h-full">
                       <ProductCard
@@ -164,10 +202,10 @@ export function ProductShowcase() {
         </div>
 
         {/* View All Button - Centered below the entire section */}
-        <div className="text-center mt-16 px-4">
+        <div className="text-center mt-8 md:mt-16 px-4">
           <Link
             to={sectionConfig.button_url}
-            className="btn-primary inline-flex items-center px-8 py-3"
+            className="btn-primary inline-flex items-center text-sm md:text-base px-6 md:px-8 py-2 md:py-3"
           >
             {sectionConfig.button_text}
           </Link>

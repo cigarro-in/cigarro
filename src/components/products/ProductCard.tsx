@@ -186,17 +186,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Product Info */}
         <div className="p-4">
-          <div className="mb-3">
-            <p className="text-canyon text-xs font-medium uppercase tracking-wider mb-1">
+          <div className="mb-2">
+            <p className="text-canyon text-[10px] font-medium uppercase tracking-wider mb-1">
               {product.brand || 'Premium'}
             </p>
-            <h3 className="text-dark font-bold text-base leading-tight hover:text-canyon transition-colors line-clamp-2">
+            <h3 className="text-dark font-semibold text-sm leading-snug hover:text-canyon transition-colors truncate" title={product.name}>
               {product.name}
             </h3>
           </div>
           
           <div className="flex items-center justify-between">
-            <p className="text-dark font-bold text-base">
+            <p className="text-dark font-bold text-sm">
               ₹{formatIndianPrice(product.price)}
             </p>
             

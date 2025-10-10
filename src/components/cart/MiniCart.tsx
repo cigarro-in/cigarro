@@ -163,7 +163,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
 
             {/* Mobile Cart Sidebar - Standardized Mobile Sidebar */}
             <div
-              className="md:hidden fixed inset-0 z-[9999] transition-opacity duration-300 opacity-100 pointer-events-auto"
+              className="md:hidden fixed inset-0 z-[99999] transition-opacity duration-300 opacity-100 pointer-events-auto"
               onClick={onClose}
             >
               {/* Backdrop */}

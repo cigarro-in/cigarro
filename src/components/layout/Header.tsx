@@ -500,7 +500,7 @@ const Header = () => {
 
       {/* Search Overlay */}
       {isSearchOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={handleSearchClose}>
+        <div className="fixed inset-0 bg-black/50 z-[99999]" onClick={handleSearchClose}>
           <div className="absolute top-20 left-1/2 transform -translate-x-1/2 w-full max-w-4xl mx-auto p-4">
             <div className="bg-creme rounded-lg shadow-xl border border-coyote" onClick={(e) => e.stopPropagation()}>
               {/* Search Input */}

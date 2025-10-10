@@ -163,16 +163,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const mergedItems = [...userItems];
         
         for (const guestItem of guestItems) {
-          const existingItemIndex = mergedItems.findIndex(item => item.id === guestItem.id);
+          const existingItemIndex = mergedItems.findIndex(item => 
+            item.id === guestItem.id && 
+            item.variant_id === guestItem.variant_id && 
+            item.combo_id === guestItem.combo_id
+          );
           if (existingItemIndex >= 0) {
             // Add quantities if item exists
             mergedItems[existingItemIndex].quantity += guestItem.quantity;
             // Update in database
-            await supabase
+            const updateQuery = supabase
               .from('cart_items')
               .update({ quantity: mergedItems[existingItemIndex].quantity })
               .eq('user_id', user.id)
               .eq('product_id', guestItem.id);
+            
+            if (guestItem.variant_id) {
+              updateQuery.eq('variant_id', guestItem.variant_id);
+            }
+            if (guestItem.combo_id) {
+              updateQuery.eq('combo_id', guestItem.combo_id);
+            }
+            
+            await updateQuery;
           } else {
             // Add new item
             mergedItems.push(guestItem);
@@ -182,7 +195,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
               .insert({
                 user_id: user.id,
                 product_id: guestItem.id,
-                quantity: guestItem.quantity
+                quantity: guestItem.quantity,
+                variant_id: guestItem.variant_id,
+                combo_id: guestItem.combo_id
               });
           }
         }
@@ -303,14 +318,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const product = products[i];
       const quantity = quantities[i];
       
-      const existingItemIndex = newItems.findIndex(item => item.id === product.id);
+      // Check for existing item considering variant_id and combo_id
+      const existingItemIndex = newItems.findIndex(item => 
+        item.id === product.id && 
+        item.variant_id === (product as any).variant_id && 
+        item.combo_id === (product as any).combo_id
+      );
       
       if (existingItemIndex >= 0) {
         // Add to existing quantity
         newItems[existingItemIndex].quantity += quantity;
       } else {
         // Add new item
-        newItems.push({ ...product, quantity });
+        newItems.push({ 
+          ...product, 
+          quantity,
+          variant_id: (product as any).variant_id,
+          combo_id: (product as any).combo_id
+        });
       }
     }
     

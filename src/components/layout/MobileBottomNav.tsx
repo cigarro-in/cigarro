@@ -55,7 +55,7 @@ export const MobileBottomNav = () => {
       requiresAuth: true as const
     },
     {
-      path: user ? '/orders' : '#',
+      path: user ? '/profile' : '#',
       icon: User,
       label: user ? 'Profile' : 'Login',
       exact: true,

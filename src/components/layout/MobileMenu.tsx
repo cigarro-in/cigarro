@@ -69,7 +69,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
   // Keep mounted for smooth animations
   return (
     <div
-      className={`md:hidden fixed inset-0 z-[9999] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      className={`md:hidden fixed inset-0 z-[99999] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       aria-hidden={!isOpen}
       onClick={onClose}
     >
@@ -84,7 +84,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* FROZEN HEADER */}
-        <div className="flex-shrink-0 p-6 border-b border-border bg-background/95 backdrop-blur-sm">
+        <div className="flex-shrink-0 sticky top-0 z-10 p-6 border-b border-border bg-background/95 backdrop-blur-sm">
           <div className="text-foreground font-serif font-normal tracking-tight leading-none text-2xl uppercase mb-2">
             CIGARRO
           </div>
@@ -128,29 +128,23 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
             </div>
           ))}
 
-          {/* Sign Out Button */}
-          {user && (
-            <div className="py-4 border-t border-border">
-              <button
-                onClick={() => {
-                  signOut();
-                  onClose();
-                }}
-                className="flex items-center gap-4 px-6 py-3 text-foreground hover:bg-muted/50 transition-colors duration-200 w-full text-left"
-              >
-                <LogOut className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
-                <span className="font-sans text-base">Sign Out</span>
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* FROZEN FOOTER */}
-        <div className="flex-shrink-0 p-6 border-t border-border bg-background/95 backdrop-blur-sm">
-          <p className="text-muted-foreground text-xs font-sans text-center">
-            Premium tobacco products for adults 21+
-          </p>
-        </div>
+        {/* FROZEN FOOTER WITH SIGN OUT */}
+        {user && (
+          <div className="flex-shrink-0 sticky bottom-0 z-10 bg-background/95 backdrop-blur-sm border-t border-border">
+            <button
+              onClick={() => {
+                signOut();
+                onClose();
+              }}
+              className="flex items-center gap-4 px-6 py-3 text-foreground hover:bg-muted/50 transition-colors duration-200 w-full text-left"
+            >
+              <LogOut className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+              <span className="font-sans text-base">Sign Out</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

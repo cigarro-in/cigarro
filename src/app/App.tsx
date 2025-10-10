@@ -7,6 +7,9 @@ import Header from '../components/layout/Header';
 import { MobileLayout } from '../components/layout/MobileLayout';
 import Hero from '../pages/home/Hero';
 import { FeaturedProducts } from '../pages/home/FeaturedProducts';
+import { CategoriesScroller } from '../pages/home/CategoriesScroller';
+import { BrandsScroller } from '../pages/home/BrandsScroller';
+import { CategoryShowcases } from '../pages/home/CategoryShowcases';
 import { BrandHeritage } from '../pages/company/BrandHeritage';
 import { ProductShowcase } from '../components/products/ProductShowcase';
 import { CategoriesGrid } from '../pages/content/CategoriesGrid';
@@ -21,10 +24,13 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../utils/supabase/client';
 // Lazy load components that are not needed immediately
 const CheckoutPage = lazy(() => import('../pages/cart/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+const MobileCheckoutPage = lazy(() => import('../pages/cart/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
 const UPIPaymentPage = lazy(() => import('../pages/cart/UPIPaymentPage').then(m => ({ default: m.UPIPaymentPage })));
+const OrderSuccessPage = lazy(() => import('../pages/order/OrderSuccessPage').then(m => ({ default: m.OrderSuccessPage })));
 const CartPage = lazy(() => import('../pages/cart/CartPage'));
 const AdminDashboard = lazy(() => import('../admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
+const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const ProductPage = lazy(() => import('../pages/products/ProductPage'));
 const CollectionsPage = lazy(() => import('../pages/products/CollectionsPage').then(m => ({ default: m.CollectionsPage })));
 const ProductsPage = lazy(() => import('../pages/products/ProductsPage').then(m => ({ default: m.ProductsPage })));
@@ -57,15 +63,37 @@ function HomePage() {
   return (
     <>
       <Hero />
-      <div className="h-12"></div> {/* Standard section spacer */}
+      
+      {/* Mobile: Categories Scroller, Desktop: Skip to Featured */}
+      <div className="md:hidden">
+        <CategoriesScroller />
+      </div>
+      
+      <div className="h-0 md:h-12"></div>
       <FeaturedProducts />
-      <div className="h-12"></div> {/* Standard section spacer */}
+      
+      {/* Mobile: Brands Scroller */}
+      <div className="md:hidden">
+        <BrandsScroller />
+      </div>
+      
+      {/* Mobile: Category Showcases with Products */}
+      <div className="md:hidden">
+        <CategoryShowcases />
+      </div>
+      
+      {/* <div className="h-8 md:h-12"></div>
       <BrandHeritage />
-      <div className="h-12"></div> {/* Standard section spacer */}
+      <div className="h-8 md:h-12"></div> */}
       <ProductShowcase />
-      <div className="h-12"></div> {/* Standard section spacer */}
-      <CategoriesGrid />
-      <div className="h-12"></div> {/* Standard section spacer */}
+      <div className="h-8 md:h-12"></div>
+      
+      {/* Desktop: Full Categories Grid */}
+      <div className="hidden md:block">
+        <CategoriesGrid />
+      </div>
+      
+      <div className="h-8 md:h-12"></div>
       <BlogSection />
     </>
   );
@@ -136,9 +164,12 @@ function AppContent() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/cart" element={<CartPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/mobile-checkout" element={<MobileCheckoutPage />} />
                   <Route path="/payment" element={<UPIPaymentPage />} />
+                  <Route path="/order-success" element={<OrderSuccessPage />} />
                   <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
                   <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/product/:slug" element={<ProductPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/collections" element={<CollectionsPage />} />
@@ -173,9 +204,12 @@ function AppContent() {
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/cart" element={<CartPage />} />
-                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/checkout" element={<MobileCheckoutPage />} />
+                    <Route path="/mobile-checkout" element={<MobileCheckoutPage />} />
                     <Route path="/payment" element={<UPIPaymentPage />} />
+                    <Route path="/order-success" element={<OrderSuccessPage />} />
                     <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/product/:slug" element={<ProductPage />} />
                     <Route path="/products" element={<ProductsPage />} />
                     <Route path="/collections" element={<CollectionsPage />} />

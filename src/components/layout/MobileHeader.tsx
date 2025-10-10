@@ -133,8 +133,8 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
   return (
     <>
       {/* Mobile Header (desktop-like container) */}
-      <header className="mobile-header md:hidden fixed top-0 left-0 right-0 z-[9999] safe-area-top">
-        <div className="px-4 py-2">
+      <header className="mobile-header md:hidden fixed top-0 left-0 right-0 z-[9999]">
+        <div className="px-3 pt-3 pb-0">
         <div className="bg-creme border border-coyote rounded-md h-[50px] flex items-center justify-between">
           {/* Menu Button with triple lines */}
           <button 
@@ -172,7 +172,7 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
 
       {/* Search Sidebar - Standardized Mobile Sidebar */}
       <div
-        className={`md:hidden fixed inset-0 z-[9999] transition-opacity duration-300 ${isSearchOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`md:hidden fixed inset-0 z-[99999] transition-opacity duration-300 ${isSearchOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         aria-hidden={!isSearchOpen}
         onClick={handleSearchClose}
       >

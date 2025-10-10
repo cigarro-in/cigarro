@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
-import { cache, cacheHelpers, CACHE_KEYS, CACHE_DURATION } from '../../utils/cache';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -76,25 +75,21 @@ export function ProductsPage() {
     const loadData = async () => {
       try {
         // Test database connection first
-        // Skip DB connection test if we have cached data
-        const hasCachedData = cacheHelpers.getFilterData() !== null;
-        if (!hasCachedData) {
-          console.log('Testing database connection...');
-          const { data: testData, error: testError } = await supabase
-            .from('products')
-            .select('id')
-            .limit(1);
-          
-          if (testError) {
-            console.error('Database connection failed:', testError);
-            toast.error('Database connection failed. Please check your configuration.');
-            setIsLoading(false);
-            setIsInitialLoad(false);
-            return;
-          }
-          
-          console.log('Database connection successful');
+        console.log('Testing database connection...');
+        const { data: testData, error: testError } = await supabase
+          .from('products')
+          .select('id')
+          .limit(1);
+        
+        if (testError) {
+          console.error('Database connection failed:', testError);
+          toast.error('Database connection failed. Please check your configuration.');
+          setIsLoading(false);
+          setIsInitialLoad(false);
+          return;
         }
+        
+        console.log('Database connection successful');
         await Promise.all([fetchProducts(), fetchFilterData()]);
         setIsInitialLoad(false);
       } catch (error) {
@@ -177,18 +172,6 @@ export function ProductsPage() {
 
   const fetchFilterData = async () => {
     try {
-      // Check cache first
-      const cachedFilterData = cacheHelpers.getFilterData();
-      if (cachedFilterData) {
-        console.log('Using cached filter data');
-        setCategories(cachedFilterData.categories || []);
-        setBrands(cachedFilterData.brands || []);
-        setOrigins(cachedFilterData.origins || []);
-        setStrengths(cachedFilterData.strengths || []);
-        setPackSizes(cachedFilterData.packSizes || []);
-        return;
-      }
-
       console.log('Fetching filter data...');
       
       // Fetch all filter data in parallel
@@ -255,18 +238,6 @@ export function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
-      // Create cache key based on filters
-      const filterKey = `products_${selectedCategories.join(',')}_${selectedBrands.join(',')}_${selectedOrigins.join(',')}_${selectedStrengths.join(',')}_${selectedPackSizes.join(',')}_${selectedPriceRange.join(',')}_${urlSearchQuery}`;
-      
-      // Try to get from cache first
-      const cachedProducts = cache.get<Product[]>(filterKey);
-      if (cachedProducts && cachedProducts.length >= 0) {
-        console.log('Using cached products for:', filterKey);
-        setProducts(cachedProducts);
-        setIsLoading(false);
-        return;
-      }
-      
       let query = supabase
         .from('products')
         .select(`
@@ -325,10 +296,6 @@ export function ProductsPage() {
       
       const products = data || [];
       setProducts(products);
-      
-      // Cache the results
-      cache.set(filterKey, products, CACHE_DURATION.MEDIUM);
-      console.log('Cached products for:', filterKey);
       
     } catch (error) {
       console.error('Error fetching products:', error);

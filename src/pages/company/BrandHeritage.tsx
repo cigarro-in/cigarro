@@ -46,9 +46,52 @@ export function BrandHeritage() {
   };
 
   return (
-    <section className="py-16 bg-creme min-h-screen flex items-center">
+    <section className="py-6 md:py-16 bg-creme md:min-h-screen md:flex md:items-center">
       <div className="w-full max-w-none px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        {/* Mobile: Compact overlay on image */}
+        <div className="md:hidden relative">
+          <div className="relative h-[400px] rounded-lg overflow-hidden">
+            <img 
+              src={sectionData.backgroundImage} 
+              alt="Tobacco craftsmanship"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+            
+            <div className="absolute inset-0 flex flex-col justify-end p-6">
+              <div className="suptitle text-creme-light/90 mb-2">{sectionData.title}</div>
+              <h2 className="text-creme-light font-serif text-xl font-bold mb-3">
+                {sectionData.subtitle}
+              </h2>
+              <p className="text-creme-light/90 text-sm mb-4 line-clamp-3">
+                {sectionData.description}
+              </p>
+              
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="text-center">
+                  <div className="font-serif text-xl text-canyon mb-0.5">1847</div>
+                  <div className="text-[9px] text-creme-light/80 uppercase tracking-wider">Founded</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-serif text-xl text-canyon mb-0.5">15</div>
+                  <div className="text-[9px] text-creme-light/80 uppercase tracking-wider">Blenders</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-serif text-xl text-canyon mb-0.5">47</div>
+                  <div className="text-[9px] text-creme-light/80 uppercase tracking-wider">Blends</div>
+                </div>
+              </div>
+              
+              <a href={sectionData.buttonUrl} className="inline-flex items-center justify-center bg-dark text-creme-light hover:bg-canyon transition-all duration-300 font-medium text-xs uppercase tracking-wide px-6 py-2.5 rounded-full w-fit">
+                {sectionData.buttonText}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: Original layout */}
+        <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Content */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
