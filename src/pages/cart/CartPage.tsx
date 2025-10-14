@@ -58,11 +58,11 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100 }}
-      className="bg-background border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200"
+      className="bg-background border-2 border-coyote/20 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-coyote/40 transition-all duration-200"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-center gap-3">
         {/* Product Image */}
-        <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+        <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-coyote/10">
           <img
             src={!imageError ? getProductImageUrl(item.gallery_images?.[0]) : getProductImageUrl()}
             alt={item.name}
@@ -74,35 +74,39 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
         {/* Product Info */}
         <div className="flex-1 min-w-0">
           <Link to={`/product/${item.slug}`} className="group">
-            <h3 className="font-medium text-foreground group-hover:text-accent transition-colors duration-200 line-clamp-2 leading-tight">
+            <h3 className="font-semibold text-dark text-sm group-hover:text-canyon transition-colors duration-200 line-clamp-1 leading-tight">
               {item.name}
             </h3>
           </Link>
-          <p className="text-sm text-muted-foreground mt-1">{item.brand}</p>
-          <p className="text-lg font-semibold text-foreground mt-2">₹{formatIndianPrice(item.price)}</p>
-          <p className="text-sm text-muted-foreground mt-1">Quantity: {item.quantity}</p>
+          {item.brand && (
+            <p className="text-xs text-canyon font-medium uppercase tracking-wide mt-0.5">{item.brand}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5">
+            <p className="text-base font-bold text-dark">₹{formatIndianPrice(item.price)}</p>
+            <span className="text-xs text-dark/50">× {item.quantity}</span>
+          </div>
         </div>
 
         {/* Quantity Controls & Remove */}
-        <div className="flex flex-col items-end gap-3">
+        <div className="flex flex-col items-end gap-2">
           {/* Quantity Controls */}
-          <div className="flex items-center bg-muted rounded-lg p-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => handleQuantityChange(item.quantity - 1)}
               disabled={isUpdating || isLoading || item.quantity <= 1}
-              className="w-8 h-8 rounded-md bg-background text-foreground hover:bg-primary hover:text-primary-foreground transition-colors duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               aria-label="Decrease quantity"
             >
-              <Minus className="w-4 h-4" />
+              <Minus className="w-3 h-3" />
             </button>
-            <span className="w-12 text-center font-medium text-foreground text-sm">{item.quantity}</span>
+            <span className="w-8 text-center font-semibold text-dark text-sm">{item.quantity}</span>
             <button
               onClick={() => handleQuantityChange(item.quantity + 1)}
               disabled={isUpdating || isLoading}
-              className="w-8 h-8 rounded-md bg-background text-foreground hover:bg-primary hover:text-primary-foreground transition-colors duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               aria-label="Increase quantity"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
             </button>
           </div>
 
@@ -110,20 +114,20 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isLoading}
-            className="text-red-500 hover:text-red-600 transition-colors duration-200 p-2 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            className="text-canyon hover:text-red-600 transition-colors duration-200 p-1.5 hover:bg-canyon/10 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
             title="Remove from cart"
             aria-label="Remove item"
           >
-            <Trash2 className="w-5 h-5" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Subtotal for this item */}
-      <div className="mt-4 pt-3 border-t border-border">
+      <div className="mt-3 pt-2.5 border-t border-coyote/20">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Subtotal:</span>
-          <span className="text-base font-medium text-foreground">₹{formatIndianPrice(lineTotal)}</span>
+          <span className="text-xs text-dark/60 font-medium uppercase tracking-wide">Item Total</span>
+          <span className="text-base font-bold text-dark">₹{formatIndianPrice(lineTotal)}</span>
         </div>
       </div>
 
@@ -134,28 +138,24 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-4 pt-4 border-t border-border bg-muted/50 rounded-lg p-4"
+            className="mt-3 pt-3 border-t border-coyote/20 bg-canyon/5 rounded-lg p-3"
           >
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-dark mb-3 font-medium">
               Remove "{item.name}" from your cart?
             </p>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
+              <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1"
+                className="flex-1 px-3 py-2 text-sm font-medium text-dark bg-creme-light border-2 border-coyote rounded-lg hover:bg-creme transition-all active:scale-95"
               >
                 Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
+              </button>
+              <button
                 onClick={handleRemove}
-                className="flex-1"
+                className="flex-1 px-3 py-2 text-sm font-medium text-creme-light bg-canyon rounded-lg hover:bg-red-600 transition-all active:scale-95"
               >
                 Remove
-              </Button>
+              </button>
             </div>
           </motion.div>
         )}

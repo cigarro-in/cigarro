@@ -132,39 +132,39 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
 
   return (
     <>
-      {/* Mobile Header (desktop-like container) */}
-      <header className="mobile-header md:hidden fixed top-0 left-0 right-0 z-[9999]">
-        <div className="px-3 pt-3 pb-0">
-        <div className="bg-creme border border-coyote rounded-md h-[50px] flex items-center justify-between">
-          {/* Menu Button with triple lines */}
+      {/* Mobile Header */}
+      <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-[9999] bg-creme">
+        <div className="px-3 py-2">
+        <div className="bg-creme border border-coyote rounded-lg h-12 sm:h-14 flex items-center justify-between">
+          {/* Menu Button - Touch-friendly */}
           <button 
             type="button" 
-            className="flex items-center justify-center h-[50px] px-4 border-r border-coyote rounded-tl-md transition-colors duration-300 hover:bg-creme-light"
+            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-r border-coyote rounded-l-lg hover:bg-creme-light active:bg-coyote/20 transition-colors duration-200"
             onClick={onMenuToggle}
-            aria-label="Open menu"
+            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {isMenuOpen ? (
-              <X className="w-6 h-6 text-dark" strokeWidth={1.5} />
+              <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-dark" strokeWidth={1.5} />
             ) : (
-              <div className="inline-block relative w-6 h-px bg-dark transition-colors duration-300 before:content-[''] before:block before:w-6 before:h-px before:bg-dark before:-translate-y-[6px] before:transition-all after:content-[''] after:block after:w-6 after:h-px after:bg-dark after:translate-y-[6px] after:transition-all"></div>
+              <div className="inline-block relative w-4 h-px sm:w-5 md:w-6 bg-dark before:content-[''] before:block before:w-4 sm:before:w-5 md:before:w-6 before:h-px before:bg-dark before:-translate-y-[5px] sm:before:-translate-y-[6px] before:transition-all after:content-[''] after:block after:w-4 sm:after:w-5 md:after:w-6 after:h-px after:bg-dark after:translate-y-[5px] sm:after:translate-y-[6px] after:transition-all"></div>
             )}
           </button>
 
           {/* Logo */}
           <Link to="/" className="flex-1 flex justify-center">
-            <div className="text-dark font-serif font-normal tracking-tight leading-none text-xl uppercase">
+            <h1 className="text-dark font-serif font-normal tracking-tight leading-none text-lg sm:text-xl uppercase">
               CIGARRO
-            </div>
+            </h1>
           </Link>
 
-          {/* Search Button */}
+          {/* Search Button - Touch-friendly */}
           <button 
             type="button"
-            className="flex items-center justify-center h-[50px] px-4 border-l border-coyote rounded-tr-md transition-colors duration-300 hover:bg-creme-light"
+            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-l border-coyote rounded-r-lg hover:bg-creme-light active:bg-coyote/20 transition-colors duration-200"
             onClick={() => setIsSearchOpen(true)}
             aria-label="Search"
           >
-            <Search className="w-6 h-6 text-dark" strokeWidth={1.5} />
+            <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-dark" strokeWidth={1.5} />
           </button>
         </div>
         </div>

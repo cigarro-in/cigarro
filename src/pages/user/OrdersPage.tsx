@@ -308,26 +308,32 @@ export function OrdersPage() {
 
                     {/* Product Preview */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
-                        <ImageWithFallback
-                          src={order.items[0].image}
-                          alt={order.items[0].name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-sans text-sm text-foreground font-medium truncate">
-                          {order.items[0].name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.items[0].brand} • {formatINR(order.items[0].price)}
-                        </p>
-                        {order.items.length > 1 && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            +{order.items.length - 1} more {order.items.length === 2 ? 'item' : 'items'}
-                          </p>
-                        )}
-                      </div>
+                      {order.items && order.items.length > 0 ? (
+                        <>
+                          <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
+                            <ImageWithFallback
+                              src={order.items[0].image}
+                              alt={order.items[0].name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-sans text-sm text-foreground font-medium truncate">
+                              {order.items[0].name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {order.items[0].brand} • {formatINR(order.items[0].price)}
+                            </p>
+                            {order.items.length > 1 && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                +{order.items.length - 1} more {order.items.length === 2 ? 'item' : 'items'}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No items found</p>
+                      )}
                     </div>
 
                     {/* Quick Status Info */}

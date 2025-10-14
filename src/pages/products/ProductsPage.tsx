@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
-import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Search } from 'lucide-react';
+import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Search, X } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { formatINR } from '../../utils/currency';
@@ -37,7 +37,7 @@ export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Removed pagination - using lazy loading instead
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,9 +58,14 @@ export function ProductsPage() {
   // Loading states
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   
+  // Drag to dismiss states
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragCurrentY, setDragCurrentY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  
   const { addToCart, isLoading: cartLoading } = useCart();
 
-  const productsPerPage = 12;
+  // Removed productsPerPage - showing all products for lazy loading
   
   // Dynamic filter sections based on database data
   const [filterSections, setFilterSections] = useState<FilterSection[]>([]);
@@ -369,7 +374,34 @@ export function ProductsPage() {
     setSelectedPackSizes([]);
     setSelectedPriceRange([]);
     setSearchQuery('');
-    setCurrentPage(1);
+  };
+
+  // Drag to dismiss handlers
+  const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setDragStartY(clientY);
+    setDragCurrentY(clientY);
+    setIsDragging(true);
+  };
+
+  const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDragging) return;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const diff = clientY - dragStartY;
+    if (diff > 0) {
+      setDragCurrentY(clientY);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (!isDragging) return;
+    const diff = dragCurrentY - dragStartY;
+    if (diff > 100) {
+      setShowMobileFilters(false);
+    }
+    setIsDragging(false);
+    setDragStartY(0);
+    setDragCurrentY(0);
   };
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -387,12 +419,8 @@ export function ProductsPage() {
     }
   });
 
-  const paginatedProducts = sortedProducts.slice(
-    (currentPage - 1) * productsPerPage,
-    currentPage * productsPerPage
-  );
-
-  const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
+  // Show all products - lazy loading will be implemented
+  const displayedProducts = sortedProducts;
 
   if (isLoading) {
     return (
@@ -415,44 +443,9 @@ export function ProductsPage() {
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
         {/* Mobile Header */}
-        <div className="md:hidden px-4 bg-background border-b border-border">
+        <div className="md:hidden px-4 bg-background">
           <div className="text-center">
             <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">Products</h1>
-          </div>
-        </div>
-
-        {/* Mobile Controls */}
-        <div className="md:hidden px-4 py-3 bg-background border-b border-border">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg text-foreground font-medium"
-            >
-              <span>Filters</span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
-            </button>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              >
-                <Grid3X3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('two-col')}
-                className={`p-2 rounded-lg ${viewMode === 'two-col' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-              >
-                <Grid2X2 className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <button
-              onClick={resetAllFilters}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-sm"
-            >
-              Reset
-            </button>
           </div>
         </div>
 
@@ -494,15 +487,31 @@ export function ProductsPage() {
 
         {/* Main Content Area */}
         <div className="main-container">
-          {/* Mobile Filter Toggle */}
-          <div className="lg:hidden mb-6">
-            <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center gap-2 text-dark font-sans font-medium text-lg uppercase tracking-wide"
-            >
-              <span>Filters</span>
-              <ChevronDown className={`w-5 h-5 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
-            </button>
+          {/* Mobile Filter Button */}
+          <div className="lg:hidden mb-6 px-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowMobileFilters(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-dark text-creme-light rounded-xl font-medium text-sm transition-all active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span>Filters</span>
+                {(selectedCategories.length + selectedBrands.length + selectedPriceRange.length) > 0 && (
+                  <span className="px-2 py-0.5 bg-canyon text-creme-light rounded-full text-xs font-bold">
+                    {selectedCategories.length + selectedBrands.length + selectedPriceRange.length}
+                  </span>
+                )}
+              </button>
+              
+              <button
+                onClick={resetAllFilters}
+                className="px-4 py-3 bg-creme-light border border-coyote text-dark rounded-xl font-medium text-sm transition-all active:scale-95"
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-8">
@@ -570,88 +579,171 @@ export function ProductsPage() {
               </div>
             </div>
 
-            {/* Mobile Filter Sidebar */}
+            {/* Mobile Filter Drawer - World-Class Design */}
             {showMobileFilters && (
-              <div className="lg:hidden fixed inset-0 z-50 bg-creme">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-dark font-sans font-medium text-lg uppercase tracking-wide">Filters</h2>
-                    <button
-                      onClick={() => setShowMobileFilters(false)}
-                      className="text-dark hover:text-canyon transition-colors"
-                    >
-                      <ChevronUp className="w-6 h-6" />
-                    </button>
+              <>
+                {/* Backdrop */}
+                <div 
+                  className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
+                  onClick={() => setShowMobileFilters(false)}
+                />
+                
+                {/* Drawer */}
+                <div 
+                  className="lg:hidden fixed inset-x-0 bottom-0 z-50 bg-creme rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up-smooth transition-transform duration-200"
+                  style={{
+                    transform: isDragging ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` : 'translateY(0)'
+                  }}
+                >
+                  {/* Handle Bar - Draggable */}
+                  <div 
+                    className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing"
+                    onTouchStart={handleDragStart}
+                    onTouchMove={handleDragMove}
+                    onTouchEnd={handleDragEnd}
+                    onMouseDown={handleDragStart}
+                    onMouseMove={handleDragMove}
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                  >
+                    <div className="w-12 h-1.5 bg-coyote/30 rounded-full" />
                   </div>
                   
-                  <div className="space-y-4">
-                    {filterSections.map((section, index) => (
-                      <div key={section.id} className={`${index > 0 ? 'border-t border-coyote/30 pt-4' : ''}`}>
-                        <button
-                          onClick={() => toggleFilterSection(section.id)}
-                          className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-2"
-                        >
-                          <span>{section.name}</span>
-                          {section.isExpanded ? (
-                            <ChevronUp className="w-5 h-5" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5" />
-                          )}
-                        </button>
-                        
-                        {section.isExpanded && (
-                          <div className="space-y-1 pb-3">
-                            {section.items.map((item, itemIndex) => {
-                              const isChecked = (() => {
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-coyote/20">
+                    <div>
+                      <h2 className="text-xl font-serif text-dark">Filters</h2>
+                      <p className="text-sm text-dark/60 font-sans mt-0.5">
+                        {(selectedCategories.length + selectedBrands.length + selectedPriceRange.length) > 0 
+                          ? `${selectedCategories.length + selectedBrands.length + selectedPriceRange.length} active`
+                          : 'Select filters'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+                    <div className="space-y-6 pb-6">
+                      {filterSections.map((section) => (
+                        <div key={section.id} className="space-y-3">
+                          <button
+                            onClick={() => toggleFilterSection(section.id)}
+                            className="flex items-center justify-between w-full text-left group"
+                          >
+                            <span className="text-base font-semibold text-dark uppercase tracking-wide">
+                              {section.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {(() => {
+                                let count = 0;
                                 switch (section.id) {
-                                  case 'categories':
-                                    return selectedCategories.includes(item);
-                                  case 'brands':
-                                    return selectedBrands.includes(item);
-                                  case 'origins':
-                                    return selectedOrigins.includes(item);
-                                  case 'strengths':
-                                    return selectedStrengths.includes(item);
-                                  case 'pack-sizes':
-                                    return selectedPackSizes.includes(item);
-                                  case 'price-range':
-                                    return selectedPriceRange.includes(item);
-                                  default:
-                                    return false;
+                                  case 'categories': count = selectedCategories.length; break;
+                                  case 'brands': count = selectedBrands.length; break;
+                                  case 'origins': count = selectedOrigins.length; break;
+                                  case 'strengths': count = selectedStrengths.length; break;
+                                  case 'pack-sizes': count = selectedPackSizes.length; break;
+                                  case 'price-range': count = selectedPriceRange.length; break;
                                 }
-                              })();
-
-                              return (
-                                <label 
-                                  key={itemIndex} 
-                                  htmlFor={`mobile-${section.id}-${itemIndex}`}
-                                  className="flex items-center space-x-3 cursor-pointer hover:bg-creme/30 rounded-md p-1 -m-1 transition-colors"
-                                >
-                                  <Checkbox
-                                    id={`mobile-${section.id}-${itemIndex}`}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked: boolean) => handleFilterChange(section.id, item, !!checked)}
-                                    className="border-coyote/30 data-[state=checked]:bg-canyon data-[state=checked]:border-canyon"
-                                  />
-                                  <span className="text-dark font-sans text-base">
-                                    {item}
+                                return count > 0 ? (
+                                  <span className="px-2 py-0.5 bg-canyon text-creme-light rounded-full text-xs font-bold">
+                                    {count}
                                   </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                                ) : null;
+                              })()}
+                              {section.isExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-dark transition-transform" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-dark transition-transform" />
+                              )}
+                            </div>
+                          </button>
+                          
+                          {section.isExpanded && (
+                            <div className="space-y-2 pl-1">
+                              {section.items.map((item, itemIndex) => {
+                                const isChecked = (() => {
+                                  switch (section.id) {
+                                    case 'categories': return selectedCategories.includes(item);
+                                    case 'brands': return selectedBrands.includes(item);
+                                    case 'origins': return selectedOrigins.includes(item);
+                                    case 'strengths': return selectedStrengths.includes(item);
+                                    case 'pack-sizes': return selectedPackSizes.includes(item);
+                                    case 'price-range': return selectedPriceRange.includes(item);
+                                    default: return false;
+                                  }
+                                })();
+
+                                return (
+                                  <label 
+                                    key={itemIndex} 
+                                    htmlFor={`mobile-${section.id}-${itemIndex}`}
+                                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+                                      isChecked 
+                                        ? 'bg-canyon/10 border-2 border-canyon' 
+                                        : 'bg-creme-light border-2 border-transparent hover:border-coyote/30'
+                                    }`}
+                                  >
+                                    <span className={`text-sm font-medium ${
+                                      isChecked ? 'text-canyon' : 'text-dark'
+                                    }`}>
+                                      {item}
+                                    </span>
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                      isChecked 
+                                        ? 'bg-canyon border-canyon' 
+                                        : 'border-coyote bg-white'
+                                    }`}>
+                                      {isChecked && (
+                                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <input
+                                      type="checkbox"
+                                      id={`mobile-${section.id}-${itemIndex}`}
+                                      checked={isChecked}
+                                      onChange={(e) => handleFilterChange(section.id, item, e.target.checked)}
+                                      className="sr-only"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Footer Actions */}
+                  <div className="flex-shrink-0 px-6 py-4 border-t border-coyote/20 bg-creme/95 backdrop-blur-sm">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          resetAllFilters();
+                          setShowMobileFilters(false);
+                        }}
+                        className="flex-1 px-4 py-3 bg-creme-light border-2 border-coyote text-dark rounded-xl font-semibold text-sm transition-all active:scale-95"
+                      >
+                        Clear All
+                      </button>
+                      <button
+                        onClick={() => setShowMobileFilters(false)}
+                        className="flex-1 px-4 py-3 bg-dark text-creme-light rounded-xl font-semibold text-sm transition-all active:scale-95 shadow-lg"
+                      >
+                        Show {sortedProducts.length} Products
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Products Grid */}
             <div className="flex-1 relative">
 
-            {paginatedProducts.length === 0 ? (
+            {displayedProducts.length === 0 ? (
               <div className="text-center py-16">
                 <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-coyote" />
                 <h3 className="text-2xl font-serif text-dark mb-4">No products found</h3>
@@ -665,9 +757,9 @@ export function ProductsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -30 }}
                   transition={{ duration: 0.4, ease: "easeInOut" }}
-                  key={`products-${selectedCategories.join(',')}-${selectedBrands.join(',')}-${selectedOrigins.join(',')}-${selectedStrengths.join(',')}-${selectedPackSizes.join(',')}-${selectedPriceRange.join(',')}-${searchQuery}-${currentPage}`}
+                  key={`products-${selectedCategories.join(',')}-${selectedBrands.join(',')}-${selectedOrigins.join(',')}-${selectedStrengths.join(',')}-${selectedPackSizes.join(',')}-${selectedPriceRange.join(',')}-${searchQuery}`}
                 >
-                  {paginatedProducts.map((product, index) => (
+                  {displayedProducts.map((product, index) => (
                     <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 30 }}
@@ -691,56 +783,8 @@ export function ProductsPage() {
                 </motion.div>
               </AnimatePresence>
             )}
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border border-coyote rounded-md text-dark font-sans disabled:opacity-50 disabled:cursor-not-allowed hover:bg-creme-light transition-colors duration-300"
-              >
-                Previous
-              </button>
               
-              <div className="flex gap-1">
-                {[...Array(totalPages)].map((_, i) => {
-                  const pageNum = i + 1;
-                  if (
-                    pageNum === 1 ||
-                    pageNum === totalPages ||
-                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-10 h-10 rounded-md font-sans font-medium transition-colors duration-300 ${
-                          currentPage === pageNum
-                            ? 'bg-dark text-creme-light'
-                            : 'border border-coyote hover:bg-creme-light text-dark'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  } else if (
-                    pageNum === currentPage - 2 ||
-                    pageNum === currentPage + 2
-                  ) {
-                    return (
-                      <span key={pageNum} className="w-10 h-10 flex items-center justify-center text-coyote">
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 border border-coyote rounded-md text-dark font-sans disabled:opacity-50 disabled:cursor-not-allowed hover:bg-creme-light transition-colors duration-300"
-              >
-                Next
-              </button>
+              {/* Pagination removed - using lazy loading */}
             </div>
           </div>
         </div>

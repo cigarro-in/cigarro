@@ -154,58 +154,71 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
 
   return (
-    <div className="group bg-creme-light rounded-lg shadow-lg border border-coyote/20 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative">
-      {/* Wishlist Button - Outside Link */}
+    <div className="group relative bg-creme-light rounded-lg shadow-md border border-coyote/20 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+      {/* Wishlist Button - Compact */}
       <button
         onClick={handleWishlistToggle}
         disabled={wishlistLoading}
-        className="absolute top-3 right-3 z-10 p-2 bg-creme-light/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-creme-light transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed group/wishlist"
+        className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 
+                   w-8 h-8 sm:w-9 sm:h-9 
+                   flex items-center justify-center
+                   bg-creme-light/90 backdrop-blur-sm rounded-full shadow-md 
+                   hover:bg-creme-light hover:scale-110 
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   transition-all duration-300"
         aria-label={isWishlisted(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
       >
         <Heart
-          className={`w-5 h-5 transition-all duration-300 ${
+          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-all duration-300 ${
             isWishlisted(product.id)
               ? 'fill-canyon text-canyon'
-              : 'text-dark group-hover/wishlist:text-canyon'
+              : 'text-dark hover:text-canyon'
           }`}
           strokeWidth={1.5}
         />
       </button>
 
-      <Link to={`/product/${product.slug}`} className="block relative">
-        {/* Product Image */}
-        <div className="relative aspect-square overflow-hidden bg-creme/20">
+      <Link to={`/product/${product.slug}`} className="block">
+        {/* Product Image - Responsive aspect ratio */}
+        <div className="relative aspect-square overflow-hidden bg-white">
           <img
-            className="w-full h-full object-cover transition-all duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
             ref={imgRef}
+            loading="lazy"
           />
         </div>
 
-        {/* Product Info */}
-        <div className="p-4">
-          <div className="mb-2">
-            <p className="text-canyon text-[10px] font-medium uppercase tracking-wider mb-1">
+        {/* Product Info - Compact padding and text */}
+        <div className="p-2 sm:p-2.5 md:p-3">
+          <div className="mb-1.5 sm:mb-2">
+            <p className="text-canyon text-[9px] sm:text-[10px] font-medium uppercase tracking-wider mb-0.5">
               {product.brand || 'Premium'}
             </p>
-            <h3 className="text-dark font-semibold text-sm leading-snug hover:text-canyon transition-colors truncate" title={product.name}>
+            <h3 className="text-dark font-semibold text-xs sm:text-sm md:text-base leading-tight hover:text-canyon transition-colors line-clamp-2 min-h-[1rem]" title={product.name}>
               {product.name}
             </h3>
           </div>
           
-          <div className="flex items-center justify-between">
-            <p className="text-dark font-bold text-sm">
+          <div className="flex items-center justify-between gap-1.5">
+            <p className="text-dark font-bold text-sm sm:text-base md:text-lg">
               ₹{formatIndianPrice(product.price)}
             </p>
             
-            {/* Add to Cart Button */}
+            {/* Add to Cart Button - Compact */}
             {onAddToCart && (
               <button
                 onClick={handleAddToCart}
                 disabled={isLoading}
-                className="bg-dark text-creme-light hover:bg-canyon transition-all duration-300 font-medium text-xs uppercase tracking-wide px-3 py-1.5 rounded-full disabled:opacity-50 min-w-[80px] sm:min-w-[100px]"
+                className="bg-dark text-creme-light hover:bg-canyon active:scale-95
+                           transition-all duration-300 
+                           font-medium text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wide 
+                           px-4 py-1 sm:px-5 sm:py-1.5 md:px-6 md:py-2
+                           h-7 sm:h-8 md:h-9
+                           rounded-full 
+                           disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Adding...' : 'Add'}
               </button>

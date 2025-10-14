@@ -14,12 +14,38 @@
   --font-family-sans: 'DM-Sans', system-ui, sans-serif;
   --font-family-serif: 'PP-Editorial-New', Georgia, serif;
   
-  /* Design System Variables */
+  /* Design System Variables (Legacy - kept for compatibility) */
   --default-w: 1440;
   --mobile-w: 375;
   --padding-inline: calc(100vw * 10 / var(--default-w));
   --gutter: max(10px, var(--padding-inline));
   --radius: 0.5rem;
+
+  /* Responsive Spacing Scale (Mobile → Desktop) */
+  --space-xs: clamp(0.25rem, 0.5vw, 0.5rem);
+  --space-sm: clamp(0.5rem, 1vw, 0.75rem);
+  --space-md: clamp(0.75rem, 1.5vw, 1rem);
+  --space-lg: clamp(1rem, 2vw, 1.5rem);
+  --space-xl: clamp(1.5rem, 3vw, 2rem);
+  --space-2xl: clamp(2rem, 4vw, 3rem);
+  --space-3xl: clamp(3rem, 6vw, 4rem);
+  --space-4xl: clamp(4rem, 8vw, 6rem);
+  --space-5xl: clamp(6rem, 10vw, 8rem);
+  
+  /* Touch Target Sizes (WCAG 2.1 AA Compliant) */
+  --touch-target-min: 44px;
+  --touch-target-comfortable: 48px;
+  
+  /* Responsive Typography Scale */
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
+  --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+  --text-3xl: clamp(1.875rem, 1.5rem + 1.875vw, 2.5rem);
+  --text-4xl: clamp(2.25rem, 1.8rem + 2.25vw, 3rem);
+  --text-5xl: clamp(3rem, 2.4rem + 3vw, 4rem);
 
   /* Extend Tailwind Colors */
   --color-background: var(--color-creme);
@@ -146,6 +172,11 @@ input[type="number"]:placeholder-shown {
 
 :root {
   --spacing-section: max(60px, calc(100vw * 110 / 1440));
+  
+  /* Responsive Section Spacing */
+  --section-spacing-mobile: clamp(2rem, 8vw, 4rem);
+  --section-spacing-tablet: clamp(4rem, 10vw, 6rem);
+  --section-spacing-desktop: clamp(6rem, 12vw, 8rem);
 }
 
 html {
@@ -160,20 +191,21 @@ body {
   overflow-x: hidden;
   overflow-y: scroll;
   background-color: var(--color-creme);
-  padding-top: 60px;
+  padding-top: 64px; /* Mobile header height */
   font-family: var(--font-family-sans);
   color: var(--color-dark);
 }
 
-@media (max-width: 1024px) {
+/* Responsive body padding for fixed headers */
+@media (min-width: 640px) {
   body {
-    padding-top: 85px;
+    padding-top: 72px; /* Small tablet */
   }
 }
 
-@media (max-width: 767px) {
+@media (min-width: 1024px) {
   body {
-    padding-top: 80px;
+    padding-top: 80px; /* Desktop header height */
   }
 }
 
@@ -281,61 +313,95 @@ body {
   text-transform: uppercase;
   letter-spacing: -0.02em;
   color: var(--color-dark);
-  font-size: max(16px, 1600vw / var(--default-w));
+  font-size: var(--text-sm);
   line-height: 1.075;
-  margin-bottom: min(20px, 2000vw / var(--default-w));
+  margin-bottom: var(--space-sm);
 }
 
-@media (max-width: 767px) {
+@media (min-width: 640px) {
   .suptitle {
-    font-size: 1.4rem;
-    line-height: 1.07;
-    margin-bottom: 10px;
+    font-size: var(--text-base);
+    line-height: 1.1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .suptitle {
+    font-size: var(--text-lg);
   }
 }
 
 .big-title {
   font-family: var(--font-family-serif);
   color: var(--color-dark);
-  font-size: calc(11000vw / var(--default-w));
-  line-height: 1.18;
-  letter-spacing: calc(-20vw / var(--default-w));
+  font-size: var(--text-4xl);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
-@media (max-width: 767px) {
+@media (min-width: 640px) {
   .big-title {
-    font-size: 4rem;
+    font-size: clamp(3.5rem, 6vw, 5rem);
+    line-height: 1.15;
+  }
+}
+
+@media (min-width: 1024px) {
+  .big-title {
+    font-size: var(--text-5xl);
+    line-height: 1.18;
+  }
+}
+
+@media (min-width: 1536px) {
+  .big-title {
+    font-size: clamp(5rem, 7.5vw, 7rem);
   }
 }
 
 .main-title {
   font-family: var(--font-family-serif);
   color: var(--color-dark);
-  font-size: calc(8000vw / var(--default-w));
-  line-height: 0.94;
-  letter-spacing: calc(-20vw / var(--default-w));
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   margin-bottom: 0.6em;
 }
 
-@media (max-width: 767px) {
+@media (min-width: 640px) {
   .main-title {
-    font-size: 4rem;
+    font-size: var(--text-4xl);
+    line-height: 1.05;
+  }
+}
+
+@media (min-width: 1024px) {
+  .main-title {
+    font-size: clamp(3.5rem, 5.5vw, 5.5rem);
+    line-height: 0.94;
   }
 }
 
 .medium-title {
   font-family: var(--font-family-serif);
   color: var(--color-dark);
-  font-size: calc(6000vw / var(--default-w));
-  line-height: 1.05;
-  letter-spacing: calc(-20vw / var(--default-w));
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   margin-bottom: 0.6em;
 }
 
-@media (max-width: 767px) {
+@media (min-width: 640px) {
   .medium-title {
-    font-size: 3rem;
-    line-height: 1.24;
+    font-size: var(--text-3xl);
+    line-height: 1.15;
+  }
+}
+
+@media (min-width: 1024px) {
+  .medium-title {
+    font-size: clamp(2.5rem, 4vw, 4rem);
+    line-height: 1.05;
   }
 }
 
@@ -540,6 +606,75 @@ body {
 @keyframes shimmer {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slide-up-smooth {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up-smooth {
+  animation: slide-up-smooth 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bounce-once {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.animate-bounce-once {
+  animation: bounce-once 0.6s ease-out;
 }
 
 /* Smooth scroll behavior */

@@ -249,18 +249,18 @@ export function FeaturedProducts() {
                 
                 // Only scale the card that's closest to center (within 0.6 threshold)
                 const isClosestToCenter = distanceFromCenter < 0.6;
-                const scale = isClosestToCenter ? 1.18 : 0.9;
+                const scale = isClosestToCenter ? 1.12 : 0.9;
                 const opacity = isClosestToCenter ? 1 : 0.7;
                 const zIndex = isClosestToCenter ? 1000 : 1;
 
                 return (
                   <div
                     key={`${product.id}-${index}`}
-                    className="flex-shrink-0 will-change-transform"
+                    className="flex-shrink-0 will-change-transform flex items-center"
                     style={{ 
                       position: 'relative',
                       width: '33.333%', // exactly 3 visible items
-                      padding: '0 8px', // 16px gap between items
+                      padding: '0 8px',
                       transform: `scale(${scale})`,
                       opacity,
                       zIndex,

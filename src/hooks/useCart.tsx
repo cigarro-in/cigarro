@@ -57,10 +57,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!isInitialized) {
       loadCart();
       setIsInitialized(true);
-    } else if (user?.id) {
-      loadCart(); // Only reload when user actually changes
     }
-  }, [user?.id, isInitialized]);
+  }, [isInitialized]);
+  
+  // Reload cart when user changes (login/logout)
+  useEffect(() => {
+    if (isInitialized && user !== undefined) {
+      loadCart();
+    }
+  }, [user?.id]);
 
   // Remove duplicate initial mount effect
   // useEffect(() => {

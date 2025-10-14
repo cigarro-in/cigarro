@@ -3,6 +3,16 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
+  <!-- 
+    PRODUCTION SITEMAP - Cigarro.in
+    Last Updated: 2025-10-14
+    
+    To regenerate with latest database content:
+    cd scripts && node generate-sitemap.js
+    
+    This file contains ONLY real, production routes.
+  -->
+  
   <!-- Homepage - Highest Priority -->
   <url>
     <loc>https://cigarro.in/</loc>
@@ -78,39 +88,5 @@
     <priority>0.4</priority>
   </url>
   
-  <!-- Dynamic Routes (Examples) -->
-  <url>
-    <loc>https://cigarro.in/product/premium-cigarette</loc>
-    <lastmod>2025-10-11</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  
-  <url>
-    <loc>https://cigarro.in/category/premium</loc>
-    <lastmod>2025-10-11</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  </url>
-  
-  <url>
-    <loc>https://cigarro.in/brands/camel</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  
-  <!-- Sample Blog Posts -->
-  <url>
-    <loc>https://cigarro.in/blog/premium-cigarette-guide</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
-  <url>
-    <loc>https://cigarro.in/blog/cigarette-storage-tips</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
+  <!-- Dynamic content will be generated from database by running: node scripts/generate-sitemap.js -->
 </urlset>

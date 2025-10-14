@@ -274,57 +274,57 @@ const Header = () => {
   };
 
   return (
-    <header className="hidden md:block fixed top-0 left-0 right-0 z-50 p-[max(10px,calc(100vw*10/1440))]">
-      <div className="bg-creme border border-coyote rounded-md h-[50px] flex flex-wrap justify-between relative z-10">
+    <header className="hidden lg:block fixed top-0 left-0 right-0 z-50 px-4 py-3">
+      <div className="bg-creme border border-coyote rounded-lg h-14 flex items-center justify-between px-2 relative z-10">
         {/* Left Section - Menu */}
-        <div className="flex flex-wrap">
-          <button 
-            type="button" 
-            className="flex flex-wrap items-center cursor-pointer border-r border-coyote rounded-tl-md px-[max(10px,calc(100vw*17/1440))] gap-[calc(100vw*15/1440)] transition-colors duration-300 hover:bg-dark group"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {/* Hamburger Menu */}
-            <div className="inline-block relative w-[min(40px,max(20px,calc(100vw*32/1440)))] h-px bg-dark transition-colors duration-300 group-hover:bg-creme-light before:content-[''] before:block before:w-[min(40px,max(20px,calc(100vw*32/1440)))] before:h-px before:bg-dark before:transform before:translate-y-[min(-3px,calc(-100vw*6/1440))] before:transition-all before:duration-500 after:content-[''] after:block after:w-[min(40px,max(20px,calc(100vw*32/1440)))] after:h-px after:bg-dark after:mt-[max(2px,calc(100vw*5/1440))] after:transition-all after:duration-500 md:before:translate-y-[-3px] md:after:mt-[3px] md:w-5 md:before:w-5 md:after:w-5 group-hover:before:bg-creme-light group-hover:after:bg-creme-light"></div>
-            <span className="hidden md:block text-dark font-sans font-normal text-[min(24px,max(16px,calc(100vw*18/1440)))] leading-tight tracking-tight transition-colors duration-300 group-hover:text-creme-light">
-              Menu
-            </span>
-          </button>
-        </div>
+        <button 
+          type="button" 
+          className="flex items-center gap-3 px-4 py-2 border-r border-coyote rounded-l-lg hover:bg-dark transition-colors duration-300 group"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          {/* Hamburger Menu */}
+          <div className="inline-block relative w-4 h-px lg:w-5 bg-dark transition-colors duration-300 group-hover:bg-creme-light before:content-[''] before:block before:w-4 lg:before:w-5 before:h-px before:bg-dark before:transform before:-translate-y-[5px] lg:before:-translate-y-[6px] before:transition-all before:duration-300 after:content-[''] after:block after:w-4 lg:after:w-5 after:h-px after:bg-dark after:translate-y-[5px] lg:after:translate-y-[6px] after:transition-all after:duration-300 group-hover:before:bg-creme-light group-hover:after:bg-creme-light"></div>
+          <span className="text-dark font-sans font-normal text-base leading-tight tracking-tight transition-colors duration-300 group-hover:text-creme-light">
+            Menu
+          </span>
+        </button>
 
         {/* Center Section - Logo */}
-        <div className="absolute top-0 left-1/2 h-[50px] transform -translate-x-1/2 overflow-hidden">
-          <div className="flex items-center justify-center h-[50px]">
-            <a href="/" className="block">
-              <div className="text-dark font-serif font-normal tracking-tight leading-none text-xl md:text-2xl uppercase">
-                CIGARRO
-              </div>
-            </a>
-          </div>
-        </div>
+        <Link to="/" className="absolute left-1/2 -translate-x-1/2">
+          <h1 className="text-dark font-serif font-normal tracking-tight leading-none text-2xl uppercase">
+            CIGARRO
+          </h1>
+        </Link>
 
         {/* Right Section - Icons */}
-        <div className="flex">
+        <div className="flex items-center gap-1">
           {/* Search */}
           <button 
-            className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] transition-colors duration-300 hover:bg-creme-light md:border-l md:border-coyote"
+            className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
             onClick={() => setIsSearchOpen(!isSearchOpen)}
+            aria-label="Search"
           >
-            <Search className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
+            <Search className="w-4 h-4 lg:w-5 lg:h-5 xl:w-5 xl:h-5 text-dark" strokeWidth={1.5} />
           </button>
           
           {/* Wishlist */}
-          <Link to="/wishlist" className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote transition-colors duration-300 hover:bg-creme-light">
-            <Heart className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
-            <span className="ml-[max(10px,calc(100vw*14/1440))] inline-block text-white font-sans font-medium rounded-full text-center bg-dark text-[clamp(13px,calc(100vw*13/1440),16px)] leading-[clamp(25px,calc(100vw*32/1440),32px)] tracking-tight w-[min(32px,max(25px,calc(100vw*32/1440)))] h-[min(32px,max(25px,calc(100vw*32/1440)))]">
-              {wishlistCount}
-            </span>
+          <Link 
+            to="/wishlist" 
+            className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300 relative"
+            aria-label="Wishlist"
+          >
+            <Heart className="w-4 h-4 lg:w-5 lg:h-5 xl:w-5 xl:h-5 text-dark" strokeWidth={1.5} />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-creme-light bg-dark rounded-full">
+                {wishlistCount}
+              </span>
+            )}
           </Link>
 
           {/* Cart */}
           <div 
             className="relative"
             onMouseEnter={() => {
-              // Clear auto-hide timeout when hovering
               if (autoShowTimeout) {
                 clearTimeout(autoShowTimeout);
                 setAutoShowTimeout(null);
@@ -334,13 +334,16 @@ const Header = () => {
             onMouseLeave={() => setIsMiniCartOpen(false)}
           >
             <button 
-              className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote transition-colors duration-300 hover:bg-creme-light"
+              className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300 relative"
               onClick={() => setIsMiniCartOpen(!isMiniCartOpen)}
+              aria-label="Shopping cart"
             >
-              <ShoppingBag className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
-              <span className="ml-[max(10px,calc(100vw*14/1440))] inline-block text-white font-sans font-medium rounded-full text-center bg-dark text-[clamp(13px,calc(100vw*13/1440),16px)] leading-[clamp(25px,calc(100vw*32/1440),32px)] tracking-tight w-[min(32px,max(25px,calc(100vw*32/1440)))] h-[min(32px,max(25px,calc(100vw*32/1440)))]">
-                {totalItems || 0}
-              </span>
+              <ShoppingBag className="w-4 h-4 lg:w-5 lg:h-5 xl:w-5 xl:h-5 text-dark" strokeWidth={1.5} />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-creme-light bg-dark rounded-full">
+                  {totalItems}
+                </span>
+              )}
             </button>
             
             {/* Mini Cart */}
@@ -350,7 +353,7 @@ const Header = () => {
             />
           </div>
 
-          {/* Authentication - Now rightmost */}
+          {/* Authentication */}
           {user ? (
             <div 
               className="relative"
@@ -358,29 +361,30 @@ const Header = () => {
               onMouseLeave={() => setIsUserDropdownOpen(false)}
             >
               <button 
-                className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote rounded-tr-md rounded-br-md transition-colors duration-300 hover:bg-creme-light"
+                className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                aria-label="User menu"
               >
-                <User className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
+                <User className="w-4 h-4 lg:w-5 lg:h-5 xl:w-5 xl:h-5 text-dark" strokeWidth={1.5} />
               </button>
               {/* User Dropdown */}
-              <div className={`absolute right-0 top-full mt-2 w-56 bg-creme border border-coyote rounded-md shadow-lg transition-all duration-300 z-50 ${isUserDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+              <div className={`absolute right-0 top-full mt-2 w-56 bg-creme border border-coyote rounded-lg shadow-xl transition-all duration-300 z-50 ${isUserDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
                 <div className="p-4 border-b border-coyote">
-                  <p className="font-medium text-dark text-lg">{user.name}</p>
-                  <p className="text-coyote text-sm">{user.email}</p>
+                  <p className="font-medium text-dark text-base">{user.name}</p>
+                  <p className="text-coyote text-sm truncate">{user.email}</p>
                 </div>
-                <div className="py-3">
+                <div className="py-2">
                   {user.isAdmin && (
-                    <a href="/admin" className="block px-4 py-3 text-base text-dark hover:bg-creme-light transition-colors">
+                    <Link to="/admin" className="block px-4 py-2.5 text-sm text-dark hover:bg-creme-light transition-colors">
                       Admin Dashboard
-                    </a>
+                    </Link>
                   )}
-                  <a href="/orders" className="block px-4 py-3 text-base text-dark hover:bg-creme-light transition-colors">
+                  <Link to="/orders" className="block px-4 py-2.5 text-sm text-dark hover:bg-creme-light transition-colors">
                     My Orders
-                  </a>
+                  </Link>
                   <button 
                     onClick={() => signOut()}
-                    className="w-full text-left px-4 py-3 text-base text-dark hover:bg-creme-light transition-colors flex items-center gap-3"
+                    className="w-full text-left px-4 py-2.5 text-sm text-dark hover:bg-creme-light transition-colors flex items-center gap-2"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -390,10 +394,11 @@ const Header = () => {
             </div>
           ) : (
             <button 
-              className="cursor-pointer inline-flex justify-center items-center h-[50px] px-[max(10px,calc(100vw*15/1440))] border-l border-coyote rounded-tr-md rounded-br-md transition-colors duration-300 hover:bg-creme-light"
+              className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
               onClick={() => setIsAuthDialogOpen(true)}
+              aria-label="Sign in"
             >
-              <User className="w-6 h-6 text-dark flex-shrink-0" strokeWidth={1.5} />
+              <User className="w-5 h-5 text-dark" strokeWidth={1.5} />
             </button>
           )}
         </div>
@@ -401,48 +406,48 @@ const Header = () => {
 
       {/* Navigation Menu */}
       {isMenuOpen && (
-        <div className="absolute top-[calc(100%-max(10px,calc(100vw*10/1440)))] left-[max(10px,calc(100vw*10/1440))] right-[max(10px,calc(100vw*10/1440))] bg-creme border border-coyote border-t-0 rounded-b-md max-h-[calc(100vh-70px)] overflow-y-auto scrollbar-none opacity-100 visible">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-0">
+        <div className="absolute top-[calc(100%-0.75rem)] left-4 right-4 bg-creme border border-coyote border-t-0 rounded-b-lg max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide shadow-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-0">
             {/* Shop Section */}
-            <div className="p-[calc(100vw*45/1440)] border-b border-coyote md:border-b-0 md:border-r md:border-coyote overflow-hidden">
-              <span className="block text-dark font-sans font-medium uppercase text-[max(14px,calc(100vw*14/1440))] leading-tight tracking-tight mb-[calc(100vw*15/1440)]">
+            <div className="p-6 border-b border-coyote lg:border-b-0 lg:border-r lg:border-coyote">
+              <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
                 Shop
               </span>
-              <Link to="/products" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/products" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 All Products
               </Link>
-              <Link to="/collections" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/collections" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Collections
               </Link>
-              <Link to="/wishlist" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/wishlist" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Wishlist
               </Link>
-              <Link to="/cart" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/cart" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Shopping Cart
               </Link>
             </div>
             
             {/* Account Section */}
-            <div className="p-[calc(100vw*45/1440)] border-b border-coyote md:border-b-0 md:border-r md:border-coyote overflow-hidden">
-              <span className="block text-dark font-sans font-medium uppercase text-[max(14px,calc(100vw*14/1440))] leading-tight tracking-tight mb-[calc(100vw*15/1440)]">
+            <div className="p-6 border-b border-coyote lg:border-b-0 lg:border-r lg:border-coyote">
+              <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
                 Account
               </span>
               {user ? (
                 <>
-                  <Link to="/orders" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/orders" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                     My Orders
                   </Link>
-                  <Link to="/wishlist" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+                  <Link to="/wishlist" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                     My Wishlist
                   </Link>
                   {user.isAdmin && (
-                    <Link to="/admin" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+                    <Link to="/admin" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                       Admin Dashboard
                     </Link>
                   )}
                   <button 
                     onClick={() => { signOut(); setIsMenuOpen(false); }}
-                    className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon text-left"
+                    className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon text-left"
                   >
                     Sign Out
                   </button>
@@ -450,7 +455,7 @@ const Header = () => {
               ) : (
                 <button 
                   onClick={() => { setIsAuthDialogOpen(true); setIsMenuOpen(false); }}
-                  className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon text-left"
+                  className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon text-left"
                 >
                   Sign In / Register
                 </button>
@@ -458,39 +463,39 @@ const Header = () => {
             </div>
             
             {/* Information Section */}
-            <div className="p-[calc(100vw*45/1440)] border-b border-coyote md:border-b-0 md:border-r md:border-coyote overflow-hidden">
-              <span className="block text-dark font-sans font-medium uppercase text-[max(14px,calc(100vw*14/1440))] leading-tight tracking-tight mb-[calc(100vw*15/1440)]">
+            <div className="p-6 border-b border-coyote lg:border-b-0 lg:border-r lg:border-coyote">
+              <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
                 Information
               </span>
-              <Link to="/about" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/about" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 About Us
               </Link>
-              <Link to="/blog" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/blog" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Blog
               </Link>
-              <Link to="/contact" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/contact" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Contact Us
               </Link>
-              <Link to="/shipping" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/shipping" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Shipping Info
               </Link>
             </div>
             
             {/* Legal Section */}
-            <div className="p-[calc(100vw*45/1440)] overflow-hidden">
-              <span className="block text-dark font-sans font-medium uppercase text-[max(14px,calc(100vw*14/1440))] leading-tight tracking-tight mb-[calc(100vw*15/1440)]">
+            <div className="p-6">
+              <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
                 Legal
               </span>
-              <Link to="/privacy" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/privacy" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Privacy Policy
               </Link>
-              <Link to="/terms" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/terms" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Terms of Service
               </Link>
-              <a href="#" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
+              <a href="#" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon">
                 Age Verification
               </a>
-              <a href="#" className="block text-dark font-sans font-normal text-[max(14px,calc(100vw*14/1440))] leading-[2.14] tracking-tight transition-colors duration-300 hover:text-canyon">
+              <a href="#" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon">
                 Responsible Use
               </a>
             </div>
@@ -505,22 +510,23 @@ const Header = () => {
             <div className="bg-creme rounded-lg shadow-xl border border-coyote" onClick={(e) => e.stopPropagation()}>
               {/* Search Input */}
               <div className="p-6 border-b border-coyote">
-                <div className="flex items-center gap-4">
-                  <Search className="w-6 h-6 text-coyote" />
+                <div className="flex items-center gap-3 lg:gap-4">
+                  <Search className="w-5 h-5 lg:w-6 lg:h-6 text-coyote" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     placeholder="Search for premium tobacco products..."
-                    className="flex-1 bg-transparent text-dark placeholder:text-coyote text-lg focus:outline-none"
+                    className="flex-1 bg-transparent text-dark placeholder:text-coyote text-base lg:text-lg focus:outline-none"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  {isSearching && <Loader2 className="w-5 h-5 text-coyote animate-spin" />}
+                  {isSearching && <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 text-coyote animate-spin" />}
                   <button 
                     onClick={handleSearchClose}
-                    className="text-coyote hover:text-dark transition-colors"
+                    className="text-coyote hover:text-dark transition-colors p-1"
+                    aria-label="Close search"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5 lg:w-6 lg:h-6" />
                   </button>
                 </div>
               </div>

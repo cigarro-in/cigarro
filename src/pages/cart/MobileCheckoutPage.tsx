@@ -22,8 +22,10 @@ import {
   Edit3,
   Navigation,
   Loader2,
-  Tag
+  Tag,
+  Copy
 } from 'lucide-react';
+import QRCodeLib from 'qrcode';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -118,6 +120,11 @@ export function MobileCheckoutPage() {
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [orderId, setOrderId] = useState('');
+  const [paymentStage, setPaymentStage] = useState<'processing' | 'confirmed'>('processing');
+  const [transactionId, setTransactionId] = useState('');
+  const [qrCodeDataURL, setQrCodeDataURL] = useState('');
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Address form state
   const [addressForm, setAddressForm] = useState({
@@ -652,25 +659,28 @@ export function MobileCheckoutPage() {
     }
 
     const amount = getFinalTotal();
+    const couponDiscountAmount = appliedDiscount?.discount_amount || 0;
+    const totalDiscountAmount = randomDiscount + couponDiscountAmount;
+    
     const orderData = {
       user_id: user.id,
       transaction_id: transactionId,
       status: status,
-      total_amount: amount,
-      payment_method: selectedPaymentMethod || 'upi',
-      shipping_method: selectedShipping,
+      total: amount,
+      subtotal: totalPrice,
+      tax: 0,
       shipping: getShippingCost(),
-      discount_amount: appliedDiscount?.discount_amount || 0,
-      // Removed coupon_code as it doesn't exist in the orders table
-      // Applied discount code is stored in the discount_amount field
-      shipping_full_name: selectedAddress.full_name,
+      discount: totalDiscountAmount,
+      discount_code: appliedDiscount?.discount_code || null,
+      discount_id: appliedDiscount?.discount_id || null,
+      payment_method: selectedPaymentMethod || 'upi',
+      shipping_name: selectedAddress.full_name,
       shipping_address: selectedAddress.address,
       shipping_city: selectedAddress.city,
       shipping_state: selectedAddress.state,
       shipping_zip_code: selectedAddress.pincode,
       shipping_country: selectedAddress.country || 'India',
       shipping_phone: selectedAddress.phone,
-      created_at: new Date().toISOString(),
       estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
 
@@ -691,6 +701,7 @@ export function MobileCheckoutPage() {
       order_id: order.id,
       product_id: item.id,
       product_name: item.name,
+      product_brand: item.brand || 'Premium',
       product_price: item.variant_price || item.price,
       product_image: item.image || (item.gallery_images && item.gallery_images[0]) || '',
       quantity: item.quantity,
@@ -725,11 +736,12 @@ export function MobileCheckoutPage() {
     
     try {
       // Generate transaction ID for UPI reference
-      const transactionId = `TXN${Date.now().toString().slice(-8)}`;
+      const txnId = `TXN${Date.now().toString().slice(-8)}`;
+      setTransactionId(txnId);
       const amount = getFinalTotal();
       
       // Save order to database with 'pending' status first
-      await saveOrderToDatabase(transactionId, 'pending');
+      await saveOrderToDatabase(txnId, 'pending');
       
       // Create UPI payment link with dynamic amount
       const upiId = 'hrejuh@upi'; // UPI ID
@@ -743,56 +755,46 @@ export function MobileCheckoutPage() {
         '&cu=INR';
       
       // Show payment processing dialog
+      setPaymentStage('processing');
       setIsConfirmingPayment(true);
       
       // Open UPI app
       window.location.href = upiLink;
       
-      // Start countdown from 10 seconds
-      let count = 10;
+      // Start countdown from 8 seconds for processing stage
+      let count = 8;
       setCountdown(count);
       
-      const countdownTimer = setInterval(() => {
+      const countdownTimer = setInterval(async () => {
         count--;
         setCountdown(count);
         
         if (count <= 0) {
           clearInterval(countdownTimer);
-          // After countdown, wait for a random time (0-3s) before showing success
-          const randomDelay = Math.floor(Math.random() * 3000);
           
-          setTimeout(async () => {
-            try {
-              // Update order status to 'paid'
-              await supabase
-                .from('orders')
-                .update({ 
-                  status: 'paid',
-                  payment_confirmed: true,
-                  payment_confirmed_at: new Date().toISOString()
-                })
-                .eq('transaction_id', transactionId);
-              
-              // Clear the cart
-              clearCart();
-              
-              // Navigate to success page
-              navigate('/order-success', { 
-                state: { 
-                  message: 'Order placed successfully!',
-                  orderId: `ORD${transactionId.slice(-8)}`,
-                  amount: amount
-                } 
-              });
-              
-            } catch (error) {
-              console.error('Error updating order status:', error);
-              toast.error('Payment processed but failed to update order status');
-            } finally {
-              setIsProcessing(false);
-              setIsConfirmingPayment(false);
-            }
-          }, randomDelay);
+          // Switch to confirmed stage
+          setPaymentStage('confirmed');
+          
+          // Update order status immediately (no auto-redirect)
+          try {
+            await supabase
+              .from('orders')
+              .update({ 
+                status: 'paid',
+                payment_confirmed: true,
+                payment_confirmed_at: new Date().toISOString()
+              })
+              .eq('transaction_id', txnId);
+            
+            // Clear the cart
+            clearCart();
+            
+          } catch (error) {
+            console.error('Error updating order status:', error);
+            toast.error('Payment processed but failed to update order status');
+          } finally {
+            setIsProcessing(false);
+          }
         }
       }, 1000);
       
@@ -802,6 +804,86 @@ export function MobileCheckoutPage() {
       setIsProcessing(false);
       setIsConfirmingPayment(false);
     }
+  };
+
+  const handleQRPayment = async () => {
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
+      return;
+    }
+
+    if (!user) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
+    try {
+      // Generate transaction ID and QR code
+      const txnId = `TXN${Date.now().toString().slice(-8)}`;
+      setTransactionId(txnId);
+      const amount = getFinalTotal();
+      
+      // Create UPI payment URL
+      const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${amount}&tn=Order ${txnId}&cu=INR`;
+      
+      // Generate QR code
+      const qrDataURL = await QRCodeLib.toDataURL(upiURL, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      setQrCodeDataURL(qrDataURL);
+      setShowQRDialog(true);
+      
+      // Save order to database
+      await saveOrderToDatabase(txnId, 'pending');
+      
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast.error('Failed to generate QR code');
+    }
+  };
+
+  const handleQRPaymentDone = () => {
+    setShowQRDialog(false);
+    setPaymentStage('processing');
+    setIsConfirmingPayment(true);
+    
+    // Start countdown
+    let count = 8;
+    setCountdown(count);
+    
+    const countdownTimer = setInterval(async () => {
+      count--;
+      setCountdown(count);
+      
+      if (count <= 0) {
+        clearInterval(countdownTimer);
+        setPaymentStage('confirmed');
+        
+        // Update order status immediately (no auto-redirect)
+        try {
+          await supabase
+            .from('orders')
+            .update({ 
+              status: 'paid',
+              payment_confirmed: true,
+              payment_confirmed_at: new Date().toISOString()
+            })
+            .eq('transaction_id', transactionId);
+          
+          clearCart();
+        } catch (error) {
+          console.error('Error updating order:', error);
+          toast.error('Payment processed but failed to update order status');
+        }
+        // Keep confirmation screen open - user will navigate using buttons
+      }
+    }, 1000);
   };
 
   const handleProcessOrder = async () => {
@@ -869,23 +951,19 @@ export function MobileCheckoutPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-8 p-0"
+                    <button
+                      className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                       onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id)}
                     >
                       <Minus className="w-3 h-3" />
-                    </Button>
-                    <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-8 p-0"
+                    </button>
+                    <span className="text-sm font-semibold w-8 text-center">{item.quantity}</span>
+                    <button
+                      className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                       onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id)}
                     >
                       <Plus className="w-3 h-3" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1083,16 +1161,28 @@ export function MobileCheckoutPage() {
             {/* Pay Button (2/3) */}
             <Button
               onClick={() => {
+                if (!selectedAddress) {
+                  toast.error('Please select a delivery address first');
+                  setShowAddressDialog(true);
+                  return;
+                }
                 if (selectedPaymentMethod === 'upi') {
                   handleUPIPayment();
                 } else {
                   setShowPaymentDialog(true);
                 }
               }}
-              disabled={!selectedAddress || isProcessing}
-              className="flex-1 bg-accent hover:bg-accent/90 text-white font-semibold py-3"
+              disabled={isProcessing}
+              className="flex-1 bg-dark hover:bg-canyon text-creme-light font-semibold py-3 rounded-lg transition-all active:scale-95 disabled:opacity-50"
             >
-              {isProcessing ? 'Processing...' : `Pay ${formatINR(getFinalTotal())}`}
+              {isProcessing ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                `Pay ${formatINR(getFinalTotal())}`
+              )}
             </Button>
           </div>
         </div>
@@ -1402,83 +1492,334 @@ export function MobileCheckoutPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Method Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle>Payment Method</DialogTitle>
-          </DialogHeader>
-          {isConfirmingPayment ? (
-            <div className="py-6 text-center">
-              <div className="flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-                  <Check className="w-8 h-8 text-green-500" />
+      {/* Payment Confirmation Full Screen Overlay */}
+      {isConfirmingPayment && (
+        <div className="fixed inset-0 z-[9999] bg-creme flex items-center justify-center p-6 animate-fade-in">
+          <div className="w-full max-w-md">
+            {paymentStage === 'processing' ? (
+              /* Processing Stage */
+              <div className="text-center space-y-6 animate-slide-up-smooth">
+                {/* Animated Loader */}
+                <div className="relative mx-auto w-24 h-24">
+                  <div className="absolute inset-0 rounded-full border-4 border-canyon/30"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-canyon animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 text-canyon animate-pulse" />
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-medium text-lg mb-1">Payment Confirmation</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {countdown > 0 
-                      ? `Confirming your payment... (${countdown}s)`
-                      : 'Processing your order...'}
+
+                {/* Status Text */}
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-serif text-dark">
+                    Processing Payment
+                  </h2>
+                  <p className="text-base text-dark/70 font-sans">
+                    Please wait while we process your payment...
                   </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Order ID: {orderId}
+                </div>
+
+                {/* Countdown Circle */}
+                <div className="flex items-center justify-center gap-3">
+                  <div className="relative w-16 h-16">
+                    <svg className="w-16 h-16 transform -rotate-90">
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                        className="text-coyote/30"
+                      />
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 28}`}
+                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 8)}`}
+                        className="text-canyon transition-all duration-1000"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xl font-bold text-dark">{countdown}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transaction Details */}
+                <div className="bg-creme-light rounded-2xl p-5 border-2 border-coyote/20">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Amount</span>
+                      <span className="text-lg font-bold text-dark">{formatINR(getFinalTotal())}</span>
+                    </div>
+                    <div className="h-px bg-coyote/20"></div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Transaction ID</span>
+                      <span className="text-dark font-mono text-xs">{transactionId}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Loading Dots */}
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-canyon animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-canyon animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 rounded-full bg-canyon animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+
+                <p className="text-xs text-dark/50 font-sans">
+                  Do not close this window or press back
+                </p>
+              </div>
+            ) : (
+              /* Confirmed Stage */
+              <div className="text-center space-y-6 animate-scale-in">
+                {/* Success Check */}
+                <div className="relative mx-auto w-28 h-28">
+                  <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping"></div>
+                  <div className="relative w-28 h-28 rounded-full bg-green-500 flex items-center justify-center shadow-2xl animate-bounce-once">
+                    <Check className="w-14 h-14 text-white" strokeWidth={3} />
+                  </div>
+                </div>
+
+                {/* Success Text */}
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-serif text-dark">
+                    Payment Confirmed!
+                  </h2>
+                  <p className="text-base text-dark/70 font-sans">
+                    Your order has been placed successfully
                   </p>
+                </div>
+
+                {/* Order Summary */}
+                <div className="bg-creme-light rounded-2xl p-6 border-2 border-green-500/30">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-dark/60 font-medium">Order Total</span>
+                      <span className="text-2xl font-bold text-green-600">{formatINR(getFinalTotal())}</span>
+                    </div>
+                    <div className="h-px bg-coyote/20"></div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Transaction ID</span>
+                      <span className="text-dark font-mono text-xs">{transactionId}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Items</span>
+                      <span className="text-dark font-semibold">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={() => navigate('/orders')}
+                    className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon"
+                  >
+                    View My Orders
+                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => navigate('/products')}
+                      className="flex-1 bg-creme-light border-2 border-coyote text-dark py-3 rounded-xl font-medium text-sm transition-all active:scale-95 hover:bg-creme"
+                    >
+                      Browse Products
+                    </button>
+                    <button
+                      onClick={() => navigate('/cart')}
+                      className="flex-1 bg-creme-light border-2 border-coyote text-dark py-3 rounded-xl font-medium text-sm transition-all active:scale-95 hover:bg-creme"
+                    >
+                      View Cart
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-green-600 font-medium">
+                  ✓ Order confirmation sent to your email
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Method Dialog - Improved */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-sm mx-auto p-0">
+          {/* Header */}
+          <div className="p-4 border-b border-border/20">
+            <h3 className="text-lg font-serif text-dark text-center">Choose Payment Method</h3>
+            <p className="text-xs text-dark/60 text-center mt-1">Select how you want to pay</p>
+          </div>
+          
+          <div className="p-4 space-y-3">
+            {/* UPI Apps Option */}
+            <button
+              onClick={() => {
+                setSelectedPaymentMethod('upi');
+                setShowPaymentDialog(false);
+                handleUPIPayment();
+              }}
+              className="w-full p-4 bg-creme-light border-2 border-coyote/30 rounded-xl hover:border-canyon hover:bg-creme transition-all active:scale-95 group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-dark flex items-center justify-center flex-shrink-0 group-hover:bg-canyon transition-colors">
+                  <Smartphone className="w-6 h-6 text-creme-light" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-dark text-sm">UPI Apps</p>
+                  <p className="text-xs text-dark/60 mt-0.5">GPay, PhonePe, Paytm & more</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-dark/40 group-hover:text-canyon transition-colors" />
+              </div>
+            </button>
+
+            {/* QR Code Option */}
+            <button
+              onClick={() => {
+                setSelectedPaymentMethod('qr');
+                setShowPaymentDialog(false);
+                handleQRPayment();
+              }}
+              className="w-full p-4 bg-creme-light border-2 border-coyote/30 rounded-xl hover:border-canyon hover:bg-creme transition-all active:scale-95 group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-dark flex items-center justify-center flex-shrink-0 group-hover:bg-canyon transition-colors">
+                  <QrCode className="w-6 h-6 text-creme-light" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-dark text-sm">QR Code</p>
+                  <p className="text-xs text-dark/60 mt-0.5">Scan with any UPI app</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-dark/40 group-hover:text-canyon transition-colors" />
+              </div>
+            </button>
+
+            {/* Payment Link Option */}
+            <button
+              onClick={() => {
+                setSelectedPaymentMethod('link');
+                setShowPaymentDialog(false);
+                toast.info('Payment link feature coming soon');
+              }}
+              className="w-full p-4 bg-creme-light border-2 border-coyote/30 rounded-xl hover:border-canyon hover:bg-creme transition-all active:scale-95 group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-dark flex items-center justify-center flex-shrink-0 group-hover:bg-canyon transition-colors">
+                  <ExternalLink className="w-6 h-6 text-creme-light" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-dark text-sm">Payment Link</p>
+                  <p className="text-xs text-dark/60 mt-0.5">Send link to someone else</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-dark/40 group-hover:text-canyon transition-colors" />
+              </div>
+            </button>
+
+            {/* Cancel Button */}
+            <button
+              onClick={() => setShowPaymentDialog(false)}
+              className="w-full py-2.5 text-sm text-dark/60 hover:text-dark transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code Payment Dialog - Compact */}
+      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogContent className="max-w-sm mx-auto p-0">
+          {/* Header with Back Button */}
+          <div className="flex items-center gap-3 p-4 border-b border-border/20">
+            <button
+              onClick={() => setShowQRDialog(false)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 rotate-180" />
+            </button>
+            <h3 className="text-lg font-serif text-dark flex-1">Scan to Pay</h3>
+          </div>
+          
+          <div className="space-y-4 p-4">
+            {/* QR Code Display - Compact */}
+            <div className="flex justify-center">
+              {qrCodeDataURL ? (
+                <div className="p-3 bg-white rounded-xl border-2 border-dark">
+                  <img src={qrCodeDataURL} alt="Payment QR Code" className="w-48 h-48" />
+                </div>
+              ) : (
+                <div className="w-48 h-48 bg-muted rounded-xl flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+
+            {/* Payment Details - Compact */}
+            <div className="bg-creme-light rounded-lg p-3 border border-coyote/20">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-dark/60 font-medium">Amount</span>
+                  <span className="text-lg font-bold text-dark">{formatINR(getFinalTotal())}</span>
+                </div>
+                <div className="h-px bg-coyote/20"></div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-dark/60">ID</span>
+                  <span className="text-dark font-mono">{transactionId}</span>
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <button
-                onClick={() => {
-                  setSelectedPaymentMethod('upi');
-                  setShowPaymentDialog(false);
-                  handleUPIPayment();
-                }}
-                className="w-full p-4 border border-border/30 rounded-lg hover:border-accent/50 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <Smartphone className="w-6 h-6 text-accent" />
-                  <div className="text-left">
-                    <p className="font-medium">UPI Apps</p>
-                    <p className="text-xs text-muted-foreground">Pay with any UPI app</p>
-                  </div>
-                </div>
-              </button>
 
-              <button
-                onClick={() => {
-                  setSelectedPaymentMethod('qr');
-                  setShowPaymentDialog(false);
-                }}
-                className="w-full p-4 border border-border/30 rounded-lg hover:border-accent/50 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <QrCode className="w-6 h-6 text-accent" />
-                  <div className="text-left">
-                    <p className="font-medium">QR Code</p>
-                    <p className="text-xs text-muted-foreground">Scan to pay</p>
-                  </div>
-                </div>
-              </button>
+            {/* Instructions - Compact */}
+            <div className="bg-canyon/10 rounded-lg p-3 border border-canyon/30">
+              <p className="text-xs text-dark/70 leading-relaxed">
+                Open any UPI app, scan the QR code, complete payment, and click "Payment Done" below.
+              </p>
+            </div>
 
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={handleQRPaymentDone}
+                className="w-full py-3 bg-dark text-creme-light rounded-lg font-semibold text-sm transition-all active:scale-95 hover:bg-canyon flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Payment Done
+              </button>
               <button
                 onClick={() => {
-                  setSelectedPaymentMethod('link');
-                  setShowPaymentDialog(false);
+                  const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${getFinalTotal()}&tn=Order ${transactionId}&cu=INR`;
+                  navigator.clipboard.writeText(upiURL);
+                  setIsCopied(true);
+                  toast.success('UPI link copied to clipboard');
+                  setTimeout(() => setIsCopied(false), 2000);
                 }}
-                className="w-full p-4 border border-border/30 rounded-lg hover:border-accent/50 transition-all"
+                className={`w-full py-2.5 border rounded-lg font-medium text-xs transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                  isCopied 
+                    ? 'bg-green-500 border-green-500 text-white' 
+                    : 'bg-creme-light border-coyote text-dark hover:bg-creme'
+                }`}
               >
-                <div className="flex items-center gap-3">
-                  <ExternalLink className="w-6 h-6 text-accent" />
-                  <div className="text-left">
-                    <p className="font-medium">Someone else paying?</p>
-                    <p className="text-xs text-muted-foreground">Send payment link</p>
-                  </div>
-                </div>
+                {isCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy UPI Link
+                  </>
+                )}
               </button>
             </div>
-          )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
