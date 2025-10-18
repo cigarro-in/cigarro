@@ -16,6 +16,8 @@ import { ComboDisplayComponent } from '../../components/variants/VariantSelector
 import { ProductVariant, ProductCombo } from '../../types/variants';
 import { formatINR } from '../../utils/currency';
 import { ProductCard } from '../../components/products/ProductCard';
+import { SEOHead } from '../../components/seo/SEOHead';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 
 interface ProductDetails {
   id: string;
@@ -393,9 +395,41 @@ function ProductPage() {
 
   return (
     <>
+      <SEOHead
+        title={selectedVariant 
+          ? `${product.name} - ${selectedVariant.variant_name} | ${product.brand}`
+          : product.meta_title || `${product.name} | ${product.brand} | Cigarro`
+        }
+        description={(selectedVariant as any)?.meta_description || product.meta_description || product.short_description || product.description}
+        keywords={[
+          product.brand,
+          product.name,
+          'premium cigarettes',
+          'buy online India',
+          'authentic tobacco',
+          selectedVariant?.variant_name || '',
+          product.origin || ''
+        ].filter(Boolean)}
+        image={gallery[0] || product.gallery_images[0]}
+        url={`https://cigarro.in/product/${product.slug}${selectedVariant ? `?variant=${selectedVariant.id}` : ''}`}
+        type="product"
+        price={getCurrentPrice().toString()}
+        currency="INR"
+        availability={product.stock > 0 ? 'in stock' : 'out of stock'}
+        brand={product.brand}
+        category={product.pack_size || 'Cigarettes'}
+      />
+      <BreadcrumbSchema
+        items={[
+          { name: 'Home', url: 'https://cigarro.in' },
+          { name: 'Products', url: 'https://cigarro.in/products' },
+          { name: product.brand, url: `https://cigarro.in/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}` },
+          { name: product.name, url: `https://cigarro.in/product/${product.slug}` }
+        ]}
+      />
       <Helmet>
-        <title>{product?.meta_title || product?.name || 'Product'}</title>
-        <meta name="description" content={product?.meta_description || product?.description || 'Premium tobacco product'} />
+        <meta name="product:price:amount" content={getCurrentPrice().toString()} />
+        <meta name="product:price:currency" content="INR" />
         <link rel="canonical" href={`https://cigarro.in/product/${product?.slug}`} />
       </Helmet>
       

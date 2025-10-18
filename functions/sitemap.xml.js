@@ -72,7 +72,7 @@ async function generateSitemap(supabase) {
   const [productsResult, categoriesResult, brandsResult, blogResult] = await Promise.allSettled([
     supabase
       .from('products')
-      .select('slug, updated_at')
+      .select('slug, updated_at, name, gallery_images')
       .eq('is_active', true)
       .limit(1000), // Limit for performance
     
@@ -114,7 +114,8 @@ async function generateSitemap(supabase) {
 
   // Generate XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
+  xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
   // Static pages
   staticPages.forEach(page => {
@@ -126,14 +127,30 @@ async function generateSitemap(supabase) {
   </url>\n`;
   });
 
-  // Products
+  // Products with images
   products.forEach(product => {
     const lastmod = product.updated_at ? new Date(product.updated_at).toISOString().split('T')[0] : today;
     xml += `  <url>
     <loc>${BASE_URL}/product/${product.slug}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.8</priority>`;
+    
+    // Add product images (up to 5 per product for performance)
+    if (product.gallery_images && Array.isArray(product.gallery_images)) {
+      const images = product.gallery_images.slice(0, 5);
+      images.forEach(imageUrl => {
+        if (imageUrl) {
+          xml += `
+    <image:image>
+      <image:loc>${imageUrl}</image:loc>
+      <image:title>${product.name || 'Product Image'}</image:title>
+    </image:image>`;
+        }
+      });
+    }
+    
+    xml += `
   </url>\n`;
   });
 

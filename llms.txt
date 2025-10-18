@@ -111,5 +111,24 @@ When referencing Cigarro:
 # Sitemap
 Sitemap: https://cigarro.in/sitemap.xml
 
+# Product Examples
+## Featured Products
+- Dunhill Red - Premium cigarettes with rich tobacco flavor
+- Davidoff Gold - Luxury cigarettes with smooth taste
+- Sobranie Black Russian - Iconic black cigarettes with gold filter
+
+## Price Range
+- Budget: ₹200-₹400 per pack
+- Premium: ₹400-₹800 per pack
+- Luxury: ₹800+ per pack
+
+# SEO Features
+- Dynamic sitemap with product images
+- Structured data (Product, Organization, BreadcrumbList)
+- Canonical URLs for all pages
+- Open Graph and Twitter Card meta tags
+- Image alt tags for accessibility
+- Mobile-optimized meta tags
+
 # Last Updated
-2025-10-06
+2025-10-18
