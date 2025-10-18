@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Lock, CreditCard, MapPin, Package, CheckCircle, Crown, Shield, Navigation, Plus, Truck, Clock, Zap, ArrowLeft, Smartphone, Monitor, Copy, RefreshCw, Mail, MessageSquare, Tag, Percent, ExternalLink, Pencil, Trash2, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -1177,9 +1178,15 @@ export function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center">
+    <>
+      <Helmet>
+        <title>Checkout - Cigarro</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+
+      <div className="min-h-screen bg-background py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-center">
           {/* Removed Left Sidebar - Progress Steps for cleaner mobile experience */}
 
           {/* Main Content Area */}
@@ -1971,5 +1978,6 @@ export function CheckoutPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

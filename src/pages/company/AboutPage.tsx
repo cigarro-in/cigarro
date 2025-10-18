@@ -144,6 +144,7 @@ export function AboutPage() {
       <Helmet>
         <title>About Us - Cigarro</title>
         <meta name="description" content="Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection." />
+        <link rel="canonical" href="https://cigarro.in/about" />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">

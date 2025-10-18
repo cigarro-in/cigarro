@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -238,9 +239,15 @@ export function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-8">
-      {/* Header */}
-      <div className="border-b border-border/20 bg-background/95 backdrop-blur-sm sticky top-0 z-40">
+    <>
+      <Helmet>
+        <title>My Orders - Cigarro</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+
+      <div className="min-h-screen bg-background pb-20 md:pb-8">
+        {/* Header */}
+        <div className="border-b border-border/20 bg-background/95 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-2 sm:pb-4">
           <div className="text-center">
             <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
@@ -617,5 +624,6 @@ export function OrdersPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -125,6 +125,7 @@ export function BrandPage() {
       <Helmet>
         <title>{brand.name} - Premium Cigarettes | Cigarro</title>
         <meta name="description" content={`${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`} />
+        <link rel="canonical" href={`https://cigarro.in/brands/${slug}`} />
       </Helmet>
 
       <div className="min-h-screen bg-creme">

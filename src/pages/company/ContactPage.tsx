@@ -110,6 +110,7 @@ export function ContactPage() {
       <Helmet>
         <title>Contact Us - Cigarro</title>
         <meta name="description" content="Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection." />
+        <link rel="canonical" href="https://cigarro.in/contact" />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">

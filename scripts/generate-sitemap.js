@@ -27,10 +27,10 @@ const staticPages = [
   // Shopping Pages
   { url: '/collections', priority: 0.8, changefreq: 'weekly', name: 'Collections' },
   { url: '/brands', priority: 0.8, changefreq: 'weekly', name: 'Brands' },
-  { url: '/cart', priority: 0.5, changefreq: 'always', name: 'Shopping Cart' },
   
   // Content Pages
   { url: '/blog', priority: 0.7, changefreq: 'daily', name: 'Blog' },
+  { url: '/blogs', priority: 0.7, changefreq: 'daily', name: 'Blogs' },
   { url: '/about', priority: 0.6, changefreq: 'monthly', name: 'About Us' },
   { url: '/contact', priority: 0.6, changefreq: 'monthly', name: 'Contact Us' },
   
@@ -281,7 +281,7 @@ async function generate() {
     console.log('🏷️  Processing brands...');
     brands.forEach(brand => {
       brandUrls.push({
-        loc: `${BASE_URL}/brands/${brand.slug}`,
+        loc: `${BASE_URL}/brand/${brand.slug}`,
         lastmod: brand.updated_at,
         changefreq: 'monthly',
         priority: 0.6

@@ -269,7 +269,7 @@ export function WishlistPage() {
     <>
       <Helmet>
         <title>My Wishlist - Cigarro</title>
-        <meta name="description" content="Your saved favorite products from our premium collection." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">

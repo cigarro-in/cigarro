@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { getBlogImageUrl } from '../../utils/supabase/storage';
 import { supabase } from '../../utils/supabase/client';
-import { BlogPost } from '../../types/blog';
+import type { BlogPost as BlogPostType } from '../../types/blog';
 
 
 
 export function BlogsPage() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [posts, setPosts] = useState<BlogPostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -48,14 +49,21 @@ export function BlogsPage() {
 
 
   return (
-    <div className="min-h-screen bg-creme pt-24 pb-12">
-      <div className="main-container">
-        {/* Page Header */}
-        <div className="text-center mb-8">
-          <h1 className="main-title text-dark mb-6 max-w-4xl mx-auto">
-            Stories of Craftsmanship & Heritage
-          </h1>
-        </div>
+    <>
+      <Helmet>
+        <title>Blog - Stories of Craftsmanship & Heritage | Cigarro</title>
+        <meta name="description" content="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes." />
+        <link rel="canonical" href="https://cigarro.in/blogs" />
+      </Helmet>
+
+      <div className="min-h-screen bg-creme pt-24 pb-12">
+        <div className="main-container">
+          {/* Page Header */}
+          <div className="text-center mb-8">
+            <h1 className="main-title text-dark mb-6 max-w-4xl mx-auto">
+              Stories of Craftsmanship & Heritage
+            </h1>
+          </div>
 
 
 
@@ -175,14 +183,15 @@ export function BlogsPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 
 // Individual Blog Post Component
 export function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([]);
+  const [post, setPost] = useState<BlogPostType | null>(null);
+  const [relatedPosts, setRelatedPosts] = useState<BlogPostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

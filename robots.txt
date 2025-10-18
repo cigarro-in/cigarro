@@ -20,12 +20,18 @@ Disallow: /*?*page=
 
 # Allow all public content (default behavior)
 Allow: /products
+Allow: /product/
 Allow: /category/
 Allow: /brands/
+Allow: /brand/
 Allow: /collections
 Allow: /blog/
+Allow: /blogs
 Allow: /about
 Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /shipping
 
 # Sitemap location
 Sitemap: https://cigarro.in/sitemap.xml

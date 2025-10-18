@@ -269,7 +269,7 @@ export default function CartPage() {
     <>
       <Helmet>
         <title>{`My Cart (${totalItems}) - Cigarro`}</title>
-        <meta name="description" content="Review your items before checkout" />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="min-h-[100dvh] bg-background pb-24">

@@ -15,6 +15,7 @@ export interface ProductVariant {
     width: number;
     height: number;
   };
+  attributes?: Record<string, any>; // JSONB field for variant attributes
   is_active: boolean;
   sort_order: number;
   // New schema supports variant_images table; keep images for backward compat
