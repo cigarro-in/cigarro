@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { LogOut, Save, RefreshCw, FileText } from 'lucide-react';
 import { useAdminAuth } from '../hooks/useAdminAuth';
 import { generateSitemap } from '../utils/sitemap-generator';
+import { PaymentVerificationMonitor } from './admin/PaymentVerificationMonitor';
 
 interface SiteSettings {
   site_name: string;
@@ -117,6 +118,16 @@ export function SiteSettingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Payment Verification Monitor */}
+      <Card className="bg-creme-light border-coyote">
+        <CardHeader>
+          <CardTitle className="font-serif-premium text-dark">Payment Verification Monitor</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PaymentVerificationMonitor />
+        </CardContent>
+      </Card>
+
       {/* Site Settings Card */}
       <Card className="bg-creme-light border-coyote">
         <CardHeader>

@@ -93,32 +93,40 @@ CREATE UNIQUE INDEX idx_bank_templates_unique ON public.bank_email_templates(ban
 CREATE INDEX idx_bank_templates_active ON public.bank_email_templates(is_active, priority DESC);
 
 -- =====================================================
--- 3. Payment Verification Logs Table
+-- 3. Payment Verification Logs Table (Simplified for Monitoring)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS public.payment_verification_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  verification_id UUID REFERENCES public.payment_verifications(id) ON DELETE CASCADE,
+  order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
+  transaction_id TEXT NOT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
   
-  event_type TEXT NOT NULL CHECK (event_type IN (
-    'email_received',
-    'parsing_started',
-    'parsing_completed',
-    'parsing_failed',
-    'verification_started',
-    'verification_success',
-    'verification_failed',
-    'order_updated',
-    'notification_sent'
-  )),
-  event_data JSONB,
+  -- Verification status
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'failed')),
+  
+  -- Step-by-step tracking
+  email_found BOOLEAN DEFAULT false,
+  email_parsed BOOLEAN DEFAULT false,
+  amount_matched BOOLEAN DEFAULT false,
+  
+  -- Payment details
+  bank_name TEXT,
+  upi_reference TEXT,
+  sender_vpa TEXT,
+  
+  -- Error tracking
   error_message TEXT,
-  processing_time_ms INTEGER, -- Time taken for this step
   
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  verified_at TIMESTAMPTZ,
+  
+  UNIQUE(transaction_id)
 );
 
-CREATE INDEX idx_verification_logs_verification ON public.payment_verification_logs(verification_id);
-CREATE INDEX idx_verification_logs_event ON public.payment_verification_logs(event_type);
+CREATE INDEX idx_verification_logs_order ON public.payment_verification_logs(order_id);
+CREATE INDEX idx_verification_logs_transaction ON public.payment_verification_logs(transaction_id);
+CREATE INDEX idx_verification_logs_status ON public.payment_verification_logs(status);
 CREATE INDEX idx_verification_logs_created ON public.payment_verification_logs(created_at DESC);
 
 -- =====================================================

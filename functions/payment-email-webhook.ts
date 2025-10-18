@@ -86,6 +86,14 @@ export default {
       const verificationRequest: VerificationRequest = await request.json();
       console.log('🔍 Verification request:', verificationRequest);
 
+      // Create initial log entry
+      const logId = await createVerificationLog(env, {
+        orderId: verificationRequest.orderId,
+        transactionId: verificationRequest.transactionId,
+        amount: verificationRequest.amount,
+        status: 'pending'
+      });
+
       // Check Gmail for payment confirmation (with 60 second timeout)
       const email = await checkGmailForPayment(
         env,
@@ -96,6 +104,14 @@ export default {
 
       if (!email) {
         console.log('⏰ No payment email found within timeout');
+        
+        // Update log - email not found
+        await updateVerificationLog(env, logId, {
+          status: 'failed',
+          email_found: false,
+          error_message: 'No payment email found within 60 seconds'
+        });
+        
         return new Response(JSON.stringify({ 
           verified: false,
           message: 'Payment email not found yet'
@@ -107,11 +123,24 @@ export default {
 
       console.log('📧 Found payment email');
       
+      // Update log - email found
+      await updateVerificationLog(env, logId, {
+        email_found: true
+      });
+      
       // Parse email for payment details
       const parsedPayment = await parsePaymentEmail(email, env);
 
       if (!parsedPayment) {
         console.log('❌ Could not parse payment from email');
+        
+        // Update log - parsing failed
+        await updateVerificationLog(env, logId, {
+          status: 'failed',
+          email_parsed: false,
+          error_message: 'Could not parse payment details from email'
+        });
+        
         return new Response(JSON.stringify({ 
           verified: false,
           message: 'Could not parse payment email'
@@ -122,6 +151,21 @@ export default {
       }
 
       console.log('💰 Parsed payment:', parsedPayment);
+      
+      // Update log - email parsed successfully
+      await updateVerificationLog(env, logId, {
+        email_parsed: true,
+        bank_name: parsedPayment.bankName,
+        upi_reference: parsedPayment.upiReference,
+        sender_vpa: parsedPayment.senderVPA
+      });
+
+      // Check if amount matches
+      const amountMatches = Math.abs(parsedPayment.amount - verificationRequest.amount) < 0.01;
+      
+      await updateVerificationLog(env, logId, {
+        amount_matched: amountMatches
+      });
 
       // Verify and update order in Supabase
       const verified = await verifyPaymentInSupabase(
@@ -130,6 +174,13 @@ export default {
         verificationRequest.orderId,
         env
       );
+
+      // Final log update
+      await updateVerificationLog(env, logId, {
+        status: verified ? 'verified' : 'failed',
+        verified_at: verified ? new Date().toISOString() : undefined,
+        error_message: verified ? undefined : 'Amount mismatch or order update failed'
+      });
 
       return new Response(JSON.stringify({ 
         verified,
@@ -142,6 +193,24 @@ export default {
 
     } catch (error) {
       console.error('❌ Error processing verification:', error);
+      
+      // Try to log the error (best effort)
+      try {
+        const verificationRequest: VerificationRequest = await request.clone().json();
+        const logId = await createVerificationLog(env, {
+          orderId: verificationRequest.orderId,
+          transactionId: verificationRequest.transactionId,
+          amount: verificationRequest.amount,
+          status: 'failed'
+        });
+        
+        await updateVerificationLog(env, logId, {
+          error_message: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+      } catch (logError) {
+        console.error('Failed to log error:', logError);
+      }
+      
       return new Response(JSON.stringify({ 
         verified: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -624,4 +693,87 @@ async function verifyPaymentInSupabase(
   }
   
   return false;
+}
+
+/**
+ * Create verification log entry
+ */
+async function createVerificationLog(
+  env: Env,
+  data: {
+    orderId: string;
+    transactionId: string;
+    amount: number;
+    status: string;
+  }
+): Promise<string> {
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/payment_verification_logs`,
+    {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        order_id: data.orderId,
+        transaction_id: data.transactionId,
+        amount: data.amount,
+        status: data.status,
+        email_found: false,
+        email_parsed: false,
+        amount_matched: false
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    console.error('Failed to create log:', await response.text());
+    return '';
+  }
+
+  const [log] = await response.json();
+  return log?.id || '';
+}
+
+/**
+ * Update verification log entry
+ */
+async function updateVerificationLog(
+  env: Env,
+  logId: string,
+  updates: {
+    status?: string;
+    email_found?: boolean;
+    email_parsed?: boolean;
+    amount_matched?: boolean;
+    bank_name?: string;
+    upi_reference?: string;
+    sender_vpa?: string;
+    error_message?: string;
+    verified_at?: string;
+  }
+): Promise<void> {
+  if (!logId) return;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+
+  await fetch(
+    `${env.SUPABASE_URL}/rest/v1/payment_verification_logs?id=eq.${logId}`,
+    {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(updates),
+    }
+  );
 }
