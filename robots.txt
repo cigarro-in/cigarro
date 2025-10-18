@@ -26,7 +26,6 @@ Allow: /brands/
 Allow: /brand/
 Allow: /collections
 Allow: /blog/
-Allow: /blogs
 Allow: /about
 Allow: /contact
 Allow: /terms

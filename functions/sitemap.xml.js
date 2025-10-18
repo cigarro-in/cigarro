@@ -61,7 +61,6 @@ async function generateSitemap(supabase) {
     { url: '/collections', priority: 0.8, changefreq: 'weekly' },
     { url: '/brands', priority: 0.8, changefreq: 'weekly' },
     { url: '/blog', priority: 0.7, changefreq: 'daily' },
-    { url: '/blogs', priority: 0.7, changefreq: 'daily' },
     { url: '/about', priority: 0.6, changefreq: 'monthly' },
     { url: '/contact', priority: 0.6, changefreq: 'monthly' },
     { url: '/privacy', priority: 0.3, changefreq: 'yearly' },

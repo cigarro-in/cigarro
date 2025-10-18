@@ -30,7 +30,6 @@ const staticPages = [
   
   // Content Pages
   { url: '/blog', priority: 0.7, changefreq: 'daily', name: 'Blog' },
-  { url: '/blogs', priority: 0.7, changefreq: 'daily', name: 'Blogs' },
   { url: '/about', priority: 0.6, changefreq: 'monthly', name: 'About Us' },
   { url: '/contact', priority: 0.6, changefreq: 'monthly', name: 'Contact Us' },
   
