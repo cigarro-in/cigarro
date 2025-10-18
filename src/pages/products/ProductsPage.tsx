@@ -439,6 +439,7 @@ export function ProductsPage() {
       <Helmet>
         <title>All our products - Cigarro</title>
         <meta name="description" content="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands." />
+        <link rel="canonical" href="https://cigarro.in/products" />
       </Helmet>
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">

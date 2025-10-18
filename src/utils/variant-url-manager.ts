@@ -180,9 +180,13 @@ export class VariantURLManager {
 
   /**
    * Generate canonical URL for variant
+   * Always points to base product URL to avoid duplicate content issues
    */
   generateCanonicalURL(productSlug: string, variantSlug?: string): string {
-    return this.generateVariantURL(productSlug, variantSlug);
+    // Always return base product URL without variant parameter
+    // This tells Google all variants are the same content
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/product/${productSlug}`;
   }
 
   /**

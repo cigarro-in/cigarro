@@ -125,6 +125,7 @@ export function MobileCheckoutPage() {
   const [qrCodeDataURL, setQrCodeDataURL] = useState('');
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPaymentCompleted, setIsPaymentCompleted] = useState(false);
 
   // Address form state
   const [addressForm, setAddressForm] = useState({
@@ -160,10 +161,12 @@ export function MobileCheckoutPage() {
   }, [user]);
 
   useEffect(() => {
-    if (items.length === 0) {
+    // Only redirect to cart if items are empty AND payment is not completed
+    if (items.length === 0 && !isPaymentCompleted) {
+      console.log('🛒 Cart is empty, redirecting to cart page');
       navigate('/cart');
     }
-  }, [items, navigate]);
+  }, [items, navigate, isPaymentCompleted]);
 
   const loadSavedAddresses = async () => {
     if (!user) return;
@@ -275,7 +278,8 @@ export function MobileCheckoutPage() {
       });
 
       const { latitude, longitude } = position.coords;
-      console.log('Location obtained:', { latitude, longitude });
+      console.log('✅ Location obtained:', { latitude, longitude });
+      toast.info('📍 Processing location data...');
 
       // Use multiple geocoding services for better reliability
       let addressData = null;
@@ -295,7 +299,7 @@ export function MobileCheckoutPage() {
           const nominatimData = await nominatimResponse.json();
           if (nominatimData && nominatimData.address) {
             addressData = nominatimData;
-            console.log('Nominatim data:', nominatimData);
+            console.log('✅ Nominatim data:', nominatimData);
           }
         }
       } catch (nominatimError) {
@@ -324,7 +328,7 @@ export function MobileCheckoutPage() {
                   country: geocodeData.countryName || 'India'
                 }
               };
-              console.log('BigDataCloud data:', geocodeData);
+              console.log('✅ BigDataCloud data:', geocodeData);
             }
           }
         } catch (fallbackError) {
@@ -352,15 +356,27 @@ export function MobileCheckoutPage() {
           ? addressParts.join(', ')
           : `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
         
-        // Update form with detected location
-        setAddressForm(prev => ({
-          ...prev,
+        console.log('📝 Updating form with:', {
           address: formattedAddress,
-          city: city || prev.city,
-          state: state || prev.state,
-          pincode: pincode || prev.pincode,
-          country: country
-        }));
+          city,
+          state,
+          pincode,
+          country
+        });
+        
+        // Update form with detected location
+        setAddressForm(prev => {
+          const updated = {
+            ...prev,
+            address: formattedAddress,
+            city: city || prev.city,
+            state: state || prev.state,
+            pincode: pincode || prev.pincode,
+            country: country
+          };
+          console.log('✅ Form updated:', updated);
+          return updated;
+        });
         
         // Clear any previous errors for auto-filled fields
         setAddressErrors(prev => ({
@@ -371,17 +387,52 @@ export function MobileCheckoutPage() {
           pincode: pincode ? '' : prev.pincode
         }));
         
-        toast.success('📍 Location detected successfully!');
+        toast.success(`📍 Location filled! ${city ? city + ', ' + state : 'Please verify details'}`);
+        
+        // Auto-save the location-detected address if user info is complete
+        if (user && addressForm.full_name && addressForm.phone) {
+          try {
+            const locationAddressData = {
+              user_id: user.id,
+              full_name: addressForm.full_name.trim(),
+              phone: addressForm.phone.trim(),
+              address: formattedAddress,
+              pincode: pincode || addressForm.pincode,
+              city: city || addressForm.city,
+              state: state || addressForm.state,
+              country: country,
+              label: 'Current Location',
+              latitude: latitude,
+              longitude: longitude
+            };
+            
+            const { data: savedAddr, error: saveError } = await supabase
+              .from('saved_addresses')
+              .insert([locationAddressData])
+              .select()
+              .single();
+            
+            if (!saveError && savedAddr) {
+              setSavedAddresses(prev => [savedAddr, ...prev]);
+              setSelectedAddress(savedAddr);
+              toast.success('✅ Location saved to your addresses!');
+            }
+          } catch (saveErr) {
+            console.log('Could not auto-save location:', saveErr);
+            // Non-critical error, location is still filled in form
+          }
+        }
         
       } else {
         // If geocoding fails, just use coordinates
         const coordinateAddress = `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
+        console.log('⚠️ Geocoding failed, using coordinates:', coordinateAddress);
         setAddressForm(prev => ({
           ...prev,
           address: coordinateAddress
         }));
         
-        toast.success('📍 Location coordinates obtained');
+        toast.warning('📍 Location detected, but address details unavailable. Please fill manually.');
       }
 
     } catch (error) {
@@ -637,11 +688,18 @@ export function MobileCheckoutPage() {
         clearInterval(timer);
         // Navigate to success page with a small random delay (0-3 seconds)
         const randomDelay = Math.floor(Math.random() * 3000);
+        const finalAmount = getFinalTotal();
+        const itemCount = items.length;
+        
+        console.log('📦 Navigating to order success:', { orderId: newOrderId, amount: finalAmount, items: itemCount });
+        
         setTimeout(() => {
           navigate('/order-success', { 
             state: { 
               message: 'Order placed successfully!',
-              orderId: newOrderId
+              orderId: newOrderId,
+              amount: finalAmount,
+              itemCount: itemCount
             } 
           });
         }, randomDelay);
@@ -774,6 +832,7 @@ export function MobileCheckoutPage() {
           
           // Switch to confirmed stage
           setPaymentStage('confirmed');
+          setIsPaymentCompleted(true); // Prevent auto-redirect to cart
           
           // Update order status immediately (no auto-redirect)
           try {
@@ -786,8 +845,8 @@ export function MobileCheckoutPage() {
               })
               .eq('transaction_id', txnId);
             
-            // Clear the cart
-            clearCart();
+            console.log('✅ Payment confirmed, clearing cart');
+            await clearCart();
             
           } catch (error) {
             console.error('Error updating order status:', error);
@@ -863,9 +922,13 @@ export function MobileCheckoutPage() {
       
       if (count <= 0) {
         clearInterval(countdownTimer);
+        
+        // Switch to confirmed stage
         setPaymentStage('confirmed');
         
         // Update order status immediately (no auto-redirect)
+        setIsPaymentCompleted(true); // Prevent auto-redirect to cart
+        
         try {
           await supabase
             .from('orders')
@@ -876,12 +939,15 @@ export function MobileCheckoutPage() {
             })
             .eq('transaction_id', transactionId);
           
-          clearCart();
+          console.log('✅ Payment confirmed, clearing cart');
+          await clearCart();
+          
         } catch (error) {
-          console.error('Error updating order:', error);
+          console.error('Error updating order status:', error);
           toast.error('Payment processed but failed to update order status');
+        } finally {
+          setIsProcessing(false);
         }
-        // Keep confirmation screen open - user will navigate using buttons
       }
     }, 1000);
   };

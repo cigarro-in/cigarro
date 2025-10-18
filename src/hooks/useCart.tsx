@@ -89,7 +89,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Load from localStorage for guests
       const savedCart = localStorage.getItem('cart');
       if (savedCart) {
-        setItems(JSON.parse(savedCart));
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          console.log('🛒 Loading guest cart from localStorage:', parsedCart.length, 'items');
+          setItems(parsedCart);
+        } catch (error) {
+          console.error('Failed to parse cart from localStorage:', error);
+          localStorage.removeItem('cart');
+          setItems([]);
+        }
+      } else {
+        console.log('🛒 No guest cart found in localStorage');
+        setItems([]);
       }
       return;
     }
@@ -100,6 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
       
       // Get cart items from Supabase
+      console.log('🛒 Loading cart for user:', user.id);
       const { data: cartItems, error } = await supabase
         .from('cart_items')
         .select(`
@@ -133,7 +145,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         `)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Failed to load cart from database:', error);
+        throw error;
+      }
+      
+      console.log('✅ Cart loaded from database:', cartItems?.length || 0, 'items');
 
       // Transform Supabase data to CartItem format
       const userItems: CartItem[] = cartItems?.filter(item => item.products).map(item => {
@@ -141,7 +158,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const variant = item.product_variants as any;
         const combo = item.product_combos as any;
         
-        return {
+        // Convert null to undefined for proper comparison
+        const variantId = item.variant_id || undefined;
+        const comboId = item.combo_id || undefined;
+        
+        const cartItem = {
           id: product.id,
           name: product.name,
           slug: product.slug,
@@ -154,17 +175,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
           review_count: product.review_count,
           image: product.gallery_images?.[0] || '',
           quantity: item.quantity,
-          variant_id: item.variant_id,
+          variant_id: variantId,
           variant_name: variant?.variant_name,
           variant_price: variant?.price,
-          combo_id: item.combo_id,
+          combo_id: comboId,
           combo_name: combo?.name,
           combo_price: combo?.combo_price
         };
+        
+        console.log('📦 Loaded cart item:', {
+          id: cartItem.id,
+          name: cartItem.name,
+          quantity: cartItem.quantity,
+          variant_id: cartItem.variant_id,
+          combo_id: cartItem.combo_id
+        });
+        
+        return cartItem;
       }) || [];
       
       // Merge guest cart with user cart
       if (guestItems.length > 0) {
+        console.log('🔄 Merging', guestItems.length, 'guest items with', userItems.length, 'user items');
         const mergedItems = [...userItems];
         
         for (const guestItem of guestItems) {
@@ -208,13 +240,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
         
         // Save merged cart and clear localStorage
+        console.log('✅ Merged cart:', mergedItems.length, 'items');
         setItems(mergedItems);
         localStorage.removeItem('cart');
       } else {
+        console.log('✅ Using user cart:', userItems.length, 'items');
         setItems(userItems);
       }
     } catch (error) {
-      console.error('Failed to load cart:', error);
+      console.error('❌ Failed to load cart:', error);
+      // Fallback to empty cart on error
+      setItems([]);
     }
   };
 
@@ -387,17 +423,55 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const updateQuantity = async (productId: string, quantity: number, variantId?: string, comboId?: string) => {
+    console.log('🔄 updateQuantity called:', { productId, quantity, variantId, comboId });
+    console.log('📋 Current cart items:', items.map(i => ({
+      id: i.id,
+      name: i.name,
+      quantity: i.quantity,
+      variant_id: i.variant_id,
+      combo_id: i.combo_id
+    })));
+    
     if (quantity <= 0) {
       await removeFromCart(productId, variantId, comboId);
       return;
     }
 
     const originalItems = items;
+    
+    // Find matching item
+    const matchingItem = items.find(item => {
+      const idMatch = item.id === productId;
+      const variantMatch = item.variant_id === variantId;
+      const comboMatch = item.combo_id === comboId;
+      
+      console.log('🔍 Checking item:', {
+        itemId: item.id,
+        itemVariantId: item.variant_id,
+        itemComboId: item.combo_id,
+        idMatch,
+        variantMatch,
+        comboMatch,
+        allMatch: idMatch && variantMatch && comboMatch
+      });
+      
+      return idMatch && variantMatch && comboMatch;
+    });
+    
+    if (!matchingItem) {
+      console.error('❌ No matching item found for update!');
+      return;
+    }
+    
+    console.log('✅ Found matching item:', matchingItem.name);
+    
     const newItems = items.map(item =>
       item.id === productId && item.variant_id === variantId && item.combo_id === comboId
         ? { ...item, quantity }
         : item
     );
+    
+    console.log('📝 Updated items:', newItems.map(i => ({ id: i.id, name: i.name, quantity: i.quantity })));
     
     // Update UI immediately
     setItems(newItems);

@@ -18,8 +18,8 @@ const formatIndianPrice = (priceINR: number): string => {
 
 interface CartItemProps {
   item: any;
-  updateQuantity: (productId: string, quantity: number) => Promise<void>;
-  removeFromCart: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number, variantId?: string, comboId?: string) => Promise<void>;
+  removeFromCart: (productId: string, variantId?: string, comboId?: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -30,22 +30,26 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
 
   const handleQuantityChange = async (newQuantity: number) => {
     if (newQuantity < 1) return;
-    setIsUpdating(true);
+    // Don't set isUpdating to keep buttons responsive
     try {
-      await updateQuantity(item.id, newQuantity);
+      console.log('🔄 Updating quantity:', { productId: item.id, quantity: newQuantity, variantId: item.variant_id, comboId: item.combo_id });
+      await updateQuantity(item.id, newQuantity, item.variant_id, item.combo_id);
+      console.log('✅ Quantity updated successfully');
     } catch (error) {
+      console.error('❌ Failed to update quantity:', error);
       toast.error('Failed to update quantity');
-    } finally {
-      setIsUpdating(false);
     }
   };
 
   const handleRemove = async () => {
     try {
-      await removeFromCart(item.id);
+      console.log('🗑️ Removing item:', { productId: item.id, variantId: item.variant_id, comboId: item.combo_id });
+      await removeFromCart(item.id, item.variant_id, item.combo_id);
       toast.success('Item removed from cart');
       setShowDeleteConfirm(false);
+      console.log('✅ Item removed successfully');
     } catch (error) {
+      console.error('❌ Failed to remove item:', error);
       toast.error('Failed to remove item');
     }
   };
@@ -93,8 +97,8 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleQuantityChange(item.quantity - 1)}
-              disabled={isUpdating || isLoading || item.quantity <= 1}
-              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              disabled={item.quantity <= 1}
+              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 active:scale-95"
               aria-label="Decrease quantity"
             >
               <Minus className="w-3 h-3" />
@@ -102,8 +106,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
             <span className="w-8 text-center font-semibold text-dark text-sm">{item.quantity}</span>
             <button
               onClick={() => handleQuantityChange(item.quantity + 1)}
-              disabled={isUpdating || isLoading}
-              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center active:scale-95"
               aria-label="Increase quantity"
             >
               <Plus className="w-3 h-3" />
@@ -113,8 +116,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
           {/* Remove Button */}
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            disabled={isLoading}
-            className="text-canyon hover:text-red-600 transition-colors duration-200 p-1.5 hover:bg-canyon/10 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+            className="text-canyon hover:text-red-600 transition-colors duration-200 p-1.5 hover:bg-canyon/10 rounded-lg active:scale-95"
             title="Remove from cart"
             aria-label="Remove item"
           >

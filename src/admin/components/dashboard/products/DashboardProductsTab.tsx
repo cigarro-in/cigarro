@@ -414,39 +414,21 @@ export function DashboardProductsTab({
       </Card>
 
       {/* Product Modal */}
-      <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
-            <DialogDescription>
-              {editingProduct ? 'Update product information and variants' : 'Create a new product with variants'}
-            </DialogDescription>
-          </DialogHeader>
-          <ProductForm
-            product={editingProduct}
-            isActive={true}
-            onSave={() => {
-              setShowProductModal(false);
-              setEditingProduct(null);
-              // Refresh products data
-              window.location.reload();
-            }}
-            onCancel={() => {
-              setShowProductModal(false);
-              setEditingProduct(null);
-            }}
-            onDelete={editingProduct ? () => {
-              if (confirm('Are you sure you want to delete this product?')) {
-                // Handle delete
-                setShowProductModal(false);
-                setEditingProduct(null);
-                // Refresh products data
-                window.location.reload();
-              }
-            } : undefined}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* ProductForm has its own Dialog wrapper */}
+      <ProductForm
+        product={editingProduct}
+        isOpen={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setEditingProduct(null);
+        }}
+        onSave={() => {
+          setShowProductModal(false);
+          setEditingProduct(null);
+          // Refresh products data
+          window.location.reload();
+        }}
+      />
 
     </div>
   );

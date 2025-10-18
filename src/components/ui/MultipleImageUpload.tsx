@@ -24,16 +24,11 @@ export function MultipleImageUpload({
   description 
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
-  const [showSelectorModal, setShowSelectorModal] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) {
-      return;
-    }
-
-    const files = Array.from(event.target.files);
+  const uploadFiles = async (files: File[]) => {
     const remainingSlots = 10 - imageUrls.length;
-    
+
     if (files.length > remainingSlots) {
       toast.error(`You can only upload ${remainingSlots} more images. Maximum 10 images allowed.`);
       return;
@@ -43,41 +38,30 @@ export function MultipleImageUpload({
 
     try {
       const uploadPromises = files.map(async (file) => {
-        // Security validation for each file
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        
+        const maxSize = 5 * 1024 * 1024;
         if (!allowedTypes.includes(file.type)) {
           throw new Error(`Invalid file type for ${file.name}. Only JPEG, PNG, and WebP images are allowed.`);
         }
-        
         if (file.size > maxSize) {
           throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
         }
-        
-        // Additional security: validate file extension matches MIME type
         const fileExt = file.name.split('.').pop()?.toLowerCase();
         const validExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        
         if (!fileExt || !validExtensions.includes(fileExt)) {
           throw new Error(`Invalid file extension for ${file.name}.`);
         }
-        
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${fileName}`;
-
         const { error } = await supabase.storage
           .from('asset_images')
           .upload(filePath, file);
-
         if (error) {
           throw error;
         }
-
         const { data: { publicUrl } } = supabase.storage
           .from('asset_images')
           .getPublicUrl(filePath);
-        
         return publicUrl;
       });
 
@@ -89,6 +73,15 @@ export function MultipleImageUpload({
     }
 
     setUploading(false);
+  };
+  const [showSelectorModal, setShowSelectorModal] = useState(false);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) {
+      return;
+    }
+    const files = Array.from(event.target.files);
+    await uploadFiles(files);
   };
 
   const handleRemoveImage = (index: number) => {
@@ -135,7 +128,20 @@ export function MultipleImageUpload({
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="flex flex-wrap gap-2"
+              className={`flex flex-wrap gap-2 ${dragOver ? 'ring-2 ring-primary/40 ring-offset-2' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={async (e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'));
+                if (files.length) {
+                  await uploadFiles(files as File[]);
+                }
+              }}
             >
               {imageUrls.map((url, index) => (
                 <Draggable key={url} draggableId={url} index={index}>
@@ -218,6 +224,7 @@ export function MultipleImageUpload({
           onImageSelect={handleImageSelect}
           title={title || "Select Product Image"}
           description={description || "Choose an image from your library or upload a new one"}
+          defaultMode="select"
         />
       )}
     </div>

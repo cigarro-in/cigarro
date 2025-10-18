@@ -237,6 +237,7 @@ function ProductPage() {
       <Helmet>
         <title>{product?.meta_title || product?.name || 'Product'}</title>
         <meta name="description" content={product?.meta_description || product?.description || 'Premium tobacco product'} />
+        <link rel="canonical" href={`https://cigarro.in/product/${product?.slug}`} />
       </Helmet>
       
       <div className="min-h-screen bg-background md:bg-creme text-foreground md:text-dark pb-24 md:pb-0">

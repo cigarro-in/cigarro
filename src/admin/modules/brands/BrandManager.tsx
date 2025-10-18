@@ -133,19 +133,17 @@ export default function EnhancedBrandManager({ onStatsUpdate }: EnhancedBrandMan
   const loadBrands = async () => {
     setIsLoading(true);
     try {
-      // Check if brands table exists by trying to query it
       const { data, error } = await supabase
         .from('brands')
         .select(`
           *,
           product_count:products(count)
         `)
-        .order('sort_order', { ascending: true })
-        .limit(1);
+        .order('sort_order', { ascending: true });
 
       if (error) {
-        // If brands table doesn't exist, create mock data or show empty state
-        console.warn('Brands table not found, using empty state');
+        console.error('Error loading brands:', error);
+        toast.error('Failed to load brands');
         setBrands([]);
         return;
       }

@@ -13,6 +13,7 @@ interface ImageSelectorModalProps {
   currentImageUrl?: string;
   title?: string;
   description?: string;
+  defaultMode?: 'select' | 'upload';
 }
 
 export function ImageSelectorModal({ 
@@ -21,9 +22,10 @@ export function ImageSelectorModal({
   onImageSelect, 
   currentImageUrl,
   title = "Select Image",
-  description = "Choose how you want to add an image"
+  description = "Choose how you want to add an image",
+  defaultMode
 }: ImageSelectorModalProps) {
-  const [mode, setMode] = useState<'select' | 'upload' | null>(null);
+  const [mode, setMode] = useState<'select' | 'upload' | null>(defaultMode || null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(currentImageUrl || null);
 
   const handleImageSelect = (imageUrl: string) => {

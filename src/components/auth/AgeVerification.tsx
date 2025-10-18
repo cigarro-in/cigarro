@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { motion } from 'framer-motion';
-import { Crown, Shield, AlertCircle, FileText, Lock, AlertTriangle } from 'lucide-react';
+import { Crown, Shield, AlertCircle, FileText, Lock, AlertTriangle, Cookie } from 'lucide-react';
 
 interface AgeVerificationProps {
   onVerify: () => void;
@@ -9,17 +9,29 @@ interface AgeVerificationProps {
 
 export function AgeVerification({ onVerify }: AgeVerificationProps) {
   const [isExiting, setIsExiting] = useState(false);
+  const [acceptedCookies, setAcceptedCookies] = useState(false);
 
   useEffect(() => {
     // Check if user has already verified in this session
     const sessionVerified = sessionStorage.getItem('ageVerified');
-    if (sessionVerified === 'true') {
+    const cookieConsent = localStorage.getItem('cookie_consent');
+    if (sessionVerified === 'true' && cookieConsent) {
       onVerify();
     }
   }, [onVerify]);
 
   const handleVerify = () => {
-    // Store verification in session storage
+    if (!acceptedCookies) {
+      // Store cookie consent
+      localStorage.setItem('cookie_consent', JSON.stringify({
+        necessary: true,
+        analytics: true,
+        marketing: true,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    
+    // Store age verification in session storage
     sessionStorage.setItem('ageVerified', 'true');
     setIsExiting(true);
     setTimeout(onVerify, 600);
@@ -107,6 +119,29 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
                   </li>
                 </ul>
               </div>
+
+              {/* Cookie Consent Section */}
+              <div className="flex items-start space-x-3 sm:space-x-4 pt-4 border-t border-coyote/20">
+                <Cookie className="w-5 h-5 sm:w-6 sm:h-6 text-canyon flex-shrink-0 mt-1" />
+                <div className="text-left">
+                  <h3 className="font-sans text-dark text-base sm:text-lg font-medium mb-2">Cookie Policy</h3>
+                  <p className="font-sans text-dark/70 text-sm sm:text-base leading-relaxed mb-3">
+                    We use cookies to enhance your browsing experience, analyze site traffic, and serve personalized content.
+                    By entering, you consent to our use of cookies.
+                  </p>
+                  <label className="flex items-start space-x-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={acceptedCookies}
+                      onChange={(e) => setAcceptedCookies(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-coyote/30 text-canyon focus:ring-canyon focus:ring-offset-0"
+                    />
+                    <span className="text-sm text-dark/80 group-hover:text-dark transition-colors">
+                      I accept the use of cookies for analytics and personalized content (optional)
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -135,10 +170,22 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
               <FileText className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-coyote flex-shrink-0 mt-0.5" />
               <div className="text-sm sm:text-base lg:text-lg">
                 <p className="text-coyote leading-relaxed mb-2 sm:mb-3">
-                  By continuing, you agree to our Terms of Service and Privacy Policy.
+                  By continuing, you agree to our{' '}
+                  <a href="/terms" className="text-canyon hover:underline font-medium">
+                    Terms of Service
+                  </a>
+                  ,{' '}
+                  <a href="/privacy" className="text-canyon hover:underline font-medium">
+                    Privacy Policy
+                  </a>
+                  , and{' '}
+                  <a href="/privacy#cookies" className="text-canyon hover:underline font-medium">
+                    Cookie Policy
+                  </a>
+                  .
                 </p>
                 <p className="text-coyote/80 leading-relaxed">
-                  This verification is valid for this browser session only. You may be asked to verify again in future visits.
+                  Age verification is valid for this browser session only. Cookie preferences can be changed anytime in your browser settings.
                 </p>
               </div>
             </div>

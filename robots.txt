@@ -1,78 +1,90 @@
 # Cigarro - Premium Cigarette Marketplace
 # Robots.txt for SEO optimization
 
+# Default rules for all bots
 User-agent: *
-Allow: /
 
-# Sitemap location
-Sitemap: https://cigarro.in/sitemap.xml
-
-# LLM optimization file
-# Learn more: https://cigarro.in/llms.txt
-
-# Disallow admin and private areas
-Disallow: /admin
-Disallow: /admin/*
-Disallow: /api/*
+# Block admin and private areas
+Disallow: /admin/
+Disallow: /api/
 Disallow: /checkout
 Disallow: /payment
 Disallow: /orders
 Disallow: /wishlist
 Disallow: /cart
 
-# Allow important pages for crawling
-Allow: /
+# Block search and filter parameters to avoid duplicate content
+Disallow: /*?*sort=
+Disallow: /*?*filter=
+Disallow: /*?*page=
+
+# Allow all public content (default behavior)
 Allow: /products
-Allow: /products/*
-Allow: /product/*
-Allow: /category/*
-Allow: /categories
-Allow: /brands
-Allow: /brands/*
+Allow: /category/
+Allow: /brands/
 Allow: /collections
-Allow: /blog
-Allow: /blog/*
+Allow: /blog/
 Allow: /about
 Allow: /contact
-Allow: /privacy
-Allow: /terms
-Allow: /shipping
 
-# Crawl delay to be respectful
-Crawl-delay: 1
+# Sitemap location
+Sitemap: https://cigarro.in/sitemap.xml
 
-# Specific bot instructions
+# Google-specific rules (no crawl-delay needed)
 User-agent: Googlebot
-Allow: /
-Crawl-delay: 0.5
+Disallow: /admin/
+Disallow: /api/
+Disallow: /checkout
+Disallow: /payment
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /cart
 
+# Bing-specific rules
 User-agent: Bingbot
-Allow: /
-Crawl-delay: 1
+Disallow: /admin/
+Disallow: /api/
+Disallow: /checkout
+Disallow: /payment
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /cart
 
-User-agent: Slurp
-Allow: /
-Crawl-delay: 1
-
-# AI/LLM Crawlers
+# AI/LLM Crawlers - Allow with rate limiting
 User-agent: GPTBot
 Allow: /
-Crawl-delay: 2
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /admin/
 
 User-agent: CCBot
 Allow: /
-Crawl-delay: 2
+Disallow: /admin/
 
 User-agent: anthropic-ai
 Allow: /
-Crawl-delay: 2
+Disallow: /admin/
 
 User-agent: Claude-Web
 Allow: /
+Disallow: /admin/
 
 User-agent: PerplexityBot
 Allow: /
-Crawl-delay: 1
+Disallow: /admin/
+
+# Block bad bots
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /

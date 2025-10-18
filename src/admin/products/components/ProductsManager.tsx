@@ -9,7 +9,7 @@ import { supabase } from '../../../utils/supabase/client';
 import { formatINR } from '../../../utils/currency';
 import { DataTable } from '../../components/shared/DataTable';
 import { StandardModal } from '../../components/shared/StandardModal';
-import { ProductForm } from './index';
+import { ProductForm } from './ProductForm';
 import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
 
 interface Product {
@@ -293,36 +293,15 @@ export function ProductsManager() {
         onRowClick={handleEditProduct}
       />
 
-      <StandardModal
+      <ProductForm
+        product={editingProduct}
         isOpen={showProductModal}
         onClose={() => setShowProductModal(false)}
-        title={editingProduct ? 'Edit Product' : 'Add New Product'}
-        size="xl"
-        headerActions={
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={productIsActive}
-              onCheckedChange={setProductIsActive}
-            />
-            <Label className="text-dark font-medium">Active</Label>
-          </div>
-        }
-      >
-        <ProductForm
-          product={editingProduct}
-          isActive={productIsActive}
-          onSave={() => {
-            setShowProductModal(false);
-            fetchProducts();
-          }}
-          onCancel={() => setShowProductModal(false)}
-          onDelete={() => {
-            setShowProductModal(false);
-            fetchProducts();
-            toast.success('Product deleted successfully');
-          }}
-        />
-      </StandardModal>
+        onSave={() => {
+          setShowProductModal(false);
+          fetchProducts();
+        }}
+      />
     </div>
   );
 }

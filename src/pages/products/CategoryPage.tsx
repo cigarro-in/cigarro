@@ -204,6 +204,7 @@ export function CategoryPage() {
       <Helmet>
         <title>{pageTitle} - Cigarro</title>
         <meta name="description" content={pageDescription} />
+        <link rel="canonical" href={`https://cigarro.in${slug ? `/category/${slug}` : '/products'}`} />
       </Helmet>
 
       <div className="main-container section">
