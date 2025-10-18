@@ -17,6 +17,7 @@ export async function generateSitemap(baseUrl: string = 'https://cigarro.in'): P
     { loc: '/collections', changefreq: 'weekly' as const, priority: 0.8 },
     { loc: '/brands', changefreq: 'weekly' as const, priority: 0.8 },
     { loc: '/blog', changefreq: 'daily' as const, priority: 0.7 },
+    { loc: '/blogs', changefreq: 'daily' as const, priority: 0.7 },
     { loc: '/about', changefreq: 'monthly' as const, priority: 0.6 },
     { loc: '/contact', changefreq: 'monthly' as const, priority: 0.6 },
     { loc: '/privacy', changefreq: 'yearly' as const, priority: 0.3 },
@@ -73,10 +74,10 @@ export async function generateSitemap(baseUrl: string = 'https://cigarro.in'): P
     if (brands) {
       brands.forEach(brand => {
         urls.push({
-          loc: `/brands/${brand.slug}`,
+          loc: `/brand/${brand.slug}`,
           lastmod: new Date(brand.updated_at).toISOString().split('T')[0],
-          changefreq: 'weekly',
-          priority: 0.7
+          changefreq: 'monthly',
+          priority: 0.6
         });
       });
     }

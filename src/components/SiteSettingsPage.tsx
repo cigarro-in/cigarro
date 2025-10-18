@@ -8,8 +8,9 @@ import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { supabase } from '../utils/supabase/client';
 import { toast } from 'sonner';
-import { LogOut, Save } from 'lucide-react';
+import { LogOut, Save, RefreshCw, FileText } from 'lucide-react';
 import { useAdminAuth } from '../hooks/useAdminAuth';
+import { generateSitemap } from '../utils/sitemap-generator';
 
 interface SiteSettings {
   site_name: string;
@@ -28,6 +29,7 @@ export function SiteSettingsPage() {
     meta_description: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingSitemap, setIsGeneratingSitemap] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -84,6 +86,35 @@ export function SiteSettingsPage() {
     setSettings(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePurgeSitemapCache = async () => {
+    setIsGeneratingSitemap(true);
+    const loadingToast = toast.loading('Purging sitemap cache...');
+    
+    try {
+      // Force refresh by adding cache-busting parameter
+      const response = await fetch(`https://cigarro.in/sitemap.xml?t=${Date.now()}`, {
+        cache: 'reload',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      if (response.ok) {
+        toast.dismiss(loadingToast);
+        toast.success('Sitemap cache purged! Fresh sitemap will be generated on next request.');
+      } else {
+        throw new Error('Failed to purge cache');
+      }
+    } catch (error) {
+      console.error('Error purging sitemap cache:', error);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to purge sitemap cache');
+    } finally {
+      setIsGeneratingSitemap(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Site Settings Card */}
@@ -133,6 +164,47 @@ export function SiteSettingsPage() {
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Settings'}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SEO Tools Card */}
+      <Card className="bg-creme-light border-coyote">
+        <CardHeader>
+          <CardTitle className="font-serif-premium text-dark">SEO Tools</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-white rounded-lg border border-coyote">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-5 h-5 text-canyon" />
+                  <h3 className="font-medium text-dark">Sitemap Generator</h3>
+                </div>
+                <p className="text-sm text-dark/70 mb-4">
+                  Your sitemap is generated dynamically at <code className="bg-coyote/20 px-1 py-0.5 rounded text-xs">cigarro.in/sitemap.xml</code> and cached for 1 hour. 
+                  Purge the cache to force immediate regeneration with latest products, categories, and brands.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handlePurgeSitemapCache}
+                    disabled={isGeneratingSitemap}
+                    className="bg-canyon hover:bg-canyon/90 text-creme"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isGeneratingSitemap ? 'animate-spin' : ''}`} />
+                    {isGeneratingSitemap ? 'Purging...' : 'Purge Cache'}
+                  </Button>
+                  <Button
+                    onClick={() => window.open('https://cigarro.in/sitemap.xml', '_blank')}
+                    variant="outline"
+                    className="border-canyon text-canyon hover:bg-canyon hover:text-creme"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    View Sitemap
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

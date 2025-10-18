@@ -54,13 +54,14 @@ async function generateSitemap(supabase) {
   const BASE_URL = 'https://cigarro.in';
   const today = new Date().toISOString().split('T')[0];
   
-  // Static pages
+  // Static pages (NO user-specific pages like cart!)
   const staticPages = [
     { url: '/', priority: 1.0, changefreq: 'daily' },
     { url: '/products', priority: 0.9, changefreq: 'daily' },
     { url: '/collections', priority: 0.8, changefreq: 'weekly' },
     { url: '/brands', priority: 0.8, changefreq: 'weekly' },
-    { url: '/cart', priority: 0.5, changefreq: 'always' },
+    { url: '/blog', priority: 0.7, changefreq: 'daily' },
+    { url: '/blogs', priority: 0.7, changefreq: 'daily' },
     { url: '/about', priority: 0.6, changefreq: 'monthly' },
     { url: '/contact', priority: 0.6, changefreq: 'monthly' },
     { url: '/privacy', priority: 0.3, changefreq: 'yearly' },
@@ -69,7 +70,7 @@ async function generateSitemap(supabase) {
   ];
 
   // Fetch data (with error handling)
-  const [productsResult, categoriesResult] = await Promise.allSettled([
+  const [productsResult, categoriesResult, brandsResult, blogResult] = await Promise.allSettled([
     supabase
       .from('products')
       .select('slug, updated_at')
@@ -79,11 +80,38 @@ async function generateSitemap(supabase) {
     supabase
       .from('categories')
       .select('slug, updated_at')
+      .limit(100),
+    
+    supabase
+      .from('products')
+      .select('brand, updated_at')
+      .eq('is_active', true)
+      .not('brand', 'is', null),
+    
+    supabase
+      .from('blog_posts')
+      .select('slug, updated_at')
+      .eq('status', 'published')
       .limit(100)
   ]);
 
   const products = productsResult.status === 'fulfilled' ? productsResult.value.data || [] : [];
   const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value.data || [] : [];
+  
+  // Process brands (deduplicate and create slugs)
+  const brandData = brandsResult.status === 'fulfilled' ? brandsResult.value.data || [] : [];
+  const brandMap = new Map();
+  brandData.forEach(({ brand, updated_at }) => {
+    if (!brandMap.has(brand)) {
+      brandMap.set(brand, {
+        slug: brand.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+        updated_at: updated_at
+      });
+    }
+  });
+  const brands = Array.from(brandMap.values());
+  
+  const blogPosts = blogResult.status === 'fulfilled' ? blogResult.value.data || [] : [];
 
   // Generate XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -118,6 +146,28 @@ async function generateSitemap(supabase) {
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>\n`;
+  });
+
+  // Brands
+  brands.forEach(brand => {
+    const lastmod = brand.updated_at ? new Date(brand.updated_at).toISOString().split('T')[0] : today;
+    xml += `  <url>
+    <loc>${BASE_URL}/brand/${brand.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>\n`;
+  });
+
+  // Blog Posts
+  blogPosts.forEach(post => {
+    const lastmod = post.updated_at ? new Date(post.updated_at).toISOString().split('T')[0] : today;
+    xml += `  <url>
+    <loc>${BASE_URL}/blog/${post.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>\n`;
   });
 
