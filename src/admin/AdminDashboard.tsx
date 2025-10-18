@@ -191,9 +191,9 @@ export function AdminDashboard({ onStatsUpdate }: AdminDashboardProps) {
               onAddVariant={handleAddVariant}
               onEditVariant={handleEditVariant}
               onDeleteVariant={handleDeleteVariant}
+              onRefresh={loadDashboardData}
             />
           </TabsContent>
-
           {/* Categories Tab */}
           <TabsContent value="categories" className="mt-6">
             <CategoryManager onStatsUpdate={onStatsUpdate} />

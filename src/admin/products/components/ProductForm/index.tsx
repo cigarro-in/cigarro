@@ -3,8 +3,8 @@
 // Premium product management with tabs, variants, and discount pricing
 // ============================================================================
 
-import { useState, useEffect } from 'react';
-import { Save, X, Loader2, Package, Image as ImageIcon } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Save, X, Loader2, Package, Trash2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../components/ui/dialog';
@@ -19,6 +19,7 @@ import { supabase } from '../../../../utils/supabase/client';
 import { Product, ProductFormData, VariantFormData, generateSlug, calculateDiscount } from '../../../../types/product';
 
 // Tab Components
+import { QuickSetupTab } from './QuickSetupTab';
 import { BasicInfoTab } from './BasicInfoTab';
 import { PricingInventoryTab } from './PricingInventoryTab';
 import { VariantsTab } from './VariantsTab';
@@ -30,22 +31,34 @@ interface ProductFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: (product: Product) => void;
 }
 
-export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormProps) {
+export function ProductForm({ product, isOpen, onClose, onSave, onDelete }: ProductFormProps) {
   const [activeTab, setActiveTab] = useState('quick');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>(getInitialFormData());
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: boolean;
+    brand?: boolean;
+    price?: boolean;
+    images?: boolean;
+  }>({});
 
   useEffect(() => {
-    if (product) {
-      loadProductData(product);
-    } else {
-      setFormData(getInitialFormData());
-      setActiveTab('quick');
+    if (isOpen) {
+      // Reset validation errors when modal opens
+      setValidationErrors({});
+      
+      if (product) {
+        loadProductData(product);
+      } else {
+        setFormData(getInitialFormData());
+        setActiveTab('quick');
+      }
+      setHasUnsavedChanges(false);
     }
-    setHasUnsavedChanges(false);
   }, [product, isOpen]);
 
   function getInitialFormData(): ProductFormData {
@@ -121,15 +134,15 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
         structured_data: v.structured_data || {}
       }));
 
-      setFormData({
+      const loadedData = {
         name: product.name,
         slug: product.slug,
         brand: product.brand,
-        description: product.description,
+        description: product.description || '',
         short_description: product.short_description || '',
         price: product.price,
-        compare_at_price: product.compare_at_price,
-        cost_price: product.cost_price,
+        compare_at_price: product.compare_at_price || undefined,
+        cost_price: product.cost_price || undefined,
         stock: product.stock,
         track_inventory: product.track_inventory ?? true,
         continue_selling_when_out_of_stock: product.continue_selling_when_out_of_stock ?? false,
@@ -155,16 +168,115 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
         twitter_image: product.twitter_image || '',
         structured_data: product.structured_data || {},
         variants: mappedVariants
+      };
+
+      console.log('📥 ========== LOADED PRODUCT DATA ==========');
+      console.log('📥 Basic Info:', {
+        name: loadedData.name,
+        slug: loadedData.slug,
+        brand: loadedData.brand,
+        description: loadedData.description?.substring(0, 50) + '...',
+        short_description: loadedData.short_description?.substring(0, 50) + '...'
       });
+      console.log('📥 Pricing:', {
+        price: loadedData.price,
+        compare_at_price: loadedData.compare_at_price,
+        cost_price: loadedData.cost_price,
+        stock: loadedData.stock
+      });
+      console.log('📥 Images:', {
+        gallery_images_count: loadedData.gallery_images.length,
+        gallery_images: loadedData.gallery_images,
+        image_alt_text: loadedData.image_alt_text
+      });
+      console.log('📥 Status:', {
+        is_active: loadedData.is_active,
+        is_featured: loadedData.is_featured,
+        is_showcase: loadedData.is_showcase,
+        track_inventory: loadedData.track_inventory,
+        continue_selling_when_out_of_stock: loadedData.continue_selling_when_out_of_stock
+      });
+      console.log('📥 Product Details:', {
+        origin: loadedData.origin,
+        pack_size: loadedData.pack_size,
+        specifications_count: loadedData.specifications.length,
+        specifications: loadedData.specifications
+      });
+      console.log('📥 SEO:', {
+        meta_title: loadedData.meta_title,
+        meta_description: loadedData.meta_description?.substring(0, 50) + '...',
+        meta_keywords: loadedData.meta_keywords,
+        canonical_url: loadedData.canonical_url
+      });
+      console.log('📥 Social Media:', {
+        og_title: loadedData.og_title,
+        og_description: loadedData.og_description?.substring(0, 50) + '...',
+        og_image: loadedData.og_image,
+        twitter_title: loadedData.twitter_title
+      });
+      console.log('📥 Variants:', {
+        count: loadedData.variants.length,
+        details: loadedData.variants.map(v => ({
+          id: v.id,
+          name: v.variant_name,
+          type: v.variant_type,
+          price: v.price,
+          stock: v.stock,
+          assigned_images_count: v.assigned_images?.length || 0,
+          assigned_images: v.assigned_images,
+          is_active: v.is_active
+        }))
+      });
+      console.log('📥 ==========================================');
+
+      setFormData(loadedData);
     } catch (error) {
       console.error('Error loading product data:', error);
       toast.error('Failed to load product data');
     }
   }
 
-  const handleFormChange = (updates: Partial<ProductFormData>) => {
+  const handleFormChange = useCallback((updates: Partial<ProductFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }));
     setHasUnsavedChanges(true);
+    // Clear validation errors when user starts fixing them
+    if (updates.name !== undefined) setValidationErrors(prev => ({ ...prev, name: false }));
+    if (updates.brand !== undefined) setValidationErrors(prev => ({ ...prev, brand: false }));
+    if (updates.price !== undefined) setValidationErrors(prev => ({ ...prev, price: false }));
+    if (updates.gallery_images !== undefined) setValidationErrors(prev => ({ ...prev, images: false }));
+  }, []);
+
+  const validateRequiredFields = (): boolean => {
+    const errors = {
+      name: !formData.name.trim(),
+      brand: !formData.brand.trim(),
+      price: formData.price <= 0,
+      images: formData.gallery_images.length === 0
+    };
+
+    setValidationErrors(errors);
+
+    if (errors.name || errors.brand || errors.price || errors.images) {
+      const missingFields = [
+        errors.name && 'Name',
+        errors.brand && 'Brand',
+        errors.price && 'Price',
+        errors.images && 'Images'
+      ].filter(Boolean).join(', ');
+      
+      toast.error(`Missing required fields: ${missingFields}`);
+      
+      // Navigate to appropriate tab
+      if (errors.name || errors.brand || errors.price) {
+        setActiveTab('quick');
+      } else if (errors.images) {
+        setActiveTab('images');
+      }
+      
+      return false;
+    }
+
+    return true;
   };
 
   const handleSave = async (e?: React.MouseEvent) => {
@@ -175,22 +287,68 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
     try {
       setLoading(true);
 
+      console.log('💾 ========== SAVING PRODUCT DATA ==========');
+      console.log('💾 Basic Info:', {
+        name: formData.name,
+        slug: formData.slug || generateSlug(formData.name),
+        brand: formData.brand,
+        description: formData.description?.substring(0, 50) + '...',
+        short_description: formData.short_description?.substring(0, 50) + '...'
+      });
+      console.log('💾 Pricing:', {
+        price: formData.price,
+        compare_at_price: formData.compare_at_price,
+        cost_price: formData.cost_price,
+        stock: formData.stock
+      });
+      console.log('💾 Images:', {
+        gallery_images_count: formData.gallery_images.length,
+        gallery_images: formData.gallery_images,
+        image_alt_text: formData.image_alt_text
+      });
+      console.log('💾 Status:', {
+        is_active: formData.is_active,
+        is_featured: formData.is_featured,
+        is_showcase: formData.is_showcase,
+        track_inventory: formData.track_inventory,
+        continue_selling_when_out_of_stock: formData.continue_selling_when_out_of_stock
+      });
+      console.log('💾 Product Details:', {
+        origin: formData.origin,
+        pack_size: formData.pack_size,
+        specifications_count: formData.specifications.length,
+        specifications: formData.specifications
+      });
+      console.log('💾 SEO:', {
+        meta_title: formData.meta_title,
+        meta_description: formData.meta_description?.substring(0, 50) + '...',
+        meta_keywords: formData.meta_keywords,
+        canonical_url: formData.canonical_url
+      });
+      console.log('💾 Social Media:', {
+        og_title: formData.og_title,
+        og_description: formData.og_description?.substring(0, 50) + '...',
+        og_image: formData.og_image,
+        twitter_title: formData.twitter_title
+      });
+      console.log('💾 Variants:', {
+        count: formData.variants.length,
+        details: formData.variants.map(v => ({
+          id: v.id,
+          name: v.variant_name,
+          type: v.variant_type,
+          price: v.price,
+          stock: v.stock,
+          assigned_images_count: v.assigned_images?.length || 0,
+          assigned_images: v.assigned_images,
+          is_active: v.is_active
+        }))
+      });
+      console.log('💾 ==========================================');
+
       // Validate required fields
-      if (!formData.name.trim()) {
-        toast.error('Product name is required');
-        setActiveTab('quick');
-        return;
-      }
-
-      if (!formData.brand.trim()) {
-        toast.error('Brand is required');
-        setActiveTab('quick');
-        return;
-      }
-
-      if (formData.price <= 0) {
-        toast.error('Price must be greater than 0');
-        setActiveTab('quick');
+      if (!validateRequiredFields()) {
+        setLoading(false);
         return;
       }
 
@@ -277,20 +435,25 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
   };
 
   async function saveVariants(productId: string) {
+    console.log('💾 Saving variants:', formData.variants.length);
+    
     // Delete removed variants
     if (product) {
       const existingVariantIds = formData.variants.filter(v => v.id).map(v => v.id);
-      const { error: deleteError } = await supabase
-        .from('product_variants')
-        .delete()
-        .eq('product_id', productId)
-        .not('id', 'in', `(${existingVariantIds.join(',')})`);
+      if (existingVariantIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('product_variants')
+          .delete()
+          .eq('product_id', productId)
+          .not('id', 'in', `(${existingVariantIds.join(',')})`);
 
-      if (deleteError) console.error('Error deleting variants:', deleteError);
+        if (deleteError) console.error('Error deleting variants:', deleteError);
+      }
     }
 
     // Save variants
     for (const variant of formData.variants) {
+      console.log('💾 Saving variant:', variant.variant_name, 'with', variant.assigned_images?.length || 0, 'images');
       const attributes = variant.attributes
         .filter(attr => attr.key.trim() && attr.value.trim())
         .reduce((acc, attr) => ({ ...acc, [attr.key]: attr.value }), {});
@@ -369,120 +532,30 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
     }
   }
 
-  const handleClose = () => {
-    if (hasUnsavedChanges) {
-      if (confirm('You have unsaved changes. Are you sure you want to close?')) {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
-  };
-
   // Calculate discount info for display
-  const discountInfo = calculateDiscount(formData.price, formData.compare_at_price);
-
-  // Minimal, focused Quick Setup tab
-  function QuickStartTab({
-    value,
-    onChange,
-    goToImages,
-  }: {
-    value: ProductFormData;
-    onChange: (u: Partial<ProductFormData>) => void;
-    goToImages: () => void;
-  }) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <Label className="font-sans text-[var(--color-dark)]">Product Name</Label>
-            <Input
-              value={value.name}
-              onChange={(e) => onChange({ name: e.target.value, slug: value.slug || generateSlug(e.target.value) })}
-              placeholder="e.g., Marlboro Gold Pack"
-              className="bg-[var(--color-creme-light)] border-[var(--color-coyote)]"
-            />
-          </div>
-          <div className="space-y-3">
-            <Label className="font-sans text-[var(--color-dark)]">Brand</Label>
-            <Input
-              value={value.brand}
-              onChange={(e) => onChange({ brand: e.target.value })}
-              placeholder="e.g., Marlboro"
-              className="bg-[var(--color-creme-light)] border-[var(--color-coyote)]"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <Label className="font-sans text-[var(--color-dark)]">Price (₹)</Label>
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              value={value.price ?? 0}
-              onChange={(e) => onChange({ price: Number(e.target.value) })}
-              placeholder="0.00"
-              className="bg-[var(--color-creme-light)] border-[var(--color-coyote)]"
-            />
-            <p className="text-xs text-[var(--color-dark)]/70">Set only the selling price now. You can add cost and compare-at later.</p>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border-2 border-[var(--color-coyote)] bg-[var(--color-creme-light)] px-4 py-3">
-            <div>
-              <p className="font-sans text-[var(--color-dark)]">Active</p>
-              <p className="text-xs text-[var(--color-dark)]/70">Enable product visibility</p>
-            </div>
-            <Switch checked={!!value.is_active} onCheckedChange={(v: boolean) => onChange({ is_active: v })} />
-          </div>
-        </div>
-
-        <div className="rounded-lg border-2 border-[var(--color-coyote)] bg-[var(--color-creme-light)] p-4 flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="font-sans text-[var(--color-dark)]">Primary Image</p>
-            <p className="text-xs text-[var(--color-dark)]/70">Optional now. You can add images anytime.</p>
-          </div>
-          <Button type="button" variant="outline" onClick={goToImages} className="border-[var(--color-coyote)]">
-            <ImageIcon className="w-4 h-4 mr-2" />
-            Manage Images
-          </Button>
-        </div>
-
-        <Separator className="bg-[var(--color-coyote)]" />
-
-        <div className="flex flex-wrap gap-3">
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={loading}
-            className="bg-[var(--color-dark)] text-[var(--color-creme-light)] hover:bg-[var(--color-canyon)] px-6"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Save Product
-              </>
-            )}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => setActiveTab('variants')} className="border-[var(--color-coyote)]">
-            Create Variants Later
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const discountInfo = useMemo(() => 
+    calculateDiscount(formData.price, formData.compare_at_price),
+    [formData.price, formData.compare_at_price]
+  );
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        if (hasUnsavedChanges) {
+          if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+            setValidationErrors({});
+            setHasUnsavedChanges(false);
+            onClose();
+          }
+        } else {
+          setValidationErrors({});
+          onClose();
+        }
+      }
+    }} modal={true}>
       <DialogContent 
-        className="max-w-7xl h-[95vh] flex flex-col bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)] shadow-2xl p-0 gap-0"
-        onPointerDownOutside={(e) => e.preventDefault()}
+        className="max-w-7xl h-[95vh] flex flex-col bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)] shadow-2xl p-0 gap-0 overflow-hidden"
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Fixed Header */}
         <DialogHeader className="border-b-2 border-[var(--color-coyote)] px-8 py-6 bg-gradient-to-r from-[var(--color-creme)] to-[var(--color-creme-light)] flex-shrink-0">
@@ -561,11 +634,7 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
             {/* Scrollable Tab Content */}
             <div className="flex-1 overflow-y-auto px-8 py-6 bg-[var(--color-creme)] scrollbar-thin scrollbar-thumb-[var(--color-coyote)] scrollbar-track-transparent">
               <TabsContent value="quick" className="mt-0 h-full">
-                <QuickStartTab
-                  value={formData}
-                  onChange={handleFormChange}
-                  goToImages={() => setActiveTab('images')}
-                />
+                <QuickSetupTab formData={formData} onChange={handleFormChange} validationErrors={validationErrors} />
               </TabsContent>
               <TabsContent value="basic" className="mt-0 h-full">
                 <BasicInfoTab formData={formData} onChange={handleFormChange} />
@@ -597,16 +666,46 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
         {/* Fixed Footer */}
         <div className="border-t-2 border-[var(--color-coyote)] px-8 py-5 bg-gradient-to-r from-[var(--color-creme-light)] to-[var(--color-creme)] flex-shrink-0">
           <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-              className="border-2 border-[var(--color-coyote)] hover:bg-[var(--color-coyote)] hover:text-[var(--color-dark)] px-6 py-2.5 font-sans font-medium transition-all"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (hasUnsavedChanges) {
+                    if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+                      setValidationErrors({});
+                      setHasUnsavedChanges(false);
+                      onClose();
+                    }
+                  } else {
+                    onClose();
+                  }
+                }}
+                disabled={loading}
+                className="border-2 border-[var(--color-coyote)] hover:bg-[var(--color-coyote)] hover:text-[var(--color-dark)] px-6 py-2.5 font-sans font-medium transition-all"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+
+              {product && onDelete && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (confirm(`Delete "${product.name}"? This action cannot be undone.`)) {
+                      onDelete(product);
+                      onClose();
+                    }
+                  }}
+                  disabled={loading}
+                  className="bg-red-600 text-white hover:bg-red-700 px-6 py-2.5 font-sans font-medium transition-all"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Product
+                </Button>
+              )}
+            </div>
 
             <Button
               type="button"
@@ -622,7 +721,7 @@ export function ProductForm({ product, isOpen, onClose, onSave }: ProductFormPro
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  {product ? 'Update Product' : 'Create Product'}
+                  {product ? 'Update Product' : 'Save Product'}
                 </>
               )}
             </Button>

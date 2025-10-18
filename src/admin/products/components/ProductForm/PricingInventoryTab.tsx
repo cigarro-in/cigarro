@@ -49,8 +49,8 @@ export function PricingInventoryTab({ formData, onChange }: PricingInventoryTabP
               <Input
                 id="price"
                 type="number"
-                value={formData.price || ''}
-                onChange={(e) => onChange({ price: parseFloat(e.target.value) || 0 })}
+                value={formData.price === 0 ? '' : formData.price}
+                onChange={(e) => onChange({ price: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                 placeholder="0.00"
                 step="0.01"
                 min="0"
@@ -180,8 +180,8 @@ export function PricingInventoryTab({ formData, onChange }: PricingInventoryTabP
             <Input
               id="stock"
               type="number"
-              value={formData.stock || ''}
-              onChange={(e) => onChange({ stock: parseInt(e.target.value) || 0 })}
+              value={formData.stock === 0 ? '' : formData.stock}
+              onChange={(e) => onChange({ stock: e.target.value === '' ? 0 : parseInt(e.target.value) })}
               placeholder="0"
               min="0"
               step="1"

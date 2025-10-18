@@ -28,6 +28,7 @@ import { Product, ProductVariant } from '../types/index';
 import { formatINR } from '../../../../utils/currency';
 import { toast } from 'sonner';
 import { ProductForm } from '../../../../admin/products/components/ProductForm';
+import { supabase } from '../../../../utils/supabase/client';
 
 interface DashboardProductsTabProps {
   products: Product[];
@@ -35,6 +36,7 @@ interface DashboardProductsTabProps {
   onAddVariant: () => void;
   onEditVariant: (variant: ProductVariant) => void;
   onDeleteVariant: (variantId: string) => void;
+  onRefresh?: () => void;
 }
 
 export function DashboardProductsTab({
@@ -42,7 +44,8 @@ export function DashboardProductsTab({
   variants,
   onAddVariant,
   onEditVariant,
-  onDeleteVariant
+  onDeleteVariant,
+  onRefresh
 }: DashboardProductsTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -83,10 +86,24 @@ export function DashboardProductsTab({
     setShowProductModal(true);
   };
 
-  // Handle edit product
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setShowProductModal(true);
+  // Handle edit product - fetch fresh data from database
+  const handleEditProduct = async (product: Product) => {
+    try {
+      // Fetch fresh product data from database
+      const { data: freshProduct, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', product.id)
+        .single();
+
+      if (error) throw error;
+
+      setEditingProduct(freshProduct as any);
+      setShowProductModal(true);
+    } catch (error) {
+      console.error('Error loading product:', error);
+      toast.error('Failed to load product data');
+    }
   };
 
   // Handle add variant - open product form with this product
@@ -271,7 +288,6 @@ export function DashboardProductsTab({
                 <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Variants</TableHead>
-                <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -282,8 +298,11 @@ export function DashboardProductsTab({
                 return (
                   <React.Fragment key={product.id}>
                     {/* Product Row */}
-                    <TableRow>
-                      <TableCell>
+                    <TableRow
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleEditProduct(product)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedProducts.includes(product.id)}
                           onCheckedChange={(checked: boolean) => {
@@ -324,48 +343,14 @@ export function DashboardProductsTab({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{productVariants.length} variants</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAddVariant(product)}
-                            className="h-6 px-2"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditProduct(product)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAddVariant(product)}>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Variant
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDeleteVariant(product.id)}>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Badge variant="outline">{productVariants.length} variants</Badge>
                       </TableCell>
                     </TableRow>
 
                     {/* Variants Row */}
                     {isExpanded && productVariants.length > 0 && (
                       <TableRow className="bg-muted/50">
-                        <TableCell colSpan={8}>
+                        <TableCell colSpan={7}>
                           <div className="p-4">
                             <h4 className="font-medium mb-3">Variants</h4>
                             <div className="space-y-2">
@@ -416,7 +401,7 @@ export function DashboardProductsTab({
       {/* Product Modal */}
       {/* ProductForm has its own Dialog wrapper */}
       <ProductForm
-        product={editingProduct}
+        product={editingProduct as any}
         isOpen={showProductModal}
         onClose={() => {
           setShowProductModal(false);
@@ -426,7 +411,44 @@ export function DashboardProductsTab({
           setShowProductModal(false);
           setEditingProduct(null);
           // Refresh products data
-          window.location.reload();
+          if (onRefresh) {
+            onRefresh();
+          }
+          toast.success('Products refreshed');
+        }}
+        onDelete={async (product) => {
+          try {
+            const { error } = await supabase
+              .from('products')
+              .delete()
+              .eq('id', product.id);
+
+            if (error) {
+              // Handle foreign key constraint errors
+              if (error.code === '23503') {
+                if (error.message.includes('order_items')) {
+                  toast.error('Cannot delete product: It has been ordered by customers. Consider deactivating it instead.');
+                } else if (error.message.includes('cart_items')) {
+                  toast.error('Cannot delete product: It is currently in customer carts. Consider deactivating it instead.');
+                } else {
+                  toast.error('Cannot delete product: It is referenced by other records.');
+                }
+              } else {
+                throw error;
+              }
+              return;
+            }
+
+            toast.success(`Deleted ${product.name}`);
+            setShowProductModal(false);
+            setEditingProduct(null);
+            if (onRefresh) {
+              onRefresh();
+            }
+          } catch (error: any) {
+            console.error('Error deleting product:', error);
+            toast.error(error.message || 'Failed to delete product');
+          }
         }}
       />
 

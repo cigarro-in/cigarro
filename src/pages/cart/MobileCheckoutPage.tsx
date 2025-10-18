@@ -101,8 +101,19 @@ const addressSuggestions = [
 
 export function MobileCheckoutPage() {
   const navigate = useNavigate();
-  const { items, updateQuantity, removeFromCart, totalPrice, clearCart } = useCart();
+  const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
+
+  // Check for Buy Now flow
+  const isBuyNow = sessionStorage.getItem('isBuyNow') === 'true';
+  const buyNowItemData = sessionStorage.getItem('buyNowItem');
+  const buyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
+
+  // Use Buy Now item or cart items
+  const items = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
+  const totalPrice = isBuyNow && buyNowItem 
+    ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
+    : cartTotalPrice;
 
   // State management
   const [selectedShipping, setSelectedShipping] = useState('standard');
@@ -1005,12 +1016,7 @@ export function MobileCheckoutPage() {
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm truncate">{item.name}</h4>
-                    {item.variant_name && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.variant_name}
-                      </p>
-                    )}
+                    <h4 className="font-medium text-sm truncate">{item.name}{item.variant_name && ` (${item.variant_name})`}</h4>
                     <p className="text-sm font-semibold text-foreground">
                       {formatINR(item.variant_price || item.price)}
                     </p>

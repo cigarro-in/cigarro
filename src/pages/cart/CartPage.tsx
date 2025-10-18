@@ -79,7 +79,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
         <div className="flex-1 min-w-0">
           <Link to={`/product/${item.slug}`} className="group">
             <h3 className="font-semibold text-dark text-sm group-hover:text-canyon transition-colors duration-200 line-clamp-1 leading-tight">
-              {item.name}
+              {item.name}{item.variant_name && ` (${item.variant_name})`}
             </h3>
           </Link>
           {item.brand && (

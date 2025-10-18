@@ -1,5 +1,5 @@
 // ============================================================================
-// BASIC INFO TAB - Product name, brand, description
+// QUICK SETUP TAB - Essential product information for fast creation
 // ============================================================================
 
 import { useState, useEffect } from 'react';
@@ -9,17 +9,23 @@ import { Textarea } from '../../../../components/ui/textarea';
 import { Button } from '../../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Switch } from '../../../../components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
-import { Alert, AlertDescription } from '../../../../components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { supabase } from '../../../../utils/supabase/client';
 import { ProductFormData, generateSlug } from '../../../../types/product';
+import { MultipleImageUpload } from '../../../../components/ui/MultipleImageUpload';
 
-interface BasicInfoTabProps {
+interface QuickSetupTabProps {
   formData: ProductFormData;
   onChange: (updates: Partial<ProductFormData>) => void;
+  validationErrors: {
+    name?: boolean;
+    brand?: boolean;
+    price?: boolean;
+    images?: boolean;
+  };
 }
 
-export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
+export function QuickSetupTab({ formData, onChange, validationErrors }: QuickSetupTabProps) {
   const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
   const [autoSlug, setAutoSlug] = useState(true);
   const [customBrand, setCustomBrand] = useState(false);
@@ -73,7 +79,7 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
 
   return (
     <div className="space-y-6 pb-6">
-      {/* Product Status - Compact Toggle Bubbles */}
+      {/* Product Status */}
       <Card className="bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)]">
         <CardHeader className="text-center pb-3">
           <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">Status</CardTitle>
@@ -108,35 +114,45 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
         </CardContent>
       </Card>
 
-      {/* Basic Information */}
+      {/* Essential Information */}
       <Card className="bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)]">
         <CardHeader className="text-center pb-3">
-          <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">Basic Information</CardTitle>
+          <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">Essential Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Row 1: Name + Brand */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-sm font-medium text-[var(--color-dark)]">
+              <Label htmlFor="quick-name" className="text-sm font-medium text-[var(--color-dark)]">
                 Product Name <span className="text-[var(--color-canyon)]">*</span>
               </Label>
               <Input
-                id="name"
+                id="quick-name"
                 value={formData.name}
                 onChange={(e) => onChange({ name: e.target.value })}
                 placeholder="Marlboro Red Premium"
-                className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] h-10"
-                required
+                className={`bg-[var(--color-creme)] border-2 ${
+                  validationErrors.name
+                    ? 'border-red-500 focus:ring-2 focus:ring-red-500'
+                    : 'border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)]'
+                } h-10`}
               />
+              {validationErrors.name && (
+                <p className="text-xs text-red-600 font-medium">Product name is required</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="brand" className="text-sm font-medium text-[var(--color-dark)]">
+              <Label htmlFor="quick-brand" className="text-sm font-medium text-[var(--color-dark)]">
                 Brand <span className="text-[var(--color-canyon)]">*</span>
               </Label>
               {!customBrand ? (
                 <Select value={formData.brand} onValueChange={handleBrandChange}>
-                  <SelectTrigger className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] h-10">
+                  <SelectTrigger className={`bg-[var(--color-creme)] border-2 ${
+                    validationErrors.brand
+                      ? 'border-red-500'
+                      : 'border-[var(--color-coyote)]'
+                  } h-10`}>
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent className="bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)]">
@@ -156,7 +172,11 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
                     value={formData.brand}
                     onChange={(e) => onChange({ brand: e.target.value })}
                     placeholder="Enter custom brand name"
-                    className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] h-10"
+                    className={`bg-[var(--color-creme)] border-2 ${
+                      validationErrors.brand
+                        ? 'border-red-500 focus:ring-2 focus:ring-red-500'
+                        : 'border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)]'
+                    } h-10`}
                   />
                   <Button
                     type="button"
@@ -171,18 +191,57 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
                   </Button>
                 </div>
               )}
-              {brands.length === 0 && !customBrand && (
-                <p className="text-xs text-[var(--color-canyon)] mt-1">
-                  No brands available. Using custom input.
-                </p>
+              {validationErrors.brand && (
+                <p className="text-xs text-red-600 font-medium">Brand is required</p>
               )}
             </div>
           </div>
 
-          {/* Row 2: Slug + Auto-toggle */}
+          {/* Row 2: Price + Stock */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-price" className="text-sm font-medium text-[var(--color-dark)]">
+                Price (₹) <span className="text-[var(--color-canyon)]">*</span>
+              </Label>
+              <Input
+                id="quick-price"
+                type="number"
+                min={0}
+                step="0.01"
+                value={formData.price === 0 ? '' : formData.price}
+                onChange={(e) => onChange({ price: e.target.value === '' ? 0 : Number(e.target.value) })}
+                placeholder="0.00"
+                className={`bg-[var(--color-creme)] border-2 ${
+                  validationErrors.price
+                    ? 'border-red-500 focus:ring-2 focus:ring-red-500'
+                    : 'border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)]'
+                } h-10`}
+              />
+              {validationErrors.price && (
+                <p className="text-xs text-red-600 font-medium">Price must be greater than 0</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-stock" className="text-sm font-medium text-[var(--color-dark)]">
+                Stock Quantity
+              </Label>
+              <Input
+                id="quick-stock"
+                type="number"
+                min={0}
+                value={formData.stock === 0 ? '' : formData.stock}
+                onChange={(e) => onChange({ stock: e.target.value === '' ? 0 : Number(e.target.value) })}
+                placeholder="0"
+                className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] h-10"
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Slug + Auto-toggle */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="slug" className="text-sm font-medium text-[var(--color-dark)]">
+              <Label htmlFor="quick-slug" className="text-sm font-medium text-[var(--color-dark)]">
                 URL Slug
               </Label>
               <div className="flex items-center gap-2">
@@ -195,8 +254,8 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
               </div>
             </div>
             <Input
-              id="slug"
-              value={formData.slug}
+              id="quick-slug"
+              value={formData.slug || ''}
               onChange={(e) => onChange({ slug: e.target.value })}
               placeholder="marlboro-red-premium"
               disabled={autoSlug}
@@ -204,52 +263,62 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
             />
           </div>
 
-          {/* Row 3: Short Description */}
+          {/* Row 4: Short Description */}
           <div className="space-y-1.5">
-            <Label htmlFor="short_description" className="text-sm font-medium text-[var(--color-dark)]">
+            <Label htmlFor="quick-short-desc" className="text-sm font-medium text-[var(--color-dark)]">
               Short Description
             </Label>
             <Textarea
-              id="short_description"
+              id="quick-short-desc"
               value={formData.short_description || ''}
               onChange={(e) => onChange({ short_description: e.target.value })}
-              placeholder="Brief listing description"
+              placeholder="Brief listing description (shown in product cards)"
               rows={2}
-              className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] resize-none"
-            />
-          </div>
-
-          {/* Row 4: Full Description */}
-          <div className="space-y-1.5">
-            <Label htmlFor="description" className="text-sm font-medium text-[var(--color-dark)]">
-              Full Description
-            </Label>
-            <Textarea
-              id="description"
-              value={formData.description || ''}
-              onChange={(e) => onChange({ description: e.target.value })}
-              placeholder="Detailed product information"
-              rows={4}
               className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] resize-none"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Product Details */}
+      {/* Product Images */}
+      <Card className={`bg-[var(--color-creme-light)] border-2 ${
+        validationErrors.images ? 'border-red-500' : 'border-[var(--color-coyote)]'
+      }`}>
+        <CardHeader className="text-center pb-3">
+          <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">
+            Product Images <span className="text-[var(--color-canyon)]">*</span>
+          </CardTitle>
+          {validationErrors.images && (
+            <p className="text-xs text-red-600 font-medium mt-1">At least one image is required</p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <MultipleImageUpload
+            imageUrls={formData.gallery_images}
+            onImageUrlsChange={(urls: string[]) => onChange({ gallery_images: urls })}
+            showSelector={true}
+            title="Product Images"
+            description="Upload or select product images"
+          />
+          <p className="text-xs text-[var(--color-dark)]/70 mt-3 text-center">
+            Upload product images. First image will be the primary display image.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Quick Product Details */}
       <Card className="bg-[var(--color-creme-light)] border-2 border-[var(--color-coyote)]">
         <CardHeader className="text-center pb-3">
-          <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">Product Details</CardTitle>
+          <CardTitle className="text-lg font-sans font-semibold text-[var(--color-dark)] uppercase tracking-wide">Quick Details (Optional)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Row 1: Origin + Pack Size */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="origin" className="text-sm font-medium text-[var(--color-dark)]">
+              <Label htmlFor="quick-origin" className="text-sm font-medium text-[var(--color-dark)]">
                 Origin
               </Label>
               <Input
-                id="origin"
+                id="quick-origin"
                 value={formData.origin || ''}
                 onChange={(e) => onChange({ origin: e.target.value })}
                 placeholder="USA, India"
@@ -258,11 +327,11 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="pack_size" className="text-sm font-medium text-[var(--color-dark)]">
+              <Label htmlFor="quick-pack-size" className="text-sm font-medium text-[var(--color-dark)]">
                 Pack Size
               </Label>
               <Input
-                id="pack_size"
+                id="quick-pack-size"
                 value={formData.pack_size || ''}
                 onChange={(e) => onChange({ pack_size: e.target.value })}
                 placeholder="20 sticks, 10 packs"
@@ -270,61 +339,18 @@ export function BasicInfoTab({ formData, onChange }: BasicInfoTabProps) {
               />
             </div>
           </div>
-
-          {/* Row 2: Specifications */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-[var(--color-dark)]">Specifications</Label>
-            <div className="space-y-2">
-              {formData.specifications.map((spec, index) => (
-                <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                  <Input
-                    value={spec.key}
-                    onChange={(e) => {
-                      const newSpecs = [...formData.specifications];
-                      newSpecs[index].key = e.target.value;
-                      onChange({ specifications: newSpecs });
-                    }}
-                    placeholder="Key"
-                    className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] h-9"
-                  />
-                  <Input
-                    value={spec.value}
-                    onChange={(e) => {
-                      const newSpecs = [...formData.specifications];
-                      newSpecs[index].value = e.target.value;
-                      onChange({ specifications: newSpecs });
-                    }}
-                    placeholder="Value"
-                    className="bg-[var(--color-creme)] border-2 border-[var(--color-coyote)] focus:ring-2 focus:ring-[var(--color-canyon)] h-9"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newSpecs = formData.specifications.filter((_, i) => i !== index);
-                      onChange({ specifications: newSpecs.length > 0 ? newSpecs : [{ key: '', value: '' }] });
-                    }}
-                    className="px-3 text-[var(--color-canyon)] hover:bg-[var(--color-coyote)] rounded transition-all text-lg"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  onChange({
-                    specifications: [...formData.specifications, { key: '', value: '' }]
-                  });
-                }}
-                className="text-sm text-[var(--color-canyon)] hover:underline"
-              >
-                + Add
-              </button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
+      {/* Helper Text */}
+      <div className="bg-[var(--color-canyon)]/10 border-2 border-[var(--color-canyon)]/30 rounded-lg p-4">
+        <p className="text-sm text-[var(--color-dark)] font-medium mb-2">💡 Quick Setup Guide:</p>
+        <ul className="text-xs text-[var(--color-dark)]/80 space-y-1 ml-4 list-disc">
+          <li>Fill in the essential fields marked with <span className="text-[var(--color-canyon)]">*</span> to save your product</li>
+          <li>Use other tabs (Basic Info, Pricing, Variants, SEO) for advanced configuration</li>
+          <li>You can save now and add more details later</li>
+        </ul>
+      </div>
     </div>
   );
 }

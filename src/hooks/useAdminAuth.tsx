@@ -210,11 +210,16 @@ export function useAdminAuth(): AdminAuthContext {
         });
       }
 
-      const { error } = await supabase.auth.signOut();
+      // Sign out from all sessions (global scope)
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
 
       if (error) {
         throw error;
       }
+
+      // Clear all local storage related to auth
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
 
       // Clear state
       setAuthState({
@@ -225,6 +230,9 @@ export function useAdminAuth(): AdminAuthContext {
         hasAccess: false,
         error: null
       });
+
+      // Force reload to clear any cached data
+      window.location.href = '/';
 
     } catch (error: any) {
       console.error('Sign out error:', error);

@@ -215,8 +215,8 @@ export function VariantsTab({ formData, onChange, productImages }: VariantsTabPr
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/70">₹</span>
                               <Input
                                 type="number"
-                                value={variant.price || ''}
-                                onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) || 0 })}
+                                value={variant.price === 0 ? '' : (variant.price || '')}
+                                onChange={(e) => updateVariant(index, { price: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                 placeholder="0.00"
                                 step="0.01"
                                 className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
@@ -267,8 +267,8 @@ export function VariantsTab({ formData, onChange, productImages }: VariantsTabPr
                             <Label className="text-[var(--color-dark)] font-medium">Stock Quantity</Label>
                             <Input
                               type="number"
-                              value={variant.stock || ''}
-                              onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) || 0 })}
+                              value={variant.stock === 0 ? '' : (variant.stock || '')}
+                              onChange={(e) => updateVariant(index, { stock: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                               placeholder="0"
                               min="0"
                               className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"

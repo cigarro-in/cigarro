@@ -21,8 +21,19 @@ import QRCode from 'qrcode';
 
 export function CheckoutPage() {
   const navigate = useNavigate();
-  const { items, totalPrice, clearCart, getCartItemPrice } = useCart();
+  const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
+  
+  // Check for Buy Now flow
+  const isBuyNow = sessionStorage.getItem('isBuyNow') === 'true';
+  const buyNowItemData = sessionStorage.getItem('buyNowItem');
+  const buyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
+  
+  // Use Buy Now item or cart items
+  const items = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
+  const totalPrice = isBuyNow && buyNowItem 
+    ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
+    : cartTotalPrice;
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1); // 1: shipping, 2: review, 3: payment
   const [isProcessing, setIsProcessing] = useState(false);
@@ -1621,18 +1632,10 @@ export function CheckoutPage() {
                             className="w-16 h-16 object-cover rounded"
                           />
                           <div className="flex-1">
-                            <h3 className="font-serif-premium text-foreground">{item.name}</h3>
+                            <h3 className="font-serif-premium text-foreground">{item.name}{item.variant_name && ` (${item.variant_name})`}</h3>
                             <p className="text-sm text-muted-foreground">{item.brand}</p>
                             
-                            {/* Variant/Combo Info */}
-                            {item.variant_name && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary" className="text-xs">
-                                  <Package className="w-3 h-3 mr-1" />
-                                  {item.variant_name}
-                                </Badge>
-                              </div>
-                            )}
+                            {/* Combo Info */}
                             
                             {item.combo_name && (
                               <div className="flex items-center gap-2 mt-1">

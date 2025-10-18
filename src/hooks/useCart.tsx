@@ -316,11 +316,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ...product,
         quantity,
         variant_id: variantId,
-        variant_name: undefined, // Will be populated from database
-        variant_price: undefined, // Will be populated from database
+        variant_name: (product as any).variant_name || undefined,
+        variant_price: (product as any).variant_price || undefined,
         combo_id: comboId,
-        combo_name: undefined, // Will be populated from database
-        combo_price: undefined // Will be populated from database
+        combo_name: (product as any).combo_name || undefined,
+        combo_price: (product as any).combo_price || undefined
       };
       newItems = [...items, newItem];
     }
@@ -507,7 +507,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Helper function to add a variant to cart
   const addVariantToCart = async (product: Product, variant: any, quantity = 1) => {
-    await addToCart(product, quantity, variant.id);
+    // Create a cart item with variant information
+    const productWithVariant = {
+      ...product,
+      variant_id: variant.id,
+      variant_name: variant.variant_name,
+      variant_price: variant.price
+    };
+    await addToCart(productWithVariant, quantity, variant.id);
   };
 
   // Helper function to add a combo to cart

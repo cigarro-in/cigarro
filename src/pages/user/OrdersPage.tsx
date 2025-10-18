@@ -15,6 +15,7 @@ import { formatINR } from '../../utils/currency';
 interface OrderItem {
   id: string;
   name: string;
+  variant_name?: string;
   brand: string;
   price: number;
   image: string;
@@ -90,6 +91,7 @@ export function OrdersPage() {
         items: order.order_items.map((item: any) => ({
           id: item.product_id,
           name: item.product_name,
+          variant_name: item.variant_name,
           brand: item.product_brand,
           price: item.product_price,
           image: item.product_image,
@@ -400,7 +402,7 @@ export function OrdersPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="font-sans text-sm text-foreground font-medium truncate">
-                                    {item.name}
+                                    {item.name}{item.variant_name && ` (${item.variant_name})`}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
                                     {item.brand} • Qty: {item.quantity}

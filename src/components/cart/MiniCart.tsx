@@ -89,15 +89,10 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                             {/* Product Info */}
                             <div className="mini-cart__product-infos ml-6 flex flex-col items-start py-4 flex-1 justify-start min-w-0">
                               <p className="mini-cart__product-title text-dark font-sans font-bold text-base uppercase tracking-tight pr-[10px] leading-tight truncate">
-                                {item.name}
+                                {item.name}{item.variant_name && ` (${item.variant_name})`}
                               </p>
 
-                              {/* Variant/Combo Info */}
-                              {item.variant_name && (
-                                <p className="text-coyote font-sans text-xs mt-1 truncate">
-                                  Variant: {item.variant_name}
-                                </p>
-                              )}
+                              {/* Combo Info */}
 
                               {item.combo_name && (
                                 <p className="text-accent font-sans text-xs mt-1 font-semibold">
@@ -235,15 +230,10 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                               {/* Product Info */}
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-foreground font-sans font-semibold text-sm leading-tight line-clamp-2 mb-1">
-                                  {item.name}
+                                  {item.name}{item.variant_name && ` (${item.variant_name})`}
                                 </h4>
 
-                                {/* Variant/Combo Info */}
-                                {item.variant_name && (
-                                  <p className="text-muted-foreground text-xs mb-1">
-                                    Variant: {item.variant_name}
-                                  </p>
-                                )}
+                                {/* Combo Info */}
 
                                 {item.combo_name && (
                                   <p className="text-accent text-xs font-semibold mb-1">

@@ -27,6 +27,13 @@ export default function AdminPanelEntry() {
     performSecurityChecks();
   }, [user]);
 
+  // Redirect to home if user is not authenticated (prevents back button access after logout)
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, isLoading, navigate]);
+
   const performSecurityChecks = async () => {
     setIsLoading(true);
     const checks: SecurityCheck[] = [];
