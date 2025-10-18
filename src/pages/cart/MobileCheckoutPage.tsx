@@ -131,7 +131,7 @@ export function MobileCheckoutPage() {
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [orderId, setOrderId] = useState('');
-  const [paymentStage, setPaymentStage] = useState<'processing' | 'confirmed'>('processing');
+  const [paymentStage, setPaymentStage] = useState<'processing' | 'verifying' | 'confirmed' | 'pending'>('processing');
   const [transactionId, setTransactionId] = useState('');
   const [qrCodeDataURL, setQrCodeDataURL] = useState('');
   const [showQRDialog, setShowQRDialog] = useState(false);
@@ -830,43 +830,68 @@ export function MobileCheckoutPage() {
       // Open UPI app
       window.location.href = upiLink;
       
-      // Start countdown from 8 seconds for processing stage
-      let count = 8;
-      setCountdown(count);
-      
-      const countdownTimer = setInterval(async () => {
-        count--;
-        setCountdown(count);
+      // Wait for user to return and complete payment (give them time)
+      // Show a message asking them to return after payment
+      setTimeout(async () => {
+        // Change to verifying stage
+        setPaymentStage('verifying');
         
-        if (count <= 0) {
-          clearInterval(countdownTimer);
+        // Now start verification
+        try {
+          console.log('🔍 Starting payment verification...');
+          toast.info('Verifying your payment... This may take up to 60 seconds.');
           
-          // Switch to confirmed stage
-          setPaymentStage('confirmed');
-          setIsPaymentCompleted(true); // Prevent auto-redirect to cart
+          const verificationResponse = await fetch('/payment-email-webhook', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'default-secret'}`
+            },
+            body: JSON.stringify({
+              orderId: txnId,
+              transactionId: txnId,
+              amount: amount,
+              timestamp: new Date().toISOString()
+            })
+          });
           
-          // Update order status immediately (no auto-redirect)
-          try {
-            await supabase
-              .from('orders')
-              .update({ 
-                status: 'paid',
-                payment_confirmed: true,
-                payment_confirmed_at: new Date().toISOString()
-              })
-              .eq('transaction_id', txnId);
-            
-            console.log('✅ Payment confirmed, clearing cart');
-            await clearCart();
-            
-          } catch (error) {
-            console.error('Error updating order status:', error);
-            toast.error('Payment processed but failed to update order status');
-          } finally {
-            setIsProcessing(false);
+          if (!verificationResponse.ok) {
+            throw new Error(`Verification failed: ${verificationResponse.status}`);
           }
+          
+          const result = await verificationResponse.json();
+          console.log('Verification result:', result);
+          
+          if (result.verified) {
+            // Payment verified successfully!
+            console.log('✅ Payment verified automatically!');
+            setPaymentStage('confirmed');
+            setIsPaymentCompleted(true);
+            await clearCart();
+            toast.success('Payment verified successfully!');
+          } else {
+            // Verification failed or timed out
+            console.log('⏰ Auto-verification timed out, order saved as pending');
+            setPaymentStage('pending');
+            toast.info('Order saved! We\'ll verify your payment shortly.');
+            // Redirect to orders page after 3 seconds
+            setTimeout(() => {
+              navigate('/orders');
+            }, 3000);
+          }
+        } catch (error) {
+          console.error('❌ Verification error:', error);
+          // Show error and keep order as pending
+          setPaymentStage('pending');
+          toast.error('Could not verify payment automatically. Order saved as pending.');
+          // Redirect to orders page after 3 seconds
+          setTimeout(() => {
+            navigate('/orders');
+          }, 3000);
+        } finally {
+          setIsProcessing(false);
         }
-      }, 1000);
+      }, 60000); // Wait 60 seconds (1 minute) for user to complete payment in UPI app
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -918,49 +943,72 @@ export function MobileCheckoutPage() {
     }
   };
 
-  const handleQRPaymentDone = () => {
+  const handleQRPaymentDone = async () => {
     setShowQRDialog(false);
     setPaymentStage('processing');
     setIsConfirmingPayment(true);
     
-    // Start countdown
-    let count = 8;
-    setCountdown(count);
-    
-    const countdownTimer = setInterval(async () => {
-      count--;
-      setCountdown(count);
+    // Wait for user to complete payment (give them time)
+    setTimeout(async () => {
+      // Change to verifying stage
+      setPaymentStage('verifying');
       
-      if (count <= 0) {
-        clearInterval(countdownTimer);
+      // Now start verification
+      try {
+        console.log('🔍 Starting payment verification...');
+        toast.info('Verifying your payment... This may take up to 60 seconds.');
         
-        // Switch to confirmed stage
-        setPaymentStage('confirmed');
+        const verificationResponse = await fetch('/payment-email-webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'default-secret'}`
+          },
+          body: JSON.stringify({
+            orderId: transactionId,
+            transactionId: transactionId,
+            amount: getFinalTotal(),
+            timestamp: new Date().toISOString()
+          })
+        });
         
-        // Update order status immediately (no auto-redirect)
-        setIsPaymentCompleted(true); // Prevent auto-redirect to cart
-        
-        try {
-          await supabase
-            .from('orders')
-            .update({ 
-              status: 'paid',
-              payment_confirmed: true,
-              payment_confirmed_at: new Date().toISOString()
-            })
-            .eq('transaction_id', transactionId);
-          
-          console.log('✅ Payment confirmed, clearing cart');
-          await clearCart();
-          
-        } catch (error) {
-          console.error('Error updating order status:', error);
-          toast.error('Payment processed but failed to update order status');
-        } finally {
-          setIsProcessing(false);
+        if (!verificationResponse.ok) {
+          throw new Error(`Verification failed: ${verificationResponse.status}`);
         }
+        
+        const result = await verificationResponse.json();
+        console.log('Verification result:', result);
+        
+        if (result.verified) {
+          // Payment verified successfully!
+          console.log('✅ Payment verified automatically!');
+          setPaymentStage('confirmed');
+          setIsPaymentCompleted(true);
+          await clearCart();
+          toast.success('Payment verified successfully!');
+        } else {
+          // Verification failed or timed out
+          console.log('⏰ Auto-verification timed out, order saved as pending');
+          setPaymentStage('pending');
+          toast.info('Order saved! We\'ll verify your payment shortly.');
+          // Redirect to orders page after 3 seconds
+          setTimeout(() => {
+            navigate('/orders');
+          }, 3000);
+        }
+      } catch (error) {
+        console.error('❌ Verification error:', error);
+        // Show error and keep order as pending
+        setPaymentStage('pending');
+        toast.error('Could not verify payment automatically. Order saved as pending.');
+        // Redirect to orders page after 3 seconds
+        setTimeout(() => {
+          navigate('/orders');
+        }, 3000);
+      } finally {
+        setIsProcessing(false);
       }
-    }, 1000);
+    }, 60000); // Wait 60 seconds (1 minute) for user to complete payment
   };
 
   const handleProcessOrder = async () => {
@@ -1568,8 +1616,8 @@ export function MobileCheckoutPage() {
       {isConfirmingPayment && (
         <div className="fixed inset-0 z-[9999] bg-creme flex items-center justify-center p-6 animate-fade-in">
           <div className="w-full max-w-md">
-            {paymentStage === 'processing' ? (
-              /* Processing Stage */
+            {paymentStage === 'processing' || paymentStage === 'verifying' ? (
+              /* Processing/Verifying Stage */
               <div className="text-center space-y-6 animate-slide-up-smooth">
                 {/* Animated Loader */}
                 <div className="relative mx-auto w-24 h-24">
@@ -1583,10 +1631,12 @@ export function MobileCheckoutPage() {
                 {/* Status Text */}
                 <div className="space-y-3">
                   <h2 className="text-2xl font-serif text-dark">
-                    Processing Payment
+                    {paymentStage === 'verifying' ? 'Verifying Payment...' : 'Complete Payment in UPI App'}
                   </h2>
                   <p className="text-base text-dark/70 font-sans">
-                    Please wait while we process your payment...
+                    {paymentStage === 'verifying' 
+                      ? 'Checking for payment confirmation. This may take up to 60 seconds.'
+                      : 'Return here after completing payment. We\'ll verify automatically.'}
                   </p>
                 </div>
 
@@ -1648,7 +1698,7 @@ export function MobileCheckoutPage() {
                   Do not close this window or press back
                 </p>
               </div>
-            ) : (
+            ) : paymentStage === 'confirmed' ? (
               /* Confirmed Stage */
               <div className="text-center space-y-6 animate-scale-in">
                 {/* Success Check */}
@@ -1714,6 +1764,49 @@ export function MobileCheckoutPage() {
 
                 <p className="text-xs text-green-600 font-medium">
                   ✓ Order confirmation sent to your email
+                </p>
+              </div>
+            ) : (
+              /* Pending Stage - Verification Failed */
+              <div className="text-center space-y-6 animate-scale-in">
+                {/* Warning Icon */}
+                <div className="relative mx-auto w-28 h-28">
+                  <div className="relative w-28 h-28 rounded-full bg-yellow-500 flex items-center justify-center shadow-2xl">
+                    <Clock className="w-14 h-14 text-white" strokeWidth={3} />
+                  </div>
+                </div>
+
+                {/* Status Text */}
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-serif text-dark">
+                    Order Saved!
+                  </h2>
+                  <p className="text-base text-dark/70 font-sans">
+                    We'll verify your payment shortly
+                  </p>
+                </div>
+
+                {/* Order Summary */}
+                <div className="bg-creme-light rounded-2xl p-6 border-2 border-yellow-500/30">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-dark/60 font-medium">Order Total</span>
+                      <span className="text-2xl font-bold text-dark">{formatINR(getFinalTotal())}</span>
+                    </div>
+                    <div className="h-px bg-coyote/20"></div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Transaction ID</span>
+                      <span className="text-dark font-mono text-xs">{transactionId}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Status</span>
+                      <span className="text-yellow-600 font-semibold">Pending Verification</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-yellow-600 font-medium">
+                  Redirecting to orders page...
                 </p>
               </div>
             )}

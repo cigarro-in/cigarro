@@ -13,6 +13,7 @@ import QRCode from 'qrcode';
 
 interface PaymentData {
   orderId: string;
+  transactionId: string;
   amount: number;
   originalAmount: number;
   discount: number;
@@ -94,17 +95,37 @@ export function UPIPaymentPage() {
     setIsProcessing(true);
     
     try {
-      // Simulate payment verification (in real app, you'd check with payment gateway)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🔍 Starting automatic payment verification...');
+      toast.info('Verifying your payment... This may take up to 60 seconds.');
       
-      // For demo purposes, randomly succeed or ask user to confirm
-      const success = Math.random() > 0.3; // 70% success rate for demo
+      // Call payment verification function
+      const verificationResponse = await fetch('/payment-email-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'default-secret'}`
+        },
+        body: JSON.stringify({
+          orderId: paymentData?.orderId || '',
+          transactionId: paymentData?.transactionId || '',
+          amount: paymentData?.amount || 0,
+          timestamp: new Date().toISOString()
+        })
+      });
       
-      if (success) {
+      const result = await verificationResponse.json();
+      
+      if (result.verified) {
+        // Payment verified automatically!
+        console.log('✅ Payment verified automatically!');
+        toast.success('Payment verified successfully!');
         await processSuccessfulPayment();
       } else {
-        // Ask user to confirm payment manually
-        const confirmed = window.confirm('Did you complete the payment in your UPI app? Click OK if payment was successful.');
+        // Verification failed or timed out - ask user to confirm manually
+        console.log('⏰ Auto-verification timed out');
+        const confirmed = window.confirm(
+          'We couldn\'t verify your payment automatically. Did you complete the payment in your UPI app? Click OK if payment was successful.'
+        );
         if (confirmed) {
           await processSuccessfulPayment();
         } else {
@@ -113,10 +134,18 @@ export function UPIPaymentPage() {
         }
       }
     } catch (error) {
-      console.error('Payment verification failed:', error);
-      setPaymentStatus('failed');
-      toast.error('Payment verification failed');
-      setIsProcessing(false);
+      console.error('❌ Payment verification error:', error);
+      // Fallback to manual confirmation
+      const confirmed = window.confirm(
+        'Unable to verify payment automatically. Did you complete the payment in your UPI app? Click OK if payment was successful.'
+      );
+      if (confirmed) {
+        await processSuccessfulPayment();
+      } else {
+        setPaymentStatus('failed');
+        toast.error('Payment verification failed');
+        setIsProcessing(false);
+      }
     }
   };
 
