@@ -14,12 +14,22 @@
  */
 
 // CORS headers for all responses
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Content-Type': 'application/json'
-};
+// TODO: Replace with your actual production domain
+const ALLOWED_ORIGINS = [
+  'https://cigarro.in',
+  'https://www.cigarro.in',
+  'http://localhost:5173', // Development only
+];
+
+function getCorsHeaders(origin) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json'
+  };
+}
 
 // In-memory cache for access token (lasts 1 hour)
 // NOTE: This persists across requests in the same worker instance
@@ -29,6 +39,9 @@ let tokenExpiresAt = 0;
 // Cloudflare Pages Function - handle all methods
 export async function onRequest(context) {
   const { request, env } = context;
+  
+  const origin = request.headers.get('Origin') || '';
+  const corsHeaders = getCorsHeaders(origin);
   
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
@@ -50,14 +63,20 @@ export async function onRequest(context) {
   console.log('🔐 Auth header present:', !!request.headers.get('Authorization'));
   
   try {
-      // Verify webhook secret
+      // Verify webhook secret - REQUIRED environment variable
       const authHeader = request.headers.get('Authorization');
-      const expectedSecret = env.WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'; // Fallback to actual secret
+      const expectedSecret = env.WEBHOOK_SECRET;
+      
+      if (!expectedSecret) {
+        console.error('❌ WEBHOOK_SECRET environment variable not set');
+        return new Response(JSON.stringify({ error: 'Server configuration error' }), { 
+          status: 500,
+          headers: corsHeaders
+        });
+      }
       
       if (authHeader !== `Bearer ${expectedSecret}`) {
         console.error('❌ Invalid webhook secret');
-        console.error('Expected:', `Bearer ${expectedSecret.substring(0, 10)}...`);
-        console.error('Received:', authHeader?.substring(0, 25) + '...');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
           status: 401,
           headers: corsHeaders
@@ -68,13 +87,42 @@ export async function onRequest(context) {
 
       // Parse request body
       const verificationRequest = await request.json();
-      console.log('🔍 Verification request:', JSON.stringify(verificationRequest, null, 2));
+      
+      // Validate required fields
+      if (!verificationRequest.orderId || !verificationRequest.transactionId || !verificationRequest.amount) {
+        console.error('❌ Missing required fields');
+        return new Response(JSON.stringify({ 
+          error: 'Missing required fields: orderId, transactionId, amount' 
+        }), { 
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+      
+      // Validate amount is a positive number
+      const amount = parseFloat(verificationRequest.amount);
+      if (isNaN(amount) || amount <= 0) {
+        console.error('❌ Invalid amount:', verificationRequest.amount);
+        return new Response(JSON.stringify({ 
+          error: 'Invalid amount' 
+        }), { 
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+      
+      // Sanitized logging - don't log full request in production
+      console.log('🔍 Verification request received:', {
+        transactionId: verificationRequest.transactionId,
+        amount: amount,
+        hasOrderId: !!verificationRequest.orderId
+      });
 
       // Create initial log entry
       const logId = await createVerificationLog(env, {
         orderId: verificationRequest.orderId,
         transactionId: verificationRequest.transactionId,
-        amount: verificationRequest.amount,
+        amount: amount,
         status: 'pending'
       });
 
