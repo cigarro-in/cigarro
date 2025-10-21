@@ -26,16 +26,24 @@ const corsHeaders = {
 let cachedAccessToken = null;
 let tokenExpiresAt = 0;
 
-// Handle CORS preflight
-export async function onRequestOptions() {
-  return new Response(null, {
-    headers: corsHeaders,
-  });
-}
-
-// Cloudflare Pages Function - must export onRequestPost
-export async function onRequestPost(context) {
+// Cloudflare Pages Function - handle all methods
+export async function onRequest(context) {
   const { request, env } = context;
+  
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+    });
+  }
+  
+  // Only allow POST
+  if (request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: corsHeaders
+    });
+  }
   
   console.log('📨 Payment verification webhook called');
   console.log('🌐 Request URL:', request.url);
