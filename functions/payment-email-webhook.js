@@ -17,26 +17,22 @@
 let cachedAccessToken = null;
 let tokenExpiresAt = 0;
 
+// Handle CORS preflight
+export async function onRequestOptions() {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 // Cloudflare Pages Function - must export onRequestPost
 export async function onRequestPost(context) {
   const { request, env } = context;
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-      });
-    }
-
-    // Only accept POST requests
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
-
-    try {
+  
+  try {
       // Verify webhook secret
       const authHeader = request.headers.get('Authorization');
       if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
