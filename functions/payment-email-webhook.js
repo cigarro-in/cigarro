@@ -598,7 +598,7 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
     payment_confirmed: true,
     payment_confirmed_at: new Date().toISOString(),
     auto_verified: true,
-    status: 'confirmed'
+    status: 'processing'  // Valid enum: pending, placed, processing, shipped, delivered, cancelled
   };
   
   console.log('📝 Update data:', JSON.stringify(updateData));
