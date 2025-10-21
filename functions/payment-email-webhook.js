@@ -455,30 +455,78 @@ async function getGmailAccessToken(env) {
 
 /**
  * Extract email body from Gmail message
+ * Enhanced to handle more email formats including HTML-only emails
  */
 function extractEmailBody(message) {
   let body = '';
 
-  // Try to get plain text body
+  function decodeBase64(data) {
+    try {
+      // Gmail uses URL-safe base64
+      const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+      return atob(base64);
+    } catch (e) {
+      console.log('⚠️ Base64 decode error:', e.message);
+      return '';
+    }
+  }
+
+  function extractFromPart(part) {
+    if (part.body?.data) {
+      const decoded = decodeBase64(part.body.data);
+      if (decoded) return decoded;
+    }
+    
+    // Recursively check nested parts
+    if (part.parts) {
+      for (const nestedPart of part.parts) {
+        const extracted = extractFromPart(nestedPart);
+        if (extracted) return extracted;
+      }
+    }
+    
+    return '';
+  }
+
+  // Try direct body first
   if (message.payload?.body?.data) {
-    body = atob(message.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-  } else if (message.payload?.parts) {
-    // Multi-part email
+    body = decodeBase64(message.payload.body.data);
+  }
+  
+  // Try parts (multipart emails)
+  if (!body && message.payload?.parts) {
+    // First try to find text/plain
     for (const part of message.payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        body += atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      } else if (part.parts) {
-        // Nested parts
-        for (const nestedPart of part.parts) {
-          if (nestedPart.mimeType === 'text/plain' && nestedPart.body?.data) {
-            body += atob(nestedPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+      if (part.mimeType === 'text/plain') {
+        body = extractFromPart(part);
+        if (body) break;
+      }
+    }
+    
+    // If no text/plain, try text/html and strip tags
+    if (!body) {
+      for (const part of message.payload.parts) {
+        if (part.mimeType === 'text/html') {
+          const html = extractFromPart(part);
+          if (html) {
+            // Simple HTML tag stripping
+            body = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            break;
           }
         }
       }
     }
+    
+    // Last resort: try any part with data
+    if (!body) {
+      for (const part of message.payload.parts) {
+        body = extractFromPart(part);
+        if (body) break;
+      }
+    }
   }
 
-  return body;
+  return body.trim();
 }
 
 /**
