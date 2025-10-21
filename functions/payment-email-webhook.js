@@ -52,7 +52,12 @@ export async function onRequest(context) {
   try {
       // Verify webhook secret
       const authHeader = request.headers.get('Authorization');
-      if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
+      const expectedSecret = env.WEBHOOK_SECRET || 'default-secret'; // Fallback for testing
+      
+      console.log('🔑 Expected secret:', expectedSecret.substring(0, 10) + '...');
+      console.log('🔑 Received secret:', authHeader?.substring(0, 20) + '...');
+      
+      if (authHeader !== `Bearer ${expectedSecret}`) {
         console.error('❌ Invalid webhook secret');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
           status: 401,
