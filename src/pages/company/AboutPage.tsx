@@ -36,7 +36,7 @@ export function AboutPage() {
     {
       year: '2015',
       title: 'Founded',
-      description: 'Cigarro was established with a vision to bring premium tobacco products to discerning customers in India.',
+      description: 'Cigarro was established with a vision to bring quality tobacco products to discerning customers in India.',
       icon: Star,
       achievement: 'Birth of Excellence'
     },
@@ -50,7 +50,7 @@ export function AboutPage() {
     {
       year: '2019',
       title: 'Online Platform',
-      description: 'Launched our e-commerce platform, making premium tobacco products accessible nationwide.',
+      description: 'Launched our e-commerce platform, making authentic tobacco products accessible nationwide.',
       icon: Globe,
       achievement: 'Digital Revolution'
     },
@@ -71,9 +71,9 @@ export function AboutPage() {
     {
       year: '2024',
       title: 'Innovation',
-      description: 'Introduced advanced storage solutions and personalized curation services for our premium customers.',
+      description: 'Introduced advanced storage solutions and personalized curation services for our esteemed customers.',
       icon: Crown,
-      achievement: 'Premium Experience'
+      achievement: 'Exceptional Experience'
     }
   ];
 
@@ -82,7 +82,7 @@ export function AboutPage() {
       name: 'Rajesh Kumar',
       role: 'Founder & CEO',
       image: getTeamImageUrl('rajesh.jpg'),
-      description: 'With over 15 years in the tobacco industry, Rajesh founded Cigarro to share his passion for premium tobacco products.',
+      description: 'With over 15 years in the tobacco industry, Rajesh founded Cigarro to share his passion for fine tobacco products.',
       expertise: 'Industry Pioneer',
       gradient: 'from-canyon to-dark'
     },
@@ -121,7 +121,7 @@ export function AboutPage() {
     },
     { 
       number: '500+', 
-      label: 'Premium Products',
+      label: 'Quality Products',
       icon: Award,
       description: 'Curated collection of finest tobacco'
     },
@@ -144,6 +144,7 @@ export function AboutPage() {
       <Helmet>
         <title>About Us - Cigarro</title>
         <meta name="description" content="Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection." />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://cigarro.in/about" />
       </Helmet>
 
@@ -187,7 +188,7 @@ export function AboutPage() {
             ></motion.div>
             
             <p className="text-xl text-dark/60 max-w-2xl mx-auto leading-relaxed">
-              Where passion meets perfection in the world of premium tobacco
+              Where passion meets perfection in the world of fine tobacco
             </p>
           </motion.div>
 
@@ -223,7 +224,7 @@ export function AboutPage() {
                     className="text-lg text-dark/80 leading-relaxed"
                   >
                     At Cigarro, we are passionate about bringing the world's finest tobacco products to discerning customers. 
-                    Our journey began with a simple belief: that everyone deserves access to authentic, premium tobacco products 
+                    Our journey began with a simple belief: that everyone deserves access to authentic, quality tobacco products 
                     that represent the pinnacle of craftsmanship and tradition.
                   </motion.p>
                   
@@ -234,7 +235,7 @@ export function AboutPage() {
                     transition={{ duration: 0.8, delay: 0.5 }}
                     className="text-lg text-dark/70 leading-relaxed"
                   >
-                    From our humble beginnings to becoming India's premier destination for premium tobacco, we have remained 
+                    From our humble beginnings to becoming India's premier destination for fine tobacco, we have remained 
                     committed to excellence, authenticity, and the rich heritage that makes each product in our collection truly special.
                   </motion.p>
 
@@ -593,13 +594,13 @@ export function AboutPage() {
                 
                 <h2 className="font-serif text-4xl md:text-5xl text-dark mb-8 leading-tight">
                   Redefining Excellence in
-                  <span className="text-canyon block">Premium Tobacco</span>
+                  <span className="text-canyon block">Fine Tobacco</span>
                 </h2>
                 
                 <div className="w-32 h-1 bg-gradient-to-r from-canyon via-sunflower to-canyon mx-auto mb-8"></div>
                 
                 <p className="text-xl text-dark/80 leading-relaxed mb-8 max-w-4xl mx-auto">
-                  To be India's most trusted destination for premium tobacco products, where authenticity meets excellence, 
+                  To be India's most trusted destination for quality tobacco products, where authenticity meets excellence, 
                   and where every customer discovers products that reflect their refined taste and appreciation for quality craftsmanship.
                 </p>
                 

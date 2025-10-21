@@ -9,6 +9,7 @@ export function TermsPage() {
       <Helmet>
         <title>Terms of Service - Cigarro</title>
         <meta name="description" content="Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform." />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://cigarro.in/terms" />
       </Helmet>
       

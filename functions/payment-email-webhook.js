@@ -14,7 +14,7 @@
  */
 
 // CORS headers for all responses
-// TODO: Replace with your actual production domain
+
 const ALLOWED_ORIGINS = [
   'https://cigarro.in',
   'https://www.cigarro.in',

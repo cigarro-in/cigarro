@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { supabase } from '../../utils/supabase/client';
 import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
@@ -9,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Heart, ShoppingCart, Star, ArrowRight } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { formatINR } from '../../utils/currency';
+import { SEOHead } from '../../components/seo/SEOHead';
 
 interface Category {
   id: string;
@@ -201,11 +201,18 @@ export function CategoryPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{pageTitle} - Cigarro</title>
-        <meta name="description" content={pageDescription} />
-        <link rel="canonical" href={`https://cigarro.in${slug ? `/category/${slug}` : '/products'}`} />
-      </Helmet>
+      <SEOHead
+        title={pageTitle}
+        description={pageDescription}
+        url={slug ? `/category/${slug}` : '/products'}
+        type="website"
+        keywords={[
+          category?.name || 'tobacco products',
+          'premium cigarettes',
+          'buy online India',
+          'authentic tobacco'
+        ]}
+      />
 
       <div className="main-container section">
         {/* Header - Inspiration Style */}

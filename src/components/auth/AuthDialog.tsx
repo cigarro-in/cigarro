@@ -160,12 +160,12 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
       <DialogContent className="bg-creme border border-coyote rounded-lg max-w-2xl w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] sm:max-w-2xl p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="font-serif font-normal text-2xl sm:text-3xl lg:text-4xl text-center text-dark tracking-tight leading-tight">
-            {context === 'checkout' ? 'Complete Your Order' : 'Premium Access'}
+            {context === 'checkout' ? 'Complete Your Order' : 'Welcome'}
           </DialogTitle>
           <DialogDescription className="font-sans text-center text-coyote text-sm sm:text-base lg:text-lg mt-4 max-w-2xl mx-auto leading-relaxed">
             {context === 'checkout' 
               ? 'Sign in to your account or create a new one to proceed with checkout and complete your order.'
-              : 'Sign in to your account or create a new one to access our premium tobacco collection.'
+              : 'Sign in to your account or create a new one to access our curated tobacco collection.'
             }
           </DialogDescription>
         </DialogHeader>

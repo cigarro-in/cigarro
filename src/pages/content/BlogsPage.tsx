@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { getBlogImageUrl } from '../../utils/supabase/storage';
 import { supabase } from '../../utils/supabase/client';
 import type { BlogPost as BlogPostType } from '../../types/blog';
+import { SEOHead } from '../../components/seo/SEOHead';
 
 
 
@@ -53,7 +54,8 @@ export function BlogsPage() {
       <Helmet>
         <title>Blog - Stories of Craftsmanship & Heritage | Cigarro</title>
         <meta name="description" content="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes." />
-        <link rel="canonical" href="https://cigarro.in/blogs" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://cigarro.in/blog" />
       </Helmet>
 
       <div className="min-h-screen bg-creme pt-24 pb-12">
@@ -283,11 +285,27 @@ export function BlogPost() {
   }
 
   return (
-    <div className="min-h-screen bg-creme pt-24 pb-12">
-      <div className="main-container">
+    <>
+      <SEOHead
+        title={post.meta_title || post.title}
+        description={post.meta_description || post.excerpt}
+        url={`/blog/${post.slug}`}
+        type="article"
+        author={post.author?.name || undefined}
+        publishedTime={post.published_at || undefined}
+        modifiedTime={post.updated_at || undefined}
+        image={post.featured_image || undefined}
+        keywords={post.tags?.map(t => t.name) || []}
+        ogTitle={post.og_title || undefined}
+        ogDescription={post.og_description || undefined}
+        ogImage={post.og_image || undefined}
+      />
+      
+      <div className="min-h-screen bg-creme pt-24 pb-12">
+        <div className="main-container">
 
-        {/* Article Header */}
-        <div className="max-w-4xl mx-auto mb-8">
+          {/* Article Header */}
+          <div className="max-w-4xl mx-auto mb-8">
           {/* Category Badge */}
           <div className="flex items-center space-x-2 mb-4">
             <Tag className="w-4 h-4 text-canyon" />
@@ -434,5 +452,6 @@ export function BlogPost() {
         )}
       </div>
     </div>
+    </>
   );
 }

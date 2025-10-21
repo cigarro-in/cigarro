@@ -515,7 +515,7 @@ const Header = () => {
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Search for premium tobacco products..."
+                    placeholder="Search for quality tobacco products..."
                     className="flex-1 bg-transparent text-dark placeholder:text-coyote text-base lg:text-lg focus:outline-none"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -567,7 +567,7 @@ const Header = () => {
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-canyon text-sm font-semibold uppercase tracking-wider font-sans truncate">
-                                    {result.brand || 'Premium'}
+                                    {result.brand || 'Quality'}
                                   </p>
                                   <h4 className="text-dark font-sans font-semibold text-base leading-tight line-clamp-2">
                                     {result.name}

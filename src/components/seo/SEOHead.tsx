@@ -15,13 +15,19 @@ interface SEOHeadProps {
   availability?: 'in stock' | 'out of stock' | 'preorder';
   brand?: string;
   category?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
 }
 
 export function SEOHead({
   title = 'Cigarro - Premium Cigarettes & Tobacco Online',
   description = 'India\'s premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only.',
   keywords = ['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes'],
-  image = 'https://cigarro.in/og-image.jpg',
+  image = 'https://cigarro.in/images/favicon-32x32.png',
   url = 'https://cigarro.in',
   type = 'website',
   author,
@@ -31,10 +37,31 @@ export function SEOHead({
   currency = 'INR',
   availability = 'in stock',
   brand,
-  category
+  category,
+  ogTitle,
+  ogDescription,
+  ogImage,
+  twitterTitle,
+  twitterDescription,
+  twitterImage
 }: SEOHeadProps) {
   const fullTitle = title.includes('Cigarro') ? title : `${title} | Cigarro`;
-  const canonicalUrl = url.startsWith('http') ? url : `https://cigarro.in${url}`;
+  
+  // Build canonical URL - strip query params and trailing slashes for SEO
+  const buildCanonicalUrl = () => {
+    if (url.startsWith('http')) {
+      return url.split('?')[0].replace(/\/+$/, '');
+    }
+    const cleanPath = url.split('?')[0].replace(/\/+$/, '') || '/';
+    return `https://cigarro.in${cleanPath}`;
+  };
+  
+  const canonicalUrl = buildCanonicalUrl();
+  
+  // Optimize description length (150-160 chars for best SEO)
+  const optimizedDescription = description.length > 160 
+    ? description.substring(0, 157) + '...'
+    : description;
 
   // Generate structured data based on type
   const generateStructuredData = () => {
@@ -42,7 +69,7 @@ export function SEOHead({
       '@context': 'https://schema.org',
       '@type': type === 'product' ? 'Product' : type === 'article' ? 'Article' : 'WebSite',
       name: fullTitle,
-      description,
+      description: optimizedDescription,
       url: canonicalUrl,
       image
     };
@@ -112,25 +139,27 @@ export function SEOHead({
       {/* Primary Meta Tags */}
       <title>{fullTitle}</title>
       <meta name="title" content={fullTitle} />
-      <meta name="description" content={description} />
+      <meta name="description" content={optimizedDescription} />
       <meta name="keywords" content={keywords.join(', ')} />
       <link rel="canonical" href={canonicalUrl} />
 
       {/* Open Graph / Facebook */}
       <meta property="og:type" content={type} />
       <meta property="og:url" content={canonicalUrl} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:image" content={image} />
+      <meta property="og:title" content={ogTitle || fullTitle} />
+      <meta property="og:description" content={ogDescription || optimizedDescription} />
+      <meta property="og:image" content={ogImage || image} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
       <meta property="og:site_name" content="Cigarro" />
       <meta property="og:locale" content="en_IN" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:url" content={canonicalUrl} />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={image} />
+      <meta name="twitter:title" content={twitterTitle || ogTitle || fullTitle} />
+      <meta name="twitter:description" content={twitterDescription || ogDescription || optimizedDescription} />
+      <meta name="twitter:image" content={twitterImage || ogImage || image} />
 
       {/* Additional Meta Tags */}
       <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />

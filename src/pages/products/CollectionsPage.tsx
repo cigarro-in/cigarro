@@ -7,6 +7,7 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { ShoppingCart, Star, Plus } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
+import { SEOHead } from '../../components/seo/SEOHead';
 
 interface CategoryWithProducts {
   id: string;
@@ -75,14 +76,23 @@ export function CollectionsPage() {
   };
 
   return (
-    <div className="py-12 bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="font-serif-premium text-4xl sm:text-5xl text-foreground">Our Collections</h1>
-          <p className="font-sans-premium text-lg text-muted-foreground mt-4">
-            Explore our curated collections of premium products.
-          </p>
-        </div>
+    <>
+      <SEOHead
+        title="Our Collections - Premium Curated Products"
+        description="Explore our curated collections of premium cigarettes, cigars, and tobacco products. Discover handpicked selections from world-renowned brands."
+        url="/collections"
+        type="website"
+        keywords={['collections', 'curated products', 'premium cigarettes', 'luxury tobacco', 'exclusive collections']}
+      />
+      
+      <div className="py-12 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h1 className="font-serif-premium text-4xl sm:text-5xl text-foreground">Our Collections</h1>
+            <p className="font-sans-premium text-lg text-muted-foreground mt-4">
+              Explore our curated collections of premium products.
+            </p>
+          </div>
 
         <div className="space-y-16">
           {categories.map(category => (
@@ -110,5 +120,6 @@ export function CollectionsPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

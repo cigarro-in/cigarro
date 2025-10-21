@@ -34,7 +34,7 @@ export function ExclusiveCollections() {
       limited: true,
       available: 7,
       total: 50,
-      features: ['Hand-selected premium leaves', '18-month aging process', 'Artisan craftsmanship', 'Collector\'s certificate', 'Heritage presentation box'],
+      features: ['Hand-selected finest leaves', '18-month aging process', 'Artisan craftsmanship', 'Collector\'s certificate', 'Heritage presentation box'],
       exclusivityLevel: 'heritage',
       releaseDate: 'Limited Time'
     },
@@ -281,14 +281,14 @@ export function ExclusiveCollections() {
         <div className="text-center mt-16">
           <div className="max-w-2xl mx-auto">
             <h3 className="font-serif-premium text-2xl text-foreground mb-4">
-              Become a Premium Member
+              Become a Valued Member
             </h3>
             <p className="font-sans-premium text-muted-foreground mb-6">
               Gain exclusive access to limited collections, private events, and personalized consultations 
               with our master craftsmen.
             </p>
             <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-3">
-              Join Premium Club
+              Join Valued Club
               <Crown className="w-4 h-4 ml-2" />
             </Button>
           </div>

@@ -3,6 +3,7 @@ import { CheckCircle2, Home, Package, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { formatINR } from '../../utils/currency';
+import { Helmet } from 'react-helmet-async';
 
 type LocationState = {
   message: string;
@@ -17,18 +18,23 @@ export function OrderSuccessPage() {
   const { message, orderId, amount, itemCount } = (location.state || {}) as LocationState;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center space-y-4">
-            <div className="mx-auto w-20 h-20 bg-green-50 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-12 h-12 text-green-500" />
-            </div>
-            <CardTitle className="text-2xl font-serif">Order Confirmed!</CardTitle>
-            <p className="text-muted-foreground">
-              {message || 'Your order has been placed successfully'}
-            </p>
-          </CardHeader>
+    <>
+      <Helmet>
+        <title>Order Success - Cigarro</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center space-y-4">
+              <div className="mx-auto w-20 h-20 bg-green-50 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-12 h-12 text-green-500" />
+              </div>
+              <p className="text-muted-foreground">
+                {message || 'Your order has been placed successfully'}
+              </p>
+            </CardHeader>
           
           <CardContent className="space-y-6">
             <div className="bg-muted/20 p-4 rounded-lg space-y-3">
@@ -103,6 +109,7 @@ export function OrderSuccessPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
 

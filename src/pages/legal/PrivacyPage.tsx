@@ -105,6 +105,7 @@ export function PrivacyPage() {
       <Helmet>
         <title>Privacy Policy - Cigarro</title>
         <meta name="description" content="Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information." />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://cigarro.in/privacy" />
       </Helmet>
       

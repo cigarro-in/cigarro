@@ -83,27 +83,29 @@ export function FeaturedProducts() {
     }
   };
 
-  // Handle infinite scroll for mobile carousel with smooth center scaling
+  // Clean bidirectional infinite scroll implementation
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || featuredProducts.length === 0) return;
 
+    const itemCount = featuredProducts.length;
     let isRepositioning = false;
-    let raf = 0;
-    let scrollEndTimer: ReturnType<typeof setTimeout> | null = null;
+    let rafId = 0;
+    let snapTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Calculate item width: container width / 3 (for exactly 3 visible items)
+    // Get item width (1/3 of container for 3 visible items)
     const getItemWidth = () => container.clientWidth / 3;
 
-    // Rubber band snap to center
-    const snapToCenter = () => {
-      const itemWidth = getItemWidth();
-      const currentProgress = container.scrollLeft / itemWidth;
-      const nearestItemIndex = Math.round(currentProgress);
-      const targetScroll = nearestItemIndex * itemWidth;
+    // Snap to nearest item center
+    const snapToNearest = () => {
+      if (isRepositioning) return;
       
-      // Only snap if not already close to center
-      if (Math.abs(container.scrollLeft - targetScroll) > 5) {
+      const itemWidth = getItemWidth();
+      const currentIndex = container.scrollLeft / itemWidth;
+      const nearestIndex = Math.round(currentIndex);
+      const targetScroll = nearestIndex * itemWidth;
+      
+      if (Math.abs(container.scrollLeft - targetScroll) > 2) {
         container.scrollTo({
           left: targetScroll,
           behavior: 'smooth'
@@ -111,84 +113,86 @@ export function FeaturedProducts() {
       }
     };
 
-    const onScroll = () => {
+    // Handle scroll with infinite loop repositioning
+    const handleScroll = () => {
       if (isRepositioning) return;
-      
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
+
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
         const itemWidth = getItemWidth();
         const scrollLeft = container.scrollLeft;
-        const progress = scrollLeft / itemWidth;
+        const currentIndex = scrollLeft / itemWidth;
         
-        setActiveProgress(progress);
+        // Update active progress for visual feedback
+        setActiveProgress(currentIndex);
 
-        // Clear previous snap timer
-        if (scrollEndTimer) clearTimeout(scrollEndTimer);
-        
-        // Set new snap timer (rubber band effect)
-        scrollEndTimer = setTimeout(snapToCenter, 150);
+        // Clear and reset snap timer
+        if (snapTimer) clearTimeout(snapTimer);
+        snapTimer = setTimeout(snapToNearest, 150);
 
-        // Seamless infinite loop: reposition when crossing boundaries
-        const len = featuredProducts.length;
+        // Infinite loop logic: Jump when reaching boundaries
+        // We have 3 sets: [set0][set1][set2]
+        // Start at set1, jump seamlessly between sets
         
-        // Check boundaries more precisely
-        if (progress < len * 0.2) {
-          // Scrolling backward - move to end of middle set
+        if (currentIndex < itemCount) {
+          // Scrolled into set0 (left boundary) - jump to set1
           isRepositioning = true;
-          const offsetInSet = progress % len;
-          const targetProgress = len * 2 + offsetInSet;
-          const targetScroll = targetProgress * itemWidth;
+          const offset = currentIndex % itemCount;
+          const newIndex = itemCount + offset;
           
           container.style.scrollBehavior = 'auto';
-          container.scrollLeft = targetScroll;
-          setActiveProgress(targetProgress);
+          container.scrollLeft = newIndex * itemWidth;
+          setActiveProgress(newIndex);
           
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             container.style.scrollBehavior = 'smooth';
             isRepositioning = false;
-          }, 10);
-        } else if (progress > len * 2.8) {
-          // Scrolling forward - move to start of middle set
+          });
+        } else if (currentIndex >= itemCount * 2) {
+          // Scrolled into set2 (right boundary) - jump to set1
           isRepositioning = true;
-          const offsetInSet = progress % len;
-          const targetProgress = len + offsetInSet;
-          const targetScroll = targetProgress * itemWidth;
+          const offset = currentIndex % itemCount;
+          const newIndex = itemCount + offset;
           
           container.style.scrollBehavior = 'auto';
-          container.scrollLeft = targetScroll;
-          setActiveProgress(targetProgress);
+          container.scrollLeft = newIndex * itemWidth;
+          setActiveProgress(newIndex);
           
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             container.style.scrollBehavior = 'smooth';
             isRepositioning = false;
-          }, 10);
+          });
         }
       });
     };
 
-    container.addEventListener('scroll', onScroll, { passive: true });
-
-    // Initialize to middle set
-    const init = () => {
+    // Initialize: Start at middle set (set1)
+    const initialize = () => {
       const itemWidth = getItemWidth();
-      const startPosition = itemWidth * featuredProducts.length; // Start of middle set
-      container.style.scrollBehavior = 'auto';
-      container.scrollLeft = startPosition;
-      setActiveProgress(startPosition / itemWidth);
+      const startIndex = itemCount; // Start of set1
       
-      // Enable smooth scrolling after init
-      setTimeout(() => {
+      container.style.scrollBehavior = 'auto';
+      container.scrollLeft = startIndex * itemWidth;
+      setActiveProgress(startIndex);
+      
+      // Enable smooth scrolling after initialization
+      requestAnimationFrame(() => {
         container.style.scrollBehavior = 'smooth';
-      }, 100);
+      });
     };
 
-    const initTimer = setTimeout(init, 50);
+    // Add scroll listener
+    container.addEventListener('scroll', handleScroll, { passive: true });
 
+    // Initialize after a brief delay to ensure layout is ready
+    const initTimer = setTimeout(initialize, 100);
+
+    // Cleanup
     return () => {
       clearTimeout(initTimer);
-      if (scrollEndTimer) clearTimeout(scrollEndTimer);
-      container.removeEventListener('scroll', onScroll);
-      if (raf) cancelAnimationFrame(raf);
+      if (snapTimer) clearTimeout(snapTimer);
+      if (rafId) cancelAnimationFrame(rafId);
+      container.removeEventListener('scroll', handleScroll);
     };
   }, [featuredProducts]);
 
@@ -219,16 +223,16 @@ export function FeaturedProducts() {
         {/* Products Grid - Mobile: Infinite Carousel, Desktop: Centered Trio */}
         <div className="w-full md:w-[90%] mx-auto">
           {/* Mobile Layout: Infinite Carousel with Center Focus and Zoom */}
-          <div className="md:hidden relative py-16">
+          <div className="md:hidden relative py-0">
             <div 
               ref={scrollContainerRef}
-              className="flex overflow-x-auto scrollbar-hide"
+              className="flex overflow-x-auto overflow-y-hidden scrollbar-hide"
               style={{ 
                 WebkitOverflowScrolling: 'touch',
                 scrollbarWidth: 'none',
                 msOverflowStyle: 'none',
                 overscrollBehaviorX: 'contain',
-                touchAction: 'pan-x',
+                touchAction: 'auto',
                 scrollBehavior: 'smooth',
                 gap: '0px'
               }}
@@ -260,7 +264,7 @@ export function FeaturedProducts() {
                     style={{ 
                       position: 'relative',
                       width: '33.333%', // exactly 3 visible items
-                      padding: '0 8px',
+                      padding: '16px 8px',
                       transform: `scale(${scale})`,
                       opacity,
                       zIndex,
@@ -282,16 +286,22 @@ export function FeaturedProducts() {
             
             {/* Scroll Indicators */}
             <div className="flex justify-center gap-2 mt-4">
-              {featuredProducts.map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    index === (Math.round(activeProgress + 1.5) % featuredProducts.length)
-                      ? 'w-6 bg-canyon'
-                      : 'w-1.5 bg-dark/30'
-                  }`}
-                />
-              ))}
+              {featuredProducts.map((_, index) => {
+                // Calculate which item is currently centered
+                const currentItemIndex = Math.round(activeProgress) % featuredProducts.length;
+                const isActive = index === currentItemIndex;
+                
+                return (
+                  <div
+                    key={index}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      isActive
+                        ? 'w-6 bg-canyon'
+                        : 'w-1.5 bg-dark/30'
+                    }`}
+                  />
+                );
+              })}
             </div>
           </div>
 

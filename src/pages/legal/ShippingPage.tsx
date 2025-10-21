@@ -9,6 +9,7 @@ export function ShippingPage() {
       <Helmet>
         <title>Shipping Policy - Cigarro</title>
         <meta name="description" content="Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times." />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://cigarro.in/shipping" />
       </Helmet>
       

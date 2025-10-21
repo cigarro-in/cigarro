@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
 import { ArrowRight, Star, Package } from 'lucide-react';
+import { SEOHead } from '../../components/seo/SEOHead';
 
 interface Brand {
   name: string;
@@ -71,10 +71,13 @@ export function BrandsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Our Premium Brands - Cigarro</title>
-        <meta name="description" content="Discover our collection of premium cigarette brands from world-renowned manufacturers." />
-      </Helmet>
+      <SEOHead
+        title="Our Premium Brands"
+        description="Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world's finest brands."
+        url="/brands"
+        type="website"
+        keywords={['premium brands', 'cigarette brands', 'tobacco brands', 'luxury cigarettes']}
+      />
 
       <div className="min-h-screen bg-creme">
         {/* Hero Section */}

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
 
 export function BrandStory() {
   return (
@@ -73,7 +73,7 @@ export function BrandStory() {
                 className="text-center group"
               >
                 <div className="font-serif-premium text-3xl text-accent mb-2 group-hover:scale-110 transition-transform">47</div>
-                <div className="font-sans-premium text-sm text-muted-foreground">Premium Blends</div>
+                <div className="font-sans-premium text-sm text-muted-foreground">Signature Blends</div>
               </motion.div>
             </div>
           </motion.div>

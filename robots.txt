@@ -14,9 +14,13 @@ Disallow: /wishlist
 Disallow: /cart
 
 # Block search and filter parameters to avoid duplicate content
-Disallow: /*?*sort=
-Disallow: /*?*filter=
-Disallow: /*?*page=
+# Note: Using * in path can block too much, use specific patterns
+Disallow: /*?sort=
+Disallow: /*?filter=
+Disallow: /*?page=
+Disallow: /*?utm_
+Disallow: /*?ref=
+Disallow: /*?fbclid=
 
 # Allow all public content (default behavior)
 Allow: /products

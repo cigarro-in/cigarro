@@ -37,6 +37,12 @@ interface ProductDetails {
   gallery_images: string[];
   meta_title: string;
   meta_description: string;
+  og_title?: string;
+  og_description?: string;
+  og_image?: string;
+  twitter_title?: string;
+  twitter_description?: string;
+  twitter_image?: string;
 }
 
 function ProductPage() {
@@ -76,7 +82,7 @@ function ProductPage() {
         // Fetch product details
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, description, short_description, stock, is_active, rating, review_count, origin, pack_size, specifications, gallery_images, meta_title, meta_description')
+          .select('id, name, slug, brand, price, description, short_description, stock, is_active, rating, review_count, origin, pack_size, specifications, gallery_images, meta_title, meta_description, og_title, og_description, og_image, twitter_title, twitter_description, twitter_image')
           .eq('slug', slug)
           .single();
 
@@ -418,6 +424,12 @@ function ProductPage() {
         availability={product.stock > 0 ? 'in stock' : 'out of stock'}
         brand={product.brand}
         category={product.pack_size || 'Cigarettes'}
+        ogTitle={product.og_title}
+        ogDescription={product.og_description}
+        ogImage={product.og_image}
+        twitterTitle={product.twitter_title}
+        twitterDescription={product.twitter_description}
+        twitterImage={product.twitter_image}
       />
       <BreadcrumbSchema
         items={[
@@ -430,7 +442,6 @@ function ProductPage() {
       <Helmet>
         <meta name="product:price:amount" content={getCurrentPrice().toString()} />
         <meta name="product:price:currency" content="INR" />
-        <link rel="canonical" href={`https://cigarro.in/product/${product?.slug}`} />
       </Helmet>
       
       <div className="min-h-screen bg-creme md:bg-creme text-dark pb-24 md:pb-0">

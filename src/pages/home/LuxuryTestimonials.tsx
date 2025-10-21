@@ -114,7 +114,7 @@ export function LuxuryTestimonials() {
             <span className="block text-accent">Say About Us</span>
           </h2>
           <p className="font-sans-premium text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Discover why discerning connoisseurs and industry leaders choose our premium collection 
+            Discover why discerning connoisseurs and industry leaders choose our curated collection 
             for their most important moments and sophisticated experiences.
           </p>
         </div>

@@ -47,29 +47,20 @@ interface Category {
   name: string;
   slug: string;
   description?: string;
-  image_url?: string;
+  image?: string;
   image_alt_text?: string;
-  parent_id?: string;
-  sort_order: number;
-  is_active: boolean;
-  is_featured: boolean;
   meta_title?: string;
   meta_description?: string;
   created_at: string;
   updated_at: string;
   product_count?: number;
-  parent?: Category;
-  children?: Category[];
 }
 
 interface CategoryFormData {
   name: string;
   description: string;
-  image_url: string | null;
+  image: string | null;
   image_alt_text: string;
-  parent_id: string;
-  is_active: boolean;
-  is_featured: boolean;
   meta_title: string;
   meta_description: string;
 }
@@ -89,19 +80,13 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [featuredFilter, setFeaturedFilter] = useState<'all' | 'featured' | 'not_featured'>('all');
-  const [parentFilter, setParentFilter] = useState<string>('all');
   
   // Form state
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: '',
-    image_url: null,
+    image: null,
     image_alt_text: '',
-    parent_id: 'none',
-    is_active: true,
-    is_featured: false,
     meta_title: '',
     meta_description: ''
   });
@@ -111,11 +96,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
 
   // Analytics
   const [analytics, setAnalytics] = useState({
-    totalCategories: 0,
-    activeCategories: 0,
-    featuredCategories: 0,
-    parentCategories: 0,
-    subcategories: 0
+    totalCategories: 0
   });
 
   useEffect(() => {
@@ -125,7 +106,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
   useEffect(() => {
     filterCategories();
     calculateAnalytics();
-  }, [categories, searchTerm, statusFilter, featuredFilter, parentFilter]);
+  }, [categories, searchTerm]);
 
   const loadCategories = async () => {
     setIsLoading(true);
@@ -182,38 +163,14 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
       );
     }
 
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(category => category.is_active === (statusFilter === 'active'));
-    }
-
-    if (featuredFilter !== 'all') {
-      filtered = filtered.filter(category => category.is_featured === (featuredFilter === 'featured'));
-    }
-
-    if (parentFilter !== 'all') {
-      if (parentFilter === 'root') {
-        filtered = filtered.filter(category => !category.parent_id);
-      } else {
-        filtered = filtered.filter(category => category.parent_id === parentFilter);
-      }
-    }
-
     setFilteredCategories(filtered);
   };
 
   const calculateAnalytics = () => {
     const totalCategories = categories.length;
-    const activeCategories = categories.filter(c => c.is_active).length;
-    const featuredCategories = categories.filter(c => c.is_featured).length;
-    const parentCategories = categories.filter(c => !c.parent_id).length;
-    const subcategories = categories.filter(c => c.parent_id).length;
 
     setAnalytics({
-      totalCategories,
-      activeCategories,
-      featuredCategories,
-      parentCategories,
-      subcategories
+      totalCategories
     });
   };
 
@@ -222,11 +179,8 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     setFormData({
       name: '',
       description: '',
-      image_url: '',
+      image: '',
       image_alt_text: '',
-      parent_id: 'none',
-      is_active: true,
-      is_featured: false,
       meta_title: '',
       meta_description: ''
     });
@@ -239,11 +193,8 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     setFormData({
       name: category.name,
       description: category.description || '',
-      image_url: category.image_url || '',
+      image: category.image || '',
       image_alt_text: category.image_alt_text || '',
-      parent_id: category.parent_id || 'none',
-      is_active: category.is_active,
-      is_featured: category.is_featured,
       meta_title: category.meta_title || '',
       meta_description: category.meta_description || ''
     });
@@ -260,11 +211,6 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
 
     if (!formData.description.trim()) {
       errors.description = 'Description is required';
-    }
-
-    // Check for circular reference
-    if (editingCategory && formData.parent_id === editingCategory.id) {
-      errors.parent_id = 'Category cannot be its own parent';
     }
 
     setFormErrors(errors);
@@ -288,16 +234,15 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
 
     setIsSaving(true);
     try {
+      // Only send fields that exist in the database schema
       const sanitizedData = {
-        ...formData,
         name: sanitizer.sanitizeText(formData.name),
+        slug: generateSlug(formData.name),
         description: sanitizer.sanitizeText(formData.description),
+        image: formData.image || null,
         image_alt_text: sanitizer.sanitizeText(formData.image_alt_text),
         meta_title: sanitizer.sanitizeText(formData.meta_title),
-        meta_description: sanitizer.sanitizeText(formData.meta_description),
-        slug: generateSlug(formData.name),
-        parent_id: formData.parent_id === 'none' ? null : formData.parent_id || null,
-        sort_order: editingCategory?.sort_order || categories.length
+        meta_description: sanitizer.sanitizeText(formData.meta_description)
       };
 
       if (editingCategory) {
@@ -359,96 +304,34 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     }
   };
 
-  const handleBulkAction = async (action: string) => {
+  const handleBulkDelete = async () => {
     if (selectedCategories.length === 0) {
       toast.error('Please select categories first');
       return;
     }
 
-    if (!confirm(`Apply ${action} to ${selectedCategories.length} selected categories?`)) {
+    if (!confirm(`Delete ${selectedCategories.length} selected categories?`)) {
       return;
     }
 
     try {
-      let updateData: Partial<Category> = {};
-
-      switch (action) {
-        case 'activate':
-          updateData = { is_active: true };
-          break;
-        case 'deactivate':
-          updateData = { is_active: false };
-          break;
-        case 'feature':
-          updateData = { is_featured: true };
-          break;
-        case 'unfeature':
-          updateData = { is_featured: false };
-          break;
-        case 'delete':
-          const { error: deleteError } = await supabase
-            .from('categories')
-            .delete()
-            .in('id', selectedCategories);
-          
-          if (deleteError) throw deleteError;
-          
-          toast.success(`Deleted ${selectedCategories.length} categories`);
-          setSelectedCategories([]);
-          await loadCategories();
-          onStatsUpdate();
-          return;
-      }
-
       const { error } = await supabase
         .from('categories')
-        .update(updateData)
+        .delete()
         .in('id', selectedCategories);
-
+      
       if (error) throw error;
-
-      toast.success(`Updated ${selectedCategories.length} categories`);
+      
+      toast.success(`Deleted ${selectedCategories.length} categories`);
       setSelectedCategories([]);
       await loadCategories();
       onStatsUpdate();
     } catch (error) {
-      console.error('Error performing bulk action:', error);
-      toast.error('Failed to perform bulk action');
+      console.error('Error deleting categories:', error);
+      toast.error('Failed to delete categories');
     }
   };
 
-  const handleMoveCategory = async (categoryId: string, direction: 'up' | 'down') => {
-    try {
-      const category = categories.find(c => c.id === categoryId);
-      if (!category) return;
-
-      const siblings = categories.filter(c => c.parent_id === category.parent_id);
-      const currentIndex = siblings.findIndex(c => c.id === categoryId);
-      
-      if (direction === 'up' && currentIndex === 0) return;
-      if (direction === 'down' && currentIndex === siblings.length - 1) return;
-
-      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-      const targetCategory = siblings[targetIndex];
-
-      // Swap sort orders
-      await supabase
-        .from('categories')
-        .update({ sort_order: targetCategory.sort_order })
-        .eq('id', categoryId);
-
-      await supabase
-        .from('categories')
-        .update({ sort_order: category.sort_order })
-        .eq('id', targetCategory.id);
-
-      await loadCategories();
-      toast.success('Category order updated');
-    } catch (error) {
-      console.error('Error moving category:', error);
-      toast.error('Failed to update category order');
-    }
-  };
 
   if (isLoading) {
     return (
@@ -461,7 +344,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
   return (
     <div className="space-y-6">
       {/* Analytics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -477,10 +360,10 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <ImageIcon className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-2xl font-bold">{analytics.activeCategories}</p>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold">{categories.filter(c => c.image).length}</p>
+                <p className="text-sm text-muted-foreground">With Images</p>
               </div>
             </div>
           </CardContent>
@@ -489,34 +372,10 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
+              <CheckCircle className="h-5 w-5 text-purple-500" />
               <div>
-                <p className="text-2xl font-bold">{analytics.featuredCategories}</p>
-                <p className="text-sm text-muted-foreground">Featured</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{analytics.parentCategories}</p>
-                <p className="text-sm text-muted-foreground">Parent Categories</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Archive className="h-5 w-5 text-orange-500" />
-              <div>
-                <p className="text-2xl font-bold">{analytics.subcategories}</p>
-                <p className="text-sm text-muted-foreground">Subcategories</p>
+                <p className="text-2xl font-bold">{categories.filter(c => c.product_count && c.product_count > 0).length}</p>
+                <p className="text-sm text-muted-foreground">With Products</p>
               </div>
             </div>
           </CardContent>
@@ -544,52 +403,13 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="md:col-span-2">
-              <Input
-                placeholder="Search categories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={featuredFilter} onValueChange={(value: any) => setFeaturedFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Featured" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="featured">Featured</SelectItem>
-                <SelectItem value="not_featured">Not Featured</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={parentFilter} onValueChange={setParentFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="root">Parent Categories</SelectItem>
-                {categories.filter(c => !c.parent_id).map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    Subcategories of {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="w-full">
+            <Input
+              placeholder="Search categories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
           </div>
 
           {/* Bulk Actions */}
@@ -599,20 +419,9 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                 {selectedCategories.length} categories selected
               </span>
               <Separator orientation="vertical" className="h-4" />
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('activate')}>
-                Activate
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('deactivate')}>
-                Deactivate
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('feature')}>
-                Feature
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleBulkAction('unfeature')}>
-                Unfeature
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => handleBulkAction('delete')}>
-                Delete
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
               </Button>
             </div>
           )}
@@ -638,10 +447,8 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   />
                 </TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Parent</TableHead>
                 <TableHead>Products</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Order</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -663,9 +470,9 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
-                        {category.image_url ? (
+                        {category.image ? (
                           <img
-                            src={category.image_url}
+                            src={category.image}
                             alt={category.image_alt_text || category.name}
                             className="w-full h-full object-cover"
                           />
@@ -682,52 +489,16 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                             ? `${category.description.substring(0, 50)}...` 
                             : category.description}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {category.is_featured && (
-                            <Badge variant="secondary" className="text-xs">
-                              Featured
-                            </Badge>
-                          )}
-                        </div>
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {category.parent ? (
-                      <span className="text-sm">{category.parent.name}</span>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">Root</Badge>
-                    )}
                   </TableCell>
                   <TableCell>
                     <span className="font-medium">{category.product_count || 0}</span>
                   </TableCell>
                   <TableCell>
-                    {category.is_active ? (
-                      <Badge variant="default">Active</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inactive</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleMoveCategory(category.id, 'up')}
-                        disabled={index === 0}
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleMoveCategory(category.id, 'down')}
-                        disabled={index === filteredCategories.length - 1}
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(category.created_at).toLocaleDateString()}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -784,7 +555,6 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="media">Media</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4">
@@ -814,37 +584,12 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   <p className="text-sm text-red-500 mt-1">{formErrors.description}</p>
                 )}
               </div>
-
-              <div>
-                <Label htmlFor="parent_id">Parent Category</Label>
-                <Select 
-                  value={formData.parent_id} 
-                  onValueChange={(value: string) => setFormData(prev => ({ ...prev, parent_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select parent category (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Parent (Root Category)</SelectItem>
-                    {categories
-                      .filter(c => !c.parent_id && c.id !== editingCategory?.id)
-                      .map(category => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                {formErrors.parent_id && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.parent_id}</p>
-                )}
-              </div>
             </TabsContent>
 
             <TabsContent value="media" className="space-y-4">
               <EnhancedImageUpload
-                imageUrl={formData.image_url}
-                onImageUrlChange={(url) => setFormData(prev => ({ ...prev, image_url: url }))}
+                imageUrl={formData.image}
+                onImageUrlChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
                 title="Category Image"
                 description="Upload or select an image for this category"
                 aspectRatio="square"
@@ -881,28 +626,6 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                   onChange={(e) => setFormData(prev => ({ ...prev, meta_description: e.target.value }))}
                   placeholder="SEO description for search engines"
                 />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="settings" className="space-y-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is_active">Active</Label>
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_active: checked }))}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is_featured">Featured</Label>
-                  <Switch
-                    id="is_featured"
-                    checked={formData.is_featured}
-                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_featured: checked }))}
-                  />
-                </div>
               </div>
             </TabsContent>
           </Tabs>

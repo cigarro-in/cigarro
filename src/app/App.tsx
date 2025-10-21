@@ -106,7 +106,7 @@ function AppContent() {
   const [isAgeVerified, setIsAgeVerified] = useState(false);
   const [siteSettings, setSiteSettings] = useState({
     meta_title: 'Cigarro',
-    meta_description: 'The finest selection of premium cigarettes, cigars, and vapes.',
+    meta_description: 'The finest selection of premium cigarettes and cigars.',
     favicon_url: '/vite.svg',
     site_name: 'Cigarro',
   });
@@ -120,7 +120,7 @@ function AppContent() {
       if (data) {
         setSiteSettings({
           meta_title: data.meta_title || 'Cigarro',
-          meta_description: data.meta_description || 'The finest selection of premium cigarettes, cigars, and vapes.',
+          meta_description: data.meta_description || 'The finest selection of premium cigarettes and cigars.',
           favicon_url: data.favicon_url || '/vite.svg',
           site_name: data.site_name || 'Cigarro',
         });
@@ -150,7 +150,11 @@ function AppContent() {
       <Helmet>
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />
-        <link rel="icon" type="image/svg+xml" href={siteSettings.favicon_url || '/vite.svg'} />
+        
+        {/* Dynamic Favicon from Admin Settings */}
+        <link rel="icon" href={siteSettings.favicon_url || '/images/favicon.ico'} />
+        <link rel="shortcut icon" href={siteSettings.favicon_url || '/images/favicon.ico'} />
+        <link rel="apple-touch-icon" href={siteSettings.favicon_url || '/images/favicon-32x32.png'} />
       </Helmet>
       <div className="min-h-screen bg-creme font-sans">
         {/* Desktop Layout */}

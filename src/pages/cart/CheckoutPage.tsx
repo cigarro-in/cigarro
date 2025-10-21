@@ -1962,7 +1962,7 @@ export function CheckoutPage() {
                 <div className="mt-6 p-3 bg-accent/10 rounded-lg border border-accent/20">
                   <div className="flex items-center space-x-2">
                     <Crown className="w-4 h-4 text-accent" />
-                    <span className="font-sans-premium text-sm text-foreground">Premium Benefits</span>
+                    <span className="font-sans-premium text-sm text-foreground">Member Benefits</span>
                   </div>
                   <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                     <li>• Free returns within 30 days</li>

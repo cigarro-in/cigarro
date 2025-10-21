@@ -9,6 +9,8 @@ export function LegalPage() {
       <Helmet>
         <title>Legal Information - Cigarro Premium Marketplace</title>
         <meta name="description" content="Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://cigarro.in/legal" />
       </Helmet>
       
       <div className="min-h-screen bg-creme">

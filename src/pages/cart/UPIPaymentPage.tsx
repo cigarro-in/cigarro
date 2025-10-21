@@ -10,6 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
+import { Helmet } from 'react-helmet-async';
 
 interface PaymentData {
   orderId: string;
