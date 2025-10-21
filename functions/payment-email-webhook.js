@@ -1,6 +1,6 @@
 /**
  * Cloudflare Function: On-Demand Payment Email Verification with Gmail OAuth2
- * Checks Gmail for payment confirmation emails when order is placed
+ * Checks Gmail for payment confirmation emails when order is placed.
  * 
  * Flow:
  * 1. Frontend calls this after order creation
@@ -17,8 +17,9 @@
 let cachedAccessToken = null;
 let tokenExpiresAt = 0;
 
-export default {
-  async fetch(request, env) {
+// Cloudflare Pages Function - must export onRequestPost
+export async function onRequestPost(context) {
+  const { request, env } = context;
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -206,8 +207,7 @@ export default {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-  },
-};
+}
 
 /**
  * Check Gmail for payment confirmation email
