@@ -99,7 +99,7 @@ export function UPIPaymentPage() {
       toast.info('Verifying your payment... This may take up to 60 seconds.');
       
       // Call payment verification function
-      const verificationResponse = await fetch('/functions/payment-email-webhook', {
+      const verificationResponse = await fetch('/payment-email-webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
