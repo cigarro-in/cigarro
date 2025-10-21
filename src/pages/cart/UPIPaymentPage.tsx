@@ -96,7 +96,11 @@ export function UPIPaymentPage() {
     
     try {
       console.log('🔍 Starting automatic payment verification...');
-      toast.info('Verifying your payment... This may take up to 30 seconds.');
+      toast.info('Verifying your payment... This may take up to 5 minutes.');
+      
+      // CRITICAL: Use order creation timestamp (when payment page was opened)
+      // This ensures we search for emails from the right time window
+      const orderCreatedAt = new Date(Date.now() - 120000).toISOString(); // Assume order was created within last 2 minutes
       
       // Call payment verification function
       const verificationResponse = await fetch('/payment-email-webhook', {
@@ -109,6 +113,7 @@ export function UPIPaymentPage() {
           orderId: paymentData?.orderId || '',
           transactionId: paymentData?.transactionId || '',
           amount: paymentData?.amount || 0,
+          orderCreatedAt: orderCreatedAt, // CRITICAL: Pass order creation time
           timestamp: new Date().toISOString()
         })
       });

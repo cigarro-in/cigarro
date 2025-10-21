@@ -18,7 +18,7 @@
 const ALLOWED_ORIGINS = [
   'https://cigarro.in',
   'https://www.cigarro.in',
-  'http://localhost:5173', // Development only
+  'http://localhost:3000', // Development only
 ];
 
 function getCorsHeaders(origin) {
@@ -99,6 +99,10 @@ export async function onRequest(context) {
         });
       }
       
+      // Get order creation timestamp (critical for correct email search window)
+      const orderCreatedAt = verificationRequest.orderCreatedAt || verificationRequest.timestamp || new Date().toISOString();
+      console.log('📅 Order created at:', orderCreatedAt);
+      
       // Validate amount is a positive number
       const amount = parseFloat(verificationRequest.amount);
       if (isNaN(amount) || amount <= 0) {
@@ -126,13 +130,14 @@ export async function onRequest(context) {
         status: 'pending'
       });
 
-      // Check Gmail for payment confirmation (with 30 second timeout)
+      // Check Gmail for payment confirmation (with 5 minute timeout)
       // NOTE: Cloudflare only shows logs AFTER function completes
       const email = await checkGmailForPayment(
         env,
         verificationRequest.transactionId,
         verificationRequest.amount,
-        30 // timeout in seconds - reduced for faster feedback
+        300, // timeout in seconds - 5 minutes to allow for payment processing
+        orderCreatedAt // Pass order creation time as baseline
       );
 
       if (!email) {
@@ -142,7 +147,7 @@ export async function onRequest(context) {
         await updateVerificationLog(env, logId, {
           status: 'failed',
           email_found: false,
-          error_message: 'No payment email found within 30 seconds'
+          error_message: 'No payment email found within 5 minutes'
         });
         
         return new Response(JSON.stringify({ 
@@ -283,39 +288,40 @@ export async function onRequest(context) {
 
 /**
  * Check Gmail for payment confirmation email
- * Polls for up to timeoutSeconds, only checking NEW emails
+ * Polls for up to timeoutSeconds, checking emails received AFTER orderCreatedAt
+ * @param {string} orderCreatedAt - ISO timestamp when order was created (baseline for email search)
  */
-async function checkGmailForPayment(env, transactionId, amount, timeoutSeconds) {
+async function checkGmailForPayment(env, transactionId, amount, timeoutSeconds, orderCreatedAt) {
   const startTime = Date.now();
   const timeoutMs = timeoutSeconds * 1000;
   
-  // Get baseline - emails that existed BEFORE payment
-  console.log('📊 Getting baseline email count...');
-  const baselineMessageIds = await getRecentMessageIds(env);
-  console.log(`✅ Baseline: ${baselineMessageIds.size} existing emails`);
+  // Convert order creation time to Unix timestamp for Gmail search
+  const orderCreatedTimestamp = Math.floor(new Date(orderCreatedAt).getTime() / 1000);
+  console.log('📊 Searching for emails received after order creation...');
+  console.log(`📅 Order created at: ${orderCreatedAt} (Unix: ${orderCreatedTimestamp})`);
   
   let pollCount = 0;
   
-  // Poll every 2 seconds (faster polling)
+  // Poll every 5 seconds (reduced polling rate)
   while (Date.now() - startTime < timeoutMs) {
     pollCount++;
     console.log(`\n🔄 Poll #${pollCount} (${Math.floor((Date.now() - startTime) / 1000)}s elapsed)`);
     
     try {
-      // Check for NEW emails only
-      const newEmails = await searchNewGmailEmails(env, amount, baselineMessageIds);
+      // Check for emails received AFTER order creation
+      const matchingEmails = await searchGmailEmailsAfterTimestamp(env, amount, orderCreatedTimestamp);
       
-      if (newEmails && newEmails.length > 0) {
-        console.log(`✅ Found ${newEmails.length} NEW email(s) with matching amount!`);
-        return newEmails[0]; // Return first matching email
+      if (matchingEmails && matchingEmails.length > 0) {
+        console.log(`✅ Found ${matchingEmails.length} email(s) with matching amount after order creation!`);
+        return matchingEmails[0]; // Return first matching email
       }
       
-      console.log('⏳ No new matching emails yet, waiting 2 seconds...');
-      // Wait 2 seconds before next check
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('⏳ No matching payment emails yet, waiting 5 seconds...');
+      // Wait 5 seconds before next check
+      await new Promise(resolve => setTimeout(resolve, 5000));
     } catch (error) {
       console.error('❌ Error checking Gmail:', error.message);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
   
@@ -324,38 +330,16 @@ async function checkGmailForPayment(env, transactionId, amount, timeoutSeconds) 
 }
 
 /**
- * Get message IDs of recent emails (for baseline)
+ * Search for Gmail emails received AFTER a specific Unix timestamp
+ * This ensures we catch payment emails that arrived between order creation and verification
  */
-async function getRecentMessageIds(env) {
-  const searchQuery = 'in:anywhere newer_than:10m'; // All emails from last 10 minutes
-  const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=${encodeURIComponent(searchQuery)}`;
-  
-  const accessToken = await getGmailAccessToken(env);
-  const response = await fetch(searchUrl, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
-  
-  if (!response.ok) {
-    return new Set();
-  }
-  
-  const data = await response.json();
-  const messageIds = new Set();
-  
-  if (data.messages) {
-    data.messages.forEach(msg => messageIds.add(msg.id));
-  }
-  
-  return messageIds;
-}
-
-/**
- * Search for NEW Gmail emails only (not in baseline)
- */
-async function searchNewGmailEmails(env, amount, baselineMessageIds) {
-  // Search ALL mail including archived
-  const searchQuery = 'in:anywhere newer_than:10m';
+async function searchGmailEmailsAfterTimestamp(env, amount, afterTimestamp) {
+  // Gmail search query: emails received after the order creation time
+  // Using 'after:' with Unix timestamp ensures we get emails from the right time window
+  const searchQuery = `in:anywhere after:${afterTimestamp}`;
   const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=${encodeURIComponent(searchQuery)}`;
+  
+  console.log(`   🔍 Searching: ${searchQuery}`);
   
   const accessToken = await getGmailAccessToken(env);
   const response = await fetch(searchUrl, {
@@ -369,24 +353,17 @@ async function searchNewGmailEmails(env, amount, baselineMessageIds) {
   const data = await response.json();
   
   if (!data.messages || data.messages.length === 0) {
+    console.log('   📭 No emails found after order creation time');
     return [];
   }
   
-  // Filter to only NEW emails (not in baseline)
-  const newMessages = data.messages.filter(msg => !baselineMessageIds.has(msg.id));
-  
-  if (newMessages.length === 0) {
-    console.log('   📭 No new emails since baseline');
-    return [];
-  }
-  
-  console.log(`   📬 Found ${newMessages.length} NEW email(s) to check`);
+  console.log(`   📬 Found ${data.messages.length} email(s) after order creation`);
   
   const matchingEmails = [];
   
-  // Only check NEW messages
-  for (let i = 0; i < newMessages.length; i++) {
-    const message = newMessages[i];
+  // Check each email for matching amount
+  for (let i = 0; i < data.messages.length; i++) {
+    const message = data.messages[i];
     const accessToken = await getGmailAccessToken(env);
     
     const emailResponse = await fetch(
@@ -404,12 +381,15 @@ async function searchNewGmailEmails(env, amount, baselineMessageIds) {
       // Extract sender and subject for logging
       const fromHeader = email.payload?.headers?.find(h => h.name.toLowerCase() === 'from');
       const subjectHeader = email.payload?.headers?.find(h => h.name.toLowerCase() === 'subject');
+      const dateHeader = email.payload?.headers?.find(h => h.name.toLowerCase() === 'date');
       const sender = fromHeader?.value || 'Unknown';
       const subject = subjectHeader?.value || 'No Subject';
+      const emailDate = dateHeader?.value || 'Unknown';
       
-      console.log(`   📧 NEW Email #${i + 1}:`);
+      console.log(`   📧 Email #${i + 1}:`);
       console.log(`      From: ${sender}`);
       console.log(`      Subject: ${subject}`);
+      console.log(`      Date: ${emailDate}`);
       
       const body = extractEmailBody(email);
       
@@ -460,6 +440,9 @@ async function searchNewGmailEmails(env, amount, baselineMessageIds) {
   
   return matchingEmails;
 }
+
+// DEPRECATED: Old baseline-based search - replaced with timestamp-based search
+// Keeping for reference but no longer used
 
 /**
  * Get Gmail access token using OAuth2 refresh token

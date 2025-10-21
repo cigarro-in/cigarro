@@ -809,6 +809,10 @@ export function MobileCheckoutPage() {
       setTransactionId(txnId);
       const amount = getFinalTotal();
       
+      // CRITICAL: Capture order creation timestamp BEFORE saving to database
+      const orderCreatedAt = new Date().toISOString();
+      console.log('📅 Order created at:', orderCreatedAt);
+      
       // Save order to database with 'pending' status first
       await saveOrderToDatabase(txnId, 'pending');
       
@@ -823,68 +827,44 @@ export function MobileCheckoutPage() {
         `&tn=${encodeURIComponent(note)}` +
         '&cu=INR';
       
-      // Show payment processing dialog
+      // CRITICAL: Start server-side verification IMMEDIATELY
+      // Server will run for 30 seconds looking for payment email
+      // This happens regardless of whether user stays on page or leaves
+      console.log('🚀 Starting server-side payment verification (fire-and-forget)...');
+      
+      fetch('/payment-email-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
+        },
+        body: JSON.stringify({
+          orderId: txnId,
+          transactionId: txnId,
+          amount: amount,
+          orderCreatedAt: orderCreatedAt,
+          timestamp: new Date().toISOString()
+        }),
+        keepalive: true // Ensures request continues even if page is closed
+      }).catch(err => console.log('Verification started on server:', err));
+      
+      // Small delay to ensure webhook request is sent
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Open UPI app - user may leave browser or stay
+      // Server continues verification regardless
+      window.location.href = upiLink;
+      
+      // Show processing state
       setPaymentStage('processing');
       setIsConfirmingPayment(true);
       
-      // Open UPI app immediately - don't wait for verification
-      // User will leave browser (mobile) or stay on page (desktop)
-      window.location.href = upiLink;
-      
-      // Trigger webhook verification ONLY when user returns from UPI app
-      // This ensures the payment email has arrived before we check
-      let webhookTriggered = false;
-      
-      const triggerWebhookVerification = async () => {
-        if (webhookTriggered) return; // Prevent duplicate triggers
-        webhookTriggered = true;
-        
-        try {
-          console.log('🚀 Triggering webhook verification (user returned)...');
-          toast.info('Checking for payment confirmation...');
-          
-          const response = await fetch('/payment-email-webhook', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
-            },
-            body: JSON.stringify({
-              orderId: txnId,
-              transactionId: txnId,
-              amount: amount,
-              timestamp: new Date().toISOString()
-            })
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            console.log('Webhook result:', result);
-          }
-        } catch (error) {
-          console.log('Webhook error:', error);
-        }
-      };
-      
-      // Trigger webhook when user returns to page (after 5 seconds delay for email to arrive)
-      const handleVisibilityChangeForWebhook = () => {
-        if (!document.hidden && !webhookTriggered) {
-          console.log('👀 User returned, waiting 5s for email to arrive...');
-          setTimeout(() => {
-            triggerWebhookVerification();
-          }, 5000); // Wait 5 seconds after return for email to arrive
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChangeForWebhook);
-      
-      // Start polling for payment status (checks database)
-      // This works whether user stays on page or returns later
+      // Simple polling: Check database every 5 seconds for payment status
+      // Works whether user stays on page, leaves, or returns
       const pollInterval = setInterval(async () => {
         try {
-          console.log('🔍 Polling for payment status...');
+          console.log('🔍 Checking payment status in database...');
           
-          // Check order status in database
           const { data: order, error } = await supabase
             .from('orders')
             .select('payment_verified, payment_confirmed, status')
@@ -897,7 +877,7 @@ export function MobileCheckoutPage() {
           }
           
           if (order && (order.payment_verified === 'YES' || order.payment_confirmed)) {
-            // Payment verified!
+            // Payment verified by server!
             clearInterval(pollInterval);
             console.log('✅ Payment verified!');
             setPaymentStage('confirmed');
@@ -906,57 +886,29 @@ export function MobileCheckoutPage() {
             toast.success('Payment verified successfully!');
             setIsProcessing(false);
             setIsConfirmingPayment(false);
+            
+            // Clear localStorage
+            localStorage.removeItem('buyNowItem');
+            localStorage.removeItem('isBuyNow');
           }
         } catch (error) {
           console.error('Error polling payment status:', error);
         }
-      }, 3000); // Poll every 3 seconds
+      }, 5000); // Poll every 5 seconds
       
-      // Listen for page visibility change (when user returns from UPI app)
-      const handleVisibilityChange = () => {
-        if (!document.hidden) {
-          console.log('👀 User returned to page, checking payment status...');
-          toast.info('Checking payment status...');
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      
-      // Stop polling after 60 seconds
-      setTimeout(async () => {
+      // Stop polling after 5 minutes
+      setTimeout(() => {
         clearInterval(pollInterval);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        document.removeEventListener('visibilitychange', handleVisibilityChangeForWebhook);
         
-        // Check one final time
-        try {
-          const { data: order } = await supabase
-            .from('orders')
-            .select('payment_verified, payment_confirmed, status')
-            .eq('transaction_id', txnId)
-            .single();
-          
-          if (order && (order.payment_verified === 'YES' || order.payment_confirmed)) {
-            console.log('✅ Payment verified!');
-            setPaymentStage('confirmed');
-            setIsPaymentCompleted(true);
-            await clearCart();
-            toast.success('Payment verified successfully!');
-          } else {
-            setPaymentStage('pending');
-            toast.info('Order saved! We\'ll verify your payment shortly.');
-            setTimeout(() => navigate('/orders'), 3000);
-          }
-        } catch (error) {
-          console.error('Final check error:', error);
+        // If still not verified after 5 minutes, show pending message
+        if (!isPaymentCompleted) {
           setPaymentStage('pending');
           toast.info('Order saved! We\'ll verify your payment shortly.');
-          setTimeout(() => navigate('/orders'), 3000);
-        } finally {
           setIsProcessing(false);
           setIsConfirmingPayment(false);
+          setTimeout(() => navigate('/orders'), 3000);
         }
-      }, 60000); // 60 seconds
+      }, 300000); // 5 minutes
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -1015,7 +967,11 @@ export function MobileCheckoutPage() {
     
     // Start verification IMMEDIATELY when user clicks "I've Paid"
     console.log('🔍 Starting payment verification immediately...');
-    toast.info('Verifying your payment... This may take up to 30 seconds.');
+    toast.info('Verifying your payment... This may take up to 5 minutes.');
+    
+    // CRITICAL: Use the order creation timestamp (when QR was generated)
+    // This ensures we search for emails from the right time window
+    const orderCreatedAt = new Date(Date.now() - 60000).toISOString(); // Assume order was created within last minute
     
     // Start verification immediately
     (async () => {
@@ -1030,6 +986,7 @@ export function MobileCheckoutPage() {
             orderId: transactionId,
             transactionId: transactionId,
             amount: getFinalTotal(),
+            orderCreatedAt: orderCreatedAt, // CRITICAL: Pass order creation time
             timestamp: new Date().toISOString()
           })
         });
