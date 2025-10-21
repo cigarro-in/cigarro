@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Chrome } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
@@ -32,7 +32,7 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
     name: '',
   });
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
   // Prevent flicker by managing visibility
   React.useEffect(() => {
@@ -155,6 +155,18 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    try {
+      await signInWithGoogle();
+      // User will be redirected to Google OAuth page
+      // After successful auth, they'll be redirected back to the app
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to sign in with Google');
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-creme border border-coyote rounded-lg max-w-2xl w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] sm:max-w-2xl p-0 overflow-hidden">
@@ -247,6 +259,26 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ml-2 sm:ml-3 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </motion.form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-coyote/30"></div>
+                </div>
+                <div className="relative flex justify-center text-xs sm:text-sm uppercase">
+                  <span className="bg-creme px-2 text-coyote font-sans">Or continue with</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                variant="outline"
+                className="w-full h-10 sm:h-12 lg:h-14 bg-white border-2 border-coyote text-dark font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light transition-all duration-300 shadow-sm hover:shadow-md"
+              >
+                <Chrome className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 mr-2 sm:mr-3" />
+                {isLoading ? 'Connecting...' : 'Sign in with Google'}
+              </Button>
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-6">
@@ -329,6 +361,26 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ml-2 sm:ml-3 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </motion.form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-coyote/30"></div>
+                </div>
+                <div className="relative flex justify-center text-xs sm:text-sm uppercase">
+                  <span className="bg-creme px-2 text-coyote font-sans">Or continue with</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                variant="outline"
+                className="w-full h-10 sm:h-12 lg:h-14 bg-white border-2 border-coyote text-dark font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light transition-all duration-300 shadow-sm hover:shadow-md"
+              >
+                <Chrome className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 mr-2 sm:mr-3" />
+                {isLoading ? 'Connecting...' : 'Sign up with Google'}
+              </Button>
             </TabsContent>
           </Tabs>
         </div>
