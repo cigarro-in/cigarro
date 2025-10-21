@@ -1,8 +1,13 @@
 // Cloudflare Pages middleware for SPA routing
-export function onRequest(context) {
+export async function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
   
-  // Let Cloudflare Pages handle everything - don't interfere
+  // Skip middleware for /functions/* routes - let them handle directly
+  if (url.pathname.startsWith('/functions/')) {
+    return next();
+  }
+  
+  // Let Cloudflare Pages handle everything else
   return next();
 }
