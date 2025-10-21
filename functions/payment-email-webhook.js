@@ -603,8 +603,9 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
   
   console.log('📝 Update data:', JSON.stringify(updateData));
 
+  // Query by transaction_id instead of id (orderId is actually the transaction_id like TXN42229027)
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`,
+    `${env.SUPABASE_URL}/rest/v1/orders?transaction_id=eq.${orderId}`,
     {
       method: 'PATCH',
       headers,
