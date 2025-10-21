@@ -185,10 +185,14 @@ export async function onRequest(context) {
       if (orderUpdated) {
         console.log('✅ Order verified successfully!');
         
-        // Update log - verification complete
+        // Update log - verification complete with all payment details
         await updateVerificationLog(env, logId, {
           status: 'verified',
-          verified_at: new Date().toISOString()
+          verified_at: new Date().toISOString(),
+          bank_name: parsedPayment.bankName,
+          upi_reference: parsedPayment.upiReference,
+          sender_vpa: parsedPayment.senderVPA,
+          amount: parsedPayment.amount
         });
         
         return new Response(JSON.stringify({ 
@@ -590,7 +594,10 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
 
   const updateData = {
     payment_verified: 'YES',
-    payment_details: paymentDetails,
+    payment_verified_at: new Date().toISOString(),
+    payment_confirmed: true,
+    payment_confirmed_at: new Date().toISOString(),
+    auto_verified: true,
     status: 'confirmed'
   };
   
