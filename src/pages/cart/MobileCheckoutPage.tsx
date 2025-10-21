@@ -828,9 +828,9 @@ export function MobileCheckoutPage() {
       setIsConfirmingPayment(true);
       
       // Start verification IMMEDIATELY when pay button is clicked
-      // The Cloudflare function will poll for 60 seconds
+      // The Cloudflare function will poll for 30 seconds
       console.log('🔍 Starting payment verification immediately...');
-      toast.info('Verifying your payment... This may take up to 60 seconds.');
+      toast.info('Verifying your payment... This may take up to 30 seconds.');
       
       // Start verification in background
       (async () => {
@@ -948,7 +948,7 @@ export function MobileCheckoutPage() {
     
     // Start verification IMMEDIATELY when user clicks "I've Paid"
     console.log('🔍 Starting payment verification immediately...');
-    toast.info('Verifying your payment... This may take up to 60 seconds.');
+    toast.info('Verifying your payment... This may take up to 30 seconds.');
     
     // Start verification immediately
     (async () => {
@@ -1621,7 +1621,7 @@ export function MobileCheckoutPage() {
                   </h2>
                   <p className="text-base text-dark/70 font-sans">
                     {paymentStage === 'verifying' 
-                      ? 'Checking for payment confirmation. This may take up to 60 seconds.'
+                      ? 'Checking for payment confirmation. This may take up to 30 seconds.'
                       : 'Return here after completing payment. We\'ll verify automatically.'}
                   </p>
                 </div>

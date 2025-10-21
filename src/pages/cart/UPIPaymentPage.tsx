@@ -96,7 +96,7 @@ export function UPIPaymentPage() {
     
     try {
       console.log('🔍 Starting automatic payment verification...');
-      toast.info('Verifying your payment... This may take up to 60 seconds.');
+      toast.info('Verifying your payment... This may take up to 30 seconds.');
       
       // Call payment verification function
       const verificationResponse = await fetch('/payment-email-webhook', {
