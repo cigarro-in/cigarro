@@ -579,6 +579,8 @@ async function parsePaymentEmail(email, env) {
  * Update order status in Supabase
  */
 async function updateOrderStatus(env, orderId, status, paymentDetails) {
+  console.log(`🔄 Updating order ${orderId} to status: ${status}`);
+  
   const headers = {
     'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
     'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
@@ -586,20 +588,33 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
     'Prefer': 'return=representation',
   };
 
+  const updateData = {
+    payment_verified: 'YES',
+    payment_details: paymentDetails,
+    status: 'confirmed'
+  };
+  
+  console.log('📝 Update data:', JSON.stringify(updateData));
+
   const response = await fetch(
     `${env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`,
     {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({
-        payment_verified: 'YES',
-        payment_details: paymentDetails,
-        status: 'confirmed'
-      }),
+      body: JSON.stringify(updateData),
     }
   );
 
-  return response.ok;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ Supabase update failed (${response.status}):`, errorText);
+    return false;
+  }
+  
+  const result = await response.json();
+  console.log('✅ Supabase response:', JSON.stringify(result));
+  
+  return true;
 }
 
 /**
