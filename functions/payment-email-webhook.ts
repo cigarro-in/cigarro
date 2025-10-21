@@ -1,25 +1,36 @@
 /**
- * Cloudflare Function: On-Demand Payment Email Verification
+ * Cloudflare Function: On-Demand Payment Email Verification with Gmail OAuth2
  * Checks Gmail for payment confirmation emails when order is placed
  * 
  * Flow:
  * 1. Frontend calls this after order creation
- * 2. Connect to Gmail via IMAP
- * 3. Search for payment confirmation email (60 second timeout)
+ * 2. Get Gmail access token using OAuth2 refresh token
+ * 3. Search Gmail API for payment confirmation email (60 second timeout)
  * 4. Parse email to extract payment details
  * 5. Match payment with order
  * 6. Update order status in Supabase
- * 7. Return verification result
+ * 7. Log all steps to payment_verification_logs
+ * 8. Return verification result
  */
 
 interface Env {
-  // Environment variables
-  GMAIL_EMAIL: string; // hrejuh@gmail.com
-  GMAIL_APP_PASSWORD: string; // Gmail app password
+  // Gmail OAuth2 credentials
+  GMAIL_CLIENT_ID: string;
+  GMAIL_CLIENT_SECRET: string;
+  GMAIL_REFRESH_TOKEN: string;
+  GMAIL_USER_EMAIL: string; // hrejuh@gmail.com
+  
+  // Supabase credentials
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  WEBHOOK_SECRET: string; // For verifying requests
+  
+  // Security
+  WEBHOOK_SECRET: string;
 }
+
+// In-memory cache for access token (lasts 1 hour)
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt: number = 0;
 
 interface VerificationRequest {
   orderId: string;
@@ -265,22 +276,41 @@ async function searchGmailEmails(
   transactionId: string,
   amount: number
 ): Promise<any[]> {
-  // Simplified search - just look for recent payment emails with the amount
+  // SECURITY: Only search emails from verified bank/payment domains
+  const trustedDomains = [
+    'alerts@hdfcbank.net',
+    'alerts.mcb@hdfcbank.net', 
+    'no-reply@phonepe.com',
+    'noreply@paytm.com',
+    'alerts@icicibank.com',
+    'no-reply@axisbank.com',
+    'sbicard.alert@sbi.co.in',
+    'alerts@yesbank.in',
+    'payments-noreply@google.com'
+  ];
+  
+  const fromQuery = trustedDomains.map(email => `from:${email}`).join(' OR ');
+  
   const searchQuery = [
-    'from:(phonepe.com OR google.com OR paytm.com OR npci.org.in OR hdfcbank.com OR icicibank.com OR axisbank.com OR sbi.co.in OR yesbank.in)',
-    'subject:(payment OR transaction OR successful OR credited)',
+    `(${fromQuery})`, // Only from trusted domains
+    'subject:(payment OR transaction OR successful OR credited OR received)',
     `"Rs. ${amount}" OR "Rs ${amount}" OR "₹${amount}"`,
     'newer_than:5m' // Only check emails from last 5 minutes
   ].join(' ');
   
-  console.log('Searching Gmail with query:', searchQuery);
+  console.log('🔍 Searching trusted bank emails only');
+  console.log('📧 Trusted domains:', trustedDomains.length);
+  
+  console.log('🔎 Search query:', searchQuery.substring(0, 100) + '...');
   
   // Use Gmail API search endpoint
   const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}`;
   
+  const accessToken = await getGmailAccessToken(env);
+  
   const response = await fetch(searchUrl, {
     headers: {
-      'Authorization': `Bearer ${await getAppPasswordToken(env)}`
+      'Authorization': `Bearer ${accessToken}`
     }
   });
   
@@ -291,41 +321,57 @@ async function searchGmailEmails(
   const data = await response.json();
   
   if (!data.messages || data.messages.length === 0) {
-    console.log('No matching emails found');
+    console.log('❌ No matching emails found from trusted domains');
     return [];
   }
   
-  console.log(`Found ${data.messages.length} potential emails`);
+  console.log(`✅ Found ${data.messages.length} potential payment emails`);
   
-  // Fetch and check each email for exact amount match
+  // SECURITY: Limit to first 3 emails only to prevent excessive API calls
   const matchingEmails: any[] = [];
+  const emailsToCheck = data.messages.slice(0, 3);
   
-  for (const message of data.messages.slice(0, 5)) { // Check first 5 emails
+  console.log(`📨 Checking ${emailsToCheck.length} emails for exact amount match...`);
+  
+  for (const message of emailsToCheck) {
+    const accessToken = await getGmailAccessToken(env);
+    
     const emailResponse = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=full`,
       {
         headers: {
-          'Authorization': `Bearer ${await getAppPasswordToken(env)}`
+          'Authorization': `Bearer ${accessToken}`
         }
       }
     );
     
     if (emailResponse.ok) {
       const email = await emailResponse.json();
+      
+      // Extract sender for logging
+      const fromHeader = email.payload?.headers?.find((h: any) => h.name.toLowerCase() === 'from');
+      const sender = fromHeader?.value || 'Unknown';
+      
+      console.log(`📧 Checking email from: ${sender}`);
+      
       const body = extractEmailBody(email);
       
       // Extract amount from email body
       const amountMatch = body.match(/Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)|₹\s*([0-9,]+(?:\.[0-9]{2})?)/i);
       if (amountMatch) {
         const emailAmount = parseFloat((amountMatch[1] || amountMatch[2]).replace(/,/g, ''));
-        console.log(`Email amount: ${emailAmount}, Expected: ${amount}`);
+        console.log(`💰 Email amount: ₹${emailAmount}, Expected: ₹${amount}`);
         
         // Check if amounts match (within 0.01 tolerance)
         if (Math.abs(emailAmount - amount) < 0.01) {
-          console.log('✅ Amount matches!');
+          console.log(`✅ MATCH FOUND! Email from ${sender}`);
           matchingEmails.push(email);
           break; // Found a match, stop searching
+        } else {
+          console.log(`❌ Amount mismatch (difference: ₹${Math.abs(emailAmount - amount).toFixed(2)})`);
         }
+      } else {
+        console.log(`⚠️ Could not extract amount from email`);
       }
     }
   }
@@ -334,13 +380,47 @@ async function searchGmailEmails(
 }
 
 /**
- * Get access token using app password
- * Simpler than full OAuth flow
+ * Get Gmail access token using OAuth2 refresh token
+ * Caches token for 1 hour to avoid unnecessary refreshes
  */
-async function getAppPasswordToken(env: Env): Promise<string> {
-  // For app password, we use basic auth
-  const credentials = btoa(`${env.GMAIL_EMAIL}:${env.GMAIL_APP_PASSWORD}`);
-  return credentials;
+async function getGmailAccessToken(env: Env): Promise<string> {
+  // Check if cached token is still valid
+  if (cachedAccessToken && Date.now() < tokenExpiresAt) {
+    console.log('✅ Using cached access token');
+    return cachedAccessToken;
+  }
+  
+  console.log('🔄 Refreshing access token...');
+  
+  // Exchange refresh token for access token
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.GMAIL_CLIENT_ID,
+      client_secret: env.GMAIL_CLIENT_SECRET,
+      refresh_token: env.GMAIL_REFRESH_TOKEN,
+      grant_type: 'refresh_token'
+    })
+  });
+  
+  if (!tokenResponse.ok) {
+    const error = await tokenResponse.text();
+    throw new Error(`Failed to refresh token: ${error}`);
+  }
+  
+  const tokens = await tokenResponse.json();
+  
+  if (!tokens.access_token) {
+    throw new Error('No access token in response');
+  }
+  
+  // Cache the token (expires in 1 hour, we cache for 55 minutes to be safe)
+  cachedAccessToken = tokens.access_token;
+  tokenExpiresAt = Date.now() + (55 * 60 * 1000);
+  
+  console.log('✅ Access token refreshed successfully');
+  return tokens.access_token;
 }
 
 /**

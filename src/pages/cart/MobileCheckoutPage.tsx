@@ -841,7 +841,7 @@ export function MobileCheckoutPage() {
           console.log('🔍 Starting payment verification...');
           toast.info('Verifying your payment... This may take up to 60 seconds.');
           
-          const verificationResponse = await fetch('/payment-email-webhook', {
+          const verificationResponse = await fetch('/functions/payment-email-webhook', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -958,7 +958,7 @@ export function MobileCheckoutPage() {
         console.log('🔍 Starting payment verification...');
         toast.info('Verifying your payment... This may take up to 60 seconds.');
         
-        const verificationResponse = await fetch('/payment-email-webhook', {
+        const verificationResponse = await fetch('/functions/payment-email-webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -2,6 +2,9 @@
 https://www.cigarro.in/* https://cigarro.in/:splat 301
 http://www.cigarro.in/* https://cigarro.in/:splat 301
 
+# Cloudflare Functions
+/payment-email-webhook /functions/payment-email-webhook 200!
+
 # Static files - serve directly (must come before SPA catch-all)
 /sitemap.xml /sitemap.xml 200!
 /robots.txt /robots.txt 200!

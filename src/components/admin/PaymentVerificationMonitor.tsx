@@ -35,8 +35,8 @@ interface PaymentLog {
   order?: {
     id: string;
     status: string;
-    customer_name: string;
-    customer_email: string;
+    shipping_name: string;
+    shipping_phone: string;
   };
 }
 
@@ -88,6 +88,7 @@ export function PaymentVerificationMonitor() {
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
+      console.log('Fetching payment verification logs...');
       // Fetch logs with order details
       const { data: logsData, error: logsError } = await supabase
         .from('payment_verification_logs')
@@ -96,15 +97,19 @@ export function PaymentVerificationMonitor() {
           order:orders!payment_verification_logs_order_id_fkey (
             id,
             status,
-            customer_name,
-            customer_email
+            shipping_name,
+            shipping_phone
           )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (logsError) throw logsError;
+      if (logsError) {
+        console.error('Error fetching logs:', logsError);
+        throw logsError;
+      }
 
+      console.log('Fetched logs:', logsData);
       setLogs(logsData || []);
 
       // Calculate stats
@@ -272,8 +277,8 @@ export function PaymentVerificationMonitor() {
                       </td>
                       <td className="py-3 px-4 text-sm text-dark">
                         <div>
-                          <p className="font-medium">{log.order?.customer_name || 'N/A'}</p>
-                          <p className="text-xs text-dark/60">{log.order?.customer_email || 'N/A'}</p>
+                          <p className="font-medium">{log.order?.shipping_name || 'N/A'}</p>
+                          <p className="text-xs text-dark/60">{log.order?.shipping_phone || 'N/A'}</p>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm font-semibold text-dark">
@@ -351,11 +356,11 @@ export function PaymentVerificationMonitor() {
                   </div>
                   <div>
                     <p className="text-dark/60">Customer</p>
-                    <p className="text-dark">{selectedLog.order?.customer_name || 'N/A'}</p>
+                    <p className="text-dark">{selectedLog.order?.shipping_name || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-dark/60">Email</p>
-                    <p className="text-dark text-xs">{selectedLog.order?.customer_email || 'N/A'}</p>
+                    <p className="text-dark/60">Phone</p>
+                    <p className="text-dark text-xs">{selectedLog.order?.shipping_phone || 'N/A'}</p>
                   </div>
                 </div>
               </div>
