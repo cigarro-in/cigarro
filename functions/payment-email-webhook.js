@@ -262,34 +262,14 @@ async function checkGmailForPayment(env, transactionId, amount, timeoutSeconds) 
  * Uses Gmail API with OAuth2
  */
 async function searchGmailEmails(env, transactionId, amount) {
-  // SECURITY: Only search emails from verified bank/payment domains
-  const trustedDomains = [
-    'alerts@hdfcbank.net',
-    'alerts.mcb@hdfcbank.net', 
-    'no-reply@phonepe.com',
-    'noreply@paytm.com',
-    'alerts@icicibank.com',
-    'no-reply@axisbank.com',
-    'sbicard.alert@sbi.co.in',
-    'alerts@yesbank.in',
-    'payments-noreply@google.com'
-  ];
+  // SIMPLIFIED: Get last 5 emails from inbox, match only amount
+  const searchQuery = 'newer_than:5m'; // Only check emails from last 5 minutes
   
-  const fromQuery = trustedDomains.map(email => `from:${email}`).join(' OR ');
+  console.log('🔍 Fetching last 5 emails from inbox');
+  console.log('💰 Looking for amount: ₹' + amount);
   
-  const searchQuery = [
-    `(${fromQuery})`, // Only from trusted domains
-    'subject:(payment OR transaction OR successful OR credited OR received)',
-    `"Rs. ${amount}" OR "Rs ${amount}" OR "₹${amount}"`,
-    'newer_than:5m' // Only check emails from last 5 minutes
-  ].join(' ');
-  
-  console.log('🔍 Searching trusted bank emails only');
-  console.log('📧 Trusted domains:', trustedDomains.length);
-  console.log('🔎 Search query:', searchQuery.substring(0, 100) + '...');
-  
-  // Use Gmail API search endpoint
-  const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}`;
+  // Use Gmail API search endpoint - get last 5 messages
+  const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5&q=${encodeURIComponent(searchQuery)}`;
   
   const accessToken = await getGmailAccessToken(env);
   
@@ -306,19 +286,18 @@ async function searchGmailEmails(env, transactionId, amount) {
   const data = await response.json();
   
   if (!data.messages || data.messages.length === 0) {
-    console.log('❌ No matching emails found from trusted domains');
+    console.log('❌ No emails found in last 5 minutes');
     return [];
   }
   
-  console.log(`✅ Found ${data.messages.length} potential payment emails`);
+  console.log(`📧 Found ${data.messages.length} emails in last 5 minutes`);
   
-  // SECURITY: Limit to first 3 emails only to prevent excessive API calls
+  // Check all emails and display their content
   const matchingEmails = [];
-  const emailsToCheck = data.messages.slice(0, 3);
   
-  console.log(`📨 Checking ${emailsToCheck.length} emails for exact amount match...`);
+  console.log(`📨 Checking all ${data.messages.length} emails for amount match...`);
   
-  for (const message of emailsToCheck) {
+  for (const message of data.messages) {
     const accessToken = await getGmailAccessToken(env);
     
     const emailResponse = await fetch(
@@ -333,30 +312,51 @@ async function searchGmailEmails(env, transactionId, amount) {
     if (emailResponse.ok) {
       const email = await emailResponse.json();
       
-      // Extract sender for logging
+      // Extract sender and subject for logging
       const fromHeader = email.payload?.headers?.find(h => h.name.toLowerCase() === 'from');
+      const subjectHeader = email.payload?.headers?.find(h => h.name.toLowerCase() === 'subject');
       const sender = fromHeader?.value || 'Unknown';
+      const subject = subjectHeader?.value || 'No Subject';
       
-      console.log(`📧 Checking email from: ${sender}`);
+      console.log(`\n📧 Email ${data.messages.indexOf(message) + 1}:`);
+      console.log(`   From: ${sender}`);
+      console.log(`   Subject: ${subject}`);
       
       const body = extractEmailBody(email);
+      console.log(`   Body preview: ${body.substring(0, 200)}...`);
       
-      // Extract amount from email body
-      const amountMatch = body.match(/Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)|₹\s*([0-9,]+(?:\.[0-9]{2})?)/i);
-      if (amountMatch) {
-        const emailAmount = parseFloat((amountMatch[1] || amountMatch[2]).replace(/,/g, ''));
-        console.log(`💰 Email amount: ₹${emailAmount}, Expected: ₹${amount}`);
-        
-        // Check if amounts match (within 0.01 tolerance)
-        if (Math.abs(emailAmount - amount) < 0.01) {
-          console.log(`✅ MATCH FOUND! Email from ${sender}`);
-          matchingEmails.push(email);
-          break; // Found a match, stop searching
-        } else {
-          console.log(`❌ Amount mismatch (difference: ₹${Math.abs(emailAmount - amount).toFixed(2)})`);
+      // Extract amount from email body - try multiple patterns
+      const amountPatterns = [
+        /Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)/gi,
+        /₹\s*([0-9,]+(?:\.[0-9]{2})?)/gi,
+        /INR\s*([0-9,]+(?:\.[0-9]{2})?)/gi,
+        /amount[:\s]+Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)/gi,
+        /amount[:\s]+₹\s*([0-9,]+(?:\.[0-9]{2})?)/gi
+      ];
+      
+      let foundMatch = false;
+      for (const pattern of amountPatterns) {
+        const matches = [...body.matchAll(pattern)];
+        if (matches.length > 0) {
+          console.log(`   💰 Found ${matches.length} amount(s) in email:`);
+          for (const match of matches) {
+            const emailAmount = parseFloat(match[1].replace(/,/g, ''));
+            console.log(`      - ₹${emailAmount}`);
+            
+            // Check if amounts match (within 0.01 tolerance)
+            if (Math.abs(emailAmount - amount) < 0.01) {
+              console.log(`   ✅ MATCH FOUND! Amount ₹${emailAmount} matches expected ₹${amount}`);
+              matchingEmails.push(email);
+              foundMatch = true;
+              break;
+            }
+          }
+          if (foundMatch) break;
         }
-      } else {
-        console.log(`⚠️ Could not extract amount from email`);
+      }
+      
+      if (!foundMatch) {
+        console.log(`   ❌ No matching amount found (expected: ₹${amount})`);
       }
     }
   }

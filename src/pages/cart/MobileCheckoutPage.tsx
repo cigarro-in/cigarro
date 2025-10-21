@@ -827,19 +827,14 @@ export function MobileCheckoutPage() {
       setPaymentStage('processing');
       setIsConfirmingPayment(true);
       
-      // Open UPI app
-      window.location.href = upiLink;
-      
-      // Start verification immediately after opening UPI app
+      // Start verification IMMEDIATELY when pay button is clicked
       // The Cloudflare function will poll for 60 seconds
-      setTimeout(async () => {
-        // Change to verifying stage
-        setPaymentStage('verifying');
-        
-        // Now start verification
+      console.log('🔍 Starting payment verification immediately...');
+      toast.info('Verifying your payment... This may take up to 60 seconds.');
+      
+      // Start verification in background
+      (async () => {
         try {
-          console.log('🔍 Starting payment verification...');
-          toast.info('Verifying your payment... This may take up to 60 seconds.');
           
           const verificationResponse = await fetch('/payment-email-webhook', {
             method: 'POST',
@@ -891,7 +886,10 @@ export function MobileCheckoutPage() {
         } finally {
           setIsProcessing(false);
         }
-      }, 5000); // Wait 5 seconds for UPI app to open, then start verification
+      })(); // Execute immediately
+      
+      // Open UPI app after starting verification
+      window.location.href = upiLink;
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -945,24 +943,21 @@ export function MobileCheckoutPage() {
 
   const handleQRPaymentDone = async () => {
     setShowQRDialog(false);
-    setPaymentStage('processing');
+    setPaymentStage('verifying');
     setIsConfirmingPayment(true);
     
-    // Start verification immediately after user clicks "I've Paid"
-    setTimeout(async () => {
-      // Change to verifying stage
-      setPaymentStage('verifying');
-      
-      // Now start verification
+    // Start verification IMMEDIATELY when user clicks "I've Paid"
+    console.log('🔍 Starting payment verification immediately...');
+    toast.info('Verifying your payment... This may take up to 60 seconds.');
+    
+    // Start verification immediately
+    (async () => {
       try {
-        console.log('🔍 Starting payment verification...');
-        toast.info('Verifying your payment... This may take up to 60 seconds.');
-        
         const verificationResponse = await fetch('/payment-email-webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'default-secret'}`
+            'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
           },
           body: JSON.stringify({
             orderId: transactionId,
@@ -1008,16 +1003,7 @@ export function MobileCheckoutPage() {
       } finally {
         setIsProcessing(false);
       }
-    }, 2000); // Wait 2 seconds after "I've Paid" click, then start verification
-  };
-
-  const handleProcessOrder = async () => {
-    if (selectedPaymentMethod === 'upi') {
-      await handleUPIPayment();
-    } else {
-      // Handle other payment methods if needed
-      toast.error('Please select a payment method');
-    }
+    })(); // Execute immediately
   };
 
   if (!user) {
