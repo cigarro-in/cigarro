@@ -13,18 +13,23 @@
  * 8. Return verification result
  */
 
+// CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Content-Type': 'application/json'
+};
+
 // In-memory cache for access token (lasts 1 hour)
+// NOTE: This persists across requests in the same worker instance
 let cachedAccessToken = null;
 let tokenExpiresAt = 0;
 
 // Handle CORS preflight
 export async function onRequestOptions() {
   return new Response(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
+    headers: corsHeaders,
   });
 }
 
@@ -32,20 +37,26 @@ export async function onRequestOptions() {
 export async function onRequestPost(context) {
   const { request, env } = context;
   
+  console.log('📨 Payment verification webhook called');
+  console.log('🌐 Request URL:', request.url);
+  console.log('🔐 Auth header present:', !!request.headers.get('Authorization'));
+  
   try {
       // Verify webhook secret
       const authHeader = request.headers.get('Authorization');
       if (authHeader !== `Bearer ${env.WEBHOOK_SECRET}`) {
-        console.error('Invalid webhook secret');
+        console.error('❌ Invalid webhook secret');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
           status: 401,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       }
 
+      console.log('✅ Webhook secret verified');
+
       // Parse request body
       const verificationRequest = await request.json();
-      console.log('🔍 Verification request:', verificationRequest);
+      console.log('🔍 Verification request:', JSON.stringify(verificationRequest, null, 2));
 
       // Create initial log entry
       const logId = await createVerificationLog(env, {
@@ -78,7 +89,7 @@ export async function onRequestPost(context) {
           message: 'Payment email not found yet'
         }), { 
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       }
 
@@ -107,7 +118,7 @@ export async function onRequestPost(context) {
           message: 'Could not parse payment email'
         }), { 
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       }
 
@@ -139,7 +150,7 @@ export async function onRequestPost(context) {
           message: 'Payment amount does not match'
         }), { 
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       }
 
@@ -173,7 +184,7 @@ export async function onRequestPost(context) {
           payment: parsedPayment
         }), { 
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       } else {
         console.log('❌ Failed to update order status');
@@ -189,7 +200,7 @@ export async function onRequestPost(context) {
           message: 'Failed to update order status'
         }), { 
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: corsHeaders
         });
       }
 
@@ -200,7 +211,7 @@ export async function onRequestPost(context) {
         message: error.message
       }), { 
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: corsHeaders
       });
     }
 }

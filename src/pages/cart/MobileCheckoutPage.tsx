@@ -830,8 +830,8 @@ export function MobileCheckoutPage() {
       // Open UPI app
       window.location.href = upiLink;
       
-      // Wait for user to return and complete payment (give them time)
-      // Show a message asking them to return after payment
+      // Start verification immediately after opening UPI app
+      // The Cloudflare function will poll for 60 seconds
       setTimeout(async () => {
         // Change to verifying stage
         setPaymentStage('verifying');
@@ -891,7 +891,7 @@ export function MobileCheckoutPage() {
         } finally {
           setIsProcessing(false);
         }
-      }, 60000); // Wait 60 seconds (1 minute) for user to complete payment in UPI app
+      }, 5000); // Wait 5 seconds for UPI app to open, then start verification
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -948,7 +948,7 @@ export function MobileCheckoutPage() {
     setPaymentStage('processing');
     setIsConfirmingPayment(true);
     
-    // Wait for user to complete payment (give them time)
+    // Start verification immediately after user clicks "I've Paid"
     setTimeout(async () => {
       // Change to verifying stage
       setPaymentStage('verifying');
@@ -1008,7 +1008,7 @@ export function MobileCheckoutPage() {
       } finally {
         setIsProcessing(false);
       }
-    }, 60000); // Wait 60 seconds (1 minute) for user to complete payment
+    }, 2000); // Wait 2 seconds after "I've Paid" click, then start verification
   };
 
   const handleProcessOrder = async () => {
