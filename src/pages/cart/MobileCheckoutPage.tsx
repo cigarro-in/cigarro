@@ -827,16 +827,23 @@ export function MobileCheckoutPage() {
       setPaymentStage('processing');
       setIsConfirmingPayment(true);
       
-      // Start verification IMMEDIATELY when pay button is clicked
-      // The Cloudflare function will poll for 30 seconds
-      console.log('🔍 Starting payment verification immediately...');
-      toast.info('Verifying your payment... This may take up to 30 seconds.');
+      // Open UPI app immediately - don't wait for verification
+      // User will leave browser (mobile) or stay on page (desktop)
+      window.location.href = upiLink;
       
-      // Start verification in background
-      (async () => {
+      // Trigger webhook verification ONLY when user returns from UPI app
+      // This ensures the payment email has arrived before we check
+      let webhookTriggered = false;
+      
+      const triggerWebhookVerification = async () => {
+        if (webhookTriggered) return; // Prevent duplicate triggers
+        webhookTriggered = true;
+        
         try {
+          console.log('🚀 Triggering webhook verification (user returned)...');
+          toast.info('Checking for payment confirmation...');
           
-          const verificationResponse = await fetch('/payment-email-webhook', {
+          const response = await fetch('/payment-email-webhook', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -850,46 +857,106 @@ export function MobileCheckoutPage() {
             })
           });
           
-          if (!verificationResponse.ok) {
-            throw new Error(`Verification failed: ${verificationResponse.status}`);
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Webhook result:', result);
+          }
+        } catch (error) {
+          console.log('Webhook error:', error);
+        }
+      };
+      
+      // Trigger webhook when user returns to page (after 5 seconds delay for email to arrive)
+      const handleVisibilityChangeForWebhook = () => {
+        if (!document.hidden && !webhookTriggered) {
+          console.log('👀 User returned, waiting 5s for email to arrive...');
+          setTimeout(() => {
+            triggerWebhookVerification();
+          }, 5000); // Wait 5 seconds after return for email to arrive
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChangeForWebhook);
+      
+      // Start polling for payment status (checks database)
+      // This works whether user stays on page or returns later
+      const pollInterval = setInterval(async () => {
+        try {
+          console.log('🔍 Polling for payment status...');
+          
+          // Check order status in database
+          const { data: order, error } = await supabase
+            .from('orders')
+            .select('payment_verified, payment_confirmed, status')
+            .eq('transaction_id', txnId)
+            .single();
+          
+          if (error) {
+            console.error('Error checking order status:', error);
+            return;
           }
           
-          const result = await verificationResponse.json();
-          console.log('Verification result:', result);
+          if (order && (order.payment_verified === 'YES' || order.payment_confirmed)) {
+            // Payment verified!
+            clearInterval(pollInterval);
+            console.log('✅ Payment verified!');
+            setPaymentStage('confirmed');
+            setIsPaymentCompleted(true);
+            await clearCart();
+            toast.success('Payment verified successfully!');
+            setIsProcessing(false);
+            setIsConfirmingPayment(false);
+          }
+        } catch (error) {
+          console.error('Error polling payment status:', error);
+        }
+      }, 3000); // Poll every 3 seconds
+      
+      // Listen for page visibility change (when user returns from UPI app)
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          console.log('👀 User returned to page, checking payment status...');
+          toast.info('Checking payment status...');
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Stop polling after 60 seconds
+      setTimeout(async () => {
+        clearInterval(pollInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChangeForWebhook);
+        
+        // Check one final time
+        try {
+          const { data: order } = await supabase
+            .from('orders')
+            .select('payment_verified, payment_confirmed, status')
+            .eq('transaction_id', txnId)
+            .single();
           
-          if (result.verified) {
-            // Payment verified successfully!
-            console.log('✅ Payment verified automatically!');
+          if (order && (order.payment_verified === 'YES' || order.payment_confirmed)) {
+            console.log('✅ Payment verified!');
             setPaymentStage('confirmed');
             setIsPaymentCompleted(true);
             await clearCart();
             toast.success('Payment verified successfully!');
           } else {
-            // Verification failed or timed out
-            console.log('⏰ Auto-verification timed out, order saved as pending');
             setPaymentStage('pending');
             toast.info('Order saved! We\'ll verify your payment shortly.');
-            // Redirect to orders page after 3 seconds
-            setTimeout(() => {
-              navigate('/orders');
-            }, 3000);
+            setTimeout(() => navigate('/orders'), 3000);
           }
         } catch (error) {
-          console.error('❌ Verification error:', error);
-          // Show error and keep order as pending
+          console.error('Final check error:', error);
           setPaymentStage('pending');
-          toast.error('Could not verify payment automatically. Order saved as pending.');
-          // Redirect to orders page after 3 seconds
-          setTimeout(() => {
-            navigate('/orders');
-          }, 3000);
+          toast.info('Order saved! We\'ll verify your payment shortly.');
+          setTimeout(() => navigate('/orders'), 3000);
         } finally {
           setIsProcessing(false);
+          setIsConfirmingPayment(false);
         }
-      })(); // Execute immediately
-      
-      // Open UPI app after starting verification
-      window.location.href = upiLink;
+      }, 60000); // 60 seconds
       
     } catch (error) {
       console.error('Error processing payment:', error);
