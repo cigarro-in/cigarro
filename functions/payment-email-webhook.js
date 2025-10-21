@@ -52,13 +52,12 @@ export async function onRequest(context) {
   try {
       // Verify webhook secret
       const authHeader = request.headers.get('Authorization');
-      const expectedSecret = env.WEBHOOK_SECRET || 'default-secret'; // Fallback for testing
-      
-      console.log('🔑 Expected secret:', expectedSecret.substring(0, 10) + '...');
-      console.log('🔑 Received secret:', authHeader?.substring(0, 20) + '...');
+      const expectedSecret = env.WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'; // Fallback to actual secret
       
       if (authHeader !== `Bearer ${expectedSecret}`) {
         console.error('❌ Invalid webhook secret');
+        console.error('Expected:', `Bearer ${expectedSecret.substring(0, 10)}...`);
+        console.error('Received:', authHeader?.substring(0, 25) + '...');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
           status: 401,
           headers: corsHeaders

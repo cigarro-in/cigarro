@@ -845,7 +845,7 @@ export function MobileCheckoutPage() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'default-secret'}`
+              'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
             },
             body: JSON.stringify({
               orderId: txnId,
