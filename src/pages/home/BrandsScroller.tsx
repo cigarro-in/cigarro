@@ -83,7 +83,7 @@ export function BrandsScroller() {
 
         {/* Horizontal Scroll Container */}
         <div 
-          className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2"
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2"
           style={{ 
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
@@ -94,20 +94,20 @@ export function BrandsScroller() {
             <Link
               key={brand.id}
               to={`/brands/${brand.slug}`}
-              className="flex-shrink-0 snap-start w-[120px] group"
+              className="flex-shrink-0 snap-center w-[140px] group"
             >
-              <div className="bg-white rounded-xl border border-coyote/20 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 h-full p-4">
-                {/* Brand Logo/Name */}
-                <div className="relative aspect-square bg-gradient-to-br from-coyote/5 to-canyon/5 rounded-lg flex items-center justify-center mb-3">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 hover:scale-105 h-full">
+                {/* Brand Logo */}
+                <div className="relative aspect-square bg-creme-light flex items-center justify-center p-6">
                   {brand.logo_url ? (
                     <img
                       src={brand.logo_url}
                       alt={brand.name}
-                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                     />
                   ) : (
                     <div className="text-center">
-                      <div className="text-2xl font-serif font-bold text-dark/80 leading-tight">
+                      <div className="text-4xl font-serif font-bold text-canyon/80 leading-tight">
                         {brand.name.substring(0, 2).toUpperCase()}
                       </div>
                     </div>
@@ -115,15 +115,10 @@ export function BrandsScroller() {
                 </div>
 
                 {/* Brand Name */}
-                <div className="text-center">
-                  <h3 className="text-dark font-medium text-sm leading-tight group-hover:text-canyon transition-colors line-clamp-2 mb-1">
+                <div className="bg-white px-3 py-3 text-center">
+                  <h3 className="text-dark font-semibold text-sm leading-tight group-hover:text-canyon transition-colors line-clamp-2">
                     {brand.name}
                   </h3>
-                  {brand.product_count !== undefined && (
-                    <p className="text-dark/60 text-xs">
-                      {brand.product_count} {brand.product_count === 1 ? 'Product' : 'Products'}
-                    </p>
-                  )}
                 </div>
               </div>
             </Link>

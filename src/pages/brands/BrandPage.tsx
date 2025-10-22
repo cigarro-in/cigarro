@@ -1,20 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Star, Package, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart } from '../../hooks/useCart';
 
 interface Brand {
+  id: string;
   name: string;
-  description?: string;
-  logo_url?: string;
-  established_year?: number;
-  origin_country?: string;
-  website?: string;
+  slug: string;
+  description: string | null;
+  logo_url: string | null;
+  website_url: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  sort_order: number;
+  meta_title: string | null;
+  meta_description: string | null;
+  heritage: {
+    founded_year?: string;
+    origin_country?: string;
+    founder?: string;
+    story?: string;
+  } | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Product {
@@ -48,31 +61,36 @@ export function BrandPage() {
     try {
       setIsLoading(true);
 
-      // Get brand name from slug
-      const brandName = slug?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
+      // Fetch brand from database
+      const { data: brandData, error: brandError } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .single();
+
+      if (brandError) {
+        console.error('Brand not found:', brandError);
+        setBrand(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setBrand(brandData);
 
       // Fetch brand products
-      const { data: productsData, error } = await supabase
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
           id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at
         `)
-        .eq('brand', brandName)
+        .eq('brand', brandData.name)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (productsError) throw productsError;
 
       setProducts(productsData || []);
-
-      // Set brand info (you can expand this with a brands table later)
-      setBrand({
-        name: brandName,
-        description: `${brandName} has been a trusted name in premium tobacco products for decades, offering exceptional quality and distinctive flavor profiles that cater to discerning smokers worldwide.`,
-        established_year: 1950 + Math.floor(Math.random() * 70), // Mock data
-        origin_country: 'Various',
-        website: `https://${brandName.toLowerCase().replace(/\s+/g, '')}.com`
-      });
     } catch (error) {
       console.error('Error fetching brand data:', error);
       toast.error('Failed to load brand information');
@@ -123,10 +141,10 @@ export function BrandPage() {
   return (
     <>
       <Helmet>
-        <title>{brand.name} - Premium Cigarettes | Cigarro</title>
-        <meta name="description" content={`${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`} />
+        <title>{brand.meta_title || `${brand.name} - Premium Cigarettes | Cigarro`}</title>
+        <meta name="description" content={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`} />
         <meta name="robots" content="index, follow" />
-        <link rel="canonical" href={`https://cigarro.in/brand/${slug}`} />
+        <link rel="canonical" href={`https://cigarro.in/brands/${slug}`} />
       </Helmet>
 
       <div className="min-h-screen bg-creme">
@@ -141,98 +159,182 @@ export function BrandPage() {
           </Link>
         </div>
 
-        {/* Brand Hero Section */}
-        <div className="bg-white shadow-sm">
-          <div className="main-container py-16">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              {/* Brand Logo and Info */}
-              <div className="text-center lg:text-left">
-                <div className="w-32 h-32 bg-gradient-to-br from-canyon to-coyote rounded-full flex items-center justify-center mx-auto lg:mx-0 mb-6">
-                  <Star className="w-16 h-16 text-creme" />
-                </div>
+        {/* Brand Hero Section - Elegant Full Width */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="relative bg-creme-light border-b border-coyote/20"
+        >
+          <div className="main-container py-20">
+            <div className="max-w-5xl mx-auto">
+              {/* Brand Logo */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.6 }}
+                className="flex justify-center mb-8"
+              >
+                {brand.logo_url ? (
+                  <div className="w-40 h-40 bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center">
+                    <img
+                      src={brand.logo_url}
+                      alt={brand.name}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-40 h-40 bg-white rounded-2xl shadow-lg flex items-center justify-center">
+                    <span className="text-6xl font-serif font-bold text-canyon">
+                      {brand.name.substring(0, 1)}
+                    </span>
+                  </div>
+                )}
+              </motion.div>
 
-                <h1 className="text-4xl lg:text-5xl font-serif font-bold text-dark mb-4">
-                  {brand.name}
-                </h1>
+              {/* Brand Name */}
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.6 }}
+                className="medium-title text-center mb-6"
+              >
+                {brand.name}
+              </motion.h1>
 
-                <div className="flex items-center justify-center lg:justify-start gap-4 mb-6 text-dark/60">
-                  <span className="font-sans">{brand.established_year}</span>
-                  <span className="w-1 h-1 bg-coyote rounded-full"></span>
-                  <span className="font-sans">{brand.origin_country}</span>
-                  <span className="w-1 h-1 bg-coyote rounded-full"></span>
-                  <span className="font-sans">{products.length} products</span>
-                </div>
+              {/* Heritage Info */}
+              {brand.heritage && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.6 }}
+                  className="flex flex-wrap items-center justify-center gap-6 mb-8 text-dark/70"
+                >
+                  {brand.heritage.founded_year && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-canyon" />
+                      <span className="font-sans text-sm">Est. {brand.heritage.founded_year}</span>
+                    </div>
+                  )}
+                  {brand.heritage.origin_country && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-canyon" />
+                      <span className="font-sans text-sm">{brand.heritage.origin_country}</span>
+                    </div>
+                  )}
+                  {brand.heritage.founder && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-canyon" />
+                      <span className="font-sans text-sm">Founded by {brand.heritage.founder}</span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
-                <p className="text-dark/80 font-sans text-lg leading-relaxed mb-8">
+              {/* Brand Description */}
+              {brand.description && (
+                <motion.p 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.6 }}
+                  className="text-dark/80 font-sans text-lg md:text-xl leading-relaxed text-center max-w-3xl mx-auto mb-8"
+                >
                   {brand.description}
-                </p>
+                </motion.p>
+              )}
 
-                {brand.website && (
+              {/* Brand Story */}
+              {brand.heritage?.story && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.6 }}
+                  className="bg-white rounded-2xl p-8 shadow-md border border-coyote/10 mb-8"
+                >
+                  <h3 className="text-2xl font-serif font-bold text-dark mb-4 text-center">Our Heritage</h3>
+                  <p className="text-dark/70 font-sans leading-relaxed text-center">
+                    {brand.heritage.story}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Website Link & Stats */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.6 }}
+                className="flex flex-col sm:flex-row items-center justify-center gap-6"
+              >
+                {brand.website_url && (
                   <a
-                    href={brand.website}
+                    href={brand.website_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-canyon hover:text-canyon/80 transition-colors font-medium"
+                    className="inline-flex items-center gap-2 bg-dark text-creme-light hover:bg-canyon transition-all duration-300 px-8 py-3 rounded-full font-medium uppercase tracking-wide text-sm shadow-lg hover:shadow-xl"
                   >
+                    <ExternalLink className="w-4 h-4" />
                     Visit Official Website
-                    <ArrowLeft className="w-5 h-5 rotate-45" />
                   </a>
                 )}
-              </div>
-
-              {/* Brand Stats */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-creme p-6 rounded-lg text-center">
-                  <Package className="w-8 h-8 text-canyon mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-dark">{products.length}</div>
-                  <div className="text-dark/60 font-sans">Products</div>
+                <div className="flex items-center gap-2 text-dark/60">
+                  <Package className="w-5 h-5 text-canyon" />
+                  <span className="font-sans text-sm">{products.length} Products Available</span>
                 </div>
-
-                <div className="bg-creme p-6 rounded-lg text-center">
-                  <Star className="w-8 h-8 text-canyon mx-auto mb-3" />
-                  <div className="text-2xl font-bold text-dark">
-                    {products.length > 0 ? (products.reduce((sum, p) => sum + p.rating, 0) / products.length).toFixed(1) : '5.0'}
-                  </div>
-                  <div className="text-dark/60 font-sans">Avg Rating</div>
-                </div>
-              </div>
+              </motion.div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Products Section */}
-        <div className="main-container py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-serif font-bold text-dark mb-4">
+        <div className="main-container py-20">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-dark mb-6">
               {brand.name} Collection
             </h2>
-            <p className="text-dark/80 font-sans max-w-2xl mx-auto">
-              Explore our curated selection of {brand.name} premium cigarettes,
+            <div className="w-24 h-1 bg-canyon mx-auto mb-6"></div>
+            <p className="text-dark/70 font-sans text-lg max-w-2xl mx-auto leading-relaxed">
+              Explore our curated selection of {brand.name} premium products,
               each crafted with exceptional attention to quality and flavor.
             </p>
-          </div>
+          </motion.div>
 
           {products.length === 0 ? (
-            <div className="text-center py-16">
-              <Package className="w-16 h-16 mx-auto mb-4 text-coyote" />
-              <h3 className="text-2xl font-serif text-dark mb-4">No products available</h3>
-              <p className="text-dark/80 mb-8">We're working on bringing you {brand.name} products soon.</p>
-              <Link
-                to="/products"
-                className="inline-flex items-center gap-2 bg-dark text-creme hover:bg-canyon transition-colors px-6 py-3 rounded-full font-medium"
-              >
-                Browse All Products
-                <ShoppingCart className="w-5 h-5" />
-              </Link>
-            </div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-20"
+            >
+              <div className="bg-white rounded-2xl p-12 shadow-md border border-coyote/10 max-w-2xl mx-auto">
+                <Package className="w-20 h-20 mx-auto mb-6 text-canyon/40" />
+                <h3 className="text-3xl font-serif font-bold text-dark mb-4">Coming Soon</h3>
+                <p className="text-dark/70 font-sans text-lg mb-8 leading-relaxed">
+                  We're working on bringing you {brand.name} products soon.
+                  Check back later for our exclusive collection.
+                </p>
+                <Link
+                  to="/products"
+                  className="inline-flex items-center gap-2 bg-dark text-creme-light hover:bg-canyon transition-all duration-300 px-8 py-3 rounded-full font-medium uppercase tracking-wide text-sm shadow-lg hover:shadow-xl"
+                >
+                  Browse All Products
+                  <ArrowLeft className="w-4 h-4 rotate-180" />
+                </Link>
+              </div>
+            </motion.div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 gap-6">
               {products.map((product, index) => (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: index * 0.05 }}
                 >
                   <ProductCard
                     product={product}

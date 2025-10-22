@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
+import { Calendar, User, ArrowRight, Clock, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getBlogImageUrl } from '../../utils/supabase/storage';
 import { supabase } from '../../utils/supabase/client';
@@ -15,10 +15,44 @@ export function BlogSection() {
     description: ''
   });
   const [isLoading, setIsLoading] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   useEffect(() => {
     loadBlogData();
   }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setCanScrollLeft(container.scrollLeft > 0);
+      setCanScrollRight(
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 10
+      );
+    };
+
+    handleScroll();
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [posts]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = container.clientWidth * 0.8;
+    const targetScroll = direction === 'left' 
+      ? container.scrollLeft - scrollAmount
+      : container.scrollLeft + scrollAmount;
+
+    container.scrollTo({
+      left: targetScroll,
+      behavior: 'smooth'
+    });
+  };
 
   const loadBlogData = async () => {
     try {
@@ -90,30 +124,60 @@ export function BlogSection() {
         ) : posts.length > 0 ? (
           <>
             {/* Mobile: Horizontal Carousel */}
-            <div 
-              className="md:hidden flex gap-[1rem] overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-[0.5rem]"
-              style={{ 
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {posts.map((post, index) => (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1, duration: 0.6 }}
-                className="flex-shrink-0 w-[85%] sm:w-[45%] md:w-[38%] snap-start"
+            <div className="md:hidden relative">
+              {/* Navigation Arrows */}
+              <button
+                onClick={() => scroll('left')}
+                disabled={!canScrollLeft}
+                className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg transition-all duration-300 ${
+                  canScrollLeft 
+                    ? 'opacity-100 hover:bg-canyon hover:text-white' 
+                    : 'opacity-0 pointer-events-none'
+                }`}
+                aria-label="Previous blog post"
               >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <button
+                onClick={() => scroll('right')}
+                disabled={!canScrollRight}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg transition-all duration-300 ${
+                  canScrollRight 
+                    ? 'opacity-100 hover:bg-canyon hover:text-white' 
+                    : 'opacity-0 pointer-events-none'
+                }`}
+                aria-label="Next blog post"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Scrollable Container */}
+              <div 
+                ref={scrollContainerRef}
+                className="flex gap-[1rem] overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-[0.5rem] px-1"
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}
+              >
+                {posts.map((post, index) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1, duration: 0.6 }}
+                  className="flex-shrink-0 w-[70%] sm:w-[45%] snap-center"
+                >
                 <Link 
                   to={`/blog/${post.slug}`}
                   className="block h-full"
                 >
-                  <article className="bg-white rounded-[0.75rem] overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02] h-full">
+                  <article className="bg-white rounded-[0.75rem] overflow-hidden shadow-md hover:shadow-lg transition-all duration-500 hover:scale-[1.02] h-full">
                     {/* Article Image */}
-                    <div className="relative aspect-[16/10] overflow-hidden">
+                    <div className="relative aspect-[4/3] overflow-hidden">
                       <img
                         src={post.featured_image || getBlogImageUrl('placeholder.webp')}
                         alt={post.title}
@@ -121,47 +185,68 @@ export function BlogSection() {
                       />
                       
                       {/* Category Badge */}
-                      <div className="absolute top-[0.75rem] right-[0.75rem] bg-white/95 backdrop-blur-sm text-dark px-[0.5rem] py-[0.25rem] rounded-full text-xs font-medium">
+                      <div className="absolute top-[0.5rem] right-[0.5rem] bg-white/95 backdrop-blur-sm text-dark px-[0.4rem] py-[0.15rem] rounded-full text-[0.65rem] font-medium">
                         {post.category?.name || 'Uncategorized'}
                       </div>
                     </div>
 
                     {/* Article Content */}
-                    <div className="p-[1rem]">
+                    <div className="p-[0.75rem]">
                       {/* Meta Information */}
-                      <div className="flex items-center space-x-[0.75rem] text-dark/60 text-xs mb-[0.75rem]">
-                        <div className="flex items-center space-x-[0.25rem]">
-                          <Calendar className="w-[0.75rem] h-[0.75rem]" />
+                      <div className="flex items-center space-x-[0.5rem] text-dark/60 text-[0.65rem] mb-[0.5rem]">
+                        <div className="flex items-center space-x-[0.2rem]">
+                          <Calendar className="w-[0.65rem] h-[0.65rem]" />
                           <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not published'}</span>
                         </div>
-                        <div className="flex items-center space-x-[0.25rem]">
-                          <Clock className="w-[0.75rem] h-[0.75rem]" />
+                        <div className="flex items-center space-x-[0.2rem]">
+                          <Clock className="w-[0.65rem] h-[0.65rem]" />
                           <span>{post.reading_time ? `${post.reading_time} min` : 'Unknown'}</span>
                         </div>
                       </div>
 
                       {/* Title */}
-                      <h3 className="font-medium text-dark hover:text-canyon transition-colors leading-tight mb-[0.75rem] text-base line-clamp-2">
+                      <h3 className="font-medium text-dark hover:text-canyon transition-colors leading-tight mb-[0.5rem] text-sm line-clamp-2">
                         {post.title}
                       </h3>
 
                       {/* Excerpt */}
-                      <p className="text-dark/70 text-sm leading-relaxed line-clamp-2 mb-[1rem]">
+                      <p className="text-dark/70 text-xs leading-relaxed line-clamp-2 mb-[0.6rem]">
                         {post.excerpt}
                       </p>
 
                       {/* Read More */}
-                      <div className="flex items-center justify-between pt-[0.75rem] border-t border-coyote/20">
-                        <span className="text-canyon text-sm font-medium hover:translate-x-1 transition-transform duration-300">
+                      <div className="flex items-center justify-between pt-[0.5rem] border-t border-coyote/20">
+                        <span className="text-canyon text-xs font-medium hover:translate-x-1 transition-transform duration-300">
                           Read More
                         </span>
-                        <ArrowRight className="w-[1rem] h-[1rem] text-canyon hover:translate-x-1 transition-transform duration-300" />
+                        <ArrowRight className="w-[0.85rem] h-[0.85rem] text-canyon hover:translate-x-1 transition-transform duration-300" />
                       </div>
                     </div>
                   </article>
                 </Link>
               </motion.div>
-              ))}
+                ))}
+              </div>
+
+              {/* Scroll Indicators */}
+              <div className="flex justify-center gap-2 mt-4">
+                {posts.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      const container = scrollContainerRef.current;
+                      if (!container) return;
+                      const cardWidth = container.clientWidth * 0.70;
+                      container.scrollTo({
+                        left: index * (cardWidth + 16),
+                        behavior: 'smooth'
+                      });
+                    }}
+                    className="w-2 h-2 rounded-full bg-coyote/30 hover:bg-canyon transition-colors"
+                    aria-label={`Go to blog post ${index + 1}`}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Desktop: Grid Layout */}

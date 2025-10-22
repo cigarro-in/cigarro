@@ -74,6 +74,11 @@ function ProductPage() {
   const { addToCart, addVariantToCart, addComboToCart, isLoading } = useCart();
   const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
 
+  // Reset to first image when variant changes
+  useEffect(() => {
+    setActiveImage(0);
+  }, [selectedVariant]);
+
   useEffect(() => {
     const fetchProduct = async () => {
       if (!slug) return;
@@ -526,10 +531,10 @@ function ProductPage() {
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="relative bg-gradient-to-b from-creme to-creme/50 select-none"
+            className="relative bg-creme select-none px-4 py-6"
           >
             <div 
-              className="aspect-[4/5] overflow-hidden relative"
+              className="aspect-square overflow-hidden relative rounded-lg bg-creme-light shadow-md"
               onTouchStart={(e) => {
                 const touch = e.touches[0];
                 setTouchStart(touch.clientX);
@@ -562,14 +567,19 @@ function ProductPage() {
               <motion.div
                 className="flex h-full"
                 animate={{ x: `-${activeImage * 100}%` }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 40,
+                  mass: 0.8
+                }}
               >
                 {gallery.map((img, index) => (
                   <div key={index} className="w-full h-full flex-shrink-0">
                     <ImageWithFallback
                       src={img}
                       alt={`${product.name} - Image ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   </div>
                 ))}
