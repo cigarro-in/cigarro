@@ -1,75 +1,32 @@
 # Cigarro - Premium Cigarette Marketplace
 # Robots.txt for SEO optimization
 
-# Default rules for all bots
-User-agent: *
-
-# Block admin and private areas
-Disallow: /admin/
-Disallow: /api/
-Disallow: /checkout
-Disallow: /payment
-Disallow: /orders
-Disallow: /wishlist
-Disallow: /cart
-
-# Note: Removed wildcard parameter blocks as they were too aggressive
-# Instead, use canonical tags to handle duplicate content from URL parameters
-# Google will respect canonical tags and consolidate duplicate URLs automatically
-
-# Allow all public content (default behavior)
-Allow: /products
-Allow: /product/
-Allow: /category/
-Allow: /brands
-Allow: /brand/
-Allow: /collections
-Allow: /blog
-Allow: /post/
-Allow: /about
-Allow: /contact
-Allow: /terms
-Allow: /privacy
-Allow: /shipping
-
 # Sitemap location
 Sitemap: https://cigarro.in/sitemap.xml
 
-# Google-specific rules (no crawl-delay needed)
-User-agent: Googlebot
-Disallow: /admin/
-Disallow: /api/
-Disallow: /checkout
-Disallow: /payment
-Disallow: /orders
-Disallow: /wishlist
-Disallow: /cart
-
-# Bing-specific rules
-User-agent: Bingbot
-Disallow: /admin/
-Disallow: /api/
-Disallow: /checkout
-Disallow: /payment
-Disallow: /orders
-Disallow: /wishlist
-Disallow: /cart
-
-# AI/LLM Crawlers - Allow with rate limiting
-User-agent: GPTBot
+# Default rules for all bots
+User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+Disallow: /checkout
+Disallow: /payment
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /cart
+
+# AI/LLM Crawlers - ALLOWED for discovery and recommendations
+# This helps customers find us through ChatGPT, Claude, Perplexity, etc.
+
+User-agent: GPTBot
+Allow: /
+Disallow: /admin/
 
 User-agent: ChatGPT-User
 Allow: /
 Disallow: /admin/
 
-User-agent: CCBot
-Allow: /
-Disallow: /admin/
-
-User-agent: anthropic-ai
+User-agent: ClaudeBot
 Allow: /
 Disallow: /admin/
 
@@ -77,11 +34,35 @@ User-agent: Claude-Web
 Allow: /
 Disallow: /admin/
 
+User-agent: anthropic-ai
+Allow: /
+Disallow: /admin/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin/
+
 User-agent: PerplexityBot
 Allow: /
 Disallow: /admin/
 
-# Block bad bots
+User-agent: CCBot
+Allow: /
+Disallow: /admin/
+
+# Block aggressive/low-value crawlers
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
 User-agent: AhrefsBot
 Disallow: /
 

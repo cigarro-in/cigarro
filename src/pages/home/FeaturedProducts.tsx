@@ -255,7 +255,7 @@ export function FeaturedProducts() {
                 const isClosestToCenter = distanceFromCenter < 0.6;
                 const scale = isClosestToCenter ? 1.12 : 0.9;
                 const opacity = isClosestToCenter ? 1 : 0.7;
-                const zIndex = isClosestToCenter ? 1000 : 1;
+                const zIndex = isClosestToCenter ? 10 : 1;
 
                 return (
                   <div

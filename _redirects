@@ -1,6 +1,16 @@
-# Redirect www to non-www (canonical domain)
+# Cloudflare Pages Redirects
+# https://developers.cloudflare.com/pages/configuration/redirects/
+
+# Redirect www to non-www (301 permanent redirect)
 https://www.cigarro.in/* https://cigarro.in/:splat 301
-http://www.cigarro.in/* https://cigarro.in/:splat 301
+
+# Redirect old URLs to new systematic URLs
+/products/:slug /product/:slug 301
+/categories/:slug /category/:slug 301
+/brands/:slug /brand/:slug 301
+
+# Favicon redirect to Supabase (temporary until static file added)
+/logo.png https://emecdqvsvskzzncmltna.supabase.co/storage/v1/object/public/asset_images/eadtm7jxp1h.png 301
 
 # Cloudflare Functions (must come before static files)
 /sitemap.xml /functions/sitemap.xml.js 200!

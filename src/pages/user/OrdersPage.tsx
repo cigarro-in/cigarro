@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink } from 'lucide-react';
+import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -26,13 +26,14 @@ interface OrderItem {
 interface Order {
   id: string;
   displayOrderId: string;
+  transactionId?: string;
   items: OrderItem[];
   total: number;
   subtotal: number;
   tax: number;
   shipping: number;
   discount?: number;
-  status: 'placed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'placed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'pending';
   paymentConfirmed?: boolean;
   paymentConfirmedAt?: string;
   paymentVerified?: 'YES' | 'NO' | 'REJECTED';
@@ -68,6 +69,10 @@ export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [countdown, setCountdown] = useState(300); // 5 minutes
+  const [paymentStage, setPaymentStage] = useState<'processing' | 'verifying' | 'confirmed' | 'pending'>('processing');
+  const [retryingOrder, setRetryingOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -89,6 +94,7 @@ export function OrdersPage() {
       const formattedOrders = data?.map((order: any) => ({
         id: order.id,
         displayOrderId: order.display_order_id || 'N/A',
+        transactionId: order.transaction_id,
         items: order.order_items.map((item: any) => ({
           id: item.product_id,
           name: item.product_name,
@@ -154,6 +160,8 @@ export function OrdersPage() {
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
+      case 'pending':
+        return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
       case 'placed':
         return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
       case 'processing':
@@ -171,6 +179,8 @@ export function OrdersPage() {
 
   const getStatusText = (status: Order['status']) => {
     switch (status) {
+      case 'pending':
+        return 'Payment Pending';
       case 'placed':
         return 'Order Placed';
       case 'processing':
@@ -213,6 +223,139 @@ export function OrdersPage() {
     } catch (error) {
       console.error('Buy Again error:', error);
       toast.error('Failed to add items to cart');
+    }
+  };
+
+  const handleRetryPayment = async (order: Order) => {
+    try {
+      // Generate NEW unique transaction ID for retry payment
+      const newTransactionId = `TXN${Date.now().toString().slice(-8)}`;
+      console.log('🔄 Retry payment with new transaction ID:', newTransactionId);
+
+      setRetryingOrder(order);
+      setPaymentStage('processing');
+      setIsConfirmingPayment(true);
+      
+      // Start countdown from 5 minutes (300 seconds)
+      setCountdown(300);
+      const countdownInterval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000); // Update every second
+
+      // Update order with new transaction ID
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          transaction_id: newTransactionId,
+          payment_verified: 'NO',
+          payment_confirmed: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (updateError) {
+        console.error('Error updating transaction ID:', updateError);
+        toast.error('Failed to update order. Please try again.');
+        setIsConfirmingPayment(false);
+        clearInterval(countdownInterval);
+        return;
+      }
+
+      // Generate UPI payment link with NEW transaction ID
+      const upiId = 'hrejuh@upi';
+      const merchantName = 'Cigarro';
+      const note = `Order ${order.displayOrderId}`;
+      
+      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}` +
+        `&pn=${encodeURIComponent(merchantName)}` +
+        `&am=${order.total}` +
+        `&tn=${encodeURIComponent(note)}` +
+        '&cu=INR';
+      
+      // Trigger server-side verification with NEW transaction ID
+      const orderCreatedAt = new Date().toISOString(); // Use current time for retry
+      
+      fetch('/payment-email-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
+        },
+        body: JSON.stringify({
+          orderId: newTransactionId,
+          transactionId: newTransactionId,
+          amount: order.total,
+          orderCreatedAt: orderCreatedAt,
+          timestamp: new Date().toISOString()
+        }),
+        keepalive: true
+      }).catch(err => console.log('Verification started on server:', err));
+      
+      // Small delay to ensure webhook request is sent
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Open UPI app
+      window.location.href = upiLink;
+      
+      // Start polling for payment status with NEW transaction ID
+      let isPaymentCompleted = false;
+      const pollInterval = setInterval(async () => {
+        try {
+          console.log('🔍 Checking payment status in database...');
+          
+          const { data: orderData, error } = await supabase
+            .from('orders')
+            .select('payment_verified, payment_confirmed, status')
+            .eq('transaction_id', newTransactionId)
+            .single();
+          
+          if (error) {
+            console.error('Error checking order status:', error);
+            return;
+          }
+          
+          if (orderData && (orderData.payment_verified === 'YES' || orderData.payment_confirmed)) {
+            // Payment verified by server!
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+            console.log('✅ Payment verified!');
+            setPaymentStage('confirmed');
+            isPaymentCompleted = true;
+            toast.success('Payment verified successfully!');
+            
+            // Refresh orders list
+            await fetchOrders();
+          }
+        } catch (error) {
+          console.error('Error polling payment status:', error);
+        }
+      }, 5000); // Poll every 5 seconds
+      
+      // Stop polling after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        clearInterval(countdownInterval);
+        
+        // If still not verified after 5 minutes, show pending message
+        if (!isPaymentCompleted) {
+          setPaymentStage('pending');
+          toast.info('Order saved! We\'ll verify your payment shortly.');
+          
+          // Refresh orders list
+          fetchOrders();
+        }
+      }, 300000); // 5 minutes
+      
+    } catch (error) {
+      console.error('Retry payment error:', error);
+      toast.error('Failed to retry payment. Please try again.');
+      setIsConfirmingPayment(false);
     }
   };
 
@@ -591,6 +734,20 @@ export function OrdersPage() {
 
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-2">
+                          {/* Retry Payment Button - Show for unpaid orders */}
+                          {(!order.paymentConfirmed || order.paymentVerified === 'NO' || order.paymentVerified === 'REJECTED') && order.status === 'pending' && (
+                            <Button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRetryPayment(order);
+                              }}
+                              className="flex-1 bg-canyon text-creme-light px-4 py-2.5 rounded-full font-medium text-sm uppercase tracking-wide transition-all duration-300 hover:bg-canyon/90 flex items-center justify-center gap-2"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Retry Payment
+                            </Button>
+                          )}
+                          
                           {order.status === 'delivered' && (
                             <Button 
                               onClick={(e) => {
@@ -602,6 +759,7 @@ export function OrdersPage() {
                               Buy Again
                             </Button>
                           )}
+                          
                           <Button 
                             variant="outline"
                             onClick={(e) => {
@@ -623,6 +781,100 @@ export function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Payment Confirmation Full Screen Overlay */}
+      {isConfirmingPayment && retryingOrder && (
+        <div className="fixed inset-0 z-[9999] bg-creme flex items-center justify-center p-6 animate-fade-in">
+          <div className="w-full max-w-md">
+            {paymentStage === 'processing' || paymentStage === 'verifying' ? (
+              <div className="text-center space-y-6">
+                <div className="relative mx-auto w-24 h-24">
+                  <div className="absolute inset-0 rounded-full border-4 border-canyon/30"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-canyon animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 text-canyon animate-pulse" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-serif text-dark">
+                    {paymentStage === 'verifying' ? 'Verifying Payment...' : 'Complete Payment in UPI App'}
+                  </h2>
+                  <p className="text-base text-dark/70 font-sans">
+                    Return here after completing payment. We'll verify automatically.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  <div className="relative w-16 h-16">
+                    <svg className="w-16 h-16 transform -rotate-90">
+                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none" className="text-coyote/30" />
+                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none"
+                        strokeDasharray={`${2 * Math.PI * 28}`}
+                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 300)}`}
+                        className="text-canyon transition-all duration-1000" strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-lg font-bold text-dark">{Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-creme-light rounded-2xl p-5 border-2 border-coyote/20">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Amount</span>
+                      <span className="text-lg font-bold text-dark">{formatINR(retryingOrder.total)}</span>
+                    </div>
+                    <div className="h-px bg-coyote/20"></div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-dark/60 font-medium">Order ID</span>
+                      <span className="text-dark font-mono text-xs">{retryingOrder.displayOrderId}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : paymentStage === 'confirmed' ? (
+              <div className="text-center space-y-6">
+                <div className="relative mx-auto w-28 h-28">
+                  <div className="relative w-28 h-28 rounded-full bg-green-500 flex items-center justify-center shadow-2xl">
+                    <CheckCircle className="w-14 h-14 text-white" strokeWidth={3} />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-serif text-dark">Payment Confirmed!</h2>
+                  <p className="text-base text-dark/70 font-sans">Your payment has been verified successfully</p>
+                </div>
+                <div className="bg-creme-light rounded-2xl p-6 border-2 border-green-500/30">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-dark/60 font-medium">Order Total</span>
+                      <span className="text-2xl font-bold text-green-600">{formatINR(retryingOrder.total)}</span>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => { setIsConfirmingPayment(false); setRetryingOrder(null); }}
+                  className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon">
+                  Close
+                </button>
+              </div>
+            ) : (
+              <div className="text-center space-y-6">
+                <div className="relative mx-auto w-28 h-28">
+                  <div className="relative w-28 h-28 rounded-full bg-yellow-500 flex items-center justify-center shadow-2xl">
+                    <Clock className="w-14 h-14 text-white" strokeWidth={3} />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-serif text-dark">Verification Pending</h2>
+                  <p className="text-base text-dark/70 font-sans">We'll verify your payment shortly</p>
+                </div>
+                <button onClick={() => { setIsConfirmingPayment(false); setRetryingOrder(null); }}
+                  className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon">
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

@@ -129,7 +129,7 @@ export function MobileCheckoutPage() {
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(300); // 5 minutes = 300 seconds
   const [orderId, setOrderId] = useState('');
   const [paymentStage, setPaymentStage] = useState<'processing' | 'verifying' | 'confirmed' | 'pending'>('processing');
   const [transactionId, setTransactionId] = useState('');
@@ -859,6 +859,18 @@ export function MobileCheckoutPage() {
       setPaymentStage('processing');
       setIsConfirmingPayment(true);
       
+      // Start countdown from 5 minutes (300 seconds)
+      setCountdown(300);
+      const countdownInterval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000); // Update every second
+      
       // Simple polling: Check database every 5 seconds for payment status
       // Works whether user stays on page, leaves, or returns
       const pollInterval = setInterval(async () => {
@@ -879,13 +891,15 @@ export function MobileCheckoutPage() {
           if (order && (order.payment_verified === 'YES' || order.payment_confirmed)) {
             // Payment verified by server!
             clearInterval(pollInterval);
+            clearInterval(countdownInterval);
             console.log('✅ Payment verified!');
             setPaymentStage('confirmed');
             setIsPaymentCompleted(true);
             await clearCart();
             toast.success('Payment verified successfully!');
             setIsProcessing(false);
-            setIsConfirmingPayment(false);
+            // Keep confirmation screen open - user can navigate manually
+            // setIsConfirmingPayment(false); // Removed - don't auto-close
             
             // Clear localStorage
             localStorage.removeItem('buyNowItem');
@@ -899,14 +913,16 @@ export function MobileCheckoutPage() {
       // Stop polling after 5 minutes
       setTimeout(() => {
         clearInterval(pollInterval);
+        clearInterval(countdownInterval);
         
         // If still not verified after 5 minutes, show pending message
         if (!isPaymentCompleted) {
           setPaymentStage('pending');
           toast.info('Order saved! We\'ll verify your payment shortly.');
           setIsProcessing(false);
-          setIsConfirmingPayment(false);
-          setTimeout(() => navigate('/orders'), 3000);
+          // Keep confirmation screen open - user can navigate manually
+          // setIsConfirmingPayment(false); // Removed - don't auto-close
+          // setTimeout(() => navigate('/orders'), 3000); // Removed - don't auto-navigate
         }
       }, 300000); // 5 minutes
       
@@ -965,6 +981,18 @@ export function MobileCheckoutPage() {
     setPaymentStage('verifying');
     setIsConfirmingPayment(true);
     
+    // Start countdown from 5 minutes (300 seconds)
+    setCountdown(300);
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000); // Update every second
+    
     // Start verification IMMEDIATELY when user clicks "I've Paid"
     console.log('🔍 Starting payment verification immediately...');
     toast.info('Verifying your payment... This may take up to 5 minutes.');
@@ -1000,30 +1028,33 @@ export function MobileCheckoutPage() {
         
         if (result.verified) {
           // Payment verified successfully!
+          clearInterval(countdownInterval);
           console.log('✅ Payment verified automatically!');
           setPaymentStage('confirmed');
           setIsPaymentCompleted(true);
           await clearCart();
           toast.success('Payment verified successfully!');
         } else {
+          clearInterval(countdownInterval);
           // Verification failed or timed out
           console.log('⏰ Auto-verification timed out, order saved as pending');
           setPaymentStage('pending');
           toast.info('Order saved! We\'ll verify your payment shortly.');
-          // Redirect to orders page after 3 seconds
-          setTimeout(() => {
-            navigate('/orders');
-          }, 3000);
+          // Keep confirmation screen open - user can navigate manually
+          // setTimeout(() => {
+          //   navigate('/orders');
+          // }, 3000); // Removed - don't auto-navigate
         }
       } catch (error) {
+        clearInterval(countdownInterval);
         console.error('❌ Verification error:', error);
         // Show error and keep order as pending
         setPaymentStage('pending');
         toast.error('Could not verify payment automatically. Order saved as pending.');
-        // Redirect to orders page after 3 seconds
-        setTimeout(() => {
-          navigate('/orders');
-        }, 3000);
+        // Keep confirmation screen open - user can navigate manually
+        // setTimeout(() => {
+        //   navigate('/orders');
+        // }, 3000); // Removed - don't auto-navigate
       } finally {
         setIsProcessing(false);
       }
@@ -1671,13 +1702,13 @@ export function MobileCheckoutPage() {
                         strokeWidth="4"
                         fill="none"
                         strokeDasharray={`${2 * Math.PI * 28}`}
-                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 8)}`}
+                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 300)}`}
                         className="text-canyon transition-all duration-1000"
                         strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xl font-bold text-dark">{countdown}</span>
+                      <span className="text-lg font-bold text-dark">{Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>
                     </div>
                   </div>
                 </div>
@@ -1815,8 +1846,32 @@ export function MobileCheckoutPage() {
                   </div>
                 </div>
 
+                {/* Action Buttons for Pending State */}
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={() => navigate('/orders')}
+                    className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon"
+                  >
+                    View My Orders
+                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => navigate('/products')}
+                      className="flex-1 bg-creme-light border-2 border-coyote text-dark py-3 rounded-xl font-medium text-sm transition-all active:scale-95 hover:bg-creme"
+                    >
+                      Browse Products
+                    </button>
+                    <button
+                      onClick={() => navigate('/cart')}
+                      className="flex-1 bg-creme-light border-2 border-coyote text-dark py-3 rounded-xl font-medium text-sm transition-all active:scale-95 hover:bg-creme"
+                    >
+                      View Cart
+                    </button>
+                  </div>
+                </div>
+
                 <p className="text-xs text-yellow-600 font-medium">
-                  Redirecting to orders page...
+                  ℹ️ We'll send a confirmation email once payment is verified
                 </p>
               </div>
             )}

@@ -23,7 +23,7 @@
     <meta property="og:url" content="https://cigarro.in/">
     <meta property="og:title" content="Cigarro - The Tobacco Marketplace">
     <meta property="og:description" content="The finest selection of premium imported cigarettes and luxury cigars. Shop exclusive tobacco products online.">
-    <meta property="og:image" content="https://cigarro.in/images/favicon-32x32.png">
+    <meta property="og:image" content="https://cigarro.in/logo.png">
     <meta property="og:site_name" content="Cigarro">
     <meta property="og:locale" content="en_IN">
     
@@ -32,14 +32,18 @@
     <meta property="twitter:url" content="https://cigarro.in/">
     <meta property="twitter:title" content="Cigarro - The Tobacco Marketplace">
     <meta property="twitter:description" content="The finest selection of premium imported cigarettes, and luxury cigars.">
-    <meta property="twitter:image" content="https://cigarro.in/images/favicon-32x32.png">
+    <meta property="twitter:image" content="https://cigarro.in/logo.png">
     
-    <!-- Favicon - Fallback (will be overridden by dynamic favicon from admin settings) -->
-    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon-32x32.png">
-    <!-- Note: Dynamic favicon from site_settings will be injected by React Helmet -->
+    <!-- Favicon - Dynamic from admin settings (React Helmet will override) -->
+    <!-- Google Search requires favicon to be:
+         - At least 48x48px (multiples of 48px recommended: 48x48, 96x96, 144x144)
+         - In .ico, .png, .jpg, .svg, or .gif format
+         - Accessible to Googlebot (not blocked by robots.txt)
+         - Served from same domain as website
+    -->
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="shortcut icon" href="/logo.png">
+    <link rel="apple-touch-icon" href="/logo.png">
     
     <!-- Additional SEO -->
     <meta name="theme-color" content="#433c35">
@@ -61,7 +65,7 @@
         "url": "https://cigarro.in",
         "logo": {
           "@type": "ImageObject",
-          "url": "https://cigarro.in/images/favicon-32x32.png"
+          "url": "https://cigarro.in/logo.png"
         }
       },
       "potentialAction": {
@@ -78,7 +82,7 @@
       "@type": "Organization",
       "name": "Cigarro",
       "url": "https://cigarro.in",
-      "logo": "https://cigarro.in/images/favicon-32x32.png",
+      "logo": "https://cigarro.in/logo.png",
       "description": "India's premier online marketplace for premium cigarettes and tobacco products",
       "address": {
         "@type": "PostalAddress",
