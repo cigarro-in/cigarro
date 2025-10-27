@@ -56,3 +56,4 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
     </div>
   );
 }
+

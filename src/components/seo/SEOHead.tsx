@@ -27,7 +27,7 @@ export function SEOHead({
   title = 'Cigarro - Premium Cigarettes & Tobacco Online',
   description = 'India\'s premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only.',
   keywords = ['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes'],
-  image = 'https://cigarro.in/images/favicon-32x32.png',
+  image = 'https://cigarro.in/logo.png',
   url = 'https://cigarro.in',
   type = 'website',
   author,

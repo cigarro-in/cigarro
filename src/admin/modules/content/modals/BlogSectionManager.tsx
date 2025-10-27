@@ -56,3 +56,4 @@ export function BlogSectionManager({ open, onOpenChange, onUpdate }: BlogSection
     </div>
   );
 }
+

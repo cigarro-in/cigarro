@@ -1,17 +1,18 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { Shield, FileText, Eye, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function LegalPage() {
   return (
     <>
-      <Helmet>
-        <title>Legal Information - Cigarro Premium Marketplace</title>
-        <meta name="description" content="Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace" />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/legal" />
-      </Helmet>
+      <SEOHead
+        title="Legal Information - Terms & Policies"
+        description="Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace"
+        url="/legal"
+        type="website"
+        keywords={['legal information', 'terms and conditions', 'privacy policy', 'legal disclaimers']}
+      />
       
       <div className="min-h-screen bg-creme">
         {/* Hero Section */}

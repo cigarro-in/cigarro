@@ -56,3 +56,4 @@ export function CategoriesGridManager({ open, onOpenChange, onUpdate }: Categori
     </div>
   );
 }
+

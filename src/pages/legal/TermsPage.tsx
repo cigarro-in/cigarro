@@ -1,17 +1,18 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { FileText, AlertTriangle, CheckCircle, Shield, Users, CreditCard, Crown, Sparkles, Globe, Heart, Star, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function TermsPage() {
   return (
     <>
-      <Helmet>
-        <title>Terms of Service - Cigarro</title>
-        <meta name="description" content="Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/terms" />
-      </Helmet>
+      <SEOHead
+        title="Terms of Service - Legal Information"
+        description="Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform."
+        url="/terms"
+        type="website"
+        keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
+      />
       
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">
         {/* Background Elements */}

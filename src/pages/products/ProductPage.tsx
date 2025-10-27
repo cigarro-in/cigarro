@@ -844,7 +844,7 @@ function ProductPage() {
                   {/* Brand Header */}
                   <div className="mb-6">
                     <Link 
-                      to={`/brands/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
+                      to={`/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
                       className="flex items-center gap-4 mb-3 group"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-dark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
@@ -882,7 +882,7 @@ function ProductPage() {
 
                   {/* Visit Brand Page Button */}
                   <Link
-                    to={`/brands/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
+                    to={`/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-dark text-creme rounded-xl font-semibold text-sm uppercase tracking-wide hover:bg-dark/90 transition-all group"
                   >
                     <span>Explore {product.brand}</span>

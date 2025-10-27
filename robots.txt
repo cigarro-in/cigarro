@@ -13,23 +13,19 @@ Disallow: /orders
 Disallow: /wishlist
 Disallow: /cart
 
-# Block search and filter parameters to avoid duplicate content
-# Note: Using * in path can block too much, use specific patterns
-Disallow: /*?sort=
-Disallow: /*?filter=
-Disallow: /*?page=
-Disallow: /*?utm_
-Disallow: /*?ref=
-Disallow: /*?fbclid=
+# Note: Removed wildcard parameter blocks as they were too aggressive
+# Instead, use canonical tags to handle duplicate content from URL parameters
+# Google will respect canonical tags and consolidate duplicate URLs automatically
 
 # Allow all public content (default behavior)
 Allow: /products
 Allow: /product/
 Allow: /category/
-Allow: /brands/
+Allow: /brands
 Allow: /brand/
 Allow: /collections
-Allow: /blog/
+Allow: /blog
+Allow: /post/
 Allow: /about
 Allow: /contact
 Allow: /terms

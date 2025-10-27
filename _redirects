@@ -2,11 +2,11 @@
 https://www.cigarro.in/* https://cigarro.in/:splat 301
 http://www.cigarro.in/* https://cigarro.in/:splat 301
 
-# Cloudflare Functions
+# Cloudflare Functions (must come before static files)
+/sitemap.xml /functions/sitemap.xml.js 200!
 /payment-email-webhook /functions/payment-email-webhook 200!
 
 # Static files - serve directly (must come before SPA catch-all)
-/sitemap.xml /sitemap.xml 200!
 /robots.txt /robots.txt 200!
 /llms.txt /llms.txt 200!
 /favicon.ico /favicon.ico 200!

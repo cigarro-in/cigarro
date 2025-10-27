@@ -152,9 +152,9 @@ function AppContent() {
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />
         
         {/* Dynamic Favicon from Admin Settings */}
-        <link rel="icon" href={siteSettings.favicon_url || '/images/favicon.ico'} />
-        <link rel="shortcut icon" href={siteSettings.favicon_url || '/images/favicon.ico'} />
-        <link rel="apple-touch-icon" href={siteSettings.favicon_url || '/images/favicon-32x32.png'} />
+        <link rel="icon" href={siteSettings.favicon_url || '/logo.png'} />
+        <link rel="shortcut icon" href={siteSettings.favicon_url || '/logo.png'} />
+        <link rel="apple-touch-icon" href={siteSettings.favicon_url || '/logo.png'} />
       </Helmet>
       <div className="min-h-screen bg-creme font-sans">
         {/* Desktop Layout */}
@@ -179,12 +179,11 @@ function AppContent() {
                   <Route path="/collections" element={<CollectionsPage />} />
                   <Route path="/category/:slug" element={<CategoryPage />} />
                   <Route path="/category/:category/:brand" element={<CategoryPage />} />
-                  <Route path="/brand/:slug" element={<CategoryPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
                   <Route path="/blog" element={<BlogsPage />} />
                   <Route path="/blog/:slug" element={<BlogPost />} />
                   <Route path="/brands" element={<BrandsPage />} />
-                  <Route path="/brands/:slug" element={<BrandPage />} />
+                  <Route path="/brand/:slug" element={<BrandPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
@@ -219,12 +218,11 @@ function AppContent() {
                     <Route path="/collections" element={<CollectionsPage />} />
                     <Route path="/category/:slug" element={<CategoryPage />} />
                     <Route path="/category/:category/:brand" element={<CategoryPage />} />
-                    <Route path="/brand/:slug" element={<CategoryPage />} />
                     <Route path="/wishlist" element={<WishlistPage />} />
                     <Route path="/blog" element={<BlogsPage />} />
                     <Route path="/blog/:slug" element={<BlogPost />} />
                     <Route path="/brands" element={<BrandsPage />} />
-                    <Route path="/brands/:slug" element={<BrandPage />} />
+                    <Route path="/brand/:slug" element={<BrandPage />} />
                     <Route path="/contact" element={<ContactPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/privacy" element={<PrivacyPage />} />

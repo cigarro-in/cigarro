@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Award, Users, Globe, Heart, Shield, Star, Leaf, Coffee, Sparkles, Trophy, Target, Crown } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { getTeamImageUrl } from '../../utils/supabase/storage';
 
 export function AboutPage() {
@@ -141,12 +141,13 @@ export function AboutPage() {
 
   return (
     <>
-      <Helmet>
-        <title>About Us - Cigarro</title>
-        <meta name="description" content="Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/about" />
-      </Helmet>
+      <SEOHead
+        title="About Us - Premium Tobacco Marketplace"
+        description="Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection."
+        url="/about"
+        type="website"
+        keywords={['about cigarro', 'premium tobacco company', 'cigarette marketplace India', 'tobacco heritage', 'authentic cigarettes']}
+      />
 
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">
         {/* Background Elements */}

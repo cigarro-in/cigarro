@@ -62,3 +62,4 @@ export function EnhancedHeroSectionManager({ open, onOpenChange, onUpdate }: Enh
     </div>
   );
 }
+

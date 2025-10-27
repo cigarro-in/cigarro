@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { Lock, Eye, Shield, Database, Cookie, Mail, Users, Settings, Sparkles, Crown, CheckCircle, Globe, Heart, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -102,12 +102,13 @@ export function PrivacyPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Privacy Policy - Cigarro</title>
-        <meta name="description" content="Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/privacy" />
-      </Helmet>
+      <SEOHead
+        title="Privacy Policy - Data Protection"
+        description="Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information."
+        url="/privacy"
+        type="website"
+        keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
+      />
       
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">
         {/* Background Elements */}

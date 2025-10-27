@@ -16,7 +16,7 @@
     <meta name="keywords" content="premium imported cigarettes, luxury cigars, tobacco products, cigarette marketplace, online tobacco store, premium tobacco India">
     <meta name="author" content="Cigarro">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://cigarro.in/">
+    <!-- Canonical tag is dynamically set by React Helmet for each page -->
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
@@ -46,6 +46,51 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
+    
+    <!-- Structured Data for Homepage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Cigarro",
+      "url": "https://cigarro.in",
+      "description": "India's premier online marketplace for premium cigarettes and tobacco products",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Cigarro",
+        "url": "https://cigarro.in",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://cigarro.in/images/favicon-32x32.png"
+        }
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://cigarro.in/products?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Cigarro",
+      "url": "https://cigarro.in",
+      "logo": "https://cigarro.in/images/favicon-32x32.png",
+      "description": "India's premier online marketplace for premium cigarettes and tobacco products",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "IN"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Service",
+        "availableLanguage": ["English", "Hindi"]
+      }
+    }
+    </script>
     </head>
 
     <body>

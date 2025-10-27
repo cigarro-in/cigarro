@@ -150,7 +150,7 @@ export function BrandsPage() {
                   transition={{ duration: 0.5, delay: index * 0.05 }}
                 >
                   <Link
-                    to={`/brands/${brand.slug}`}
+                    to={`/brand/${brand.slug}`}
                     className="block bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 overflow-hidden group h-full"
                   >
                     {/* Brand Logo */}

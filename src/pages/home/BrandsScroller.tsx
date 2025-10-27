@@ -93,7 +93,7 @@ export function BrandsScroller() {
           {brands.map((brand) => (
             <Link
               key={brand.id}
-              to={`/brands/${brand.slug}`}
+              to={`/brand/${brand.slug}`}
               className="flex-shrink-0 snap-center w-[140px] group"
             >
               <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 hover:scale-105 h-full">

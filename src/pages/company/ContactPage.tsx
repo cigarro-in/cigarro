@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { MessageCircle, Phone, Mail, Clock, Send, CheckCircle, MapPin, Users, Award, Shield, Sparkles, Zap, Heart, Star, Globe, Crown } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 
 export function ContactPage() {
   const [formData, setFormData] = useState({
@@ -107,13 +107,13 @@ export function ContactPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Contact Us - Cigarro</title>
-        <meta name="description" content="Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/contact" />
-      </Helmet>
-
+      <SEOHead
+        title="Contact Us - Get Expert Tobacco Advice"
+        description="Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection. Available Mon-Sat, 9 AM - 8 PM."
+        url="/contact"
+        type="website"
+        keywords={['contact cigarro', 'tobacco experts', 'customer support', 'cigarette help', 'order support India']}
+      />
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">
         {/* Background Elements */}
         <div className="absolute inset-0 pointer-events-none">

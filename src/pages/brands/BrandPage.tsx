@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
@@ -140,12 +140,14 @@ export function BrandPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{brand.meta_title || `${brand.name} - Premium Cigarettes | Cigarro`}</title>
-        <meta name="description" content={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`} />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href={`https://cigarro.in/brands/${slug}`} />
-      </Helmet>
+      <SEOHead
+        title={brand.meta_title || `${brand.name} - Premium Cigarettes | Cigarro`}
+        description={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`}
+        url={`/brand/${slug}`}
+        type="website"
+        brand={brand.name}
+        keywords={[brand.name, 'premium cigarettes', 'tobacco products', `${brand.name} cigarettes`, 'authentic tobacco']}
+      />
 
       <div className="min-h-screen bg-creme">
         {/* Back Navigation */}

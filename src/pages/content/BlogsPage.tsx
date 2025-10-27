@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { getBlogImageUrl } from '../../utils/supabase/storage';
 import { supabase } from '../../utils/supabase/client';
 import type { BlogPost as BlogPostType } from '../../types/blog';
-import { SEOHead } from '../../components/seo/SEOHead';
 
 
 
@@ -51,12 +50,13 @@ export function BlogsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Blog - Stories of Craftsmanship & Heritage | Cigarro</title>
-        <meta name="description" content="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/blog" />
-      </Helmet>
+      <SEOHead
+        title="Blog - Stories of Craftsmanship & Heritage"
+        description="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes."
+        url="/blog"
+        type="website"
+        keywords={['tobacco blog', 'cigarette stories', 'tobacco heritage', 'smoking culture', 'premium tobacco articles']}
+      />
 
       <div className="min-h-screen bg-creme pt-24 pb-12">
         <div className="main-container">

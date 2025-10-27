@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
@@ -436,12 +436,13 @@ export function ProductsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>All our products - Cigarro</title>
-        <meta name="description" content="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/products" />
-      </Helmet>
+      <SEOHead
+        title="All Products - Premium Cigarettes & Tobacco"
+        description="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery."
+        url="/products"
+        type="website"
+        keywords={['premium cigarettes', 'buy cigarettes online', 'tobacco products', 'cigars online', 'cigarette shop', 'premium tobacco India']}
+      />
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
         {/* Mobile Header */}

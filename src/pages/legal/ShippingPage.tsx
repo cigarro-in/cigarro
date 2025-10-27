@@ -1,17 +1,18 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { SEOHead } from '../../components/seo/SEOHead';
 import { Truck, Package, Clock, MapPin, Shield, AlertTriangle, CheckCircle, Globe, Sparkles, Crown, Heart, Star, Users, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function ShippingPage() {
   return (
     <>
-      <Helmet>
-        <title>Shipping Policy - Cigarro</title>
-        <meta name="description" content="Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times." />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://cigarro.in/shipping" />
-      </Helmet>
+      <SEOHead
+        title="Shipping Policy - Delivery Information"
+        description="Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India."
+        url="/shipping"
+        type="website"
+        keywords={['shipping policy', 'delivery information', 'shipping costs', 'delivery times India']}
+      />
       
       <div className="min-h-screen bg-gradient-to-br from-creme via-creme-light to-creme pt-24 pb-12 relative overflow-hidden">
         {/* Background Elements */}
