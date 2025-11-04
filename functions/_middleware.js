@@ -16,6 +16,7 @@ export async function onRequest(context) {
   const isBot = botUserAgents.some(bot => userAgent.toLowerCase().includes(bot));
   
   if (isBot && (
+    url.pathname === '/' ||
     url.pathname.startsWith('/product/') ||
     url.pathname.startsWith('/category/') ||
     url.pathname.startsWith('/brand/') ||

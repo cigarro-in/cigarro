@@ -224,6 +224,82 @@ async function generateBrandHTML(slug, supabase, faviconUrl) {
 </html>`;
 }
 
+// Generate HTML for homepage
+function generateHomepageHTML(faviconUrl) {
+  const canonicalUrl = 'https://cigarro.in/';
+  const title = 'Cigarro - Premium Cigarettes & Tobacco Online';
+  const description = "India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only.";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="${faviconUrl}">
+  <link rel="shortcut icon" href="${faviconUrl}">
+  <link rel="apple-touch-icon" href="${faviconUrl}">
+  
+  <!-- Primary Meta Tags -->
+  <title>${escapeHtml(title)}</title>
+  <meta name="title" content="${escapeHtml(title)}">
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonicalUrl}">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image" content="${faviconUrl}">
+  <meta property="og:site_name" content="Cigarro">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="${canonicalUrl}">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${faviconUrl}">
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  ${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Cigarro',
+    url: canonicalUrl,
+    description: description,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Cigarro',
+      url: canonicalUrl,
+      logo: {
+        '@type': 'ImageObject',
+        url: faviconUrl
+      }
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://cigarro.in/products?search={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  })}
+  </script>
+</head>
+<body>
+  <h1>Cigarro - Premium Cigarettes & Tobacco Online</h1>
+  <p>${escapeHtml(description)}</p>
+  
+  <!-- This content is for search engines. Real users get the SPA. -->
+  <noscript>
+    <p>Please enable JavaScript to view the full interactive experience.</p>
+  </noscript>
+</body>
+</html>`;
+}
+
 // Generate HTML for blog posts
 async function generateBlogHTML(slug, supabase, faviconUrl) {
   try {
@@ -379,7 +455,9 @@ export async function onRequest(context) {
     let html = null;
 
     // Generate appropriate HTML based on route
-    if (url.pathname.startsWith('/product/')) {
+    if (url.pathname === '/' || url.pathname === '') {
+      html = generateHomepageHTML(faviconUrl);
+    } else if (url.pathname.startsWith('/product/')) {
       const slug = url.pathname.replace('/product/', '');
       html = await generateProductHTML(slug, supabase, faviconUrl);
     } else if (url.pathname.startsWith('/category/')) {
