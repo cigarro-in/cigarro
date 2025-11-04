@@ -56,6 +56,16 @@ interface Category {
   product_count?: number;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  image_url?: string;
+  gallery_images?: string[];
+  brand?: string;
+}
+
 interface CategoryFormData {
   name: string;
   description: string;
@@ -77,6 +87,12 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  
+  // Products for category assignment
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,6 +117,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
 
   useEffect(() => {
     loadCategories();
+    loadAllProducts();
   }, []);
 
   useEffect(() => {
@@ -153,6 +170,61 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     }
   };
 
+  const loadAllProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, slug, price, image_url, gallery_images, brand')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setAllProducts(data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  const loadCategoryProducts = async (categoryId: string) => {
+    setIsLoadingProducts(true);
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select(`
+          product_id,
+          products (
+            id, name, slug, price, image_url, gallery_images, brand
+          )
+        `)
+        .eq('category_id', categoryId);
+
+      if (error) throw error;
+
+      // Type the response properly
+      type ProductCategoryResponse = {
+        product_id: string;
+        products: Product | Product[] | null;
+      };
+
+      const products = (data as ProductCategoryResponse[] || [])
+        .map(pc => {
+          // Handle both single object and array responses
+          if (Array.isArray(pc.products)) {
+            return pc.products[0];
+          }
+          return pc.products;
+        })
+        .filter((p): p is Product => p !== null && p !== undefined);
+      
+      setCategoryProducts(products);
+    } catch (error) {
+      console.error('Error loading category products:', error);
+      toast.error('Failed to load category products');
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
   const filterCategories = () => {
     let filtered = [...categories];
 
@@ -199,6 +271,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
       meta_description: category.meta_description || ''
     });
     setFormErrors({});
+    loadCategoryProducts(category.id);
     setShowCategoryModal(true);
   };
 
@@ -332,6 +405,59 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     }
   };
 
+  const handleAddProductToCategory = async (productId: string) => {
+    if (!editingCategory) return;
+
+    try {
+      const { error } = await supabase
+        .from('product_categories')
+        .insert({
+          product_id: productId,
+          category_id: editingCategory.id
+        });
+
+      if (error) throw error;
+
+      toast.success('Product added to category');
+      await loadCategoryProducts(editingCategory.id);
+      await loadCategories();
+    } catch (error: any) {
+      if (error.code === '23505') {
+        toast.error('Product already in this category');
+      } else {
+        console.error('Error adding product:', error);
+        toast.error('Failed to add product');
+      }
+    }
+  };
+
+  const handleRemoveProductFromCategory = async (productId: string) => {
+    if (!editingCategory) return;
+
+    try {
+      const { error } = await supabase
+        .from('product_categories')
+        .delete()
+        .eq('product_id', productId)
+        .eq('category_id', editingCategory.id);
+
+      if (error) throw error;
+
+      toast.success('Product removed from category');
+      await loadCategoryProducts(editingCategory.id);
+      await loadCategories();
+    } catch (error) {
+      console.error('Error removing product:', error);
+      toast.error('Failed to remove product');
+    }
+  };
+
+  const filteredProducts = allProducts.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                         product.brand?.toLowerCase().includes(productSearchTerm.toLowerCase());
+    const notInCategory = !categoryProducts.some(cp => cp.id === product.id);
+    return matchesSearch && notInCategory;
+  });
 
   if (isLoading) {
     return (
@@ -449,13 +575,16 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                 <TableHead>Category</TableHead>
                 <TableHead>Products</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCategories.map((category, index) => (
-                <TableRow key={category.id}>
-                  <TableCell>
+                <TableRow 
+                  key={category.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleEditCategory(category)}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selectedCategories.includes(category.id)}
                       onCheckedChange={(checked: boolean) => {
@@ -500,37 +629,6 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                       {new Date(category.created_at).toLocaleDateString()}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditCategory(category)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Products
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => handleDeleteCategory(category)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -555,6 +653,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="media">Media</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
+              {editingCategory && <TabsTrigger value="products">Products ({categoryProducts.length})</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4">
@@ -628,13 +727,100 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                 />
               </div>
             </TabsContent>
+
+            {editingCategory && (
+              <TabsContent value="products" className="space-y-4">
+                {/* Current Products */}
+                <div>
+                  <Label>Current Products ({categoryProducts.length})</Label>
+                  {isLoadingProducts ? (
+                    <div className="flex items-center justify-center p-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  ) : categoryProducts.length > 0 ? (
+                    <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
+                      {categoryProducts.map(product => (
+                        <div key={product.id} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
+                          <div className="w-12 h-12 rounded overflow-hidden bg-background flex-shrink-0">
+                            <img
+                              src={product.gallery_images?.[0] || product.image_url || '/placeholder.png'}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{product.name}</p>
+                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{product.price}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveProductFromCategory(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">No products in this category yet</p>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Add Products */}
+                <div>
+                  <Label>Add Products</Label>
+                  <Input
+                    placeholder="Search products to add..."
+                    value={productSearchTerm}
+                    onChange={(e) => setProductSearchTerm(e.target.value)}
+                    className="mt-2"
+                  />
+                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
+                    {filteredProducts.length > 0 ? (
+                      filteredProducts.slice(0, 20).map(product => (
+                        <div key={product.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          <div className="w-12 h-12 rounded overflow-hidden bg-background flex-shrink-0">
+                            <img
+                              src={product.gallery_images?.[0] || product.image_url || '/placeholder.png'}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{product.name}</p>
+                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{product.price}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddProductToCategory(product.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        {productSearchTerm ? 'No products found' : 'All products are already in this category'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setShowCategoryModal(false)}>
+            <Button type="button" variant="outline" onClick={() => setShowCategoryModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveCategory} disabled={isSaving}>
+            <Button type="button" onClick={handleSaveCategory} disabled={isSaving}>
               {isSaving ? 'Saving...' : editingCategory ? 'Update Category' : 'Create Category'}
             </Button>
           </div>

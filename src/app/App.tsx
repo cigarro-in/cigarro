@@ -201,6 +201,7 @@ function AppContent() {
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/shipping" element={<ShippingPage />} />
+                  <Route path="/legal" element={<LegalPage />} />
                   {/* Catch-all route for broken links */}
                   <Route path="*" element={<HomePage />} />
                 </Routes>
@@ -242,6 +243,7 @@ function AppContent() {
                     <Route path="/privacy" element={<PrivacyPage />} />
                     <Route path="/terms" element={<TermsPage />} />
                     <Route path="/shipping" element={<ShippingPage />} />
+                    <Route path="/legal" element={<LegalPage />} />
                     {/* Catch-all route for broken links */}
                     <Route path="*" element={<HomePage />} />
                   </Routes>
