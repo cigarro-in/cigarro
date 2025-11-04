@@ -563,7 +563,9 @@ export async function onRequest(context) {
       html = generateHomepageHTML(faviconUrl);
     } else if (url.pathname === '/about' || url.pathname === '/contact' || 
                url.pathname === '/products' || url.pathname === '/collections' ||
-               url.pathname === '/brands' || url.pathname === '/blog') {
+               url.pathname === '/brands' || url.pathname === '/blog' ||
+               url.pathname === '/terms' || url.pathname === '/privacy' ||
+               url.pathname === '/shipping' || url.pathname === '/legal') {
       html = generateStaticPageHTML(url.pathname, faviconUrl);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = url.pathname.replace('/product/', '');
