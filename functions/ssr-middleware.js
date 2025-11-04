@@ -300,6 +300,94 @@ function generateHomepageHTML(faviconUrl) {
 </html>`;
 }
 
+// Generate HTML for static pages
+function generateStaticPageHTML(pathname, faviconUrl) {
+  const pages = {
+    '/about': {
+      title: 'About Us - Premium Tobacco Marketplace',
+      description: "Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection."
+    },
+    '/contact': {
+      title: 'Contact Us - Get Expert Tobacco Advice',
+      description: 'Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection. Available Mon-Sat, 9 AM - 8 PM.'
+    },
+    '/products': {
+      title: 'All Products - Premium Cigarettes & Tobacco',
+      description: 'Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery.'
+    },
+    '/collections': {
+      title: 'Our Collections - Premium Curated Products',
+      description: 'Explore our curated collections of premium cigarettes, cigars, and tobacco products. Discover handpicked selections from world-renowned brands.'
+    },
+    '/brands': {
+      title: 'Our Premium Brands',
+      description: 'Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world\'s finest brands.'
+    },
+    '/blog': {
+      title: 'Blog - Stories of Craftsmanship & Heritage',
+      description: 'Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes.'
+    }
+  };
+
+  const pageInfo = pages[pathname] || pages['/'];
+  const canonicalUrl = `https://cigarro.in${pathname}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="${faviconUrl}">
+  <link rel="shortcut icon" href="${faviconUrl}">
+  <link rel="apple-touch-icon" href="${faviconUrl}">
+  
+  <!-- Primary Meta Tags -->
+  <title>${escapeHtml(pageInfo.title)}</title>
+  <meta name="title" content="${escapeHtml(pageInfo.title)}">
+  <meta name="description" content="${escapeHtml(pageInfo.description)}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="${canonicalUrl}">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:title" content="${escapeHtml(pageInfo.title)}">
+  <meta property="og:description" content="${escapeHtml(pageInfo.description)}">
+  <meta property="og:image" content="${faviconUrl}">
+  <meta property="og:site_name" content="Cigarro">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="${canonicalUrl}">
+  <meta name="twitter:title" content="${escapeHtml(pageInfo.title)}">
+  <meta name="twitter:description" content="${escapeHtml(pageInfo.description)}">
+  <meta name="twitter:image" content="${faviconUrl}">
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  ${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: pageInfo.title,
+    description: pageInfo.description,
+    url: canonicalUrl
+  })}
+  </script>
+</head>
+<body>
+  <h1>${escapeHtml(pageInfo.title)}</h1>
+  <p>${escapeHtml(pageInfo.description)}</p>
+  
+  <!-- This content is for search engines. Real users get the SPA. -->
+  <noscript>
+    <p>Please enable JavaScript to view the full interactive experience.</p>
+  </noscript>
+</body>
+</html>`;
+}
+
 // Generate HTML for blog posts
 async function generateBlogHTML(slug, supabase, faviconUrl) {
   try {
@@ -457,6 +545,10 @@ export async function onRequest(context) {
     // Generate appropriate HTML based on route
     if (url.pathname === '/' || url.pathname === '') {
       html = generateHomepageHTML(faviconUrl);
+    } else if (url.pathname === '/about' || url.pathname === '/contact' || 
+               url.pathname === '/products' || url.pathname === '/collections' ||
+               url.pathname === '/brands' || url.pathname === '/blog') {
+      html = generateStaticPageHTML(url.pathname, faviconUrl);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = url.pathname.replace('/product/', '');
       html = await generateProductHTML(slug, supabase, faviconUrl);

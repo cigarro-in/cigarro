@@ -17,6 +17,12 @@ export async function onRequest(context) {
   
   if (isBot && (
     url.pathname === '/' ||
+    url.pathname === '/about' ||
+    url.pathname === '/contact' ||
+    url.pathname === '/products' ||
+    url.pathname === '/collections' ||
+    url.pathname === '/brands' ||
+    url.pathname === '/blog' ||
     url.pathname.startsWith('/product/') ||
     url.pathname.startsWith('/category/') ||
     url.pathname.startsWith('/brand/') ||
