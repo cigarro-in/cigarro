@@ -326,6 +326,22 @@ function generateStaticPageHTML(pathname, faviconUrl) {
     '/blog': {
       title: 'Blog - Stories of Craftsmanship & Heritage',
       description: 'Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes.'
+    },
+    '/terms': {
+      title: 'Terms of Service - Legal Information',
+      description: 'Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform.'
+    },
+    '/privacy': {
+      title: 'Privacy Policy - Data Protection',
+      description: 'Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information.'
+    },
+    '/shipping': {
+      title: 'Shipping Policy - Delivery Information',
+      description: 'Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India.'
+    },
+    '/legal': {
+      title: 'Legal Information - Terms & Policies',
+      description: 'Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace'
     }
   };
 
