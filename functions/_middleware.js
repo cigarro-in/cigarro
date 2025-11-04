@@ -23,6 +23,10 @@ export async function onRequest(context) {
     url.pathname === '/collections' ||
     url.pathname === '/brands' ||
     url.pathname === '/blog' ||
+    url.pathname === '/terms' ||
+    url.pathname === '/privacy' ||
+    url.pathname === '/shipping' ||
+    url.pathname === '/legal' ||
     url.pathname.startsWith('/product/') ||
     url.pathname.startsWith('/category/') ||
     url.pathname.startsWith('/brand/') ||
