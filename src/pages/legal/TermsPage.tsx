@@ -1,15 +1,17 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { FileText, AlertTriangle, CheckCircle, Shield, Users, CreditCard, Crown, Sparkles, Globe, Heart, Star, Scale } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function TermsPage() {
+  const location = useLocation();
   return (
     <>
       <SEOHead
         title="Terms of Service - Legal Information"
         description="Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform."
-        url="/terms"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
       />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../utils/supabase/client';
 import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ interface CategoryWithProducts {
 
 export function CollectionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [categories, setCategories] = useState<CategoryWithProducts[]>([]);
   const { addToCart, isLoading } = useCart();
 
@@ -80,7 +81,7 @@ export function CollectionsPage() {
       <SEOHead
         title="Our Collections - Premium Curated Products"
         description="Explore our curated collections of premium cigarettes, cigars, and tobacco products. Discover handpicked selections from world-renowned brands."
-        url="/collections"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['collections', 'curated products', 'premium cigarettes', 'luxury tobacco', 'exclusive collections']}
       />

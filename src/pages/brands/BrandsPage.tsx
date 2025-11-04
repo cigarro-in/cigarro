@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ interface Brand {
 }
 
 export function BrandsPage() {
+  const location = useLocation();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -88,7 +89,7 @@ export function BrandsPage() {
       <SEOHead
         title="Our Premium Brands"
         description="Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world's finest brands."
-        url="/brands"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['premium brands', 'cigarette brands', 'tobacco brands', 'luxury cigarettes']}
       />

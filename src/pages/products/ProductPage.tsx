@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check, Heart, ChevronDown, ChevronUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +48,7 @@ interface ProductDetails {
 function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [combos, setCombos] = useState<ProductCombo[]>([]);
@@ -422,7 +423,7 @@ function ProductPage() {
           product.origin || ''
         ].filter(Boolean)}
         image={gallery[0] || product.gallery_images[0]}
-        url={`https://cigarro.in/product/${product.slug}${selectedVariant ? `?variant=${selectedVariant.id}` : ''}`}
+        url={`https://cigarro.in${location.pathname}`}
         type="product"
         price={getCurrentPrice().toString()}
         currency="INR"

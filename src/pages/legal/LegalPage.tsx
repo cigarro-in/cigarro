@@ -1,15 +1,17 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Shield, FileText, Eye, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function LegalPage() {
+  const location = useLocation();
   return (
     <>
       <SEOHead
         title="Legal Information - Terms & Policies"
         description="Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace"
-        url="/legal"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['legal information', 'terms and conditions', 'privacy policy', 'legal disclaimers']}
       />

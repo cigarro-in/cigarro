@@ -1,15 +1,17 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Truck, Package, Clock, MapPin, Shield, AlertTriangle, CheckCircle, Globe, Sparkles, Crown, Heart, Star, Users, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function ShippingPage() {
+  const location = useLocation();
   return (
     <>
       <SEOHead
         title="Shipping Policy - Delivery Information"
         description="Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India."
-        url="/shipping"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['shipping policy', 'delivery information', 'shipping costs', 'delivery times India']}
       />

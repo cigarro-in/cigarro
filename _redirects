@@ -8,6 +8,7 @@ https://www.cigarro.in/* https://cigarro.in/:splat 301
 /products/:slug /product/:slug 301
 /categories/:slug /category/:slug 301
 /brands/:slug /brand/:slug 301
+/blogs /blog 301
 
 # Favicon redirect to Supabase (temporary until static file added)
 /logo.png https://emecdqvsvskzzncmltna.supabase.co/storage/v1/object/public/asset_images/eadtm7jxp1h.png 301

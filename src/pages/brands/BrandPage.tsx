@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
@@ -46,6 +46,7 @@ interface Product {
 
 export function BrandPage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const [brand, setBrand] = useState<Brand | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,7 +144,7 @@ export function BrandPage() {
       <SEOHead
         title={brand.meta_title || `${brand.name} - Premium Cigarettes | Cigarro`}
         description={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`}
-        url={`/brand/${slug}`}
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         brand={brand.name}
         keywords={[brand.name, 'premium cigarettes', 'tobacco products', `${brand.name} cigarettes`, 'authentic tobacco']}

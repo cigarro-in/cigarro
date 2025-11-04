@@ -1,9 +1,11 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Lock, Eye, Shield, Database, Cookie, Mail, Users, Settings, Sparkles, Crown, CheckCircle, Globe, Heart, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function PrivacyPage() {
+  const location = useLocation();
   const privacySections = [
     {
       icon: Database,
@@ -105,7 +107,7 @@ export function PrivacyPage() {
       <SEOHead
         title="Privacy Policy - Data Protection"
         description="Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information."
-        url="/privacy"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
       />
@@ -219,7 +221,7 @@ export function PrivacyPage() {
                   className="relative"
                 >
                   <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-canyon via-sunflower to-canyon rounded-3xl blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-canyon via-sunflower to-canyon rounded-3xl blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-700"></div>
                     <div className="relative bg-gradient-to-br from-white to-creme-light rounded-3xl p-8 border border-white/40 backdrop-blur-sm">
                       <div className="grid grid-cols-2 gap-6">
                         {[

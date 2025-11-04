@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
+import { SEOHead } from '../components/seo/SEOHead';
 import { AgeVerification } from '../components/auth/AgeVerification';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import Header from '../components/layout/Header';
@@ -24,7 +25,7 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../utils/supabase/client';
 // Lazy load components that are not needed immediately
 const CheckoutPage = lazy(() => import('../pages/cart/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
-const MobileCheckoutPage = lazy(() => import('../pages/cart/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
+const MobileCheckoutPage = lazy(() => import('../pages/cart/MobileCheckoutPageNew').then(m => ({ default: m.MobileCheckoutPageNew })));
 const UPIPaymentPage = lazy(() => import('../pages/cart/UPIPaymentPage').then(m => ({ default: m.UPIPaymentPage })));
 const OrderSuccessPage = lazy(() => import('../pages/order/OrderSuccessPage').then(m => ({ default: m.OrderSuccessPage })));
 const CartPage = lazy(() => import('../pages/cart/CartPage'));
@@ -46,6 +47,8 @@ const PrivacyPage = lazy(() => import('../pages/legal/PrivacyPage').then(m => ({
 const ShippingPage = lazy(() => import('../pages/legal/ShippingPage').then(m => ({ default: m.ShippingPage })));
 const BrandsPage = lazy(() => import('../pages/brands/BrandsPage').then(m => ({ default: m.BrandsPage })));
 const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
+const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
+const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
 
 // Loading component for better UX during transitions
 function LoadingSpinner() {
@@ -62,6 +65,13 @@ function LoadingSpinner() {
 function HomePage() {
   return (
     <>
+      <SEOHead
+        title="Cigarro - Premium Cigarettes & Tobacco Online"
+        description="India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only."
+        url="https://cigarro.in/"
+        type="website"
+        keywords={['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes', 'luxury tobacco']}
+      />
       <Hero />
       
       {/* Mobile: Categories Scroller, Desktop: Skip to Featured */}
@@ -174,6 +184,8 @@ function AppContent() {
                   <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
                   <Route path="/orders" element={<OrdersPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/referrals" element={<ReferralPage />} />
+                  <Route path="/referral/:code" element={<ReferralLandingPage />} />
                   <Route path="/product/:slug" element={<ProductPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/collections" element={<CollectionsPage />} />
@@ -213,6 +225,8 @@ function AppContent() {
                     <Route path="/order-success" element={<OrderSuccessPage />} />
                     <Route path="/orders" element={<OrdersPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/referrals" element={<ReferralPage />} />
+                    <Route path="/referral/:code" element={<ReferralLandingPage />} />
                     <Route path="/product/:slug" element={<ProductPage />} />
                     <Route path="/products" element={<ProductsPage />} />
                     <Route path="/collections" element={<CollectionsPage />} />

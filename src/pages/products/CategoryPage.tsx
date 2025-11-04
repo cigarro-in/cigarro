@@ -204,7 +204,7 @@ export function CategoryPage() {
       <SEOHead
         title={pageTitle}
         description={pageDescription}
-        url={slug ? `/category/${slug}` : '/products'}
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={[
           category?.name || 'tobacco products',

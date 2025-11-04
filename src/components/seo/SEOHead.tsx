@@ -47,13 +47,27 @@ export function SEOHead({
 }: SEOHeadProps) {
   const fullTitle = title.includes('Cigarro') ? title : `${title} | Cigarro`;
   
-  // Build canonical URL - strip query params and trailing slashes for SEO
+  // Build canonical URL - strip query params and normalize trailing slashes for SEO
   const buildCanonicalUrl = () => {
+    let cleanUrl = url;
+    
+    // Handle absolute URLs
     if (url.startsWith('http')) {
-      return url.split('?')[0].replace(/\/+$/, '');
+      cleanUrl = url.split('?')[0]; // Remove query params
+    } else {
+      // Handle relative URLs
+      const cleanPath = url.split('?')[0]; // Remove query params
+      cleanUrl = `https://cigarro.in${cleanPath}`;
     }
-    const cleanPath = url.split('?')[0].replace(/\/+$/, '') || '/';
-    return `https://cigarro.in${cleanPath}`;
+    
+    // Normalize trailing slashes
+    // Homepage should have trailing slash, other pages should not
+    if (cleanUrl === 'https://cigarro.in' || cleanUrl === 'https://cigarro.in/') {
+      return 'https://cigarro.in/';
+    }
+    
+    // Remove trailing slashes from all other pages
+    return cleanUrl.replace(/\/+$/, '');
   };
   
   const canonicalUrl = buildCanonicalUrl();

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageCircle, Phone, Mail, Clock, Send, CheckCircle, MapPin, Users, Award, Shield, Sparkles, Zap, Heart, Star, Globe, Crown } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -6,6 +7,7 @@ import { toast } from 'sonner';
 import { SEOHead } from '../../components/seo/SEOHead';
 
 export function ContactPage() {
+  const location = useLocation();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -110,7 +112,7 @@ export function ContactPage() {
       <SEOHead
         title="Contact Us - Get Expert Tobacco Advice"
         description="Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection. Available Mon-Sat, 9 AM - 8 PM."
-        url="/contact"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['contact cigarro', 'tobacco experts', 'customer support', 'cigarette help', 'order support India']}
       />
@@ -707,4 +709,3 @@ export function ContactPage() {
     </>
   );
 }
-

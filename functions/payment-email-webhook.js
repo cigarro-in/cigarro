@@ -611,10 +611,10 @@ async function parsePaymentEmail(email, env) {
 }
 
 /**
- * Update order status in Supabase
+ * Update order status in Supabase using new unified transactions system
  */
 async function updateOrderStatus(env, orderId, status, paymentDetails) {
-  console.log(`🔄 Updating order ${orderId} to status: ${status}`);
+  console.log(`🔄 Verifying payment for transaction ${orderId}`);
   
   const headers = {
     'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
@@ -623,37 +623,45 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
     'Prefer': 'return=representation',
   };
 
-  const updateData = {
-    payment_verified: 'YES',
-    payment_verified_at: new Date().toISOString(),
-    payment_confirmed: true,
-    payment_confirmed_at: new Date().toISOString(),
-    auto_verified: true,
-    status: 'processing'  // Valid enum: pending, placed, processing, shipped, delivered, cancelled
+  // Call the new verify_order_payment RPC function
+  const rpcPayload = {
+    p_transaction_id: orderId, // This is the internal_transaction_id (TXN12345678)
+    p_amount: paymentDetails.amount,
+    p_bank_name: paymentDetails.bankName || null,
+    p_upi_reference: paymentDetails.upiReference || null,
+    p_verification_method: 'email_parse',
+    p_email_verification_id: null // Can link to payment_verification_logs if needed
   };
   
-  console.log('📝 Update data:', JSON.stringify(updateData));
+  console.log('📝 RPC payload:', JSON.stringify(rpcPayload));
 
-  // Query by transaction_id instead of id (orderId is actually the transaction_id like TXN42229027)
+  // Call the secure database function
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/orders?transaction_id=eq.${orderId}`,
+    `${env.SUPABASE_URL}/rest/v1/rpc/verify_order_payment`,
     {
-      method: 'PATCH',
+      method: 'POST',
       headers,
-      body: JSON.stringify(updateData),
+      body: JSON.stringify(rpcPayload),
     }
   );
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`❌ Supabase update failed (${response.status}):`, errorText);
+    console.error(`❌ RPC call failed (${response.status}):`, errorText);
     return false;
   }
   
   const result = await response.json();
-  console.log('✅ Supabase response:', JSON.stringify(result));
+  console.log('✅ RPC response:', JSON.stringify(result));
   
-  return true;
+  // Check if verification was successful
+  if (result.success) {
+    console.log(`✅ Payment verified successfully for order ${result.order_id}`);
+    return true;
+  } else {
+    console.error(`❌ Payment verification failed: ${result.message || result.error}`);
+    return false;
+  }
 }
 
 /**

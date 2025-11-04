@@ -1,10 +1,12 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Award, Users, Globe, Heart, Shield, Star, Leaf, Coffee, Sparkles, Trophy, Target, Crown } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { getTeamImageUrl } from '../../utils/supabase/storage';
 
 export function AboutPage() {
+  const location = useLocation();
   const values = [
     {
       icon: Award,
@@ -144,7 +146,7 @@ export function AboutPage() {
       <SEOHead
         title="About Us - Premium Tobacco Marketplace"
         description="Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection."
-        url="/about"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['about cigarro', 'premium tobacco company', 'cigarette marketplace India', 'tobacco heritage', 'authentic cigarettes']}
       />

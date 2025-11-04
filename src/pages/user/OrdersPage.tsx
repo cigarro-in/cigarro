@@ -249,7 +249,12 @@ export function OrdersPage() {
       }, 1000); // Update every second
 
       // Update order with new transaction ID
-      const { error: updateError } = await supabase
+      console.log('🔄 Updating order with new transaction ID...');
+      console.log('🎯 Order ID:', order.id);
+      console.log('🆕 Old transaction ID:', order.transactionId);
+      console.log('🆕 New transaction ID:', newTransactionId);
+      
+      const { data: updateData, error: updateError } = await supabase
         .from('orders')
         .update({ 
           transaction_id: newTransactionId,
@@ -257,15 +262,18 @@ export function OrdersPage() {
           payment_confirmed: false,
           updated_at: new Date().toISOString()
         })
-        .eq('id', order.id);
+        .eq('id', order.id)
+        .select();
 
       if (updateError) {
-        console.error('Error updating transaction ID:', updateError);
+        console.error('❌ Error updating transaction ID:', updateError);
         toast.error('Failed to update order. Please try again.');
         setIsConfirmingPayment(false);
         clearInterval(countdownInterval);
         return;
       }
+      
+      console.log('✅ Order updated successfully:', updateData);
 
       // Generate UPI payment link with NEW transaction ID
       const upiId = 'hrejuh@upi';
@@ -300,24 +308,45 @@ export function OrdersPage() {
       // Small delay to ensure webhook request is sent
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Open UPI app
-      window.location.href = upiLink;
+      // Open UPI app - Use try-catch for better error handling
+      try {
+        window.location.href = upiLink;
+      } catch (err) {
+        console.error('Failed to open UPI app:', err);
+        toast.error('Failed to open UPI app. Please try again.');
+        setIsConfirmingPayment(false);
+        clearInterval(countdownInterval);
+        return;
+      }
       
       // Start polling for payment status with NEW transaction ID
       let isPaymentCompleted = false;
       const pollInterval = setInterval(async () => {
         try {
           console.log('🔍 Checking payment status in database...');
+          console.log('📋 Looking for order ID:', order.id);
+          console.log('🔑 New transaction ID:', newTransactionId);
           
+          // Query by order ID (UUID), not transaction_id
+          // The order ID stays the same, only transaction_id is updated
           const { data: orderData, error } = await supabase
             .from('orders')
-            .select('payment_verified, payment_confirmed, status')
-            .eq('transaction_id', newTransactionId)
+            .select('payment_verified, payment_confirmed, status, transaction_id')
+            .eq('id', order.id)
             .single();
           
           if (error) {
             console.error('Error checking order status:', error);
+            // Don't return on error, keep polling
             return;
+          }
+          
+          // Verify we're checking the right transaction
+          if (orderData.transaction_id !== newTransactionId) {
+            console.warn('⚠️ Transaction ID mismatch:', {
+              expected: newTransactionId,
+              found: orderData.transaction_id
+            });
           }
           
           if (orderData && (orderData.payment_verified === 'YES' || orderData.payment_confirmed)) {

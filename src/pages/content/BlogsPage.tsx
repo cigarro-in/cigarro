@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { getBlogImageUrl } from '../../utils/supabase/storage';
 import { supabase } from '../../utils/supabase/client';
 import type { BlogPost as BlogPostType } from '../../types/blog';
@@ -10,6 +10,7 @@ import type { BlogPost as BlogPostType } from '../../types/blog';
 
 
 export function BlogsPage() {
+  const location = useLocation();
   const [posts, setPosts] = useState<BlogPostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,7 +54,7 @@ export function BlogsPage() {
       <SEOHead
         title="Blog - Stories of Craftsmanship & Heritage"
         description="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes."
-        url="/blog"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['tobacco blog', 'cigarette stories', 'tobacco heritage', 'smoking culture', 'premium tobacco articles']}
       />
@@ -192,6 +193,7 @@ export function BlogsPage() {
 // Individual Blog Post Component
 export function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const [post, setPost] = useState<BlogPostType | null>(null);
   const [relatedPosts, setRelatedPosts] = useState<BlogPostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -289,7 +291,7 @@ export function BlogPost() {
       <SEOHead
         title={post.meta_title || post.title}
         description={post.meta_description || post.excerpt}
-        url={`/blog/${post.slug}`}
+        url={`https://cigarro.in/blog/${post.slug}`}
         type="article"
         author={post.author?.name || undefined}
         publishedTime={post.published_at || undefined}

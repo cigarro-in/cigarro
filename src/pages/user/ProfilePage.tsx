@@ -400,16 +400,19 @@ export function ProfilePage() {
 
                   {/* Refer & Earn */}
                   <button
-                    onClick={() => toast.info('Referral program coming soon!')}
+                    onClick={() => navigate('/referrals')}
                     className="w-full flex items-center justify-between p-4 rounded-lg border border-border/30 hover:border-accent/50 hover:bg-muted/10 transition-all group"
                   >
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors" />
-                      <span className="text-sm font-medium text-foreground">Refer & Earn</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-foreground">Refer & Earn</span>
+                        <Badge className="bg-green-50 text-green-600 border-green-200 text-xs">
+                          Get ₹100
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
-                      Coming Soon
-                    </Badge>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors" />
                   </button>
 
                   {/* My Addresses */}

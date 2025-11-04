@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { validateEmail, validatePassword, validateName, authRateLimiter } from '../../utils/validation';
+import { supabase } from '../../utils/supabase/client';
 
 interface AuthDialogProps {
   open: boolean;
@@ -126,7 +127,37 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
         passwordValidation.sanitizedValue!, 
         nameValidation.sanitizedValue!
       );
-      toast.success('Account created successfully!');
+      
+      // Check if there's a referral code in sessionStorage
+      const referralCode = sessionStorage.getItem('referral_code');
+      if (referralCode) {
+        // Get the current user after signup
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+        
+        if (newUser) {
+          // Import recordReferral dynamically to avoid circular dependencies
+          const { recordReferral } = await import('../../utils/referral/referralService');
+          const result = await recordReferral({
+            referred_user_id: newUser.id,
+            referral_code: referralCode,
+            signup_source: 'web'
+          });
+          
+          if (result.success && result.referrer_name) {
+            toast.success(`Account created! You'll get ₹100 after your first order, referred by ${result.referrer_name}`);
+          } else {
+            toast.success('Account created successfully!');
+          }
+          
+          // Clear the referral code from sessionStorage
+          sessionStorage.removeItem('referral_code');
+        } else {
+          toast.success('Account created successfully!');
+        }
+      } else {
+        toast.success('Account created successfully!');
+      }
+      
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (error: any) {

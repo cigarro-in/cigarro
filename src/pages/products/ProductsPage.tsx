@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase/client';
@@ -439,7 +439,7 @@ export function ProductsPage() {
       <SEOHead
         title="All Products - Premium Cigarettes & Tobacco"
         description="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery."
-        url="/products"
+        url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['premium cigarettes', 'buy cigarettes online', 'tobacco products', 'cigars online', 'cigarette shop', 'premium tobacco India']}
       />
