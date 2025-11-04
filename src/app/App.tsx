@@ -33,7 +33,7 @@ const AdminDashboard = lazy(() => import('../admin/AdminDashboard').then(m => ({
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
 const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const ProductPage = lazy(() => import('../pages/products/ProductPage'));
-const CollectionsPage = lazy(() => import('../pages/products/CollectionsPage').then(m => ({ default: m.CollectionsPage })));
+const CategoriesPage = lazy(() => import('../pages/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
 const ProductsPage = lazy(() => import('../pages/products/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const CategoryPage = lazy(() => import('../pages/products/CategoryPage').then(m => ({ default: m.CategoryPage })));
 const LegalPage = lazy(() => import('../pages/legal/LegalPage').then(m => ({ default: m.LegalPage })));
@@ -188,11 +188,11 @@ function AppContent() {
                   <Route path="/referral/:code" element={<ReferralLandingPage />} />
                   <Route path="/product/:slug" element={<ProductPage />} />
                   <Route path="/products" element={<ProductsPage />} />
-                  <Route path="/collections" element={<CollectionsPage />} />
+                  <Route path="/categories" element={<CategoriesPage />} />
                   <Route path="/category/:slug" element={<CategoryPage />} />
                   <Route path="/category/:category/:brand" element={<CategoryPage />} />
                   <Route path="/wishlist" element={<WishlistPage />} />
-                  <Route path="/blog" element={<BlogsPage />} />
+                  <Route path="/blogs" element={<BlogsPage />} />
                   <Route path="/blog/:slug" element={<BlogPost />} />
                   <Route path="/brands" element={<BrandsPage />} />
                   <Route path="/brand/:slug" element={<BrandPage />} />
@@ -230,11 +230,11 @@ function AppContent() {
                     <Route path="/referral/:code" element={<ReferralLandingPage />} />
                     <Route path="/product/:slug" element={<ProductPage />} />
                     <Route path="/products" element={<ProductsPage />} />
-                    <Route path="/collections" element={<CollectionsPage />} />
+                    <Route path="/categories" element={<CategoriesPage />} />
                     <Route path="/category/:slug" element={<CategoryPage />} />
                     <Route path="/category/:category/:brand" element={<CategoryPage />} />
                     <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/blog" element={<BlogsPage />} />
+                    <Route path="/blogs" element={<BlogsPage />} />
                     <Route path="/blog/:slug" element={<BlogPost />} />
                     <Route path="/brands" element={<BrandsPage />} />
                     <Route path="/brand/:slug" element={<BrandPage />} />

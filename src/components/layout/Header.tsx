@@ -416,8 +416,8 @@ const Header = () => {
               <Link to="/products" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 All Products
               </Link>
-              <Link to="/collections" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
-                Collections
+              <Link to="/categories" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+                Categories
               </Link>
               <Link to="/wishlist" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Wishlist
@@ -470,7 +470,7 @@ const Header = () => {
               <Link to="/about" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 About Us
               </Link>
-              <Link to="/blog" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/blogs" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>
                 Blog
               </Link>
               <Link to="/contact" className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon" onClick={() => setIsMenuOpen(false)}>

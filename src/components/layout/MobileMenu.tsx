@@ -33,7 +33,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
       title: 'Shop',
       items: [
         { icon: Grid3x3, label: 'All Products', path: '/products' },
-        { icon: Star, label: 'Collections', path: '/collections' },
+        { icon: Star, label: 'Categories', path: '/categories' },
         { icon: Heart, label: 'Wishlist', path: '/wishlist', badge: wishlistCount },
         { icon: ShoppingBag, label: 'Shopping Cart', path: '/cart' },
       ]
@@ -52,7 +52,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
       title: 'Information',
       items: [
         { icon: Info, label: 'About Us', path: '/about' },
-        { icon: BookOpen, label: 'Blog', path: '/blog' },
+        { icon: BookOpen, label: 'Blog', path: '/blogs' },
         { icon: Phone, label: 'Contact Us', path: '/contact' },
         { icon: Truck, label: 'Shipping Info', path: '/shipping' },
       ]

@@ -17,14 +17,14 @@ interface CategoryWithProducts {
   products: Product[];
 }
 
-export function CollectionsPage() {
+export function CategoriesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [categories, setCategories] = useState<CategoryWithProducts[]>([]);
   const { addToCart, isLoading } = useCart();
 
   useEffect(() => {
-    const fetchCollections = async () => {
+    const fetchCategories = async () => {
       const { data, error } = await supabase
         .from('categories')
         .select(`
@@ -51,7 +51,7 @@ export function CollectionsPage() {
         .order('order', { foreignTable: 'products', ascending: true });
 
       if (error) {
-        toast.error('Failed to load collections.');
+        toast.error('Failed to load categories.');
         console.error(error);
       } else {
         // The data needs some transformation
@@ -63,7 +63,7 @@ export function CollectionsPage() {
       }
     };
 
-    fetchCollections();
+    fetchCategories();
   }, []);
 
   const handleAddToCart = async (e: React.MouseEvent, product: Product) => {
@@ -78,20 +78,18 @@ export function CollectionsPage() {
 
   return (
     <>
-      <SEOHead
-        title="Our Collections - Premium Curated Products"
-        description="Explore our curated collections of premium cigarettes, cigars, and tobacco products. Discover handpicked selections from world-renowned brands."
-        url={`https://cigarro.in${location.pathname}`}
-        type="website"
-        keywords={['collections', 'curated products', 'premium cigarettes', 'luxury tobacco', 'exclusive collections']}
+      <SEOHead 
+        title="Product Categories - Browse by Category"
+        description="Explore our organized categories of premium cigarettes, cigars, and tobacco products. Find exactly what you're looking for by browsing our curated categories."
+        url="https://cigarro.in/categories"
       />
       
       <div className="py-12 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h1 className="font-serif-premium text-4xl sm:text-5xl text-foreground">Our Collections</h1>
+            <h1 className="font-serif-premium text-4xl sm:text-5xl text-foreground">Our Categories</h1>
             <p className="font-sans-premium text-lg text-muted-foreground mt-4">
-              Explore our curated collections of premium products.
+              Explore our curated categories of premium products.
             </p>
           </div>
 

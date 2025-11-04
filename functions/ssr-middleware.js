@@ -315,15 +315,15 @@ function generateStaticPageHTML(pathname, faviconUrl) {
       title: 'All Products - Premium Cigarettes & Tobacco',
       description: 'Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery.'
     },
-    '/collections': {
-      title: 'Our Collections - Premium Curated Products',
-      description: 'Explore our curated collections of premium cigarettes, cigars, and tobacco products. Discover handpicked selections from world-renowned brands.'
+    '/categories': {
+      title: 'Product Categories - Browse by Category',
+      description: 'Explore our organized categories of premium cigarettes, cigars, and tobacco products. Find exactly what you\'re looking for by browsing our curated collections.'
     },
     '/brands': {
       title: 'Our Premium Brands',
       description: 'Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world\'s finest brands.'
     },
-    '/blog': {
+    '/blogs': {
       title: 'Blog - Stories of Craftsmanship & Heritage',
       description: 'Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes.'
     },
@@ -562,8 +562,8 @@ export async function onRequest(context) {
     if (url.pathname === '/' || url.pathname === '') {
       html = generateHomepageHTML(faviconUrl);
     } else if (url.pathname === '/about' || url.pathname === '/contact' || 
-               url.pathname === '/products' || url.pathname === '/collections' ||
-               url.pathname === '/brands' || url.pathname === '/blog' ||
+               url.pathname === '/products' || url.pathname === '/categories' ||
+               url.pathname === '/brands' || url.pathname === '/blogs' ||
                url.pathname === '/terms' || url.pathname === '/privacy' ||
                url.pathname === '/shipping' || url.pathname === '/legal') {
       html = generateStaticPageHTML(url.pathname, faviconUrl);

@@ -49,8 +49,8 @@ const Footer = () => {
                     <Link to="/products" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       All Products
                     </Link>
-                    <Link to="/collections" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Collections
+                    <Link to="/categories" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Categories
                     </Link>
                     <Link to="/wishlist" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Wishlist
@@ -84,7 +84,7 @@ const Footer = () => {
                 <div>
                   <h4 className="suptitle text-dark mb-4">Information</h4>
                   <div className="space-y-3">
-                    <Link to="/blog" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                    <Link to="/blogs" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Blog
                     </Link>
                     <Link to="/contact" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
@@ -111,7 +111,7 @@ const Footer = () => {
             <div className="text-center">
               {/* Copyright */}
               <div className="text-coyote text-base leading-relaxed">
-                © 2025 Cigarro. All rights reserved.
+                2025 Cigarro. All rights reserved.
               </div>
             </div>
           </div>

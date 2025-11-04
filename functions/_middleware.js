@@ -20,9 +20,9 @@ export async function onRequest(context) {
     url.pathname === '/about' ||
     url.pathname === '/contact' ||
     url.pathname === '/products' ||
-    url.pathname === '/collections' ||
+    url.pathname === '/categories' ||
     url.pathname === '/brands' ||
-    url.pathname === '/blog' ||
+    url.pathname === '/blogs' ||
     url.pathname === '/terms' ||
     url.pathname === '/privacy' ||
     url.pathname === '/shipping' ||
