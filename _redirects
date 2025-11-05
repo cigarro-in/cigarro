@@ -4,9 +4,6 @@
 # Redirect www to non-www (301 permanent redirect)
 https://www.cigarro.in/* https://cigarro.in/:splat 301
 
-# Favicon redirect to Supabase (temporary until static file added)
-/logo.png https://emecdqvsvskzzncmltna.supabase.co/storage/v1/object/public/asset_images/eadtm7jxp1h.png 301
-
 # Cloudflare Functions (must come before static files)
 /sitemap.xml /functions/sitemap.xml.js 200!
 /payment-email-webhook /functions/payment-email-webhook 200!
@@ -15,6 +12,7 @@ https://www.cigarro.in/* https://cigarro.in/:splat 301
 /robots.txt /robots.txt 200!
 /llms.txt /llms.txt 200!
 /favicon.ico /favicon.ico 200!
+/icons/* /icons/:splat 200!
 /images/* /images/:splat 200!
 /fonts/* /fonts/:splat 200!
 
