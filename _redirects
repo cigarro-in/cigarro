@@ -1,21 +1,12 @@
 # Cloudflare Pages Redirects
 # https://developers.cloudflare.com/pages/configuration/redirects/
 
-# Redirect www to non-www (301 permanent redirect)
-https://www.cigarro.in/* https://cigarro.in/:splat 301
+# Note: Configure www to non-www redirect in Cloudflare Dashboard
+# Go to: Pages > Your Project > Custom domains
+# Add both cigarro.in and www.cigarro.in as custom domains
+# Cloudflare will automatically handle the www redirect
 
-# Cloudflare Functions (must come before static files)
-/sitemap.xml /functions/sitemap.xml.js 200!
-/payment-email-webhook /functions/payment-email-webhook 200!
-
-# Static files - serve directly (must come before SPA catch-all)
-/robots.txt /robots.txt 200!
-/llms.txt /llms.txt 200!
-/favicon.ico /favicon.ico 200!
-/icons/* /icons/:splat 200!
-/images/* /images/:splat 200!
-/fonts/* /fonts/:splat 200!
-/media/* /media/:splat 200!
-
-# Handle SPA routing - catch-all for everything else
+# SPA fallback - serve index.html for all routes
+# Static files (images, fonts, icons, etc.) are served automatically
+# Functions in /functions/ directory are served automatically
 /* /index.html 200
