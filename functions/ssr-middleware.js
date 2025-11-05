@@ -547,14 +547,8 @@ export async function onRequest(context) {
       env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Fetch dynamic site settings (favicon, logo, etc.)
-    const { data: siteSettings } = await supabase
-      .from('site_settings')
-      .select('favicon_url, site_name')
-      .single();
-    
-    const faviconUrl = siteSettings?.favicon_url || 'https://cigarro.in/logo.png';
-    const siteName = siteSettings?.site_name || 'Cigarro';
+    // Use static favicon path (no database fetch needed)
+    const faviconUrl = 'https://cigarro.in/icons/android-chrome-512x512.png';
 
     let html = null;
 

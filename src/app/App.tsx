@@ -117,7 +117,6 @@ function AppContent() {
   const [siteSettings, setSiteSettings] = useState({
     meta_title: 'Cigarro',
     meta_description: 'The finest selection of premium cigarettes and cigars.',
-    favicon_url: '/vite.svg',
     site_name: 'Cigarro',
   });
 
@@ -125,13 +124,12 @@ function AppContent() {
     const fetchSiteSettings = async () => {
       const { data, error } = await supabase
         .from('site_settings')
-        .select('*')
+        .select('meta_title, meta_description, site_name')
         .single();
       if (data) {
         setSiteSettings({
           meta_title: data.meta_title || 'Cigarro',
           meta_description: data.meta_description || 'The finest selection of premium cigarettes and cigars.',
-          favicon_url: data.favicon_url || '/vite.svg',
           site_name: data.site_name || 'Cigarro',
         });
       }
@@ -161,10 +159,10 @@ function AppContent() {
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />
         
-        {/* Dynamic Favicon from Admin Settings */}
-        <link rel="icon" href={siteSettings.favicon_url || '/logo.png'} />
-        <link rel="shortcut icon" href={siteSettings.favicon_url || '/logo.png'} />
-        <link rel="apple-touch-icon" href={siteSettings.favicon_url || '/logo.png'} />
+        {/* Static Favicon - Uses icons from /icons/ folder */}
+        <link rel="icon" type="image/x-icon" href="/icons/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Helmet>
       <div className="min-h-screen bg-creme font-sans">
         {/* Desktop Layout */}
