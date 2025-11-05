@@ -5,8 +5,8 @@ import { Mail } from 'lucide-react';
 const Footer = () => {
   return (
     <footer className="section bg-creme-light relative overflow-hidden z-10">
-      {/* Background Video (optional) */}
-      <video 
+      {/* Background Video (optional) - Commented out until video file is added */}
+      {/* <video 
         className="absolute left-0 right-0 top-0 bottom-0 w-full h-full object-cover z-[-1] pointer-events-none opacity-30"
         autoPlay
         muted
@@ -14,7 +14,7 @@ const Footer = () => {
         playsInline
       >
         <source src="/media/cigarro-background-video.mp4" type="video/mp4" />
-      </video>
+      </video> */}
       
       <div className="main-container">
         <div className="bg-creme-light rounded-lg p-8 lg:p-16">

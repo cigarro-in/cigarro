@@ -15,6 +15,7 @@ https://www.cigarro.in/* https://cigarro.in/:splat 301
 /icons/* /icons/:splat 200!
 /images/* /images/:splat 200!
 /fonts/* /fonts/:splat 200!
+/media/* /media/:splat 200!
 
 # Handle SPA routing - catch-all for everything else
 /* /index.html 200
