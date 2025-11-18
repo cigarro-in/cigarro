@@ -10,7 +10,6 @@ import { supabase } from '../utils/supabase/client';
 import { toast } from 'sonner';
 import { LogOut, Save, RefreshCw, FileText } from 'lucide-react';
 import { useAdminAuth } from '../hooks/useAdminAuth';
-import { generateSitemap } from '../utils/sitemap-generator';
 
 interface SiteSettings {
   site_name: string;
@@ -30,6 +29,7 @@ export function SiteSettingsPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingSitemap, setIsGeneratingSitemap] = useState(false);
+  const [performanceResults, setPerformanceResults] = useState<any>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -189,6 +189,13 @@ export function SiteSettingsPage() {
                 <div className="flex gap-3">
                   <Button
                     onClick={async () => {
+                      const isProduction = window.location.hostname === 'cigarro.in';
+                      
+                      if (!isProduction) {
+                        toast.info('⚠️ Cache refresh only works in production.\n\nIn development, there is no cache - all data loads fresh from Supabase.', { duration: 5000 });
+                        return;
+                      }
+                      
                       const loading = toast.loading('Refreshing cache...');
                       try {
                         const response = await fetch('https://cigarro.in/api/invalidate-cache', {
@@ -213,9 +220,154 @@ export function SiteSettingsPage() {
                   
                   <Button
                     onClick={async () => {
-                      const loading = toast.loading('Testing cache performance...');
+                      console.log('🧪 Test Performance button clicked');
+                      const loading = toast.loading('Testing performance...');
                       try {
-                        const endpoints = [
+                        const isProduction = window.location.hostname === 'cigarro.in';
+                        console.log('🌍 Hostname:', window.location.hostname);
+                        console.log('🏭 Is Production:', isProduction);
+                        
+                        let endpoints;
+                        
+                        if (!isProduction) {
+                          console.log('💻 Development mode - Testing Supabase directly');
+                          toast.dismiss(loading);
+                          const devLoading = toast.loading('Testing Supabase connection...');
+                          
+                          // First test basic connection with timeout
+                          console.log('🔌 Testing Supabase connection...');
+                          console.log('📍 Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'NOT SET');
+                          
+                          try {
+                            const connectionTimeout = new Promise((_, reject) => 
+                              setTimeout(() => reject(new Error('Connection timeout (5s)')), 5000)
+                            );
+                            
+                            const connectionTest = supabase
+                              .from('categories')
+                              .select('count')
+                              .limit(1);
+                            
+                            const { data: testData, error: testError } = await Promise.race([
+                              connectionTest,
+                              connectionTimeout
+                            ]) as any;
+                            
+                            if (testError) {
+                              console.error('❌ Supabase connection failed:', testError);
+                              toast.dismiss(devLoading);
+                              toast.error(`Supabase Error: ${testError.message}\n\nCheck your database and RLS policies.`, { duration: 8000 });
+                              return;
+                            }
+                            console.log('✅ Supabase connected successfully');
+                          } catch (err: any) {
+                            console.error('❌ Supabase connection error:', err);
+                            toast.dismiss(devLoading);
+                            
+                            if (err.message.includes('timeout')) {
+                              toast.error(`⏱️ Supabase connection timeout!\n\nYour database is not responding. Check:\n1. Internet connection\n2. Supabase project status\n3. .env credentials`, { duration: 10000 });
+                            } else {
+                              toast.error(`Cannot connect to Supabase: ${err?.message || 'Unknown error'}`, { duration: 8000 });
+                            }
+                            return;
+                          }
+                          
+                          toast.dismiss(devLoading);
+                          const perfLoading = toast.loading('Testing query performance...');
+                          
+                          // Test Supabase directly in development
+                          const results = [];
+                          
+                          const tests = [
+                            { name: 'Categories', query: () => supabase.from('categories').select('id, name, slug').limit(5) },
+                            { name: 'Products', query: () => supabase.from('products').select('id, name, price').limit(5) },
+                            { name: 'Brands', query: () => supabase.from('brands').select('id, name').limit(5) },
+                          ];
+                          
+                          console.log(`📡 Testing ${tests.length} Supabase queries...`);
+                          
+                          for (const test of tests) {
+                            console.log(`🔍 Testing: ${test.name}`);
+                            try {
+                              const start = performance.now();
+                              
+                              // Add 10 second timeout
+                              const timeoutPromise = new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error('Timeout after 10s')), 10000)
+                              );
+                              
+                              const { data, error } = await Promise.race([
+                                test.query(),
+                                timeoutPromise
+                              ]) as any;
+                              
+                              const end = performance.now();
+                              const time = Math.round(end - start);
+                              
+                              if (error) {
+                                console.error(`   ❌ Error:`, error);
+                              }
+                              
+                              const result = {
+                                name: test.name,
+                                time,
+                                cacheStatus: 'SUPABASE',
+                                size: data ? `${Math.round(JSON.stringify(data).length / 1024)}KB` : 'N/A',
+                                status: !error ? '✅' : '❌',
+                                error: error?.message || null
+                              };
+                              
+                              console.log(`   ${result.status} ${time}ms | Direct DB | ${result.size}${error ? ` | Error: ${error.message}` : ''}`);
+                              results.push(result);
+                            } catch (err: any) {
+                              console.error(`   ❌ Exception:`, err);
+                              results.push({
+                                name: test.name,
+                                time: 0,
+                                cacheStatus: 'ERROR',
+                                size: 'N/A',
+                                status: '❌',
+                                error: err?.message || 'Unknown error'
+                              });
+                            }
+                          }
+                          
+                          console.log('✅ All Supabase tests completed');
+                          toast.dismiss(perfLoading);
+                          
+                          // Show results
+                          let message = '📊 Supabase Performance (Development):\n\n';
+                          results.forEach(r => {
+                            message += `${r.status} ${r.name}:\n`;
+                            message += `   ⏱️ ${r.time}ms | 💾 Direct DB | 📦 ${r.size}\n\n`;
+                          });
+                          
+                          const avgTime = Math.round(results.reduce((sum, r) => sum + r.time, 0) / results.length);
+                          message += `Average: ${avgTime}ms (No cache - Direct Supabase)\n\n`;
+                          message += `💡 Deploy to production to see cache performance (30-50ms expected)`;
+                          
+                          console.table(results);
+                          console.log('📊 Supabase Performance Summary:', {
+                            averageTime: `${avgTime}ms`,
+                            mode: 'Development - Direct Database',
+                            recommendation: 'Deploy to production for 10x faster cached responses'
+                          });
+                          
+                          // Store results for display
+                          setPerformanceResults({
+                            mode: 'development',
+                            results,
+                            avgTime,
+                            timestamp: new Date().toLocaleTimeString()
+                          });
+                          
+                          toast.success(message, { duration: 10000 });
+                          return;
+                        }
+                        
+                        console.log('✅ Production detected, starting cache tests...');
+                        
+                        endpoints = [
                           { name: 'Categories', url: 'https://cigarro.in/api/categories' },
                           { name: 'Products', url: 'https://cigarro.in/api/products' },
                           { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
@@ -225,7 +377,10 @@ export function SiteSettingsPage() {
 
                         const results = [];
                         
+                        console.log(`📡 Testing ${endpoints.length} endpoints...`);
+                        
                         for (const endpoint of endpoints) {
+                          console.log(`🔍 Testing: ${endpoint.name} - ${endpoint.url}`);
                           const start = performance.now();
                           const response = await fetch(endpoint.url);
                           const end = performance.now();
@@ -233,14 +388,19 @@ export function SiteSettingsPage() {
                           const cacheStatus = response.headers.get('X-Cache-Status') || 'UNKNOWN';
                           const size = response.headers.get('content-length') || 'N/A';
                           
-                          results.push({
+                          const result = {
                             name: endpoint.name,
                             time,
                             cacheStatus,
                             size: size !== 'N/A' ? `${Math.round(parseInt(size) / 1024)}KB` : 'N/A',
                             status: response.ok ? '✅' : '❌'
-                          });
+                          };
+                          
+                          console.log(`   ${result.status} ${time}ms | ${cacheStatus} | ${result.size}`);
+                          results.push(result);
                         }
+                        
+                        console.log('✅ All endpoint tests completed');
 
                         toast.dismiss(loading);
                         
@@ -264,11 +424,22 @@ export function SiteSettingsPage() {
                           recommendation: avgTime < 100 ? '🚀 Excellent!' : avgTime < 300 ? '✅ Good' : '⚠️ Consider refreshing cache'
                         });
                         
+                        // Store results for display
+                        setPerformanceResults({
+                          mode: 'production',
+                          results,
+                          avgTime,
+                          hitCount,
+                          timestamp: new Date().toLocaleTimeString()
+                        });
+                        
+                        console.log('📊 Showing results toast...');
                         toast.success(message, { duration: 10000 });
+                        console.log('✅ Cache performance test complete!');
                       } catch (error) {
+                        console.error('❌ Cache test error:', error);
                         toast.dismiss(loading);
                         toast.error('Failed to test cache performance');
-                        console.error('Cache test error:', error);
                       }
                     }}
                     variant="outline"
@@ -277,6 +448,71 @@ export function SiteSettingsPage() {
                     📊 Test Performance
                   </Button>
                 </div>
+                
+                {/* Performance Results Display */}
+                {performanceResults && (
+                  <div className="mt-6 p-4 bg-creme-light rounded-lg border border-coyote">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-dark">
+                        📊 Performance Test Results
+                        <span className="ml-2 text-xs text-dark/60">
+                          {performanceResults.mode === 'development' ? '(Development - Direct DB)' : '(Production - Cached)'}
+                        </span>
+                      </h4>
+                      <span className="text-xs text-dark/60">{performanceResults.timestamp}</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {performanceResults.results.map((result: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded border border-coyote/30">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{result.status}</span>
+                            <span className="font-medium text-dark">{result.name}</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className={`font-mono ${result.time < 100 ? 'text-green-600' : result.time < 300 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              ⏱️ {result.time}ms
+                            </span>
+                            <span className="text-dark/60">
+                              💾 {result.cacheStatus}
+                            </span>
+                            <span className="text-dark/60">
+                              📦 {result.size}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-canyon/10 rounded border border-canyon/30">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-dark">Average Response Time:</span>
+                        <span className={`text-lg font-mono font-bold ${performanceResults.avgTime < 100 ? 'text-green-600' : performanceResults.avgTime < 300 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {performanceResults.avgTime}ms
+                        </span>
+                      </div>
+                      {performanceResults.mode === 'production' && performanceResults.hitCount !== undefined && (
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="font-medium text-dark">Cache Hit Rate:</span>
+                          <span className="text-lg font-mono font-bold text-green-600">
+                            {performanceResults.hitCount}/{performanceResults.results.length}
+                          </span>
+                        </div>
+                      )}
+                      <div className="mt-2 text-sm text-dark/70">
+                        {performanceResults.mode === 'development' ? (
+                          <p>💡 Deploy to production to see 3-5x faster cached responses (30-50ms expected)</p>
+                        ) : (
+                          <p>
+                            {performanceResults.avgTime < 100 ? '🚀 Excellent performance!' : 
+                             performanceResults.avgTime < 300 ? '✅ Good performance' : 
+                             '⚠️ Consider refreshing cache'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

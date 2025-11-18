@@ -659,7 +659,7 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
 
   // Call the appropriate database function
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/${rpcEndpoint}`,
+    `${env.VITE_SUPABASE_URL}/rest/v1/rpc/${rpcEndpoint}`,
     {
       method: 'POST',
       headers,
@@ -697,7 +697,7 @@ async function createVerificationLog(env, logData) {
   };
 
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/payment_verification_logs`,
+    `${env.VITE_SUPABASE_URL}/rest/v1/payment_verification_logs`,
     {
       method: 'POST',
       headers,
@@ -734,7 +734,7 @@ async function updateVerificationLog(env, logId, updates) {
   };
 
   await fetch(
-    `${env.SUPABASE_URL}/rest/v1/payment_verification_logs?id=eq.${logId}`,
+    `${env.VITE_SUPABASE_URL}/rest/v1/payment_verification_logs?id=eq.${logId}`,
     {
       method: 'PATCH',
       headers,

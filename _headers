@@ -1,12 +1,51 @@
 # IMPORTANT: More specific rules MUST come first in Cloudflare Pages
 
-# Static assets - long cache, let browser detect MIME types naturally
+# Static assets - EXPLICIT Content-Type headers to fix Firefox MIME type issues
 /assets/*.css
+  Content-Type: text/css; charset=utf-8
   Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.js
+  Content-Type: application/javascript; charset=utf-8
   Cache-Control: public, max-age=31536000, immutable
 
+/assets/*.woff2
+  Content-Type: font/woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.woff
+  Content-Type: font/woff
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.ttf
+  Content-Type: font/ttf
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.webp
+  Content-Type: image/webp
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.png
+  Content-Type: image/png
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.jpg
+  Content-Type: image/jpeg
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.jpeg
+  Content-Type: image/jpeg
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.svg
+  Content-Type: image/svg+xml
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.gif
+  Content-Type: image/gif
+  Cache-Control: public, max-age=31536000, immutable
+
+# Fallback for other assets
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
@@ -24,10 +63,9 @@
   X-XSS-Protection: 1; mode=block
   X-Robots-Tag: index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1
 
-# All other routes - full security headers
+# All other routes - security headers (removed X-Content-Type-Options to allow external scripts)
 /*
   X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload

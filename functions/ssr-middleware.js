@@ -543,7 +543,7 @@ export async function onRequest(context) {
   try {
     // Initialize Supabase
     const supabase = createClient(
-      env.SUPABASE_URL,
+      env.VITE_SUPABASE_URL,
       env.VITE_SUPABASE_ANON_KEY
     );
 
