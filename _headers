@@ -1,4 +1,21 @@
-/*
+# IMPORTANT: More specific rules MUST come first in Cloudflare Pages
+
+# Static assets - long cache, let browser detect MIME types naturally
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/images/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML pages - no cache + full security
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -7,14 +24,11 @@
   X-XSS-Protection: 1; mode=block
   X-Robots-Tag: index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1
 
-/images/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.js
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.css
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.html
-  Cache-Control: public, max-age=0, must-revalidate
+# All other routes - full security headers
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-XSS-Protection: 1; mode=block
