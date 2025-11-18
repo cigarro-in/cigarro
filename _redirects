@@ -6,7 +6,7 @@
 # Add both cigarro.in and www.cigarro.in as custom domains
 # Cloudflare will automatically handle the www redirect
 
-# SPA fallback - serve index.html for all routes
-# Static files (images, fonts, icons, etc.) are served automatically
+# SPA routing is handled automatically by Cloudflare Pages
+# Static assets (/assets/*, /images/*, etc.) are served directly
 # Functions in /functions/ directory are served automatically
-/* /index.html 200
+# All other routes fall back to index.html automatically
