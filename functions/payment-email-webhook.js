@@ -623,21 +623,43 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
     'Prefer': 'return=representation',
   };
 
-  // Call the new verify_order_payment RPC function
-  const rpcPayload = {
-    p_transaction_id: orderId, // This is the internal_transaction_id (TXN12345678)
-    p_amount: paymentDetails.amount,
-    p_bank_name: paymentDetails.bankName || null,
-    p_upi_reference: paymentDetails.upiReference || null,
-    p_verification_method: 'email_parse',
-    p_email_verification_id: null // Can link to payment_verification_logs if needed
-  };
+  // Check if this is a wallet load transaction
+  const isWalletLoad = orderId.startsWith('TXN') && paymentDetails.description?.toLowerCase().includes('wallet');
   
-  console.log('📝 RPC payload:', JSON.stringify(rpcPayload));
+  let rpcPayload, rpcEndpoint;
+  
+  if (isWalletLoad) {
+    // Call complete_wallet_load for wallet transactions
+    rpcPayload = {
+      p_transaction_id: orderId,
+      p_gateway_transaction_id: paymentDetails.upiReference || null,
+      p_bank_name: paymentDetails.bankName || null,
+      p_metadata: {
+        verification_method: 'email_parse',
+        email_parsed_at: new Date().toISOString()
+      }
+    };
+    rpcEndpoint = 'complete_wallet_load';
+    console.log('💰 Detected wallet load transaction');
+  } else {
+    // Call verify_order_payment for order transactions
+    rpcPayload = {
+      p_transaction_id: orderId,
+      p_amount: paymentDetails.amount,
+      p_bank_name: paymentDetails.bankName || null,
+      p_upi_reference: paymentDetails.upiReference || null,
+      p_verification_method: 'email_parse',
+      p_email_verification_id: null
+    };
+    rpcEndpoint = 'verify_order_payment';
+    console.log('🛒 Detected order payment transaction');
+  }
+  
+  console.log(`📝 RPC payload for ${rpcEndpoint}:`, JSON.stringify(rpcPayload));
 
-  // Call the secure database function
+  // Call the appropriate database function
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/verify_order_payment`,
+    `${env.SUPABASE_URL}/rest/v1/rpc/${rpcEndpoint}`,
     {
       method: 'POST',
       headers,

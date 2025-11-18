@@ -31,6 +31,8 @@ const OrderSuccessPage = lazy(() => import('../pages/order/OrderSuccessPage').th
 const CartPage = lazy(() => import('../pages/cart/CartPage'));
 const AdminDashboard = lazy(() => import('../admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
+import { WalletPage } from '../pages/wallet/WalletPage';
+import { TransactionProcessingPage } from '../pages/transaction/TransactionProcessingPage';
 const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const ProductPage = lazy(() => import('../pages/products/ProductPage'));
 const CategoriesPage = lazy(() => import('../pages/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
@@ -181,6 +183,8 @@ function AppContent() {
                   <Route path="/order-success" element={<OrderSuccessPage />} />
                   <Route path="/admin/*" element={<AdminDashboard onStatsUpdate={() => {}} />} />
                   <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/wallet" element={<WalletPage />} />
+                  <Route path="/transaction" element={<TransactionProcessingPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/referrals" element={<ReferralPage />} />
                   <Route path="/referral/:code" element={<ReferralLandingPage />} />
@@ -223,6 +227,8 @@ function AppContent() {
                     <Route path="/payment" element={<UPIPaymentPage />} />
                     <Route path="/order-success" element={<OrderSuccessPage />} />
                     <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/wallet" element={<WalletPage />} />
+                    <Route path="/transaction" element={<TransactionProcessingPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/referrals" element={<ReferralPage />} />
                     <Route path="/referral/:code" element={<ReferralLandingPage />} />

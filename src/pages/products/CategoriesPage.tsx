@@ -10,10 +10,11 @@ import { useCart } from '../../hooks/useCart';
 import { SEOHead } from '../../components/seo/SEOHead';
 
 interface CategoryWithProducts {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
+  category_id: string;
+  category_name: string;
+  category_slug: string;
+  category_description: string;
+  category_image: string;
   products: Product[];
 }
 
@@ -25,41 +26,41 @@ export function CategoriesPage() {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select(`
-          id,
-          name,
-          description,
-          image,
-          products:product_categories!inner(
-            order,
-            products!inner(
-              id,
-              name,
-              brand,
-              price,
-              description,
-              is_active,
-              slug,
-              gallery_images,
-              rating,
-              review_count
-            )
-          )
-        `)
-        .order('order', { foreignTable: 'products', ascending: true });
+      try {
+        // Try Cloudflare cached API first (ultra-fast edge response)
+        const response = await fetch('https://cigarro.in/api/categories');
+        
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data || []);
+          
+          // Log cache status for debugging
+          const cacheStatus = response.headers.get('X-Cache-Status');
+          console.log('📦 Categories loaded from:', cacheStatus === 'HIT' ? 'Edge Cache ⚡' : 'Database 🔍');
+          return;
+        }
+        
+        // Fallback to direct Supabase call if API fails
+        console.log('⚠️ API failed, falling back to direct Supabase');
+        const { data, error } = await supabase.rpc('get_categories_with_products');
 
-      if (error) {
-        toast.error('Failed to load categories.');
-        console.error(error);
-      } else {
-        // The data needs some transformation
-        const formattedData = data.map(category => ({
-          ...category,
-          products: category.products.map((p: any) => p.products).filter(p => p.is_active),
-        }));
-        setCategories(formattedData);
+        if (error) {
+          toast.error('Failed to load categories.');
+          console.error(error);
+        } else {
+          setCategories(data || []);
+        }
+      } catch (error) {
+        // Final fallback to direct Supabase
+        console.error('Fetch error, using Supabase fallback:', error);
+        const { data, error: supabaseError } = await supabase.rpc('get_categories_with_products');
+        
+        if (supabaseError) {
+          toast.error('Failed to load categories.');
+          console.error(supabaseError);
+        } else {
+          setCategories(data || []);
+        }
       }
     };
 
@@ -95,8 +96,8 @@ export function CategoriesPage() {
 
         <div className="space-y-16">
           {categories.map(category => (
-            <section key={category.id}>
-              <h2 className="font-serif-premium text-3xl text-foreground mb-6">{category.name}</h2>
+            <section key={category.category_id}>
+              <h2 className="font-serif-premium text-3xl text-foreground mb-6">{category.category_name}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
                 {category.products.map((product, index) => (
                   <ProductCard

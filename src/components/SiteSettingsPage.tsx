@@ -168,12 +168,120 @@ export function SiteSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* SEO Tools Card */}
+      {/* SEO & Performance Tools Card */}
       <Card className="bg-creme-light border-coyote">
         <CardHeader>
-          <CardTitle className="font-serif-premium text-dark">SEO Tools</CardTitle>
+          <CardTitle className="font-serif-premium text-dark">SEO & Performance Tools</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Cache Refresh */}
+          <div className="p-4 bg-white rounded-lg border border-coyote">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <RefreshCw className="w-5 h-5 text-canyon" />
+                  <h3 className="font-medium text-dark">Cloudflare Cache</h3>
+                </div>
+                <p className="text-sm text-dark/70 mb-4">
+                  <strong>All pages cached for 24 hours:</strong> Homepage, Products, Categories, Brands, Featured Products.
+                  After updating any content, click here to refresh ALL caches immediately and show fresh data across the entire site.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={async () => {
+                      const loading = toast.loading('Refreshing cache...');
+                      try {
+                        const response = await fetch('https://cigarro.in/api/invalidate-cache', {
+                          method: 'POST',
+                        });
+                        if (response.ok) {
+                          toast.dismiss(loading);
+                          toast.success('Cache refreshed! Changes will appear immediately.');
+                        } else {
+                          throw new Error('Failed');
+                        }
+                      } catch (error) {
+                        toast.dismiss(loading);
+                        toast.error('Failed to refresh cache');
+                      }
+                    }}
+                    className="bg-canyon hover:bg-canyon/90 text-creme"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Cache Now
+                  </Button>
+                  
+                  <Button
+                    onClick={async () => {
+                      const loading = toast.loading('Testing cache performance...');
+                      try {
+                        const endpoints = [
+                          { name: 'Categories', url: 'https://cigarro.in/api/categories' },
+                          { name: 'Products', url: 'https://cigarro.in/api/products' },
+                          { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
+                          { name: 'Brands', url: 'https://cigarro.in/api/brands' },
+                          { name: 'Featured Products', url: 'https://cigarro.in/api/featured-products' },
+                        ];
+
+                        const results = [];
+                        
+                        for (const endpoint of endpoints) {
+                          const start = performance.now();
+                          const response = await fetch(endpoint.url);
+                          const end = performance.now();
+                          const time = Math.round(end - start);
+                          const cacheStatus = response.headers.get('X-Cache-Status') || 'UNKNOWN';
+                          const size = response.headers.get('content-length') || 'N/A';
+                          
+                          results.push({
+                            name: endpoint.name,
+                            time,
+                            cacheStatus,
+                            size: size !== 'N/A' ? `${Math.round(parseInt(size) / 1024)}KB` : 'N/A',
+                            status: response.ok ? '✅' : '❌'
+                          });
+                        }
+
+                        toast.dismiss(loading);
+                        
+                        // Create detailed results message
+                        let message = '📊 Cache Performance Test Results:\n\n';
+                        results.forEach(r => {
+                          message += `${r.status} ${r.name}:\n`;
+                          message += `   ⏱️ ${r.time}ms | 💾 ${r.cacheStatus} | 📦 ${r.size}\n\n`;
+                        });
+                        
+                        const avgTime = Math.round(results.reduce((sum, r) => sum + r.time, 0) / results.length);
+                        const hitCount = results.filter(r => r.cacheStatus === 'HIT').length;
+                        
+                        message += `Average: ${avgTime}ms | Cache Hits: ${hitCount}/${results.length}`;
+                        
+                        // Show in console for detailed view
+                        console.table(results);
+                        console.log('📊 Cache Performance Summary:', {
+                          averageTime: `${avgTime}ms`,
+                          cacheHitRate: `${hitCount}/${results.length}`,
+                          recommendation: avgTime < 100 ? '🚀 Excellent!' : avgTime < 300 ? '✅ Good' : '⚠️ Consider refreshing cache'
+                        });
+                        
+                        toast.success(message, { duration: 10000 });
+                      } catch (error) {
+                        toast.dismiss(loading);
+                        toast.error('Failed to test cache performance');
+                        console.error('Cache test error:', error);
+                      }
+                    }}
+                    variant="outline"
+                    className="border-canyon text-canyon hover:bg-canyon/10"
+                  >
+                    📊 Test Performance
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sitemap */}
           <div className="p-4 bg-white rounded-lg border border-coyote">
             <div className="flex items-start justify-between">
               <div className="flex-1">

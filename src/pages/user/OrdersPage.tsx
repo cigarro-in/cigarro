@@ -232,22 +232,6 @@ export function OrdersPage() {
       const newTransactionId = `TXN${Date.now().toString().slice(-8)}`;
       console.log('🔄 Retry payment with new transaction ID:', newTransactionId);
 
-      setRetryingOrder(order);
-      setPaymentStage('processing');
-      setIsConfirmingPayment(true);
-      
-      // Start countdown from 5 minutes (300 seconds)
-      setCountdown(300);
-      const countdownInterval = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownInterval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000); // Update every second
-
       // Update order with new transaction ID
       console.log('🔄 Updating order with new transaction ID...');
       console.log('🎯 Order ID:', order.id);
@@ -268,26 +252,13 @@ export function OrdersPage() {
       if (updateError) {
         console.error('❌ Error updating transaction ID:', updateError);
         toast.error('Failed to update order. Please try again.');
-        setIsConfirmingPayment(false);
-        clearInterval(countdownInterval);
         return;
       }
       
       console.log('✅ Order updated successfully:', updateData);
 
-      // Generate UPI payment link with NEW transaction ID
-      const upiId = 'hrejuh@upi';
-      const merchantName = 'Cigarro';
-      const note = `Order ${order.displayOrderId}`;
-      
-      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}` +
-        `&pn=${encodeURIComponent(merchantName)}` +
-        `&am=${order.total}` +
-        `&tn=${encodeURIComponent(note)}` +
-        '&cu=INR';
-      
       // Trigger server-side verification with NEW transaction ID
-      const orderCreatedAt = new Date().toISOString(); // Use current time for retry
+      const orderCreatedAt = new Date().toISOString();
       
       fetch('/payment-email-webhook', {
         method: 'POST',
@@ -304,87 +275,38 @@ export function OrdersPage() {
         }),
         keepalive: true
       }).catch(err => console.log('Verification started on server:', err));
+
+      // Generate UPI payment link
+      const upiId = 'hrejuh@upi';
+      const merchantName = 'Cigarro';
+      const note = `Order ${order.displayOrderId}`;
       
-      // Small delay to ensure webhook request is sent
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Open UPI app - Use try-catch for better error handling
-      try {
-        window.location.href = upiLink;
-      } catch (err) {
-        console.error('Failed to open UPI app:', err);
-        toast.error('Failed to open UPI app. Please try again.');
-        setIsConfirmingPayment(false);
-        clearInterval(countdownInterval);
-        return;
-      }
-      
-      // Start polling for payment status with NEW transaction ID
-      let isPaymentCompleted = false;
-      const pollInterval = setInterval(async () => {
-        try {
-          console.log('🔍 Checking payment status in database...');
-          console.log('📋 Looking for order ID:', order.id);
-          console.log('🔑 New transaction ID:', newTransactionId);
-          
-          // Query by order ID (UUID), not transaction_id
-          // The order ID stays the same, only transaction_id is updated
-          const { data: orderData, error } = await supabase
-            .from('orders')
-            .select('payment_verified, payment_confirmed, status, transaction_id')
-            .eq('id', order.id)
-            .single();
-          
-          if (error) {
-            console.error('Error checking order status:', error);
-            // Don't return on error, keep polling
-            return;
+      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}` +
+        `&pn=${encodeURIComponent(merchantName)}` +
+        `&am=${order.total}` +
+        `&tn=${encodeURIComponent(note)}` +
+        '&cu=INR';
+
+      // Navigate to unified transaction page
+      navigate('/transaction', {
+        state: {
+          type: 'order_retry',
+          transactionId: newTransactionId,
+          amount: order.total,
+          orderId: order.id,
+          paymentMethod: 'upi',
+          upiUrl: upiLink,
+          metadata: {
+            original_transaction_id: order.transactionId,
+            order_display_id: order.displayOrderId,
+            retry_attempt: true
           }
-          
-          // Verify we're checking the right transaction
-          if (orderData.transaction_id !== newTransactionId) {
-            console.warn('⚠️ Transaction ID mismatch:', {
-              expected: newTransactionId,
-              found: orderData.transaction_id
-            });
-          }
-          
-          if (orderData && (orderData.payment_verified === 'YES' || orderData.payment_confirmed)) {
-            // Payment verified by server!
-            clearInterval(pollInterval);
-            clearInterval(countdownInterval);
-            console.log('✅ Payment verified!');
-            setPaymentStage('confirmed');
-            isPaymentCompleted = true;
-            toast.success('Payment verified successfully!');
-            
-            // Refresh orders list
-            await fetchOrders();
-          }
-        } catch (error) {
-          console.error('Error polling payment status:', error);
         }
-      }, 5000); // Poll every 5 seconds
-      
-      // Stop polling after 5 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        clearInterval(countdownInterval);
-        
-        // If still not verified after 5 minutes, show pending message
-        if (!isPaymentCompleted) {
-          setPaymentStage('pending');
-          toast.info('Order saved! We\'ll verify your payment shortly.');
-          
-          // Refresh orders list
-          fetchOrders();
-        }
-      }, 300000); // 5 minutes
+      });
       
     } catch (error) {
       console.error('Retry payment error:', error);
       toast.error('Failed to retry payment. Please try again.');
-      setIsConfirmingPayment(false);
     }
   };
 

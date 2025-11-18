@@ -24,7 +24,6 @@ interface Address {
   state: string;
   country: string;
   label: string;
-  is_primary?: boolean;
 }
 
 export function MobileCheckoutPageNew() {
@@ -71,7 +70,11 @@ export function MobileCheckoutPageNew() {
   });
 
   // QR code state
-  const [qrCode, setQrCode] = useState('');
+  const [qrCode, setQrCode] = useState<string>('');
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
 
   // Shipping cost calculation
   const getShippingCost = () => {
@@ -99,18 +102,57 @@ export function MobileCheckoutPageNew() {
         p_user_id: user.id
       });
 
-      if (error) {
-        console.error('Error fetching wallet balance:', error);
-        setWalletBalance(0);
-      } else {
-        console.log('✅ Wallet balance:', data);
-        setWalletBalance(data || 0);
-      }
+      if (error) throw error;
+      setWalletBalance(data || 0);
     } catch (error) {
-      console.error('Failed to fetch wallet balance:', error);
+      console.error('Error fetching wallet balance:', error);
       setWalletBalance(0);
     } finally {
       setIsWalletLoading(false);
+    }
+  };
+
+  // Fetch saved addresses and auto-select
+  const fetchSavedAddresses = async () => {
+    if (!user) return;
+
+    try {
+      const { data: addresses, error } = await supabase
+        .from('saved_addresses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching addresses:', error);
+        return;
+      }
+
+      if (addresses && addresses.length > 0) {
+        setSavedAddresses(addresses);
+        
+        // Auto-select first (most recent) address
+        const addressToSelect = addresses[0];
+        
+        console.log('📍 Auto-selecting address:', addressToSelect.label);
+        
+        setSelectedAddress({
+          id: addressToSelect.id,
+          full_name: addressToSelect.full_name,
+          phone: addressToSelect.phone,
+          address: addressToSelect.address,
+          pincode: addressToSelect.pincode,
+          city: addressToSelect.city,
+          state: addressToSelect.state,
+          country: addressToSelect.country || 'India',
+          label: addressToSelect.label
+        });
+      } else {
+        console.log('📍 No saved addresses found');
+        setSavedAddresses([]);
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
     }
   };
 
@@ -215,6 +257,27 @@ export function MobileCheckoutPageNew() {
     }
   };
 
+  // Helper function to trigger payment webhook
+  const triggerPaymentWebhook = (transactionId: string, orderId: string, amount: number) => {
+    const orderCreatedAt = new Date().toISOString();
+    
+    fetch('/payment-email-webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
+      },
+      body: JSON.stringify({
+        orderId: transactionId,
+        transactionId: transactionId,
+        amount: amount,
+        orderCreatedAt: orderCreatedAt,
+        timestamp: new Date().toISOString()
+      }),
+      keepalive: true
+    }).catch(err => console.log('Verification started on server:', err));
+  };
+
   // Handle wallet payment
   const handleWalletPayment = async () => {
     if (!selectedAddress) {
@@ -240,11 +303,21 @@ export function MobileCheckoutPageNew() {
       const finalTotal = getFinalTotal();
       const walletAmountUsed = Math.min(walletBalance, finalTotal);
       
+      console.log('💰 Wallet Payment Flow:', {
+        txnId,
+        finalTotal,
+        walletBalance,
+        walletAmountUsed,
+        isFullPayment: walletAmountUsed >= finalTotal
+      });
+      
       // Save order first
       const order = await saveOrderToDatabase(txnId, 'pending');
       if (!order) {
         throw new Error('Failed to create order');
       }
+
+      console.log('✅ Order saved:', order.id);
 
       // Process wallet payment
       const { data: result, error } = await supabase.rpc('process_order_payment', {
@@ -261,22 +334,89 @@ export function MobileCheckoutPageNew() {
         }
       });
 
-      if (error) throw error;
-
-      if (walletAmountUsed >= finalTotal) {
-        // Full wallet payment - order completed
-        clearCart();
-        toast.success('🎉 Order completed with wallet!');
-        navigate('/orders', { replace: true });
-      } else {
-        // Partial wallet payment - continue with UPI
-        const remainingAmount = finalTotal - walletAmountUsed;
-        toast.success(`₹${walletAmountUsed} deducted from wallet. Pay remaining ₹${remainingAmount} via UPI.`);
-        handleUPIPayment(remainingAmount, txnId);
+      if (error) {
+        console.error('❌ process_order_payment error:', error);
+        throw error;
       }
+
+      console.log('✅ process_order_payment result:', result);
+
+      // Navigate to transaction processing page
+      navigate('/transaction', {
+        state: {
+          type: 'order',
+          transactionId: txnId,
+          amount: finalTotal,
+          orderId: order.id,
+          paymentMethod: 'wallet',
+          metadata: {
+            wallet_amount_used: walletAmountUsed,
+            is_full_payment: walletAmountUsed >= finalTotal,
+            items_count: items.length,
+            shipping_cost: getShippingCost(),
+            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
+          }
+        }
+      });
     } catch (error) {
-      console.error('Wallet payment error:', error);
+      console.error('❌ Wallet payment error:', error);
       toast.error('Payment failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle UPI payment
+  const handleUPIPayment = async (amount?: number, existingTxnId?: string) => {
+    if (!user) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
+      setShowAddressDialog(true);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const txnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
+      const paymentAmount = amount || Math.max(0, getFinalTotal() - walletAmountToUse);
+
+      if (!existingTxnId) {
+        const order = await saveOrderToDatabase(txnId, 'pending');
+        if (!order) {
+          toast.error('Failed to create order');
+          return;
+        }
+
+        // Trigger webhook
+        triggerPaymentWebhook(txnId, order.id, paymentAmount);
+      }
+
+      // Generate UPI URL
+      const upiUrl = `upi://pay?pa=payments@cigarro.in&pn=Cigarro&am=${paymentAmount}&cu=INR&tn=Order%20${txnId}`;
+
+      // Navigate to unified transaction page
+      navigate('/transaction', {
+        state: {
+          type: 'order',
+          transactionId: txnId,
+          amount: paymentAmount,
+          orderId: existingTxnId ? undefined : txnId,
+          paymentMethod: 'upi',
+          upiUrl: upiUrl,
+          metadata: {
+            items_count: items.length,
+            shipping_cost: getShippingCost(),
+            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
+          }
+        }
+      });
+    } catch (error) {
+      console.error('UPI payment error:', error);
+      toast.error('Failed to initiate payment');
     } finally {
       setIsProcessing(false);
     }
@@ -284,18 +424,21 @@ export function MobileCheckoutPageNew() {
 
   // Handle QR payment
   const handleQRPayment = async () => {
+    if (!user) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
     if (!selectedAddress) {
       toast.error('Please select a delivery address');
       setShowAddressDialog(true);
       return;
     }
 
-    const txnId = `TXN${Date.now().toString().slice(-8)}`;
-    const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
-
+    setIsProcessing(true);
     try {
-      const qrCodeData = await QRCodeLib.toString(paymentAmount.toString(), { type: 'terminal' });
-      setQrCode(qrCodeData);
+      const txnId = `TXN${Date.now().toString().slice(-8)}`;
+      const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
 
       // Save order first
       const order = await saveOrderToDatabase(txnId, 'pending');
@@ -305,10 +448,13 @@ export function MobileCheckoutPageNew() {
 
       // Process QR payment
       const { data: result, error } = await supabase.rpc('process_order_payment', {
+        p_user_id: user.id,
         p_order_id: order.id,
         p_transaction_id: txnId,
         p_amount: paymentAmount,
         p_payment_method: 'qr',
+        p_use_wallet: false,
+        p_wallet_amount: 0,
         p_metadata: {
           order_id: order.id,
           items_count: items.length,
@@ -320,40 +466,29 @@ export function MobileCheckoutPageNew() {
 
       if (error) throw error;
 
-      toast.success('QR code generated. Scan to pay.');
+      // Trigger webhook
+      triggerPaymentWebhook(txnId, order.id, paymentAmount);
+
+      // Navigate to unified transaction page
+      navigate('/transaction', {
+        state: {
+          type: 'order',
+          transactionId: txnId,
+          amount: paymentAmount,
+          orderId: order.id,
+          paymentMethod: 'qr',
+          metadata: {
+            items_count: items.length,
+            shipping_cost: getShippingCost(),
+            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
+          }
+        }
+      });
     } catch (error) {
       console.error('QR payment error:', error);
-      toast.error('Failed to generate QR code');
-    }
-  };
-
-  // Handle UPI payment
-  const handleUPIPayment = async (amount?: number, existingTxnId?: string) => {
-    if (!selectedAddress) {
-      toast.error('Please select a delivery address');
-      setShowAddressDialog(true);
-      return;
-    }
-
-    const txnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
-    const paymentAmount = amount || Math.max(0, getFinalTotal() - walletAmountToUse);
-
-    try {
-      if (!existingTxnId) {
-        const order = await saveOrderToDatabase(txnId, 'pending');
-        if (!order) {
-          toast.error('Failed to create order');
-          return;
-        }
-      }
-
-      const upiUrl = `upi://pay?pa=payments@cigarro.in&pn=Cigarro&am=${paymentAmount}&cu=INR&tn=Order%20Payment%20${txnId}`;
-      window.location.href = upiUrl;
-      
-      toast.success('UPI app opened. Complete payment and return here.');
-    } catch (error) {
-      console.error('UPI payment error:', error);
-      toast.error('Failed to open UPI app');
+      toast.error('Failed to initiate payment');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -361,15 +496,16 @@ export function MobileCheckoutPageNew() {
   useEffect(() => {
     if (user) {
       fetchWalletBalance();
+      fetchSavedAddresses();
     }
   }, [user]);
 
-  // Redirect if no items
+  // Redirect if no items (but not during order completion)
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !isCompletingOrder) {
       navigate('/cart');
     }
-  }, [items, navigate]);
+  }, [items, navigate, isCompletingOrder]);
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -594,6 +730,7 @@ export function MobileCheckoutPageNew() {
             onAddressSelect={setSelectedAddress}
             showDialog={showAddressDialog}
             onDialogChange={setShowAddressDialog}
+            savedAddresses={savedAddresses}
           />
         </DialogContent>
       </Dialog>

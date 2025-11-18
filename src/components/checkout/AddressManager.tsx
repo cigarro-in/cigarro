@@ -20,7 +20,6 @@ interface Address {
   state: string;
   country: string;
   label: string;
-  is_primary?: boolean;
 }
 
 interface AddressManagerProps {
@@ -30,6 +29,7 @@ interface AddressManagerProps {
   showDialog: boolean;
   onDialogChange: (show: boolean) => void;
   showInlineSelector?: boolean; // New prop for inline display
+  savedAddresses?: Address[]; // Pre-loaded addresses from parent
 }
 
 const addressSuggestions = [
@@ -47,9 +47,10 @@ export function AddressManager({
   onAddressSelect, 
   showDialog, 
   onDialogChange,
-  showInlineSelector = false
+  showInlineSelector = false,
+  savedAddresses: propSavedAddresses
 }: AddressManagerProps) {
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>(propSavedAddresses || []);
   const [showAddNewDialog, setShowAddNewDialog] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -71,9 +72,22 @@ export function AddressManager({
   const [addressErrors, setAddressErrors] = useState<{[key: string]: string}>({});
   const [pincodeLookup, setPincodeLookup] = useState<{[key: string]: { city: string; state: string } | null}>({});
 
+  // Update savedAddresses when prop changes
+  useEffect(() => {
+    if (propSavedAddresses) {
+      setSavedAddresses(propSavedAddresses);
+    }
+  }, [propSavedAddresses]);
+
   // Load saved addresses
   const loadSavedAddresses = async () => {
     if (!user) return;
+    
+    // If addresses are provided via props, use them
+    if (propSavedAddresses && propSavedAddresses.length > 0) {
+      setSavedAddresses(propSavedAddresses);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -85,9 +99,8 @@ export function AddressManager({
       if (!error && data) {
         setSavedAddresses(data);
         if (data.length > 0 && !selectedAddress) {
-          // Select primary address first, or the most recent one
-          const primaryAddress = data.find(addr => addr.is_primary);
-          onAddressSelect(primaryAddress || data[0]);
+          // Select the most recent address
+          onAddressSelect(data[0]);
         }
       }
     } catch (error) {
