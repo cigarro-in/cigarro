@@ -1,5 +1,6 @@
-// Cloudflare Worker for Brands Listing with Edge Caching
-// Caches all brands with product counts
+// Cloudflare Worker for Brands with Edge Caching
+// Caching: Requires Cache Rule in Cloudflare Dashboard
+// Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/brands
 
 import { createClient } from '@supabase/supabase-js';

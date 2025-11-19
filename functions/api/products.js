@@ -1,5 +1,6 @@
 // Cloudflare Worker for Products Listing with Edge Caching
-// Caches all active products for products page
+// Caching: Requires Cache Rule in Cloudflare Dashboard
+// Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/products
 
 import { createClient } from '@supabase/supabase-js';

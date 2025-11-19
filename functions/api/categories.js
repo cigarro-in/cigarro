@@ -1,5 +1,6 @@
-// Cloudflare Worker for Categories API with Edge Caching
-// Caches category data at the edge for ultra-fast response times
+// Cloudflare Worker for Categories with Edge Caching
+// Caching: Requires Cache Rule in Cloudflare Dashboard
+// Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/categories
 
 import { createClient } from '@supabase/supabase-js';

@@ -1,5 +1,6 @@
 // Cloudflare Worker for Homepage Data with Edge Caching
-// Uses Cloudflare's native CDN caching instead of Cache API
+// Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
+// Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/homepage-data
 
 import { createClient } from '@supabase/supabase-js';
