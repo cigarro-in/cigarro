@@ -6,16 +6,19 @@ import { formatINR } from '../../utils/currency';
 import { Helmet } from 'react-helmet-async';
 
 type LocationState = {
-  message: string;
-  orderId: string;
+  message?: string;
+  orderId?: string;
+  displayOrderId?: string;
   amount?: number;
   itemCount?: number;
+  paymentMethod?: string;
+  walletAmountUsed?: number;
 };
 
 export function OrderSuccessPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { message, orderId, amount, itemCount } = (location.state || {}) as LocationState;
+  const { message, orderId, displayOrderId, amount, itemCount, paymentMethod, walletAmountUsed } = (location.state || {}) as LocationState;
 
   return (
     <>
@@ -44,7 +47,7 @@ export function OrderSuccessPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Order Number</p>
-                  <p className="font-medium">{orderId || '--'}</p>
+                  <p className="font-medium font-mono text-lg">#{displayOrderId || orderId || '--'}</p>
                 </div>
               </div>
               

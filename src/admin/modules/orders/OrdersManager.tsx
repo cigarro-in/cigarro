@@ -151,23 +151,27 @@ export function OrdersManager() {
 
   const handlePaymentVerification = async (orderId: string, verified: 'YES' | 'NO' | 'REJECTED', reason?: string) => {
     try {
-      const updateData: any = {
-        payment_verified: verified,
-        payment_verified_at: new Date().toISOString()
-        // Note: payment_verified_by field removed to avoid UUID constraint error
-        // TODO: Implement proper admin user ID tracking if needed
-      };
-
-      if (verified === 'REJECTED' && reason) {
-        updateData.payment_rejection_reason = reason;
+      // Get current admin user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('You must be logged in as admin');
+        return;
       }
 
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', orderId);
+      // Call secure backend function
+      const { data, error } = await supabase.rpc('admin_verify_payment', {
+        p_order_id: orderId,
+        p_verified: verified,
+        p_admin_id: user.id,
+        p_rejection_reason: reason || null
+      });
 
       if (error) throw error;
+      
+      if (!data.success) {
+        toast.error(data.message || 'Failed to verify payment');
+        return;
+      }
       
       toast.success(`Payment ${verified.toLowerCase()} successfully`);
       fetchOrders();

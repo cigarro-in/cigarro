@@ -10,7 +10,7 @@ import { formatINR } from '../../utils/currency';
 import QRCode from 'qrcode';
 import { useCart } from '../../hooks/useCart';
 
-type TransactionType = 'order' | 'wallet_load' | 'order_retry';
+type TransactionType = 'order' | 'wallet_load' | 'order_retry' | 'wallet_payment';
 type TransactionStatus = 'processing' | 'completed' | 'failed' | 'timeout';
 
 interface TransactionData {
@@ -18,8 +18,11 @@ interface TransactionData {
   transactionId: string;
   amount: number;
   orderId?: string;
+  displayOrderId?: string;
   paymentMethod: 'upi' | 'qr' | 'wallet';
   upiUrl?: string;
+  autoComplete?: boolean;
+  walletAmountUsed?: number;
   metadata?: Record<string, any>;
 }
 
@@ -53,8 +56,36 @@ export function TransactionProcessingPage() {
 
   const initializeTransaction = async () => {
     try {
-      // For wallet payments, auto-verify immediately
-      if (transactionData.paymentMethod === 'wallet') {
+      // For full wallet payments with autoComplete flag
+      if (transactionData.type === 'wallet_payment' && transactionData.autoComplete) {
+        console.log('💰 Processing full wallet payment...');
+        
+        // Show processing for 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Clear cart and session storage
+        await clearCart();
+        sessionStorage.removeItem('buyNowItem');
+        sessionStorage.removeItem('isBuyNow');
+        
+        console.log('✅ Wallet payment complete, navigating to success...');
+        
+        // Navigate to success page
+        navigate('/order-success', {
+          state: {
+            orderId: transactionData.orderId,
+            displayOrderId: transactionData.displayOrderId,
+            amount: transactionData.amount,
+            paymentMethod: 'wallet',
+            walletAmountUsed: transactionData.walletAmountUsed
+          },
+          replace: true
+        });
+        return;
+      }
+
+      // For wallet payments that need verification
+      if (transactionData.paymentMethod === 'wallet' && !transactionData.autoComplete) {
         // Auto-verify wallet payment
         const { error: verifyError } = await supabase.rpc('verify_order_payment', {
           p_transaction_id: transactionData.transactionId,

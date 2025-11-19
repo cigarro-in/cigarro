@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
+import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink, RefreshCw, Loader2, Smartphone, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -68,25 +68,53 @@ export function OrdersPage() {
   const { addMultipleToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [countdown, setCountdown] = useState(300); // 5 minutes
-  const [paymentStage, setPaymentStage] = useState<'processing' | 'verifying' | 'confirmed' | 'pending'>('processing');
-  const [retryingOrder, setRetryingOrder] = useState<Order | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const ORDERS_PER_PAGE = 10;
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const lastOrderRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (user) {
-      fetchOrders();
+      fetchOrders(true);
     }
   }, [user]);
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
+  // Refresh orders when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user) {
+        console.log('📱 Page visible - Refreshing orders...');
+        setPage(0);
+        fetchOrders(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
+  const fetchOrders = async (reset = false) => {
+    if (reset) {
+      setIsInitialLoading(true);
+      setIsFetchingMore(false);
+    } else {
+      setIsFetchingMore(true);
+    }
+    const currentPage = reset ? 0 : page;
+    const from = currentPage * ORDERS_PER_PAGE;
+    const to = from + ORDERS_PER_PAGE - 1;
+
+    console.log(`📦 Fetching orders: page ${currentPage}, range ${from}-${to}`);
+
+    const { data, error, count } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*)', { count: 'exact' })
       .eq('user_id', user!.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       toast.error('Failed to fetch orders');
@@ -128,18 +156,56 @@ export function OrdersPage() {
         deliveryProofUrl: order.delivery_proof_url,
         shippingAddress: {
           name: order.shipping_name,
+          full_name: order.shipping_name,
+          phone: order.shipping_phone,
           address: order.shipping_address,
           city: order.shipping_city,
           state: order.shipping_state,
           zipCode: order.shipping_zip_code,
+          pincode: order.shipping_zip_code,
+          country: order.shipping_country || 'India',
+          label: order.shipping_method || 'Saved address',
         },
         paymentMethod: order.payment_method,
-        upiId: order.upi_id,
+        upiId: order.upi_id
       })) || [];
-      setOrders(formattedOrders);
+
+      if (reset) {
+        setOrders(formattedOrders);
+        setPage(0);
+      } else {
+        setOrders(prev => currentPage === 0 ? formattedOrders : [...prev, ...formattedOrders]);
+      }
+
+      setHasMore(formattedOrders.length === ORDERS_PER_PAGE);
+      console.log(`✅ Loaded ${formattedOrders.length} orders, hasMore: ${formattedOrders.length === ORDERS_PER_PAGE}`);
     }
-    setIsLoading(false);
+    setIsInitialLoading(false);
+    setIsFetchingMore(false);
   };
+
+  // Infinite scroll with IntersectionObserver
+  const lastOrderElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (isInitialLoading || isFetchingMore) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore) {
+        console.log('📜 Reached bottom - Loading more orders...');
+        setPage(prev => prev + 1);
+      }
+    });
+    
+    if (node) observerRef.current.observe(node);
+  }, [isInitialLoading, isFetchingMore, hasMore]);
+
+  // Fetch more when page changes
+  useEffect(() => {
+    if (page > 0 && user) {
+      console.log('📄 Page changed to:', page);
+      fetchOrders(false);
+    }
+  }, [page, user]);
 
   const getStatusIcon = (status: Order['status']) => {
     switch (status) {
@@ -227,86 +293,36 @@ export function OrdersPage() {
   };
 
   const handleRetryPayment = async (order: Order) => {
+    if (!user) {
+      toast.error('Please sign in to retry payment');
+      return;
+    }
+
     try {
-      // Generate NEW unique transaction ID for retry payment
-      const newTransactionId = `TXN${Date.now().toString().slice(-8)}`;
-      console.log('🔄 Retry payment with new transaction ID:', newTransactionId);
-
-      // Update order with new transaction ID
-      console.log('🔄 Updating order with new transaction ID...');
-      console.log('🎯 Order ID:', order.id);
-      console.log('🆕 Old transaction ID:', order.transactionId);
-      console.log('🆕 New transaction ID:', newTransactionId);
+      // Store retry order info in sessionStorage (similar to Buy Now flow)
+      const retryOrderData = {
+        orderId: order.id,
+        displayOrderId: order.displayOrderId,
+        items: order.items,
+        total: order.total,
+        subtotal: order.subtotal,
+        shipping: order.shipping,
+        discount: order.discount,
+        tax: order.tax,
+        shippingAddress: order.shippingAddress
+      };
       
-      const { data: updateData, error: updateError } = await supabase
-        .from('orders')
-        .update({ 
-          transaction_id: newTransactionId,
-          payment_verified: 'NO',
-          payment_confirmed: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id)
-        .select();
-
-      if (updateError) {
-        console.error('❌ Error updating transaction ID:', updateError);
-        toast.error('Failed to update order. Please try again.');
-        return;
-      }
+      sessionStorage.setItem('retryOrder', JSON.stringify(retryOrderData));
+      sessionStorage.setItem('isRetryPayment', 'true');
       
-      console.log('✅ Order updated successfully:', updateData);
-
-      // Trigger server-side verification with NEW transaction ID
-      const orderCreatedAt = new Date().toISOString();
+      console.log('🔄 Retry payment initiated for order:', order.displayOrderId);
       
-      fetch('/payment-email-webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
-        },
-        body: JSON.stringify({
-          orderId: newTransactionId,
-          transactionId: newTransactionId,
-          amount: order.total,
-          orderCreatedAt: orderCreatedAt,
-          timestamp: new Date().toISOString()
-        }),
-        keepalive: true
-      }).catch(err => console.log('Verification started on server:', err));
-
-      // Generate UPI payment link
-      const upiId = 'hrejuh@upi';
-      const merchantName = 'Cigarro';
-      const note = `Order ${order.displayOrderId}`;
-      
-      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}` +
-        `&pn=${encodeURIComponent(merchantName)}` +
-        `&am=${order.total}` +
-        `&tn=${encodeURIComponent(note)}` +
-        '&cu=INR';
-
-      // Navigate to unified transaction page
-      navigate('/transaction', {
-        state: {
-          type: 'order_retry',
-          transactionId: newTransactionId,
-          amount: order.total,
-          orderId: order.id,
-          paymentMethod: 'upi',
-          upiUrl: upiLink,
-          metadata: {
-            original_transaction_id: order.transactionId,
-            order_display_id: order.displayOrderId,
-            retry_attempt: true
-          }
-        }
-      });
+      // Navigate to checkout page
+      navigate('/checkout');
       
     } catch (error) {
       console.error('Retry payment error:', error);
-      toast.error('Failed to retry payment. Please try again.');
+      toast.error('Failed to initiate retry payment. Please try again.');
     }
   };
 
@@ -352,7 +368,7 @@ export function OrdersPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8">
-        {isLoading ? (
+        {isInitialLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
               <div key={i} className="bg-card rounded-lg h-32 animate-pulse border-2 border-border/30 shadow-md" />
@@ -376,12 +392,16 @@ export function OrdersPage() {
           </Card>
         ) : (
           <div className="space-y-4 md:space-y-5">
-            {orders.map((order) => {
+            {orders.map((order, index) => {
               const isExpanded = expandedOrderId === order.id;
+              const isLastOrder = orders.length === index + 1;
               
               return (
+                <div 
+                  key={order.id}
+                  ref={isLastOrder ? lastOrderElementRef : null}
+                >
                 <Card 
-                  key={order.id} 
                   className="border-2 border-border/40 bg-card overflow-hidden transition-all duration-300 hover:border-accent/50 shadow-md hover:shadow-lg"
                 >
                   {/* Compact Header - Always Visible */}
@@ -727,105 +747,26 @@ export function OrdersPage() {
                     </div>
                   )}
                 </Card>
+                </div>
               );
             })}
-          </div>
-        )}
-      </div>
-
-      {/* Payment Confirmation Full Screen Overlay */}
-      {isConfirmingPayment && retryingOrder && (
-        <div className="fixed inset-0 z-[9999] bg-creme flex items-center justify-center p-6 animate-fade-in">
-          <div className="w-full max-w-md">
-            {paymentStage === 'processing' || paymentStage === 'verifying' ? (
-              <div className="text-center space-y-6">
-                <div className="relative mx-auto w-24 h-24">
-                  <div className="absolute inset-0 rounded-full border-4 border-canyon/30"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-canyon animate-spin"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="w-10 h-10 text-canyon animate-pulse" />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-2xl font-serif text-dark">
-                    {paymentStage === 'verifying' ? 'Verifying Payment...' : 'Complete Payment in UPI App'}
-                  </h2>
-                  <p className="text-base text-dark/70 font-sans">
-                    Return here after completing payment. We'll verify automatically.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center gap-3">
-                  <div className="relative w-16 h-16">
-                    <svg className="w-16 h-16 transform -rotate-90">
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none" className="text-coyote/30" />
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="none"
-                        strokeDasharray={`${2 * Math.PI * 28}`}
-                        strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 300)}`}
-                        className="text-canyon transition-all duration-1000" strokeLinecap="round" />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-dark">{Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-creme-light rounded-2xl p-5 border-2 border-coyote/20">
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-dark/60 font-medium">Amount</span>
-                      <span className="text-lg font-bold text-dark">{formatINR(retryingOrder.total)}</span>
-                    </div>
-                    <div className="h-px bg-coyote/20"></div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-dark/60 font-medium">Order ID</span>
-                      <span className="text-dark font-mono text-xs">{retryingOrder.displayOrderId}</span>
-                    </div>
-                  </div>
-                </div>
+            
+            {/* Loading indicator for infinite scroll */}
+            {isFetchingMore && (
+              <div className="flex justify-center py-6">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : paymentStage === 'confirmed' ? (
-              <div className="text-center space-y-6">
-                <div className="relative mx-auto w-28 h-28">
-                  <div className="relative w-28 h-28 rounded-full bg-green-500 flex items-center justify-center shadow-2xl">
-                    <CheckCircle className="w-14 h-14 text-white" strokeWidth={3} />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-3xl font-serif text-dark">Payment Confirmed!</h2>
-                  <p className="text-base text-dark/70 font-sans">Your payment has been verified successfully</p>
-                </div>
-                <div className="bg-creme-light rounded-2xl p-6 border-2 border-green-500/30">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-dark/60 font-medium">Order Total</span>
-                      <span className="text-2xl font-bold text-green-600">{formatINR(retryingOrder.total)}</span>
-                    </div>
-                  </div>
-                </div>
-                <button onClick={() => { setIsConfirmingPayment(false); setRetryingOrder(null); }}
-                  className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon">
-                  Close
-                </button>
-              </div>
-            ) : (
-              <div className="text-center space-y-6">
-                <div className="relative mx-auto w-28 h-28">
-                  <div className="relative w-28 h-28 rounded-full bg-yellow-500 flex items-center justify-center shadow-2xl">
-                    <Clock className="w-14 h-14 text-white" strokeWidth={3} />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-3xl font-serif text-dark">Verification Pending</h2>
-                  <p className="text-base text-dark/70 font-sans">We'll verify your payment shortly</p>
-                </div>
-                <button onClick={() => { setIsConfirmingPayment(false); setRetryingOrder(null); }}
-                  className="w-full bg-dark text-creme-light py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 hover:bg-canyon">
-                  Close
-                </button>
+            )}
+            
+            {/* End of list indicator */}
+            {!hasMore && orders.length > 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No more orders to load
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
     </>
   );

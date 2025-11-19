@@ -183,6 +183,9 @@ export async function getOrderVerifications(
 
 /**
  * Manually verify a payment (admin only)
+ * @deprecated Use admin_verify_payment database function instead
+ * This function has been removed for security reasons.
+ * Admins should use the secure backend function through the admin panel.
  */
 export async function manuallyVerifyPayment(
   orderId: string,
@@ -193,53 +196,10 @@ export async function manuallyVerifyPayment(
     notes?: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Create manual verification record
-    const { data: verification, error: verifyError } = await supabase
-      .from('payment_verifications')
-      .insert({
-        order_id: orderId,
-        amount: verificationData.amount,
-        upi_reference: verificationData.upiReference,
-        bank_name: verificationData.bankName,
-        verification_status: 'manual',
-        verification_method: 'manual',
-        verified_at: new Date().toISOString(),
-        confidence_score: 100,
-        amount_match: true,
-        reference_match: true,
-        time_window_match: true,
-      })
-      .select()
-      .single();
-
-    if (verifyError) {
-      return { success: false, error: verifyError.message };
-    }
-
-    // Update order status
-    const { error: orderError } = await supabase
-      .from('orders')
-      .update({
-        status: 'paid',
-        payment_confirmed: true,
-        payment_confirmed_at: new Date().toISOString(),
-        payment_verification_id: verification.id,
-        auto_verified: false,
-      })
-      .eq('id', orderId);
-
-    if (orderError) {
-      return { success: false, error: orderError.message };
-    }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
+  return {
+    success: false,
+    error: 'This function has been deprecated. Use admin_verify_payment database function instead.',
+  };
 }
 
 /**

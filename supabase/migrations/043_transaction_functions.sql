@@ -52,7 +52,7 @@ DECLARE
     v_order_number TEXT;
 BEGIN
     -- Validate order belongs to user
-    SELECT total, order_number INTO v_order_total, v_order_number
+    SELECT total, display_order_id INTO v_order_total, v_order_number
     FROM public.orders
     WHERE id = p_order_id AND user_id = p_user_id;
     
@@ -157,6 +157,18 @@ BEGIN
         ) RETURNING id INTO v_gateway_txn_id;
         
         RAISE NOTICE 'Gateway transaction created: %', v_gateway_txn_id;
+    ELSE
+        -- Full wallet payment - update order immediately
+        UPDATE public.orders
+        SET payment_verified = 'YES',
+            payment_confirmed = true,
+            payment_confirmed_at = NOW(),
+            payment_verified_at = NOW(),
+            status = 'processing',
+            updated_at = NOW()
+        WHERE id = p_order_id;
+        
+        RAISE NOTICE 'Full wallet payment - Order % updated to processing', p_order_id;
     END IF;
     
     RETURN jsonb_build_object(
@@ -504,7 +516,7 @@ BEGIN
             'completed',
             'wallet',
             v_transaction_id,
-            'Refund to wallet for Order #' || v_order.order_number,
+            'Refund to wallet for Order #' || v_order.display_order_id,
             p_order_id,
             v_original_txn,
             'wallet',
@@ -534,7 +546,7 @@ BEGIN
             'processing',
             v_order.payment_method,
             v_transaction_id,
-            'Refund to ' || v_order.payment_method || ' for Order #' || v_order.order_number,
+            'Refund to ' || v_order.payment_method || ' for Order #' || v_order.display_order_id,
             p_order_id,
             v_original_txn,
             'source',
@@ -750,7 +762,7 @@ BEGIN
         'pending',
         p_payment_method,
         p_new_transaction_id,
-        'Retry payment for Order #' || v_order.order_number,
+        'Retry payment for Order #' || v_order.display_order_id,
         p_order_id,
         v_original_txn,
         COALESCE(v_retry_count, 0) + 1,

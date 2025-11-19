@@ -157,62 +157,108 @@ export function AddressManager({
         return;
       }
 
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error('Location request timed out')), 15000);
-        navigator.geolocation.getCurrentPosition(
-          (pos) => { clearTimeout(timeoutId); resolve(pos); },
-          (err) => { clearTimeout(timeoutId); reject(err); },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-        );
-      });
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        console.warn('Geolocation requires a secure context (https or localhost). Current context is insecure.');
+        toast.error('Location access requires a secure connection. Please use HTTPS or localhost.');
+        return;
+      }
+
+      try {
+        if ('permissions' in navigator && typeof navigator.permissions?.query === 'function') {
+          const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+          console.log('📍 Geolocation permission status:', status.state);
+          if (status.state === 'denied') {
+            toast.error('Location permission is blocked. Please enable it in your browser settings.');
+            return;
+          }
+        }
+      } catch (permError) {
+        console.warn('Unable to query geolocation permissions:', permError);
+      }
+
+      const requestPosition = (options: PositionOptions) =>
+        new Promise<GeolocationPosition>((resolve, reject) => {
+          const timeoutId = setTimeout(() => reject(new Error('Location request timed out')), options.timeout ? options.timeout + 5000 : 15000);
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { clearTimeout(timeoutId); resolve(pos); },
+            (err) => { clearTimeout(timeoutId); reject(err); },
+            options
+          );
+        });
+
+      let position: GeolocationPosition;
+
+      try {
+        position = await requestPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+      } catch (primaryError: any) {
+        if (primaryError?.code === 2) {
+          console.warn('High accuracy position unavailable, retrying with reduced accuracy');
+          position = await requestPosition({ enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 });
+        } else {
+          throw primaryError;
+        }
+      }
 
       const { latitude, longitude } = position.coords;
       toast.info('📍 Processing location data...');
 
-      const nominatimResponse = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=en`,
-        { headers: { 'User-Agent': 'Cigarro-Mobile-Checkout/1.0' } }
-      );
+      const params = new URLSearchParams({
+        format: 'json',
+        lat: latitude.toString(),
+        lon: longitude.toString(),
+        addressdetails: '1',
+        'accept-language': 'en'
+      });
 
-      if (nominatimResponse.ok) {
-        const data = await nominatimResponse.json();
-        if (data && data.address) {
-          const addr = data.address;
-          const road = addr.road || addr.street || '';
-          const suburb = addr.suburb || addr.neighbourhood || '';
-          const city = addr.city || addr.town || addr.village || '';
-          const state = addr.state || addr.province || '';
-          const pincode = addr.postcode || '';
-          
-          const addressParts = [];
-          if (road) addressParts.push(road);
-          if (suburb && suburb !== city) addressParts.push(suburb);
-          const formattedAddress = addressParts.join(', ') || `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-          
-          setAddressForm(prev => ({
-            ...prev,
-            address: formattedAddress,
-            city: city || prev.city,
-            state: state || prev.state,
-            pincode: pincode || prev.pincode,
-            country: 'India'
-          }));
-          
-          setAddressErrors(prev => ({
-            ...prev,
-            address: '',
-            city: city ? '' : prev.city,
-            state: state ? '' : prev.state,
-            pincode: pincode ? '' : prev.pincode
-          }));
-          
-          toast.success(`📍 Location filled! ${city ? city + ', ' + state : 'Please verify details'}`);
-        }
+      const nominatimResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`);
+
+      if (!nominatimResponse.ok) {
+        throw new Error(`Reverse geocoding failed with status ${nominatimResponse.status}`);
       }
+
+      const data = await nominatimResponse.json();
+      if (!data || !data.address) {
+        throw new Error('Reverse geocoding did not return address details');
+      }
+
+      const addr = data.address;
+      const road = addr.road || addr.street || '';
+      const suburb = addr.suburb || addr.neighbourhood || '';
+      const city = addr.city || addr.town || addr.village || '';
+      const state = addr.state || addr.province || '';
+      const pincode = addr.postcode || '';
+
+      const addressParts = [] as string[];
+      if (road) addressParts.push(road);
+      if (suburb && suburb !== city) addressParts.push(suburb);
+      const formattedAddress = addressParts.join(', ') || `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+      setAddressForm(prev => ({
+        ...prev,
+        address: formattedAddress,
+        city: prev.city || '',
+        state: prev.state || '',
+        pincode: pincode || prev.pincode,
+        country: 'India'
+      }));
+
+      setAddressErrors(prev => ({
+        ...prev,
+        address: '',
+        city: prev.city || '',
+        state: prev.state || '',
+        pincode: pincode ? '' : prev.pincode
+      }));
+
+      toast.success(`📍 Location filled! ${city ? `${city}, ${state}` : 'Please verify details'}`);
     } catch (error: any) {
       console.error('Location error:', error);
       if (error.code === 1) {
         toast.error('Location access denied. Please enable location permissions.');
+      } else if (error.code === 2) {
+        toast.error('Unable to determine your location. Please check GPS/network and try again.');
+      } else if (error.message?.includes('timed out')) {
+        toast.error('Location request timed out. Please try again.');
       } else {
         toast.error('Failed to get location. Please enter address manually.');
       }
