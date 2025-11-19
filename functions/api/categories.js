@@ -20,26 +20,7 @@ export async function onRequest(context) {
   }
 
   try {
-    // Create cache key
-    const cacheKey = new Request('https://cigarro.in/api/categories', request);
-    const cache = caches.default;
-
-    // Try to get from cache first
-    let response = await cache.match(cacheKey);
-
-    if (response) {
-      console.log('✅ Cache HIT - Serving from edge');
-      // Add cache status header
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set('X-Cache-Status', 'HIT');
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    }
-
-    console.log('❌ Cache MISS - Fetching from Supabase');
+    console.log('🔍 Categories API request received');
 
     // Initialize Supabase client
     const supabase = createClient(
@@ -56,31 +37,23 @@ export async function onRequest(context) {
         JSON.stringify({ error: 'Failed to fetch categories', details: error.message }),
         {
           status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders,
-          },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
         }
       );
     }
 
-    // Create successful response
-    response = new Response(JSON.stringify(data), {
+    console.log(`✅ Fetched ${data?.length || 0} categories with products`);
+
+    // Return response - Cloudflare will cache automatically
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400', // Cache for 24 hours
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
         'CDN-Cache-Control': 'max-age=86400',
-        'Cloudflare-CDN-Cache-Control': 'max-age=86400',
-        'X-Cache-Status': 'MISS',
         ...corsHeaders,
       },
     });
-
-    // Store in cache
-    context.waitUntil(cache.put(cacheKey, response.clone()));
-
-    return response;
 
   } catch (error) {
     console.error('Worker error:', error);

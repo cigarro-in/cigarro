@@ -279,9 +279,11 @@ export function SiteSettingsPage() {
                           const results = [];
                           
                           const tests = [
-                            { name: 'Categories', query: () => supabase.from('categories').select('id, name, slug').limit(5) },
-                            { name: 'Products', query: () => supabase.from('products').select('id, name, price').limit(5) },
-                            { name: 'Brands', query: () => supabase.from('brands').select('id, name').limit(5) },
+                            { name: 'Categories', query: () => supabase.from('categories').select('id, name, slug, image').limit(20) },
+                            { name: 'Products', query: () => supabase.from('products').select('id, name, slug, brand, price, gallery_images').limit(50) },
+                            { name: 'Homepage Data', query: () => supabase.from('hero_slides').select('*').limit(10) },
+                            { name: 'Brands', query: () => supabase.from('brands').select('*').limit(20) },
+                            { name: 'Featured Products', query: () => supabase.from('products').select('id, name, price').eq('is_featured', true).limit(12) },
                           ];
                           
                           console.log(`📡 Testing ${tests.length} Supabase queries...`);
@@ -308,11 +310,14 @@ export function SiteSettingsPage() {
                                 console.error(`   ❌ Error:`, error);
                               }
                               
+                              const sizeBytes = data ? JSON.stringify(data).length : 0;
+                              const sizeKB = sizeBytes >= 1024 ? `${Math.round(sizeBytes / 1024)}KB` : `${sizeBytes}B`;
+                              
                               const result = {
                                 name: test.name,
                                 time,
                                 cacheStatus: 'SUPABASE',
-                                size: data ? `${Math.round(JSON.stringify(data).length / 1024)}KB` : 'N/A',
+                                size: sizeKB,
                                 status: !error ? '✅' : '❌',
                                 error: error?.message || null
                               };
@@ -382,22 +387,55 @@ export function SiteSettingsPage() {
                         for (const endpoint of endpoints) {
                           console.log(`🔍 Testing: ${endpoint.name} - ${endpoint.url}`);
                           const start = performance.now();
-                          const response = await fetch(endpoint.url);
-                          const end = performance.now();
-                          const time = Math.round(end - start);
-                          const cacheStatus = response.headers.get('X-Cache-Status') || 'UNKNOWN';
-                          const size = response.headers.get('content-length') || 'N/A';
                           
-                          const result = {
-                            name: endpoint.name,
-                            time,
-                            cacheStatus,
-                            size: size !== 'N/A' ? `${Math.round(parseInt(size) / 1024)}KB` : 'N/A',
-                            status: response.ok ? '✅' : '❌'
-                          };
-                          
-                          console.log(`   ${result.status} ${time}ms | ${cacheStatus} | ${result.size}`);
-                          results.push(result);
+                          try {
+                            const response = await fetch(endpoint.url, {
+                              cache: 'no-store', // Prevent browser cache interference
+                              headers: {
+                                'Accept': 'application/json',
+                              },
+                            });
+                            
+                            const data = await response.text();
+                            const end = performance.now();
+                            const time = Math.round(end - start);
+                            
+                            // Check Cloudflare's native cache status header
+                            const cfCacheStatus = response.headers.get('cf-cache-status') || 'UNKNOWN';
+                            const cacheControl = response.headers.get('cache-control') || 'none';
+                            const age = response.headers.get('age') || '0';
+                            const size = `${Math.round(data.length / 1024)}KB`;
+                            
+                            console.log(`   Response headers:`, {
+                              'cf-cache-status': cfCacheStatus,
+                              'cache-control': cacheControl,
+                              'age': age,
+                              'content-length': response.headers.get('content-length'),
+                            });
+                            
+                            const result = {
+                              name: endpoint.name,
+                              time,
+                              cacheStatus: cfCacheStatus,
+                              size,
+                              age: `${age}s`,
+                              status: response.ok ? '✅' : '❌'
+                            };
+                            
+                            console.log(`   ${result.status} ${time}ms | ${cfCacheStatus} | ${size} | Age: ${age}s`);
+                            results.push(result);
+                          } catch (err: any) {
+                            console.error(`   ❌ Error testing ${endpoint.name}:`, err);
+                            results.push({
+                              name: endpoint.name,
+                              time: 0,
+                              cacheStatus: 'ERROR',
+                              size: 'N/A',
+                              age: 'N/A',
+                              status: '❌',
+                              error: err?.message || 'Unknown error'
+                            });
+                          }
                         }
                         
                         console.log('✅ All endpoint tests completed');
@@ -405,23 +443,36 @@ export function SiteSettingsPage() {
                         toast.dismiss(loading);
                         
                         // Create detailed results message
-                        let message = '📊 Cache Performance Test Results:\n\n';
+                        let message = '📊 Cloudflare CDN Cache Performance:\n\n';
                         results.forEach(r => {
+                          const statusIcon = r.cacheStatus === 'HIT' ? '🟢' : r.cacheStatus === 'MISS' ? '🟡' : r.cacheStatus === 'DYNAMIC' ? '🔵' : '🔴';
                           message += `${r.status} ${r.name}:\n`;
-                          message += `   ⏱️ ${r.time}ms | 💾 ${r.cacheStatus} | 📦 ${r.size}\n\n`;
+                          message += `   ${statusIcon} ${r.cacheStatus} | ⏱️ ${r.time}ms | 📦 ${r.size} | Age: ${r.age}\n\n`;
                         });
                         
-                        const avgTime = Math.round(results.reduce((sum, r) => sum + r.time, 0) / results.length);
+                        const validResults = results.filter(r => r.time > 0);
+                        const avgTime = validResults.length > 0 ? Math.round(validResults.reduce((sum, r) => sum + r.time, 0) / validResults.length) : 0;
                         const hitCount = results.filter(r => r.cacheStatus === 'HIT').length;
+                        const missCount = results.filter(r => r.cacheStatus === 'MISS').length;
+                        const dynamicCount = results.filter(r => r.cacheStatus === 'DYNAMIC').length;
                         
-                        message += `Average: ${avgTime}ms | Cache Hits: ${hitCount}/${results.length}`;
+                        message += `📈 Summary:\n`;
+                        message += `Average: ${avgTime}ms\n`;
+                        message += `🟢 HIT: ${hitCount} | 🟡 MISS: ${missCount} | 🔵 DYNAMIC: ${dynamicCount}\n\n`;
+                        message += hitCount === results.length ? '🚀 Perfect! All cached!' : 
+                                   hitCount > 0 ? '✅ Partial cache - Run again for more HITs' : 
+                                   '⚠️ No cache - First request or cache purged';
                         
                         // Show in console for detailed view
                         console.table(results);
-                        console.log('📊 Cache Performance Summary:', {
+                        console.log('📊 Cloudflare CDN Cache Summary:', {
                           averageTime: `${avgTime}ms`,
                           cacheHitRate: `${hitCount}/${results.length}`,
-                          recommendation: avgTime < 100 ? '🚀 Excellent!' : avgTime < 300 ? '✅ Good' : '⚠️ Consider refreshing cache'
+                          hits: hitCount,
+                          misses: missCount,
+                          dynamic: dynamicCount,
+                          performance: avgTime < 50 ? '🚀 Excellent (CDN cached)' : avgTime < 200 ? '✅ Good (Some cached)' : '⚠️ Slow (No cache)',
+                          recommendation: hitCount === 0 ? 'Run test again to see cache HITs' : 'Cache working correctly'
                         });
                         
                         // Store results for display

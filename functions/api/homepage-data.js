@@ -1,5 +1,5 @@
 // Cloudflare Worker for Homepage Data with Edge Caching
-// Caches featured products, categories, hero data for ultra-fast homepage
+// Uses Cloudflare's native CDN caching instead of Cache API
 // URL: https://cigarro.in/api/homepage-data
 
 import { createClient } from '@supabase/supabase-js';
@@ -18,21 +18,7 @@ export async function onRequest(context) {
   }
 
   try {
-    const cacheKey = new Request('https://cigarro.in/api/homepage-data', request);
-    const cache = caches.default;
-
-    // Try cache first
-    let response = await cache.match(cacheKey);
-
-    if (response) {
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set('X-Cache-Status', 'HIT');
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    }
+    console.log('🔍 Homepage data request received');
 
     // Initialize Supabase
     const supabase = createClient(
@@ -61,13 +47,22 @@ export async function onRequest(context) {
         .from('hero_slides')
         .select('*')
         .eq('is_active', true)
-        .order('order', { ascending: true })
+        .order('sort_order', { ascending: true })
         .limit(10)
     ]);
 
-    // Check for errors
-    if (featuredProducts.error || categories.error || heroSlides.error) {
-      throw new Error('Failed to fetch homepage data');
+    // Check for errors with detailed logging
+    if (featuredProducts.error) {
+      console.error('Featured products error:', featuredProducts.error);
+      throw new Error(`Featured products: ${featuredProducts.error.message}`);
+    }
+    if (categories.error) {
+      console.error('Categories error:', categories.error);
+      throw new Error(`Categories: ${categories.error.message}`);
+    }
+    if (heroSlides.error) {
+      console.error('Hero slides error:', heroSlides.error);
+      throw new Error(`Hero slides: ${heroSlides.error.message}`);
     }
 
     const data = {
@@ -76,23 +71,20 @@ export async function onRequest(context) {
       heroSlides: heroSlides.data || [],
     };
 
-    // Create response
-    response = new Response(JSON.stringify(data), {
+    console.log('✅ Homepage data fetched successfully');
+
+    // Return response with proper caching headers
+    // Cloudflare will automatically cache this based on Cache-Control
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400', // 24 hours
+        // Cache for 24 hours in Cloudflare's CDN
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
         'CDN-Cache-Control': 'max-age=86400',
-        'Cloudflare-CDN-Cache-Control': 'max-age=86400',
-        'X-Cache-Status': 'MISS',
         ...corsHeaders,
       },
     });
-
-    // Store in cache
-    context.waitUntil(cache.put(cacheKey, response.clone()));
-
-    return response;
 
   } catch (error) {
     console.error('Homepage data error:', error);

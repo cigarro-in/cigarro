@@ -1,5 +1,5 @@
-// Cloudflare Worker to Invalidate Categories Cache
-// Call this after updating products/categories in admin
+// Cloudflare Worker to Purge CDN Cache
+// Purges Cloudflare's CDN cache for all API endpoints
 // URL: https://cigarro.in/api/invalidate-cache
 
 export async function onRequest(context) {
@@ -29,9 +29,11 @@ export async function onRequest(context) {
   }
 
   try {
+    console.log('🗑️ Cache purge requested');
+
     // Optional: Add authentication
     const authHeader = request.headers.get('Authorization');
-    const expectedToken = env.CACHE_INVALIDATION_TOKEN; // Set this in Cloudflare env vars
+    const expectedToken = env.CACHE_INVALIDATION_TOKEN;
     
     if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
       return new Response(
@@ -43,11 +45,8 @@ export async function onRequest(context) {
       );
     }
 
-    // Get cache
-    const cache = caches.default;
-    
-    // List of all cached endpoints to invalidate
-    const cacheKeys = [
+    // List of all API endpoints to purge from CDN cache
+    const urlsToPurge = [
       'https://cigarro.in/api/categories',
       'https://cigarro.in/api/products',
       'https://cigarro.in/api/featured-products',
@@ -55,22 +54,40 @@ export async function onRequest(context) {
       'https://cigarro.in/api/homepage-data',
     ];
 
-    // Delete all caches
-    const results = await Promise.all(
-      cacheKeys.map(async (key) => {
-        const deleted = await cache.delete(new Request(key));
-        return { key, deleted };
+    // Purge each URL by making a request with Cache-Control: no-cache
+    // This forces Cloudflare to fetch fresh content from origin
+    const purgeResults = await Promise.all(
+      urlsToPurge.map(async (url) => {
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+            },
+            cf: {
+              cacheTtl: 0,
+              cacheEverything: false,
+            }
+          });
+          
+          console.log(`✅ Purged: ${url} (${response.status})`);
+          return { url, success: response.ok, status: response.status };
+        } catch (err) {
+          console.error(`❌ Failed to purge: ${url}`, err);
+          return { url, success: false, error: err.message };
+        }
       })
     );
 
-    const deletedCount = results.filter(r => r.deleted).length;
-    console.log('🗑️ Cache invalidation:', results);
+    const successCount = purgeResults.filter(r => r.success).length;
+    console.log(`🗑️ Cache purge complete: ${successCount}/${urlsToPurge.length} successful`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Cache invalidated successfully! Cleared ${deletedCount}/${cacheKeys.length} caches.`,
-        results: results 
+        message: `Cache purged! ${successCount}/${urlsToPurge.length} endpoints refreshed. Next request will be MISS, then cached.`,
+        results: purgeResults 
       }),
       {
         status: 200,
@@ -79,9 +96,9 @@ export async function onRequest(context) {
     );
 
   } catch (error) {
-    console.error('Cache invalidation error:', error);
+    console.error('Cache purge error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to invalidate cache', details: error.message }),
+      JSON.stringify({ error: 'Failed to purge cache', details: error.message }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },

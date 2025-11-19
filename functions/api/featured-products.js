@@ -18,21 +18,7 @@ export async function onRequest(context) {
   }
 
   try {
-    const cacheKey = new Request('https://cigarro.in/api/featured-products', request);
-    const cache = caches.default;
-
-    // Try cache first
-    let response = await cache.match(cacheKey);
-
-    if (response) {
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set('X-Cache-Status', 'HIT');
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    }
+    console.log('🔍 Featured products API request received');
 
     // Initialize Supabase
     const supabase = createClient(
@@ -53,23 +39,18 @@ export async function onRequest(context) {
       throw new Error(error.message);
     }
 
-    // Create response
-    response = new Response(JSON.stringify(data), {
+    console.log(`✅ Fetched ${data?.length || 0} featured products`);
+
+    // Return response - Cloudflare CDN will cache automatically
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400', // 24 hours
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
         'CDN-Cache-Control': 'max-age=86400',
-        'Cloudflare-CDN-Cache-Control': 'max-age=86400',
-        'X-Cache-Status': 'MISS',
         ...corsHeaders,
       },
     });
-
-    // Store in cache
-    context.waitUntil(cache.put(cacheKey, response.clone()));
-
-    return response;
 
   } catch (error) {
     console.error('Featured products API error:', error);
