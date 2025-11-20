@@ -38,7 +38,7 @@ import { Switch } from '../../../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Separator } from '../../../components/ui/separator';
 import { EnhancedImageUpload } from '../../../components/ui/EnhancedImageUpload';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { sanitizer } from '../../../utils/validation';
 import { auditLogger } from '../../../utils/audit-logger';

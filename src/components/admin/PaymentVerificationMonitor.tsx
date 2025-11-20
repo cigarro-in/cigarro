@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { 
   RefreshCw, 

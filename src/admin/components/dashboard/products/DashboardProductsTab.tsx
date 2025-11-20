@@ -28,7 +28,7 @@ import { Product, ProductVariant } from '../types/index';
 import { formatINR } from '../../../../utils/currency';
 import { toast } from 'sonner';
 import { ProductForm } from '../../../../admin/products/components/ProductForm';
-import { supabase } from '../../../../utils/supabase/client';
+import { supabase } from '../../../../lib/supabase/client';
 
 interface DashboardProductsTabProps {
   products: Product[];

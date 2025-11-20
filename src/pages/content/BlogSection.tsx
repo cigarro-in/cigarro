@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getBlogImageUrl } from '../../utils/supabase/storage';
-import { supabase } from '../../utils/supabase/client';
+import { getBlogImageUrl } from '../../lib/supabase/storage';
+import { supabase } from '../../lib/supabase/client';
 import { BlogPost } from '../../types/blog';
 
 

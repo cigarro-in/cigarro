@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { CartItemWithVariant } from '../types/variants';
 
 export interface Product {

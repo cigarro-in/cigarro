@@ -1,4 +1,4 @@
-import { supabase } from './supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { CartItem } from '../hooks/useCart';
 import { toast } from 'sonner';
 

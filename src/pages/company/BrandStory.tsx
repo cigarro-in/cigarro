@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
+import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 
 export function BrandStory() {
   return (

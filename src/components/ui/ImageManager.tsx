@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Badge } from './badge';
 import { Alert, AlertDescription } from './alert';
 import { Checkbox } from './checkbox';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 
 interface MediaFile {

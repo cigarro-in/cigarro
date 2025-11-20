@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 
 interface BlogSectionManagerProps {

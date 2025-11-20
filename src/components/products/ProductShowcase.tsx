@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCart, Product } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Link } from 'react-router-dom';
 import { ProductCard } from './ProductCard';
 

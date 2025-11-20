@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 

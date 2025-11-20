@@ -19,7 +19,7 @@ import { DiscountsManager } from './modules/discounts';
 import { OrdersManager } from './modules/orders';
 import { VariantsManager } from './modules/variants';
 import CategoryManager from './categories/CategoryManager';
-import { SiteSettingsPage } from '../components/SiteSettingsPage';
+import { SiteSettingsPage } from './pages/SiteSettingsPage';
 
 // Import types and hooks
 import {

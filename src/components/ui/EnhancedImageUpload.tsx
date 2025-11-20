@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { 
   Upload, 
@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Badge } from './badge';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { cn } from './utils';
 
 interface EnhancedImageUploadProps {

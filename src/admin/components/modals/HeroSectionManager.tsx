@@ -26,7 +26,7 @@ import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../components/ui/dropdown-menu';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 
 interface HeroSlide {

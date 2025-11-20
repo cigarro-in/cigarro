@@ -20,7 +20,7 @@ import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Progress } from '../../components/ui/progress';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { sanitizeString } from '../../../utils/validation';
 

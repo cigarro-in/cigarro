@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Menu, X, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Product } from '../../hooks/useCart';
 import { SearchResult } from '../../types/variants';
 import { formatINR } from '../../utils/currency';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 import Fuse from 'fuse.js';
 
 interface MobileHeaderProps {

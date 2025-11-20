@@ -6,9 +6,9 @@ import { Label } from '../../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
-import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
+import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 
 interface Product {
   id: string;

@@ -34,29 +34,29 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
     // Store age verification in session storage
     sessionStorage.setItem('ageVerified', 'true');
     setIsExiting(true);
-    setTimeout(onVerify, 600);
+    setTimeout(onVerify, 400); // Reduce exit delay
   };
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: isExiting ? 0 : 1 }}
-      transition={{ duration: 0.6 }}
-      className="fixed inset-0 z-50 bg-creme flex items-center justify-center p-4 sm:p-8"
+      transition={{ duration: 0.3 }} // Faster fade in/out
+      className="fixed inset-0 z-50 bg-creme flex items-center justify-center p-4 sm:p-8 overflow-y-auto"
     >
-      <div className="text-center max-w-md sm:max-w-lg lg:max-w-2xl mx-auto w-full">
+      <div className="text-center max-w-md sm:max-w-lg lg:max-w-2xl mx-auto w-full my-auto">
         <motion.div
-          initial={{ y: 30, opacity: 0 }}
+          initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.8 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }} // Faster content entry
           className="space-y-6 sm:space-y-8"
         >
           {/* Logo/Brand */}
           <div className="mb-8 sm:mb-12">
             <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.6, type: "spring" }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
               className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6"
             >
               <Crown className="w-8 h-8 sm:w-12 sm:h-12 text-canyon mb-2 sm:mb-0 sm:mr-4" />
@@ -67,7 +67,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: "6rem" }}
-              transition={{ delay: 0.8, duration: 0.8 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
               className="h-px bg-canyon mx-auto"
             ></motion.div>
             <p className="text-coyote text-lg sm:text-xl mt-3 sm:mt-4 font-sans">

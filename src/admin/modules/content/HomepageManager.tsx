@@ -27,7 +27,7 @@ import { FeaturedProductsManager } from '../../components/modals/FeaturedProduct
 import { ProductShowcaseManager } from '../../components/modals/ProductShowcaseManager';
 import { CategoriesGridManager } from '../../components/modals/CategoriesGridManager';
 import { BlogSectionManager } from '../../components/modals/BlogSectionManager';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 
 interface HomepageComponent {

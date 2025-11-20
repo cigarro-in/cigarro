@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
 import { Button } from './button';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { ImageSelectorModal } from './ImageSelectorModal';
 

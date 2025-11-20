@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatINR } from '../../utils/currency';
 import { AuthDialog } from '../auth/AuthDialog';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 
 interface MiniCartProps {
   isVisible: boolean;

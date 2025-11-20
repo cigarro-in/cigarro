@@ -3,7 +3,7 @@ import { useCart, Product } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../../components/products/ProductCard';
 
@@ -13,11 +13,13 @@ const formatIndianPrice = (priceINR: number): string => {
 };
 
 export function FeaturedProducts() {
-  const { addToCart, isLoading } = useCart();
+  const { addToCart, isLoading: cartLoading } = useCart();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // Track active progress as fractional index to enable smooth scaling of center card
-  const [activeProgress, setActiveProgress] = useState(0);
+  // Track active index only (integer) to avoid 60fps re-renders
+  const [activeIndex, setActiveIndex] = useState(0);
+  
   const [sectionConfig, setSectionConfig] = useState({
     title: 'Top Products',
     subtitle: 'Featured Products',
@@ -31,23 +33,6 @@ export function FeaturedProducts() {
     fetchFeaturedProducts();
     fetchSectionConfig();
   }, []);
-
-  const fetchFeaturedProducts = async () => {
-    try {
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
-        .eq('is_featured', true)
-        .eq('is_active', true)
-        .order('featured_order', { ascending: true })
-        .limit(3);
-
-      if (productsError) throw productsError;
-      setFeaturedProducts(products || []);
-    } catch (error) {
-      console.error('Error fetching featured products:', error);
-    }
-  };
 
   const fetchSectionConfig = async () => {
     try {
@@ -83,120 +68,66 @@ export function FeaturedProducts() {
     }
   };
 
-  // Clean bidirectional infinite scroll implementation
+  const fetchFeaturedProducts = async () => {
+    try {
+      setIsLoadingProducts(true);
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .eq('is_featured', true)
+        .eq('is_active', true)
+        .order('featured_order', { ascending: true })
+        .limit(3);
+
+      if (productsError) throw productsError;
+      setFeaturedProducts(products || []);
+    } catch (error) {
+      console.error('Error fetching featured products:', error);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  // Optimized scroll handler using IntersectionObserver for center item detection
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || featuredProducts.length === 0) return;
 
-    const itemCount = featuredProducts.length;
-    let isRepositioning = false;
-    let rafId = 0;
-    let snapTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // Get item width (1/3 of container for 3 visible items)
-    const getItemWidth = () => container.clientWidth / 3;
-
-    // Snap to nearest item center
-    const snapToNearest = () => {
-      if (isRepositioning) return;
-      
-      const itemWidth = getItemWidth();
-      const currentIndex = container.scrollLeft / itemWidth;
-      const nearestIndex = Math.round(currentIndex);
-      const targetScroll = nearestIndex * itemWidth;
-      
-      if (Math.abs(container.scrollLeft - targetScroll) > 2) {
-        container.scrollTo({
-          left: targetScroll,
-          behavior: 'smooth'
-        });
-      }
-    };
-
-    // Handle scroll with infinite loop repositioning
     const handleScroll = () => {
-      if (isRepositioning) return;
-
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const itemWidth = getItemWidth();
-        const scrollLeft = container.scrollLeft;
-        const currentIndex = scrollLeft / itemWidth;
-        
-        // Update active progress for visual feedback
-        setActiveProgress(currentIndex);
-
-        // Clear and reset snap timer
-        if (snapTimer) clearTimeout(snapTimer);
-        snapTimer = setTimeout(snapToNearest, 150);
-
-        // Infinite loop logic: Jump when reaching boundaries
-        // We have 3 sets: [set0][set1][set2]
-        // Start at set1, jump seamlessly between sets
-        
-        if (currentIndex < itemCount) {
-          // Scrolled into set0 (left boundary) - jump to set1
-          isRepositioning = true;
-          const offset = currentIndex % itemCount;
-          const newIndex = itemCount + offset;
-          
-          container.style.scrollBehavior = 'auto';
-          container.scrollLeft = newIndex * itemWidth;
-          setActiveProgress(newIndex);
-          
-          requestAnimationFrame(() => {
-            container.style.scrollBehavior = 'smooth';
-            isRepositioning = false;
-          });
-        } else if (currentIndex >= itemCount * 2) {
-          // Scrolled into set2 (right boundary) - jump to set1
-          isRepositioning = true;
-          const offset = currentIndex % itemCount;
-          const newIndex = itemCount + offset;
-          
-          container.style.scrollBehavior = 'auto';
-          container.scrollLeft = newIndex * itemWidth;
-          setActiveProgress(newIndex);
-          
-          requestAnimationFrame(() => {
-            container.style.scrollBehavior = 'smooth';
-            isRepositioning = false;
-          });
-        }
+      if (!container) return;
+      const itemWidth = container.clientWidth / 3;
+      const scrollLeft = container.scrollLeft;
+      const index = Math.round(scrollLeft / itemWidth);
+      
+      // Only update state if index changes
+      setActiveIndex((prev) => {
+        if (prev !== index) return index;
+        return prev;
       });
     };
 
-    // Initialize: Start at middle set (set1)
-    const initialize = () => {
-      const itemWidth = getItemWidth();
-      const startIndex = itemCount; // Start of set1
-      
-      container.style.scrollBehavior = 'auto';
-      container.scrollLeft = startIndex * itemWidth;
-      setActiveProgress(startIndex);
-      
-      // Enable smooth scrolling after initialization
-      requestAnimationFrame(() => {
-        container.style.scrollBehavior = 'smooth';
-      });
+    // Debounce scroll handler
+    let timeoutId: NodeJS.Timeout;
+    const throttledScroll = () => {
+      if (timeoutId) return;
+      timeoutId = setTimeout(() => {
+        handleScroll();
+        timeoutId = null as any;
+      }, 50); // 50ms throttle
     };
 
-    // Add scroll listener
-    container.addEventListener('scroll', handleScroll, { passive: true });
-
-    // Initialize after a brief delay to ensure layout is ready
-    const initTimer = setTimeout(initialize, 100);
-
-    // Cleanup
-    return () => {
-      clearTimeout(initTimer);
-      if (snapTimer) clearTimeout(snapTimer);
-      if (rafId) cancelAnimationFrame(rafId);
-      container.removeEventListener('scroll', handleScroll);
-    };
+    container.addEventListener('scroll', throttledScroll, { passive: true });
+    return () => container.removeEventListener('scroll', throttledScroll);
   }, [featuredProducts]);
 
-  if (!sectionConfig.is_enabled || featuredProducts.length === 0) {
+  if (!sectionConfig.is_enabled) return null;
+
+  // Minimal height reservation while loading
+  if (isLoadingProducts) {
+    return <section className="py-8 md:py-16 bg-creme min-h-[400px]"></section>;
+  }
+
+  if (featuredProducts.length === 0) {
     return null;
   }
 
@@ -245,7 +176,7 @@ export function FeaturedProducts() {
                 const itemWidth = scrollContainerRef.current ? scrollContainerRef.current.clientWidth / 3 : 200;
                 const itemLeft = index * itemWidth;
                 const itemCenter = itemLeft + itemWidth / 2;
-                const scrollLeft = activeProgress * itemWidth;
+                const scrollLeft = activeIndex * itemWidth; // Use activeIndex instead of activeProgress
                 const viewportCenter = scrollLeft + (scrollContainerRef.current?.clientWidth || 600) / 2;
                 
                 // Distance from center (0 = perfect center, higher = further away)
@@ -276,7 +207,7 @@ export function FeaturedProducts() {
                       product={product}
                       variant="default"
                       onAddToCart={handleAddToCart}
-                      isLoading={isLoading}
+                      isLoading={cartLoading} // Use cartLoading
                       index={actualIndex}
                     />
                   </div>
@@ -288,8 +219,7 @@ export function FeaturedProducts() {
             <div className="flex justify-center gap-2 mt-4">
               {featuredProducts.map((_, index) => {
                 // Calculate which item is currently centered
-                const currentItemIndex = Math.round(activeProgress) % featuredProducts.length;
-                const isActive = index === currentItemIndex;
+                const isActive = index === activeIndex % featuredProducts.length; // Use activeIndex
                 
                 return (
                   <div
@@ -313,7 +243,7 @@ export function FeaturedProducts() {
                   product={product}
                   variant="default"
                   onAddToCart={handleAddToCart}
-                  isLoading={isLoading}
+                  isLoading={cartLoading} // Use cartLoading
                   index={index}
                 />
               </div>

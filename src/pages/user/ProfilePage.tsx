@@ -33,7 +33,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 

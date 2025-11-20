@@ -1,49 +1,63 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import { SmoothScrollToTop } from './SmoothScrollToTop';
 
 interface PageTransitionProps {
   children: React.ReactNode;
 }
 
+// Optimized variants for cross-dissolve feel
 const pageVariants = {
   initial: {
     opacity: 0,
-    y: 20
+    // Remove Y translation to prevent scrolling issues
+    // y: 20
   },
   in: {
     opacity: 1,
-    y: 0
+    // y: 0,
+    transition: {
+      duration: 0.4, // Slightly longer for smoothness
+      ease: [0.25, 1, 0.5, 1] // "Quint" ease out - starts fast, slows down gently
+    }
   },
   out: {
     opacity: 0,
-    y: -20
+    // y: -20,
+    transition: {
+      duration: 0.2, // Fast exit to clear the way
+      ease: [0.25, 1, 0.5, 1]
+    }
   }
-};
-
-const pageTransition = {
-  type: "tween",
-  ease: [0.25, 0.46, 0.45, 0.94],
-  duration: 0.4
 };
 
 export function PageTransition({ children }: PageTransitionProps) {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location.pathname}
-        initial="initial"
-        animate="in"
-        exit="out"
-        variants={pageVariants}
-        transition={pageTransition}
-        className="w-full overflow-x-hidden"
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <>
+      <SmoothScrollToTop />
+      <LayoutGroup>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={location.pathname}
+            initial="initial"
+            animate="in"
+            exit="out"
+            variants={pageVariants}
+            className="w-full"
+            style={{ 
+              // Ensure the layout doesn't break during "popLayout" absolute positioning
+              width: '100%',
+              position: 'relative'
+            }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </LayoutGroup>
+    </>
   );
 }
 

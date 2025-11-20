@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';

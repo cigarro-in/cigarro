@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
+import { buildRoute } from '../../config/routes';
 import { Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, MapPin, CreditCard as PaymentIcon, ExternalLink, RefreshCw, Loader2, Smartphone, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
@@ -8,8 +9,8 @@ import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
-import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
-import { supabase } from '../../utils/supabase/client';
+import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 
@@ -312,13 +313,17 @@ export function OrdersPage() {
         shippingAddress: order.shippingAddress
       };
       
+      // Clear any stale Buy Now data
+      sessionStorage.removeItem('isBuyNow');
+      sessionStorage.removeItem('buyNowItem');
+      
       sessionStorage.setItem('retryOrder', JSON.stringify(retryOrderData));
       sessionStorage.setItem('isRetryPayment', 'true');
       
       console.log('🔄 Retry payment initiated for order:', order.displayOrderId);
       
-      // Navigate to checkout page
-      navigate('/checkout');
+      // Navigate to checkout page with retry param
+      navigate(buildRoute.checkoutWithParams({ retry: true }));
       
     } catch (error) {
       console.error('Retry payment error:', error);

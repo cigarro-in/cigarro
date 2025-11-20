@@ -19,7 +19,8 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Textarea } from '../../../components/ui/textarea';
 import { formatINR } from '../../../utils/currency';
-import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
+import { supabase } from '../../../lib/supabase/client';
+import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 import {
   AlertDialog,
   AlertDialogAction,

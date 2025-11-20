@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';

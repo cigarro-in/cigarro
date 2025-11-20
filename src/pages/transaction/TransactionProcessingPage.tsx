@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Clock, Wallet, ShoppingBag, RefreshCw, QrCode as 
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import QRCode from 'qrcode';

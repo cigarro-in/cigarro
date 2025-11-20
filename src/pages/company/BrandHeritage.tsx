@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { getBrandHeritageImageUrl } from '../../utils/supabase/storage';
-import { supabase } from '../../utils/supabase/client';
+import { getBrandHeritageImageUrl } from '../../lib/supabase/storage';
+import { supabase } from '../../lib/supabase/client';
 
 export function BrandHeritage() {
   const [sectionData, setSectionData] = useState({

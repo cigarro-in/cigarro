@@ -3,12 +3,12 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, ShoppingCart, Trash2, ArrowLeft, Share2, Grid3X3, List } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Product, useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {

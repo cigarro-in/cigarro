@@ -41,6 +41,7 @@
             "class-variance-authority": "^0.7.1",
             "clsx": "^2.0.0",
             "cmdk": "^1.1.1",
+            "dotenv": "^17.2.3",
             "embla-carousel-react": "^8.6.0",
             "framer-motion": "^11.0.0",
             "fuse.js": "^7.1.0",
@@ -75,7 +76,7 @@
       },
       "scripts": {
             "dev": "vite",
-            "build": "npm run build:copy-seo && vite build",
+            "build": "vite build",
             "build:copy-seo": "cp llms.txt public/llms.txt && cp robots.txt public/robots.txt && cp _redirects public/_redirects && cp _headers public/_headers",
             "build:dynamic-sitemap": "npm run generate-sitemap && npm run build:copy-seo && vite build",
             "generate-sitemap": "tsx src/scripts/generate-sitemap.ts",

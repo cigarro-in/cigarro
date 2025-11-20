@@ -11,7 +11,7 @@ import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
@@ -25,16 +25,32 @@ export function CheckoutPage() {
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
   
-  // Check for Buy Now flow
-  const isBuyNow = sessionStorage.getItem('isBuyNow') === 'true';
+  // Check URL params to determine checkout type
+  const searchParams = new URLSearchParams(window.location.search);
+  const urlRetryParam = searchParams.get('retry') === 'true';
+  const urlBuyNowParam = searchParams.get('buynow') === 'true';
+  
+  // Determine checkout flow type using URL params as source of truth
+  const isBuyNow = urlBuyNowParam || sessionStorage.getItem('isBuyNow') === 'true';
+  const isRetryPayment = urlRetryParam || sessionStorage.getItem('isRetryPayment') === 'true';
+  
+  // Get flow-specific data from sessionStorage
   const buyNowItemData = sessionStorage.getItem('buyNowItem');
   const buyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
   
-  // Use Buy Now item or cart items
-  const items = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
-  const totalPrice = isBuyNow && buyNowItem 
-    ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
-    : cartTotalPrice;
+  const retryOrderData = sessionStorage.getItem('retryOrder');
+  const retryOrder = isRetryPayment && retryOrderData ? JSON.parse(retryOrderData) : null;
+  
+  // Use Retry Order, Buy Now item, or cart items
+  const items = isRetryPayment && retryOrder 
+    ? retryOrder.items 
+    : (isBuyNow && buyNowItem ? [buyNowItem] : cartItems);
+  
+  const totalPrice = isRetryPayment && retryOrder
+    ? (retryOrder.subtotal || retryOrder.total)
+    : (isBuyNow && buyNowItem 
+      ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
+      : cartTotalPrice);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1); // 1: shipping, 2: review, 3: payment
   const [isProcessing, setIsProcessing] = useState(false);
@@ -96,6 +112,17 @@ export function CheckoutPage() {
     setShowAuthDialog(false);
     // User data will be updated automatically via useAuth hook
   };
+
+  // Clear sessionStorage on mount if this is a normal cart checkout (no URL params)
+  useEffect(() => {
+    if (!urlRetryParam && !urlBuyNowParam) {
+      // This is a normal cart checkout - clear any stale flow data
+      sessionStorage.removeItem('isRetryPayment');
+      sessionStorage.removeItem('retryOrder');
+      sessionStorage.removeItem('isBuyNow');
+      sessionStorage.removeItem('buyNowItem');
+    }
+  }, [urlRetryParam, urlBuyNowParam]);
 
   // Auto-show auth dialog for non-authenticated users after a brief delay to prevent flicker
   useEffect(() => {
@@ -430,152 +457,96 @@ export function CheckoutPage() {
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
     
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by this browser');
-      setIsLoadingLocation(false);
-      return;
-    }
-
     try {
-      // First check if we have permission
-      if ('permissions' in navigator) {
-        const permission = await navigator.permissions.query({ name: 'geolocation' });
-        
-        if (permission.state === 'denied') {
-          toast.error('Location access denied. Please enable location permissions in your browser settings.');
-          setIsLoadingLocation(false);
-          return;
-        }
+      if (!navigator.geolocation) {
+        toast.error('Location services not supported on this device');
+        return;
       }
 
-      // Request location with proper error handling
+      // Request location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
           resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 300000
-          }
+          (error) => reject(error),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       });
 
       const { latitude, longitude } = position.coords;
       setCurrentLocationData({ lat: latitude, lng: longitude });
-      
-      // Use a free reverse geocoding service with better error handling
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&accept-language=en`,
-          {
-            headers: {
-              'User-Agent': 'Cigarro-Checkout/1.0'
-            }
-          }
-        );
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.address) {
-          const addr = data.address;
-          
-          // Extract address components with better fallbacks
-          const houseNumber = addr.house_number || addr.building || '';
-          const road = addr.road || addr.street || addr.pedestrian || addr.path || '';
-          const suburb = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '';
-          const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
-          const state = addr.state || addr.province || addr.region || '';
-          const pincode = addr.postcode || '';
-          
-          // Build a more comprehensive address string
-          const addressParts = [];
-          if (houseNumber) addressParts.push(houseNumber);
-          if (road) addressParts.push(road);
-          if (suburb && suburb !== city) addressParts.push(suburb);
-          
-          const formattedAddress = addressParts.length > 0 
-            ? addressParts.join(', ')
-            : data.display_name?.split(',')[0] || 'Current Location';
-          
-          // Update form data and clear validation errors
-          setFormData(prev => ({
-            ...prev,
-            address: formattedAddress,
-            city: city || prev.city,
-            state: state || prev.state,
-            pincode: pincode || prev.pincode
-          }));
-          
-          // Clear validation errors for auto-filled fields
-          setValidationErrors(prev => ({
-            ...prev,
-            address: '',
-            city: city ? '' : prev.city,
-            state: state ? '' : prev.state,
-            pincode: pincode ? '' : prev.pincode
-          }));
-          
-          // Mark as new address since location was detected
-          setIsNewAddress(true);
-          setSelectedSavedAddress('');
-          setEditingAddressId(null);
-          
-          // Check address completeness after filling
-          setTimeout(() => {
-            checkAddressCompleteness();
-          }, 100);
-          
-          toast.success('Location detected and address filled!');
-        } else {
-          toast.error('Unable to get detailed address from location. Please fill manually.');
-        }
-      } catch (error: any) {
-        console.error('Error getting address from coordinates:', error);
-        toast.info('Location detected, but address details need manual entry. Please complete the form.', {
-          duration: 5000,
-          style: {
-            background: 'hsl(var(--muted))',
-            color: 'hsl(var(--muted-foreground))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '8px',
-            fontSize: '14px',
-            padding: '12px 16px'
-          }
-        });
+      toast.info('📍 Found location, fetching address...');
+
+      // Use Nominatim for reverse geocoding
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch address details');
       }
+
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const addr = data.address;
+        
+        // Extract components
+        const pincode = addr.postcode || '';
+        
+        // Construct address line
+        const addressParts = [];
+        if (addr.house_number) addressParts.push(addr.house_number);
+        if (addr.building) addressParts.push(addr.building);
+        if (addr.road) addressParts.push(addr.road);
+        if (addr.suburb) addressParts.push(addr.suburb);
+        if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
+        
+        const formattedAddress = addressParts.join(', ');
+
+        // Update form data
+        setFormData(prev => ({
+          ...prev,
+          address: formattedAddress,
+          pincode: pincode,
+          // Clear city/state/country to be filled by pincode lookup
+          city: '',
+          state: '',
+          country: 'India'
+        }));
+        
+        // Clear validation errors
+        setValidationErrors(prev => ({
+          ...prev,
+          address: '',
+          pincode: pincode ? '' : prev.pincode,
+          city: '',
+          state: ''
+        }));
+        
+        // Mark as new address since location was detected
+        setIsNewAddress(true);
+        setSelectedSavedAddress('');
+        setEditingAddressId(null);
+
+        // Trigger pincode lookup to fill city/state automatically
+        if (pincode && pincode.length === 6) {
+          await fetchLocationFromPincode(pincode);
+        }
+
+        toast.success('📍 Location details found!');
+      } else {
+        throw new Error('Incomplete address data received');
+      }
+
     } catch (error: any) {
-      console.log('Geolocation error (handled gracefully):', error);
-      let errorMessage = 'Unable to access location';
-      let description = 'Please try again or fill manually';
+      console.error('Location error:', error);
+      let errorMessage = 'Failed to get location';
       
-      if (error.code === 1) { // PERMISSION_DENIED
-        errorMessage = 'Location access needed';
-        description = 'Enable location in browser settings for auto-fill';
-      } else if (error.code === 2) { // POSITION_UNAVAILABLE
-        errorMessage = 'Location unavailable';
-        description = 'Check your connection and try again';
-      } else if (error.code === 3) { // TIMEOUT
-        errorMessage = 'Location timeout';
-        description = 'Request took too long - try again';
-      }
+      if (error.code === 1) errorMessage = 'Location permission denied';
+      if (error.code === 2) errorMessage = 'Location unavailable';
+      if (error.code === 3) errorMessage = 'Location request timed out';
       
-      toast.error(errorMessage, {
-        description,
-        duration: 4000,
-        style: {
-          background: 'hsl(var(--destructive))',
-          color: 'hsl(var(--destructive-foreground))',
-          border: '1px solid hsl(var(--destructive))',
-          borderRadius: '8px',
-          fontSize: '14px',
-          padding: '12px 16px'
-        }
-      });
+      toast.error(errorMessage);
     } finally {
       setIsLoadingLocation(false);
     }
@@ -1032,7 +1003,7 @@ export function CheckoutPage() {
       if (orderError) throw orderError;
 
       // Create order items
-      const orderItems = items.map(item => ({
+      const orderItems = items.map((item: any) => ({
         order_id: order.id,
         product_id: item.id,
         product_name: item.name,
@@ -1627,7 +1598,7 @@ export function CheckoutPage() {
                 <CardContent className="space-y-6">
                   {/* Order Items */}
                   <div className="space-y-4">
-                    {items.map((item, index) => {
+                    {items.map((item: any, index: number) => {
                       const itemPrice = getCartItemPrice(item);
                       const itemKey = `${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}-${index}`;
                       
@@ -1865,7 +1836,7 @@ export function CheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  {items.map((item, index) => {
+                  {items.map((item: any, index: number) => {
                     const itemKey = `${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}-${index}`;
                     return (
                     <div key={itemKey} className="flex justify-between items-center">

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../../../../components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { Alert, AlertDescription } from '../../../../components/ui/alert';
-import { supabase } from '../../../../utils/supabase/client';
+import { supabase } from '../../../../lib/supabase/client';
 import { ProductFormData, generateSlug } from '../../../../types/product';
 
 interface BasicInfoTabProps {

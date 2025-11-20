@@ -12,7 +12,7 @@ import { Badge } from '../../../../components/ui/badge';
 import { Separator } from '../../../../components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../../components/ui/dialog';
 import { toast } from 'sonner';
-import { supabase } from '../../../../utils/supabase/client';
+import { supabase } from '../../../../lib/supabase/client';
 import { BlogPost, BlogCategory, BlogTag } from '../../../../types/blog';
 
 interface BlogEditorModalProps {

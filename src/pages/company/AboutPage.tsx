@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Award, Users, Globe, Heart, Shield, Star, Leaf, Coffee, Sparkles, Trophy, Target, Crown } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { getTeamImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl, getTeamImageUrl } from '../../lib/supabase/storage';
 
 export function AboutPage() {
   const location = useLocation();

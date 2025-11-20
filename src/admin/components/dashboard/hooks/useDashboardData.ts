@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../../../../utils/supabase/client';
+import { supabase } from '../../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Product, ProductVariant, DashboardAnalytics, VariantFormData } from '../types/index';
 

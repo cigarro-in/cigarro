@@ -7,32 +7,31 @@
  * Prerequisites:
  * 1. Google Cloud Project with Gmail API enabled
  * 2. OAuth2 Client ID (Desktop app type)
- * 3. Downloaded credentials.json file
+ * 3. Add GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET to .env file
  * 
  * Usage:
  *   node scripts/get-gmail-refresh-token.js
  */
 
+require('dotenv').config();
+
 const http = require('http');
 const url = require('url');
 const { exec } = require('child_process');
 
-// Configuration - You'll need to fill these from Google Cloud Console
-const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const CLIENT_SECRET = 'YOUR_CLIENT_SECRET';
+// Configuration - Load from .env file
+const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
 const REDIRECT_URI = 'http://localhost:3000/oauth2callback';
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
 console.log('🔐 Gmail OAuth2 Refresh Token Generator\n');
 
-if (CLIENT_ID === 'YOUR_CLIENT_ID.apps.googleusercontent.com') {
-  console.error('❌ ERROR: Please update CLIENT_ID and CLIENT_SECRET in this script first!');
-  console.log('\n📝 Steps to get credentials:');
-  console.log('1. Go to https://console.cloud.google.com');
-  console.log('2. Create/Select a project');
-  console.log('3. Enable Gmail API');
-  console.log('4. Create OAuth2 Client ID (Desktop app)');
-  console.log('5. Download credentials and copy CLIENT_ID and CLIENT_SECRET here\n');
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error('❌ ERROR: Missing credentials in .env file!\n');
+  console.log('📝 Add these to your .env file:');
+  console.log('   GMAIL_CLIENT_ID=your_client_id');
+  console.log('   GMAIL_CLIENT_SECRET=your_client_secret\n');
   process.exit(1);
 }
 

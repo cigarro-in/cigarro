@@ -2,7 +2,7 @@
 // REFERRAL SERVICE - CLIENT-SIDE OPERATIONS
 // =====================================================
 
-import { supabase } from '../supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import type {
   Referral,
   ReferralStats,

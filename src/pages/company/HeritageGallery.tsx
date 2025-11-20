@@ -24,7 +24,7 @@ export function HeritageGallery() {
       year: '1875',
       title: 'Foundation of Excellence',
       description: 'Our journey began in the heart of Virginia with a vision to create the finest tobacco products using traditional craftsmanship and premium ingredients.',
-      image: 'https://images.unsplash.com/photo-1582374795014-9ed729788835?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwdG9iYWNjbyUyMGZhcm0lMjBoZXJpdGFnZXxlbnwxfHx8fDE3NTc2MDIyMTl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      image: 'https://images.unsplash.com/photo-1582374795014-9ed729788835?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwdG9iYWNjbyUyMGZhcm0lMjBoZXJpdGFnZXxlbnwxfHx8fDE3NTc2MDIyMTl8MA&ixlib=rb-4.1.0&q=80&w=1080',
       achievement: 'First Premium Blend',
       location: 'Virginia, USA'
     },
@@ -33,7 +33,7 @@ export function HeritageGallery() {
       year: '1923',
       title: 'Master Craftsman Era',
       description: 'Three generations of master blenders perfected our signature techniques, establishing the gold standard for premium tobacco curation.',
-      image: 'https://images.unsplash.com/photo-1582130298356-0e7a54688cbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwY3JhZnRzbWFuJTIwdG9iYWNjbyUyMGFydGlzYW58ZW58MXx8fHwxNzU3NjAyMjIzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      image: 'https://images.unsplash.com/photo-1582130298356-0e7a54688cbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aW50YWdlJTIwY3JhZnRzbWFuJTIwdG9iYWNjbyUyMGFydGlzYW58ZW58MXx8fHwxNzU3NjAyMjIzfDA&ixlib=rb-4.1.0&q=80&w=1080',
       achievement: 'Master Blender Certification',
       location: 'North Carolina, USA'
     },
@@ -42,7 +42,7 @@ export function HeritageGallery() {
       year: '1954',
       title: 'International Recognition',
       description: 'Our exceptional quality earned us international acclaim, with exclusive partnerships established across Europe and Asia.',
-      image: 'https://images.unsplash.com/photo-1740664651822-3a02ec12c121?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB2aW50YWdlJTIwaW50ZXJuYXRpb25hbCUyMHRyYWRlfGVufDF8fHx8MTc1NzYwMjIyN3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      image: 'https://images.unsplash.com/photo-1740664651822-3a02ec12c121?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB2aW50YWdlJTIwaW50ZXJuYXRpb25hbCUyMHRyYWRlfGVufDF8fHx8MTc1NzYwMjIyN3ww&ixlib=rb-4.1.0&q=80&w=1080',
       achievement: 'Global Excellence Award',
       location: 'London, UK'
     },
@@ -51,7 +51,7 @@ export function HeritageGallery() {
       year: '1978',
       title: 'Innovation & Tradition',
       description: 'Pioneering new aging techniques while preserving ancestral methods, we revolutionized the luxury tobacco experience.',
-      image: 'https://images.unsplash.com/photo-1678081624395-6d57c224df42?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBpbm5vdmF0aW9uJTIwbW9kZXJuJTIwdmludGFnZXxlbnwxfHx8fDE3NTc2MDIyMzF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      image: 'https://images.unsplash.com/photo-1678081624395-6d57c224df42?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBpbm5vdmF0aW9uJTIwbW9kZXJuJTIwdmludGFnZXxlbnwxfHx8fDE3NTc2MDIyMzF8MA&ixlib=rb-4.1.0&q=80&w=1080',
       achievement: 'Innovation Excellence',
       location: 'Switzerland'
     },

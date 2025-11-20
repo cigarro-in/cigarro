@@ -2,7 +2,7 @@
  * Audit logging utility for security and compliance
  */
 
-import { supabase } from './supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { logger } from './logger';
 
 interface AuditEvent {
@@ -11,6 +11,7 @@ interface AuditEvent {
   resource_id?: string;
   user_id?: string;
   details?: Record<string, any>;
+  metadata?: Record<string, any>;
   ip_address?: string;
   user_agent?: string;
   severity?: 'low' | 'medium' | 'high' | 'critical';
@@ -149,6 +150,7 @@ class AuditLogger {
           resource: event.resource,
           resource_id: event.resource_id,
           user_id: event.user_id,
+          metadata: event.metadata,
           details: event.details,
           ip_address: event.ip_address,
           user_agent: event.user_agent,

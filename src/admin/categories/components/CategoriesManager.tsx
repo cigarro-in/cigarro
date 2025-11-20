@@ -5,11 +5,11 @@ import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { DataTable } from '../../components/shared/DataTable';
 import { StandardModal } from '../../components/shared/StandardModal';
 import { CategoryForm } from './index';
-import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
+import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 
 interface Category {
   id: string;

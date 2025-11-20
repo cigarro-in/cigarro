@@ -3,7 +3,7 @@ import { Plus, Edit, Trash2, Percent, Calendar, DollarSign } from 'lucide-react'
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { formatINR } from '../../../utils/currency';
 import { DataTable } from '../../components/shared/DataTable';
 import { StandardModal } from '../../components/shared/StandardModal';

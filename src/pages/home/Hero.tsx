@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 
 interface HeroSlide {
   id: string;
@@ -57,47 +57,49 @@ const Hero = () => {
 
   const currentSlideData = slides[currentSlide];
 
-  if (isLoading) {
+  // Space reservation for LCP stability (no visible loader)
+  if (isLoading || slides.length === 0) {
     return (
-      <div className="pt-[var(--gutter)] pb-[var(--gutter)] relative min-h-[100dvh] flex items-center overflow-hidden">
-        <div className="main-container h-full relative z-10">
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dark"></div>
-          </div>
+      <div className="py-0 md:py-[2rem]">
+        <div className="main-container">
+          <div className="relative w-full aspect-video rounded-[0.75rem] md:rounded-[1rem] bg-transparent"></div>
         </div>
       </div>
     );
   }
 
-  if (slides.length === 0) {
-    return null;
-  }
-
   return (
     <div className="py-0 md:py-[2rem]">
       <div className="main-container">
-        <div className="relative w-full aspect-video rounded-[0.75rem] md:rounded-[1rem] overflow-hidden shadow-2xl">
+        <div className="relative w-full aspect-video rounded-[0.75rem] md:rounded-[1rem] overflow-hidden shadow-2xl transition-all duration-300">
           <div className="absolute inset-0">
             <div className="relative h-full">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 h-full" id={`header-slider__slide-${currentSlide}`}>
                 
-                {/* Big Image */}
-                <div className="relative bg-transparent overflow-hidden h-full">
-                  <img 
-                    className="hidden md:block w-full h-full object-cover object-center" 
-                    src={currentSlideData.image_url} 
-                    alt={`Slide ${currentSlide + 1}`}
-                    width="1440" 
-                    height="1491"
-                  />
-                  <img 
-                    className="block md:hidden w-full h-full object-cover object-center" 
-                    src={currentSlideData.mobile_image_url || currentSlideData.image_url} 
-                    alt={`Slide ${currentSlide + 1}`}
-                  />
+                {/* Responsive Image Handling */}
+                <div className="relative bg-transparent overflow-hidden h-full w-full">
+                  <picture className="w-full h-full block">
+                    {/* Desktop Image */}
+                    <source 
+                      media="(min-width: 768px)" 
+                      srcSet={currentSlideData.image_url} 
+                    />
+                    {/* Mobile Image */}
+                    <img 
+                      className="w-full h-full object-cover object-center"
+                      src={currentSlideData.mobile_image_url || currentSlideData.image_url}
+                      alt={currentSlideData.title || `Slide ${currentSlide + 1}`}
+                      width="1440" 
+                      height="810"
+                      // LCP Optimization
+                      fetchPriority="high"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </picture>
                   
                   {/* Mobile Overlay Gradient */}
-                  <div className="md:hidden absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                  <div className="md:hidden absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
                   
                   {/* Mobile Text Overlay */}
                   <div className="md:hidden absolute inset-0 flex flex-col justify-end p-[1.5rem] pb-[2rem]">

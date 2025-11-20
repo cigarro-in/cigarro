@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { validateEmail, validatePassword, validateName, authRateLimiter } from '../../utils/validation';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 
 interface AuthDialogProps {
   open: boolean;

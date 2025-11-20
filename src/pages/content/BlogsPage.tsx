@@ -3,8 +3,8 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import { getBlogImageUrl } from '../../utils/supabase/storage';
-import { supabase } from '../../utils/supabase/client';
+import { getBlogImageUrl } from '../../lib/supabase/storage';
+import { supabase } from '../../lib/supabase/client';
 import type { BlogPost as BlogPostType } from '../../types/blog';
 
 

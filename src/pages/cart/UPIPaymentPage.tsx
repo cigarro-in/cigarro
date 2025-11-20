@@ -7,7 +7,7 @@ import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import { Helmet } from 'react-helmet-async';

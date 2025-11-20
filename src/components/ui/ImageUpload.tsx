@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from './button';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { ImageSelectorModal } from './ImageSelectorModal';
 
 interface ImageUploadProps {
@@ -139,7 +139,7 @@ export function ImageUpload({
           open={showSelectorModal}
           onOpenChange={setShowSelectorModal}
           onImageSelect={onImageUrlChange}
-          currentImageUrl={imageUrl}
+          currentImageUrl={imageUrl || undefined}
           title={title}
           description={description}
         />

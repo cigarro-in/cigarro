@@ -6,14 +6,14 @@ import { Search, ShoppingBag, Menu, X, Heart, User, LogOut, Loader2, Package, Ex
 import { AuthDialog } from '../auth/AuthDialog';
 import { MiniCart } from '../cart/MiniCart';
 import { Badge } from '../ui/badge';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { Product } from '../../hooks/useCart';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
 import { searchProductsEnhanced } from '../../utils/search';
 import { SearchResult } from '../../types/variants';
 import Fuse from 'fuse.js';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

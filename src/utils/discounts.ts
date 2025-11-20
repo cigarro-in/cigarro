@@ -1,5 +1,5 @@
 // Discount Calculation System
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { Discount, DiscountResult, CartItemWithVariant } from '../types/variants';
 
 // Calculate discount for cart items

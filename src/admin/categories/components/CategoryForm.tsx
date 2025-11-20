@@ -7,7 +7,7 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Switch } from '../../../components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
 
 interface Category {

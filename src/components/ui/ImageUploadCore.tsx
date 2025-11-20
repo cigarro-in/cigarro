@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Upload, X } from 'lucide-react';
 import { Button } from './button';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 
 interface ImageUploadCoreProps {
   imageUrl: string | null;

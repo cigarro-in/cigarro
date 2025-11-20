@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { AdminUser } from '../types/admin';
 import { securityManager } from '../utils/security';
 import { auditLogger } from '../utils/audit-logger';
@@ -42,7 +42,9 @@ export function useAdminAuth(): AdminAuthContext {
           await loadAdminProfile(session.user);
           await auditLogger.logSecurityEvent('admin_login', {
             user_id: session.user.id,
-            email: session.user.email
+            metadata: {
+              email: session.user.email
+            }
           });
         } else if (event === 'SIGNED_OUT') {
           setAuthState(prev => ({
@@ -174,8 +176,10 @@ export function useAdminAuth(): AdminAuthContext {
       if (error) {
         // Log failed login attempt
         await auditLogger.logSecurityEvent('admin_login_failed', {
-          email,
-          error: error.message,
+          metadata: {
+            email,
+            error: error.message
+          },
           ip_address: await getClientIP()
         });
         
@@ -312,8 +316,10 @@ export function useAdminAuth(): AdminAuthContext {
         // Log access status change
         await auditLogger.logSecurityEvent('admin_access_changed', {
           user_id: authState.user.id,
-          new_access: hasAccess,
-          previous_access: authState.hasAccess
+          metadata: {
+            new_access: hasAccess,
+            previous_access: authState.hasAccess
+          }
         });
       }
 

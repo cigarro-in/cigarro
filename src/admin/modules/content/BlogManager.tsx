@@ -51,10 +51,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
-import { supabase } from '../../../utils/supabase/client';
+import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { ImageWithFallback } from '../../../components/figma/ImageWithFallback';
+import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 import { BlogEditorModal } from './modals/BlogEditorModal';
 import { BlogPost, BlogCategory, BlogTag } from '../../../types/blog';
 

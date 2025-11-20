@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { buildRoute } from '../../config/routes';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check, Heart, ChevronDown, ChevronUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,9 +9,9 @@ import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
-import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
+import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { VariantSelector } from '../../components/variants/VariantSelector';
 import { ComboDisplayComponent } from '../../components/variants/VariantSelector';
 import { ProductVariant, ProductCombo } from '../../types/variants';
@@ -253,6 +254,7 @@ function ProductPage() {
       circle.style.outline = '2px solid #433c35';
       circle.style.boxShadow = '0 6px 20px rgba(0,0,0,0.18)';
       circle.style.zIndex = '2147483647';
+      circle.style.pointerEvents = 'none'; // Allow clicks to pass through
       document.body.appendChild(circle);
 
       const drop = circle.animate(
@@ -1281,6 +1283,10 @@ function ProductPage() {
                   e.preventDefault();
                   console.log('Buy now clicked');
                   
+                  // Clear any stale retry payment data
+                  sessionStorage.removeItem('isRetryPayment');
+                  sessionStorage.removeItem('retryOrder');
+                  
                   // Store buy now item in sessionStorage
                   const buyNowItem = {
                     ...product,
@@ -1293,8 +1299,8 @@ function ProductPage() {
                   sessionStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
                   sessionStorage.setItem('isBuyNow', 'true');
                   
-                  // Navigate to checkout
-                  navigate('/checkout');
+                  // Navigate to checkout with buynow param
+                  navigate(buildRoute.checkoutWithParams({ buynow: true }));
                 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex-1 h-10 bg-canyon text-creme rounded-full transition-all hover:bg-canyon/90 active:shadow-inner"

@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { AuthDialog } from '../../components/auth/AuthDialog';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {

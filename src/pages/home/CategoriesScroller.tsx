@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Leaf, Flame } from 'lucide-react';
-import { supabase } from '../../utils/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 
 interface Category {
   id: string;
@@ -29,29 +29,15 @@ export function CategoriesScroller() {
 
   const fetchCategories = async () => {
     try {
-      const { data: categoriesData, error: categoriesError } = await supabase
+      // Optimized single query - Count is nice but speed is better. 
+      // fetching just categories is instant.
+      const { data, error } = await supabase
         .from('categories')
         .select('id, name, slug, description, image')
         .order('name');
 
-      if (categoriesError) throw categoriesError;
-
-      // Get product counts for each category
-      const categoriesWithCounts = await Promise.all(
-        (categoriesData || []).map(async (category) => {
-          const { count } = await supabase
-            .from('product_categories')
-            .select('product_id', { count: 'exact' })
-            .eq('category_id', category.id);
-
-          return {
-            ...category,
-            product_count: count || 0
-          };
-        })
-      );
-
-      setCategories(categoriesWithCounts);
+      if (error) throw error;
+      setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
     } finally {
@@ -60,15 +46,8 @@ export function CategoriesScroller() {
   };
 
   if (isLoading) {
-    return (
-      <section className="py-6 bg-creme">
-        <div className="px-4">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-dark"></div>
-          </div>
-        </div>
-      </section>
-    );
+    // Minimal height reservation without visual noise
+    return <section className="py-6 bg-creme min-h-[240px]"></section>;
   }
 
   if (categories.length === 0) {

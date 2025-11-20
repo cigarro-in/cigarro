@@ -10,7 +10,7 @@ import { Button } from '../../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Switch } from '../../../../components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
-import { supabase } from '../../../../utils/supabase/client';
+import { supabase } from '../../../../lib/supabase/client';
 import { ProductFormData, generateSlug } from '../../../../types/product';
 import { MultipleImageUpload } from '../../../../components/ui/MultipleImageUpload';
 

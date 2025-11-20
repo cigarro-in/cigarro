@@ -3,7 +3,7 @@ import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
-import { getProductImageUrl } from '../../utils/supabase/storage';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 import { Product } from '../../hooks/useCart';
 
 // Helper function to format price in Indian numbering system
@@ -94,6 +94,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       circle.style.boxShadow = '0 6px 20px rgba(0,0,0,0.18)';
       circle.style.zIndex = '2147483647';
       circle.style.transform = 'translate3d(0,0,0)';
+      circle.style.pointerEvents = 'none'; // Allow clicks to pass through
       document.body.appendChild(circle);
 
       const drop = circle.animate(
