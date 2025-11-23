@@ -1,14 +1,20 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import Hero from './Hero';
-import { FeaturedProducts } from './FeaturedProducts';
 import { CategoriesScroller } from './CategoriesScroller';
-import { BrandsScroller } from './BrandsScroller';
-import { CategoryShowcases } from './CategoryShowcases';
-// import { BrandHeritage } from '../company/BrandHeritage';
-import { ProductShowcase } from '../../components/products/ProductShowcase';
-import { CategoriesGrid } from '../content/CategoriesGrid';
-import { BlogSection } from '../content/BlogSection';
+
+// Lazy load non-critical components to improve initial page load
+const FeaturedProducts = lazy(() => import('./FeaturedProducts').then(m => ({ default: m.FeaturedProducts })));
+const BrandsScroller = lazy(() => import('./BrandsScroller').then(m => ({ default: m.BrandsScroller })));
+const CategoryShowcases = lazy(() => import('./CategoryShowcases').then(m => ({ default: m.CategoryShowcases })));
+const ProductShowcase = lazy(() => import('../../components/products/ProductShowcase').then(m => ({ default: m.ProductShowcase })));
+const CategoriesGrid = lazy(() => import('../content/CategoriesGrid').then(m => ({ default: m.CategoriesGrid })));
+const BlogSection = lazy(() => import('../content/BlogSection').then(m => ({ default: m.BlogSection })));
+
+// Minimal fallback to prevent layout shifts
+const SectionFallback = ({ height = "h-96" }: { height?: string }) => (
+  <div className={`w-full ${height} animate-pulse bg-transparent`} />
+);
 
 export function HomePage() {
   return (
@@ -28,31 +34,41 @@ export function HomePage() {
       </div>
       
       <div className="h-0 md:h-12"></div>
-      <FeaturedProducts />
+      
+      <Suspense fallback={<SectionFallback height="h-[500px]" />}>
+        <FeaturedProducts />
+      </Suspense>
       
       {/* Mobile: Brands Scroller */}
       <div className="md:hidden">
-        <BrandsScroller />
+        <Suspense fallback={<SectionFallback height="h-32" />}>
+          <BrandsScroller />
+        </Suspense>
       </div>
       
       {/* Mobile: Category Showcases with Products */}
       <div className="md:hidden">
-        <CategoryShowcases />
+        <Suspense fallback={<SectionFallback height="h-[800px]" />}>
+          <CategoryShowcases />
+        </Suspense>
       </div>
       
-      {/* <div className="h-8 md:h-12"></div>
-      <BrandHeritage />
-      <div className="h-8 md:h-12"></div> */}
-      <ProductShowcase />
+      <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+        <ProductShowcase />
+      </Suspense>
       <div className="h-8 md:h-12"></div>
       
       {/* Desktop: Full Categories Grid */}
       <div className="hidden md:block">
-        <CategoriesGrid />
+        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+          <CategoriesGrid />
+        </Suspense>
       </div>
       
       <div className="h-8 md:h-12"></div>
-      <BlogSection />
+      <Suspense fallback={<SectionFallback height="h-[400px]" />}>
+        <BlogSection />
+      </Suspense>
     </>
   );
 }

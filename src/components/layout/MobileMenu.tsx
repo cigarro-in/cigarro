@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
+import { InstallPWA } from '../pwa/InstallPWA';
 import { 
   ShoppingBag, 
   Heart, 

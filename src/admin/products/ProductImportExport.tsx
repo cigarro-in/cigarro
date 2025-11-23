@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Download, 
   Upload, 
@@ -20,9 +21,9 @@ import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Progress } from '../../components/ui/progress';
-import { supabase } from '../../../lib/supabase/client';
+import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
-import { sanitizeString } from '../../../utils/validation';
+import { sanitizeString } from '../../utils/validation';
 
 interface ImportError {
   row: number;
@@ -56,11 +57,19 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
   const [brands, setBrands] = useState<any[]>([]);
 
   const loadMetadata = async () => {
+    console.log('Loading metadata (categories/brands)...');
     try {
       const [categoriesResult, brandsResult] = await Promise.all([
-        supabase.from('categories').select('id, name').eq('is_active', true),
+        supabase.from('categories').select('id, name'),
         supabase.from('brands').select('id, name').eq('is_active', true)
       ]);
+
+      console.log('Metadata loaded:', {
+        categories: categoriesResult.data?.length,
+        brands: brandsResult.data?.length,
+        catError: categoriesResult.error,
+        brandError: brandsResult.error
+      });
 
       if (categoriesResult.data) setCategories(categoriesResult.data);
       if (brandsResult.data) setBrands(brandsResult.data);
@@ -97,22 +106,22 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         'Compare Price': product.compare_price || '',
         'Cost Price': product.cost_price || '',
         'Stock': product.stock,
-        'Barcode': product.barcode || '',
         'Category': product.category?.name || '',
         'Brand': product.brand?.name || '',
-        'Weight': product.weight || '',
         'Origin': product.origin || '',
-        'Strength': product.strength || '',
         'Pack Size': product.pack_size || '',
         'Image URL': product.image_url || '',
+        'Gallery Images': (product.gallery_images || []).join(', '),
+        'Specifications': product.specifications ? Object.entries(product.specifications).map(([k, v]) => `${k}:${v}`).join('; ') : '',
         'Is Active': product.is_active ? 'Yes' : 'No',
         'Is Featured': product.is_featured ? 'Yes' : 'No',
-        'Is Digital': product.is_digital ? 'Yes' : 'No',
-        'Requires Shipping': product.requires_shipping ? 'Yes' : 'No',
         'Meta Title': product.meta_title || '',
         'Meta Description': product.meta_description || '',
-        'Created At': product.created_at,
-        'Updated At': product.updated_at
+        // Variant fields (empty for main product row)
+        'Variant Name': '',
+        'Variant Type': '',
+        'Variant Price': '',
+        'Variant Stock': ''
       })) || [];
 
       setProgress(75);
@@ -162,8 +171,11 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Please select a CSV file');
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    if (!validExtensions.includes(fileExtension)) {
+      toast.error('Please select a CSV or Excel file (.csv, .xlsx, .xls)');
       return;
     }
 
@@ -173,24 +185,49 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
 
   const previewFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim());
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      
-      // Preview first 5 rows
-      const preview = lines.slice(1, 6).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        const row: any = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-        return row;
-      });
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
 
-      setPreviewData(preview);
+    reader.onload = (e) => {
+      try {
+        let data: any[] = [];
+        
+        if (fileExtension === '.csv') {
+          // CSV parsing
+          const text = e.target?.result as string;
+          const lines = text.split('\n').filter(line => line.trim());
+          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+          
+          data = lines.slice(1, 6).map(line => {
+            const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+            const row: any = {};
+            headers.forEach((header, index) => {
+              row[header] = values[index] || '';
+            });
+            return row;
+          });
+        } else {
+          // Excel parsing
+          const binaryStr = e.target?.result;
+          const workbook = XLSX.read(binaryStr, { type: 'binary' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+          
+          // Preview first 5 rows
+          data = jsonData.slice(0, 5);
+        }
+
+        setPreviewData(data);
+      } catch (error) {
+        console.error('Preview error:', error);
+        toast.error('Failed to preview file');
+      }
     };
-    reader.readAsText(file);
+
+    if (fileExtension === '.csv') {
+      reader.readAsText(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
   };
 
   const validateRow = (row: any, rowIndex: number): ImportError[] => {
@@ -224,14 +261,13 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
       });
     }
 
-    // Email validation for any email fields
-    // URL validation for image URLs
-    if (row['Image URL'] && row['Image URL'].trim() && !row['Image URL'].match(/^https?:\/\/.+/)) {
+    // Variant validation
+    if (row['Variant Name'] && (!row['Variant Price'] || isNaN(parseFloat(row['Variant Price'])))) {
       errors.push({
         row: rowIndex,
-        field: 'Image URL',
-        message: 'Invalid URL format',
-        value: row['Image URL']
+        field: 'Variant Price',
+        message: 'Variant price is required if variant name is present',
+        value: row['Variant Price']
       });
     }
 
@@ -266,102 +302,237 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
       await loadMetadata();
       
       const reader = new FileReader();
+      const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
+      
       reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        let rows: any[] = [];
         
-        const totalRows = lines.length - 1;
+        try {
+          if (fileExtension === '.csv') {
+            // CSV parsing
+            const text = e.target?.result as string;
+            const lines = text.split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '').replace(/\*/g, ''));
+            
+            rows = lines.slice(1).map(line => {
+              const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+              const row: any = {};
+              headers.forEach((header, index) => {
+                row[header] = values[index] || '';
+              });
+              return row;
+            });
+          } else {
+            // Excel parsing
+            const binaryStr = e.target?.result;
+            const workbook = XLSX.read(binaryStr, { type: 'binary' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            rows = XLSX.utils.sheet_to_json(firstSheet, { 
+              raw: false,
+              defval: ''
+            });
+            
+            // Remove asterisks from column names
+            rows = rows.map(row => {
+              const cleanRow: any = {};
+              Object.keys(row).forEach(key => {
+                const cleanKey = key.replace(/\*/g, '').trim();
+                cleanRow[cleanKey] = row[key];
+              });
+              return cleanRow;
+            });
+          }
+        } catch (parseError) {
+          console.error('Parse error:', parseError);
+          toast.error('Failed to parse file. Please check the file format.');
+          setIsProcessing(false);
+          return;
+        }
+        
+          const totalRows = rows.length;
+        console.log(`File parsed. Total rows: ${totalRows}`);
+        
         let successfulImports = 0;
         const allErrors: ImportError[] = [];
         const warnings: string[] = [];
 
         setProgress(10);
 
-        for (let i = 1; i < lines.length; i++) {
-          try {
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            const row: any = {};
-            headers.forEach((header, index) => {
-              row[header] = values[index] || '';
-            });
+        // Group rows by Product Name
+        const productGroups: Record<string, any[]> = {};
+        rows.forEach((row, index) => {
+          const productName = row['Product Name']?.trim();
+          if (productName) {
+            if (!productGroups[productName]) {
+              productGroups[productName] = [];
+            }
+            productGroups[productName].push({ ...row, _rowIndex: index + 2 });
+          } else {
+             console.warn(`Row ${index + 2} skipped: Missing Product Name`);
+          }
+        });
 
-            // Validate row
-            const rowErrors = validateRow(row, i);
-            if (rowErrors.length > 0) {
-              allErrors.push(...rowErrors);
-              continue;
+        const productsToProcess = Object.entries(productGroups);
+        const totalProducts = productsToProcess.length;
+        console.log(`Found ${totalProducts} unique products to process.`);
+
+        for (let pIndex = 0; pIndex < totalProducts; pIndex++) {
+          const [productName, productRows] = productsToProcess[pIndex];
+          console.log(`Processing product: "${productName}" with ${productRows.length} rows`);
+          
+          const mainRow = productRows[0]; // Use first row for main product data
+
+          try {
+            // Validate all rows for this product
+            let hasErrors = false;
+            for (const row of productRows) {
+              const rowErrors = validateRow(row, row._rowIndex);
+              if (rowErrors.length > 0) {
+                console.error(`Validation errors for row ${row._rowIndex}:`, rowErrors);
+                allErrors.push(...rowErrors);
+                hasErrors = true;
+              }
+            }
+            if (hasErrors) {
+                console.warn(`Skipping product "${productName}" due to validation errors.`);
+                continue;
             }
 
             // Find category and brand IDs
-            const categoryId = row['Category'] ? findCategoryId(row['Category']) : null;
-            const brandId = row['Brand'] ? findBrandId(row['Brand']) : null;
+            const categoryId = mainRow['Category'] ? findCategoryId(mainRow['Category']) : null;
+            const brandId = mainRow['Brand'] ? findBrandId(mainRow['Brand']) : null;
 
-            if (row['Category'] && !categoryId) {
-              warnings.push(`Row ${i}: Category "${row['Category']}" not found, will be left empty`);
+            if (mainRow['Category'] && !categoryId) {
+              warnings.push(`Row ${mainRow._rowIndex}: Category "${mainRow['Category']}" not found`);
+            }
+            if (mainRow['Brand'] && !brandId) {
+              warnings.push(`Row ${mainRow._rowIndex}: Brand "${mainRow['Brand']}" not found`);
             }
 
-            if (row['Brand'] && !brandId) {
-              warnings.push(`Row ${i}: Brand "${row['Brand']}" not found, will be left empty`);
+            // Parse Specifications (Format: "Key:Value; Key2:Value2")
+            const specifications: Record<string, string> = {};
+            if (mainRow['Specifications']) {
+              mainRow['Specifications'].split(';').forEach((spec: string) => {
+                const [key, value] = spec.split(':');
+                if (key && value) specifications[key.trim()] = value.trim();
+              });
             }
+
+            // Parse Gallery Images (Format: "url1, url2, url3")
+            const galleryImages = mainRow['Gallery Images'] 
+              ? mainRow['Gallery Images'].split(',').map((url: string) => url.trim()).filter(Boolean)
+              : [];
 
             // Prepare product data
             const productData = {
-              name: sanitizeString(row['Product Name'] || ''),
-              description: sanitizeString(row['Description'] || ''),
-              short_description: sanitizeString(row['Short Description'] || ''),
-              price: parseFloat(row['Price']),
-              compare_price: row['Compare Price'] ? parseFloat(row['Compare Price']) : null,
-              cost_price: row['Cost Price'] ? parseFloat(row['Cost Price']) : null,
-              stock: parseInt(row['Stock']) || 0,
-              barcode: sanitizeString(row['Barcode'] || ''),
-              category_id: categoryId,
+              name: sanitizeString(productName),
+              description: sanitizeString(mainRow['Description'] || ''),
+              short_description: sanitizeString(mainRow['Short Description'] || ''),
+              price: parseFloat(mainRow['Price']),
+              compare_at_price: mainRow['Compare Price'] ? parseFloat(mainRow['Compare Price']) : null,
+              cost_price: mainRow['Cost Price'] ? parseFloat(mainRow['Cost Price']) : null,
+              stock: parseInt(mainRow['Stock']) || 0,
               brand_id: brandId,
-              weight: row['Weight'] ? parseFloat(row['Weight']) : null,
-              origin: sanitizeString(row['Origin'] || ''),
-              strength: sanitizeString(row['Strength'] || ''),
-              pack_size: sanitizeString(row['Pack Size'] || ''),
-              image_url: sanitizeString(row['Image URL'] || ''),
-              is_active: row['Is Active']?.toLowerCase() === 'yes',
-              is_featured: row['Is Featured']?.toLowerCase() === 'yes',
-              is_digital: row['Is Digital']?.toLowerCase() === 'yes',
-              requires_shipping: row['Requires Shipping']?.toLowerCase() !== 'no',
-              meta_title: sanitizeString(row['Meta Title'] || ''),
-              meta_description: sanitizeString(row['Meta Description'] || ''),
-              slug: row['Product Name'].toLowerCase()
+              brand: mainRow['Brand'] ? sanitizeString(mainRow['Brand']) : null, // Populate legacy brand column
+              origin: sanitizeString(mainRow['Origin'] || ''),
+              pack_size: sanitizeString(mainRow['Pack Size'] || ''),
+              image_url: sanitizeString(mainRow['Image URL'] || ''),
+              gallery_images: galleryImages,
+              specifications: specifications,
+              is_active: mainRow['Is Active'] ? mainRow['Is Active']?.toLowerCase() === 'yes' : true, // Default to true if missing
+              is_featured: mainRow['Is Featured']?.toLowerCase() === 'yes',
+              meta_title: sanitizeString(mainRow['Meta Title'] || ''),
+              meta_description: sanitizeString(mainRow['Meta Description'] || ''),
+              slug: productName.toLowerCase()
                 .replace(/[^a-z0-9 -]/g, '')
                 .replace(/\s+/g, '-')
                 .replace(/-+/g, '-')
                 .trim()
             };
 
-            // Insert product
-            const { error: insertError } = await supabase
+            // Insert Product
+            console.log('Attempting to insert product:', productData);
+            const { data: insertedProduct, error: insertError } = await supabase
               .from('products')
-              .insert(productData);
+              .insert(productData)
+              .select()
+              .single();
 
             if (insertError) {
-              allErrors.push({
-                row: i,
-                field: 'Database',
-                message: insertError.message,
-                value: productData.name
-              });
-            } else {
-              successfulImports++;
+              console.error('Supabase insert error:', insertError);
+              // Check for duplicate slug
+              if (insertError.code === '23505' && insertError.message.includes('slug')) {
+                 // Try to update existing? For now just error
+                 allErrors.push({
+                  row: mainRow._rowIndex,
+                  field: 'Product Name',
+                  message: 'Product already exists (duplicate name/slug)',
+                  value: productName
+                });
+              } else {
+                allErrors.push({
+                  row: mainRow._rowIndex,
+                  field: 'Database',
+                  message: `Insert failed: ${insertError.message} (${insertError.code})`,
+                  value: productName
+                });
+              }
+              continue;
             }
+            
+            console.log('Successfully inserted product:', insertedProduct);
+
+            // Process Category Relationship
+            if (categoryId && insertedProduct) {
+               await supabase.from('product_categories').insert({
+                 product_id: insertedProduct.id,
+                 category_id: categoryId
+               });
+            }
+
+            // Process Variants (if any)
+            // A row is a variant if it has 'Variant Name' OR if there are multiple rows
+            // Strategy: Iterate ALL rows. If 'Variant Name' is present, create variant.
+            const variantsToInsert = [];
+            
+            for (const row of productRows) {
+              if (row['Variant Name']) {
+                variantsToInsert.push({
+                  product_id: insertedProduct.id,
+                  variant_name: sanitizeString(row['Variant Name']),
+                  variant_type: sanitizeString(row['Variant Type'] || 'packaging'),
+                  price: parseFloat(row['Variant Price'] || row['Price']), // Fallback to product price
+                  stock: parseInt(row['Variant Stock']) || 0,
+                  compare_at_price: row['Compare Price'] ? parseFloat(row['Compare Price']) : null, // Inherit or override? Let's assume inherit if not present? No, simple for now.
+                  cost_price: row['Cost Price'] ? parseFloat(row['Cost Price']) : null,
+                  is_active: true
+                });
+              }
+            }
+
+            if (variantsToInsert.length > 0) {
+              const { error: variantError } = await supabase
+                .from('product_variants')
+                .insert(variantsToInsert);
+              
+              if (variantError) {
+                warnings.push(`Failed to import variants for "${productName}": ${variantError.message}`);
+              }
+            }
+
+            successfulImports++;
 
           } catch (error) {
             allErrors.push({
-              row: i,
+              row: mainRow._rowIndex,
               field: 'General',
               message: error instanceof Error ? error.message : 'Unknown error',
-              value: 'N/A'
+              value: productName
             });
           }
 
           // Update progress
-          setProgress(10 + (i / totalRows) * 80);
+          setProgress(10 + ((pIndex + 1) / totalProducts) * 80);
         }
 
         setProgress(100);
@@ -388,7 +559,11 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         }
       };
 
-      reader.readAsText(selectedFile);
+      if (fileExtension === '.csv') {
+        reader.readAsText(selectedFile);
+      } else {
+        reader.readAsBinaryString(selectedFile);
+      }
 
     } catch (error) {
       console.error('Import error:', error);
@@ -399,22 +574,106 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
   };
 
   const downloadTemplate = () => {
-    const template = [
-      'Product Name,Description,Short Description,Price,Compare Price,Cost Price,Stock,Barcode,Category,Brand,Weight,Origin,Strength,Pack Size,Image URL,Is Active,Is Featured,Is Digital,Requires Shipping,Meta Title,Meta Description',
-      'Sample Product,"A great product description","Short desc",29.99,39.99,20.00,100,1234567890123,Premium Cigarettes,Marlboro,0.05,USA,Regular,Pack of 20,https://example.com/image.jpg,Yes,No,No,Yes,"Sample Product - Premium Quality","Buy our sample product online"'
-    ].join('\n');
+    // Create workbook with formatted template
+    const templateData = [
+      {
+        'Product Name': 'Marlboro Red',
+        'Description': 'Premium quality cigarettes with rich tobacco flavor',
+        'Short Description': 'Classic Marlboro Red cigarettes',
+        'Price': 450,
+        'Compare Price': 500,
+        'Cost Price': 350,
+        'Stock': 100,
+        'Category': 'Premium Cigarettes',
+        'Brand': 'Marlboro',
+        'Origin': 'USA',
+        'Pack Size': 'Pack of 20',
+        'Image URL': 'https://example.com/marlboro.jpg',
+        'Gallery Images': 'https://example.com/img1.jpg, https://example.com/img2.jpg',
+        'Specifications': 'Strength:Strong; Ring Gauge:20',
+        'Is Active': 'Yes',
+        'Is Featured': 'No',
+        'Meta Title': 'Marlboro Red',
+        'Meta Description': 'Best cigarettes',
+        'Variant Name': 'Single Pack',
+        'Variant Type': 'packaging',
+        'Variant Price': 450,
+        'Variant Stock': 100
+      },
+      {
+        'Product Name': 'Marlboro Red',
+        'Description': 'SAME PRODUCT - NEW VARIANT',
+        'Short Description': '',
+        'Price': 450,
+        'Compare Price': '',
+        'Cost Price': '',
+        'Stock': '',
+        'Category': '',
+        'Brand': '',
+        'Origin': '',
+        'Pack Size': '',
+        'Image URL': '',
+        'Gallery Images': '',
+        'Specifications': '',
+        'Is Active': '',
+        'Is Featured': '',
+        'Meta Title': '',
+        'Meta Description': '',
+        'Variant Name': 'Carton (10 Packs)',
+        'Variant Type': 'packaging',
+        'Variant Price': 4200,
+        'Variant Stock': 10
+      }
+    ];
 
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'product_import_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    // Set column widths
+    const columnWidths = [
+      { wch: 20 }, // Product Name*
+      { wch: 30 }, // Description
+      { wch: 20 }, // Short Description
+      { wch: 10 }, // Price*
+      { wch: 12 }, // Compare Price
+      { wch: 12 }, // Cost Price
+      { wch: 8 },  // Stock
+      { wch: 20 }, // Category
+      { wch: 15 }, // Brand
+      { wch: 12 }, // Origin
+      { wch: 15 }, // Pack Size
+      { wch: 20 }, // Image URL
+      { wch: 20 }, // Gallery Images
+      { wch: 25 }, // Specifications
+      { wch: 10 }, // Is Active
+      { wch: 12 }, // Is Featured
+      { wch: 20 }, // Meta Title
+      { wch: 20 }, // Meta Description
+      { wch: 20 }, // Variant Name
+      { wch: 15 }, // Variant Type
+      { wch: 12 }, // Variant Price
+      { wch: 12 }  // Variant Stock
+    ];
+    worksheet['!cols'] = columnWidths;
 
-    toast.success('Template downloaded successfully');
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+    
+    // Add instructions sheet
+    const instructions = [
+      { 'Field': 'Product Name*', 'Required': 'YES', 'Description': 'Product Name. Rows with SAME name will be grouped as variants.', 'Example': 'Marlboro Red' },
+      { 'Field': 'Variant Name', 'Required': 'NO', 'Description': 'Name of variant (e.g., "Carton", "Pack"). If present, creates a variant.', 'Example': 'Carton' },
+      { 'Field': 'Specifications', 'Required': 'NO', 'Description': 'Key:Value pairs separated by semicolon', 'Example': 'Strength:Medium; Origin:Cuba' },
+      { 'Field': 'Gallery Images', 'Required': 'NO', 'Description': 'Comma separated URLs', 'Example': 'url1.jpg, url2.jpg' }
+    ];
+    
+    const instructionsSheet = XLSX.utils.json_to_sheet(instructions);
+    instructionsSheet['!cols'] = [{ wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(workbook, instructionsSheet, 'Instructions');
+    
+    // Download file
+    XLSX.writeFile(workbook, `product_import_template_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    toast.success('Excel template downloaded successfully');
   };
 
   return (
@@ -423,7 +682,7 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         <DialogHeader>
           <DialogTitle>Product Import/Export</DialogTitle>
           <DialogDescription>
-            Import products from CSV files or export existing products for backup and migration
+            Import products from Excel (.xlsx, .xls) or CSV files. Export existing products for backup and migration.
           </DialogDescription>
         </DialogHeader>
 
@@ -487,14 +746,16 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
-                  Import Products from CSV
+                  Import Products from Excel/CSV
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Make sure your CSV file follows the correct format. Download the template to get started.
+                    <strong>Supported formats:</strong> Excel (.xlsx, .xls) or CSV (.csv)<br />
+                    <strong>Required columns:</strong> Product Name*, Price*<br />
+                    Download the template to get started with pre-filled examples.
                   </AlertDescription>
                 </Alert>
 
@@ -511,7 +772,7 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
                   <div className="flex-1">
                     <input
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xlsx,.xls"
                       onChange={handleFileSelect}
                       className="w-full px-3 py-2 border rounded-md"
                     />

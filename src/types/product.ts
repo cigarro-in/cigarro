@@ -31,6 +31,8 @@ export interface Product {
   
   // Organization
   is_active: boolean;
+  
+  // Legacy/Deprecated (Moved to Collections)
   is_featured?: boolean;
   is_showcase?: boolean;
   featured_order?: number;
@@ -67,6 +69,23 @@ export interface Product {
   product_variants?: ProductVariant[];
   brand_relation?: Brand;
   categories?: Category[];
+  collections?: Collection[];
+}
+
+export interface Collection {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string;
+  image_url?: string;
+  type: 'manual' | 'smart';
+  rules?: any[];
+  sort_order: number;
+  is_active: boolean;
+  seo_title?: string;
+  seo_description?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProductVariant {
@@ -77,6 +96,11 @@ export interface ProductVariant {
   variant_name: string;
   variant_slug?: string;
   variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
+
+  // Tobacco Specifics
+  packaging?: 'pack' | 'carton' | 'box' | 'bundle';
+  units_contained?: number;
+  images?: string[]; // Variant specific images
   
   // Pricing
   price: number;
@@ -142,6 +166,8 @@ export interface Brand {
   description?: string;
   logo_url?: string;
   website_url?: string;
+  country_of_origin?: string;
+  tier?: 'budget' | 'standard' | 'premium' | 'luxury';
   is_active: boolean;
   is_featured: boolean;
   sort_order: number;
@@ -196,6 +222,7 @@ export interface ProductFormData {
   is_active: boolean;
   is_featured: boolean;
   is_showcase: boolean;
+  collections: string[]; // Collection IDs
   
   // Product Details
   origin?: string;
@@ -224,6 +251,10 @@ export interface VariantFormData {
   variant_name: string;
   variant_slug?: string;
   variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
+  
+  // Tobacco Specifics
+  packaging: 'pack' | 'carton' | 'box' | 'bundle';
+  units_contained: number;
   
   // Pricing
   price: number;

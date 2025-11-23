@@ -14,6 +14,7 @@ import { searchProductsEnhanced } from '../../utils/search';
 import { SearchResult } from '../../types/variants';
 import Fuse from 'fuse.js';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { InstallPWA } from '../pwa/InstallPWA';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

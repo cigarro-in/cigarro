@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, Package, Star, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Package, Star, DollarSign, Upload, Download } from 'lucide-react';
 import { Switch } from '../../../components/ui/switch';
 import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
@@ -9,32 +9,11 @@ import { supabase } from '../../../lib/supabase/client';
 import { formatINR } from '../../../utils/currency';
 import { DataTable } from '../../components/shared/DataTable';
 import { StandardModal } from '../../components/shared/StandardModal';
-import { ProductForm } from './ProductForm';
+import { ProductFormNew } from './ProductFormNew';
+import { saveProduct } from '../productService';
 import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  brand: string;
-  price: number;
-  description: string;
-  stock: number;
-  is_active: boolean;
-  rating: number;
-  review_count: number;
-  origin: string;
-  strength: string;
-  pack_size: string;
-  specifications: Record<string, string>;
-  ingredients: string[];
-  gallery_images: string[];
-  meta_title: string;
-  meta_description: string;
-  image_alt_text: string;
-  created_at: string;
-  updated_at: string;
-}
+import { ProductImportExport } from '../ProductImportExport';
+import { Product, ProductFormData } from '../../../types/product';
 
 export function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -43,6 +22,7 @@ export function ProductsManager() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [productIsActive, setProductIsActive] = useState(true);
+  const [showImportExport, setShowImportExport] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -51,13 +31,43 @@ export function ProductsManager() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // 1. Fetch Products
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select('*, collections(id)')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (productsError) throw productsError;
+
+      // 2. Fetch Variants manually (to ensure no join issues)
+      const productIds = productsData?.map(p => p.id) || [];
+      let variantsMap: Record<string, any[]> = {};
+
+      if (productIds.length > 0) {
+        const { data: variantsData, error: variantsError } = await supabase
+          .from('product_variants')
+          .select('*')
+          .in('product_id', productIds);
+        
+        if (variantsError) {
+          console.error("Error fetching variants manually:", variantsError);
+        } else {
+          // Group by product_id
+          variantsData?.forEach(v => {
+            if (!variantsMap[v.product_id]) variantsMap[v.product_id] = [];
+            variantsMap[v.product_id].push(v);
+          });
+        }
+      }
+
+      // 3. Merge Data
+      const mergedData = productsData?.map(p => ({
+        ...p,
+        product_variants: variantsMap[p.id] || []
+      }));
+      
+      setProducts(mergedData || []);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to fetch products');
@@ -184,6 +194,15 @@ export function ProductsManager() {
       )
     },
     {
+      key: 'product_variants',
+      label: 'Variants',
+      render: (_: any, product: Product) => (
+        <Badge variant="outline" className="bg-gray-50">
+          {product.product_variants?.length || 0}
+        </Badge>
+      )
+    },
+    {
       key: 'price',
       label: 'Price',
       sortable: true,
@@ -276,6 +295,15 @@ export function ProductsManager() {
           <h1 className="text-2xl font-bold text-dark">Products</h1>
           <p className="text-dark/70">Manage your product catalog</p>
         </div>
+        <Button
+          onClick={() => setShowImportExport(true)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          <Download className="h-4 w-4" />
+          Import/Export
+        </Button>
       </div>
 
       <DataTable
@@ -293,13 +321,45 @@ export function ProductsManager() {
         onRowClick={handleEditProduct}
       />
 
-      <ProductForm
-        product={editingProduct}
-        isOpen={showProductModal}
-        onClose={() => setShowProductModal(false)}
-        onSave={() => {
-          setShowProductModal(false);
+      {showProductModal && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm overflow-y-auto">
+          <div className="min-h-full w-full bg-background">
+            <ProductFormNew
+              initialData={editingProduct || undefined}
+              onSave={async (data: ProductFormData) => {
+                await saveProduct(data, editingProduct?.id);
+                setShowProductModal(false);
+                fetchProducts();
+              }}
+              onCancel={() => setShowProductModal(false)}
+              onDelete={editingProduct ? async () => {
+                try {
+                  const { error } = await supabase
+                    .from('products')
+                    .delete()
+                    .eq('id', editingProduct.id);
+
+                  if (error) throw error;
+                  
+                  toast.success('Product deleted successfully');
+                  setShowProductModal(false);
+                  fetchProducts();
+                } catch (error) {
+                  console.error('Error deleting product:', error);
+                  toast.error('Failed to delete product');
+                }
+              } : undefined}
+            />
+          </div>
+        </div>
+      )}
+
+      <ProductImportExport
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        onImportComplete={() => {
           fetchProducts();
+          toast.success('Products refreshed after import');
         }}
       />
     </div>

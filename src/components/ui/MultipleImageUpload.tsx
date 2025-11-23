@@ -14,6 +14,8 @@ interface ImageUploadProps {
   showSelector?: boolean;
   title?: string;
   description?: string;
+  maxImages?: number;
+  id?: string;
 }
 
 export function MultipleImageUpload({ 
@@ -21,16 +23,18 @@ export function MultipleImageUpload({
   onImageUrlsChange, 
   showSelector = false, 
   title, 
-  description 
+  description,
+  maxImages = 10,
+  id = "image-gallery"
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const uploadFiles = async (files: File[]) => {
-    const remainingSlots = 10 - imageUrls.length;
+    const remainingSlots = maxImages - imageUrls.length;
 
     if (files.length > remainingSlots) {
-      toast.error(`You can only upload ${remainingSlots} more images. Maximum 10 images allowed.`);
+      toast.error(`You can only upload ${remainingSlots} more images. Maximum ${maxImages} images allowed.`);
       return;
     }
 
@@ -123,7 +127,7 @@ export function MultipleImageUpload({
   return (
     <div className="space-y-4">
       <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="image-gallery" direction="horizontal">
+        <Droppable droppableId={id} direction="horizontal">
           {(provided) => (
             <div
               {...provided.droppableProps}
@@ -182,7 +186,7 @@ export function MultipleImageUpload({
                 </Draggable>
               ))}
               {provided.placeholder}
-              {imageUrls.length < 10 && (
+              {imageUrls.length < maxImages && (
                 <div className="w-20 h-20 border-2 border-dashed border-border/20 rounded-md flex items-center justify-center flex-shrink-0">
                   {showSelector ? (
                     <Button

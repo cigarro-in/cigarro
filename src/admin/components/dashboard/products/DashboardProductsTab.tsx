@@ -12,7 +12,9 @@ import {
   Archive,
   Settings,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { Button } from '../../../../components/ui/button';
@@ -27,8 +29,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Product, ProductVariant } from '../types/index';
 import { formatINR } from '../../../../utils/currency';
 import { toast } from 'sonner';
-import { ProductForm } from '../../../../admin/products/components/ProductForm';
+import { ProductFormNew } from '../../../../admin/products/components/ProductFormNew';
+import { saveProduct } from '../../../../admin/products/productService';
+import { ProductImportExport } from '../../../../admin/products/ProductImportExport';
 import { supabase } from '../../../../lib/supabase/client';
+import { ProductFormData } from '../../../../types/product';
 
 interface DashboardProductsTabProps {
   products: Product[];
@@ -52,6 +57,7 @@ export function DashboardProductsTab({
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Filter products
@@ -89,10 +95,10 @@ export function DashboardProductsTab({
   // Handle edit product - fetch fresh data from database
   const handleEditProduct = async (product: Product) => {
     try {
-      // Fetch fresh product data from database
+      // Fetch fresh product data from database INCLUDING VARIANTS
       const { data: freshProduct, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, product_variants(*), collections(id)')
         .eq('id', product.id)
         .single();
 
@@ -107,17 +113,15 @@ export function DashboardProductsTab({
   };
 
   // Handle add variant - open product form with this product
-  const handleAddVariant = (product: Product) => {
-    setEditingProduct(product);
-    setShowProductModal(true);
+  const handleAddVariant = async (product: Product) => {
+    await handleEditProduct(product);
   };
 
   // Handle edit variant - open product form with the parent product
   const handleEditVariant = (variant: ProductVariant) => {
     const parentProduct = products.find(p => p.id === variant.product_id);
     if (parentProduct) {
-      setEditingProduct(parentProduct);
-      setShowProductModal(true);
+      handleEditProduct(parentProduct);
     }
   };
 
@@ -157,10 +161,20 @@ export function DashboardProductsTab({
           <h2 className="text-2xl font-bold">Products & Variants</h2>
           <p className="text-muted-foreground">Manage your product catalog and variants</p>
         </div>
-        <Button onClick={handleAddProduct}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowImportExport(true)}
+            className="flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Import/Export
+          </Button>
+          <Button onClick={handleAddProduct}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -399,59 +413,55 @@ export function DashboardProductsTab({
       </Card>
 
       {/* Product Modal */}
-      {/* ProductForm has its own Dialog wrapper */}
-      <ProductForm
-        product={editingProduct as any}
-        isOpen={showProductModal}
-        onClose={() => {
-          setShowProductModal(false);
-          setEditingProduct(null);
-        }}
-        onSave={() => {
-          setShowProductModal(false);
-          setEditingProduct(null);
-          // Refresh products data
+      {showProductModal && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm overflow-y-auto">
+          <div className="min-h-full w-full bg-background">
+            <ProductFormNew
+              initialData={editingProduct as any}
+              onSave={async (data: ProductFormData) => {
+                await saveProduct(data, editingProduct?.id);
+                setShowProductModal(false);
+                setEditingProduct(null);
+                if (onRefresh) onRefresh();
+                toast.success('Product saved successfully');
+              }}
+              onCancel={() => {
+                setShowProductModal(false);
+                setEditingProduct(null);
+              }}
+              onDelete={editingProduct ? async () => {
+                try {
+                  const { error } = await supabase
+                    .from('products')
+                    .delete()
+                    .eq('id', editingProduct.id);
+
+                  if (error) throw error;
+                  
+                  toast.success('Product deleted successfully');
+                  setShowProductModal(false);
+                  setEditingProduct(null);
+                  if (onRefresh) onRefresh();
+                } catch (error) {
+                  console.error('Error deleting product:', error);
+                  toast.error('Failed to delete product');
+                }
+              } : undefined}
+            />
+          </div>
+        </div>
+      )}
+
+      <ProductImportExport
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        onImportComplete={() => {
           if (onRefresh) {
             onRefresh();
           }
-          toast.success('Products refreshed');
-        }}
-        onDelete={async (product) => {
-          try {
-            const { error } = await supabase
-              .from('products')
-              .delete()
-              .eq('id', product.id);
-
-            if (error) {
-              // Handle foreign key constraint errors
-              if (error.code === '23503') {
-                if (error.message.includes('order_items')) {
-                  toast.error('Cannot delete product: It has been ordered by customers. Consider deactivating it instead.');
-                } else if (error.message.includes('cart_items')) {
-                  toast.error('Cannot delete product: It is currently in customer carts. Consider deactivating it instead.');
-                } else {
-                  toast.error('Cannot delete product: It is referenced by other records.');
-                }
-              } else {
-                throw error;
-              }
-              return;
-            }
-
-            toast.success(`Deleted ${product.name}`);
-            setShowProductModal(false);
-            setEditingProduct(null);
-            if (onRefresh) {
-              onRefresh();
-            }
-          } catch (error: any) {
-            console.error('Error deleting product:', error);
-            toast.error(error.message || 'Failed to delete product');
-          }
+          toast.success('Products refreshed after import');
         }}
       />
-
     </div>
   );
 }
