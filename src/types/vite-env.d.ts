@@ -14,6 +14,16 @@ declare module 'virtual:pwa-register/react' {
   export function useRegisterSW(options?: RegisterSWOptions & { registrationOptions?: any }): RegisterSWHook
 }
 
+
+// Augment React definitions to include fetchpriority
+import 'react';
+
+declare module 'react' {
+  interface ImgHTMLAttributes<T> extends HTMLAttributes<T> {
+    fetchpriority?: 'high' | 'low' | 'auto';
+  }
+}
+
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
