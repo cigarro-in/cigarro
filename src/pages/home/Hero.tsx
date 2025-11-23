@@ -92,7 +92,7 @@ const Hero = () => {
                       width="1440" 
                       height="810"
                       // LCP Optimization
-                      fetchPriority="high"
+                      fetchpriority="high"
                       loading="eager"
                       decoding="async"
                     />
