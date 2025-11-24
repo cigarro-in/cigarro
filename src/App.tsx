@@ -13,6 +13,7 @@ import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
 import { supabase } from './lib/supabase/client';
 import { AppRoutes } from './routes/AppRoutes';
+import { ReferralTracker } from './components/referral/ReferralTracker';
 
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
@@ -24,7 +25,12 @@ function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isAgeVerified, setIsAgeVerified] = useState(false);
+  
+  // Check localStorage immediately to prevent flash of age verification
+  const [isAgeVerified, setIsAgeVerified] = useState(() => {
+    return localStorage.getItem('ageVerified') === 'true';
+  });
+
   const [siteSettings, setSiteSettings] = useState({
     meta_title: 'Cigarro',
     meta_description: 'The finest selection of premium cigarettes and cigars.',
@@ -64,6 +70,7 @@ function AppContent() {
 
   return (
     <HelmetProvider>
+      <ReferralTracker />
       <Helmet>
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />

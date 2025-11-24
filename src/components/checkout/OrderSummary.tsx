@@ -3,6 +3,7 @@ import { Wallet, Check, Edit2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Separator } from '../ui/separator';
+import { Switch } from '../ui/switch';
 import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 
@@ -91,104 +92,85 @@ export function OrderSummary({
         <span>{getShippingCost() === 0 ? 'Free' : formatINR(getShippingCost())}</span>
       </div>
       
-      {/* Wallet Balance Section */}
-      {user && walletBalance > 0 && (
-        <div className="bg-canyon/5 rounded-lg p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-canyon" />
-              <span className="text-sm font-medium">Wallet Balance</span>
-            </div>
-            <span className="text-sm font-semibold text-canyon">{formatINR(walletBalance)}</span>
-          </div>
-          
-          {walletAmountToUse === 0 ? (
-            showCustomInput ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Enter amount"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    className="flex-1 h-8 text-sm"
-                    min="1"
-                    max={Math.min(walletBalance, getFinalTotal())}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-canyon text-canyon hover:bg-canyon hover:text-white"
-                    onClick={handleApplyCustomAmount}
-                  >
-                    Apply
-                  </Button>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full text-xs"
-                  onClick={() => {
-                    setShowCustomInput(false);
-                    setCustomAmount('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-canyon text-canyon hover:bg-canyon hover:text-white"
-                  onClick={() => {
-                    const maxUse = Math.min(walletBalance, getFinalTotal());
-                    setWalletAmountToUse(maxUse);
-                    toast.success(`Using ${formatINR(maxUse)} from wallet`);
-                  }}
-                >
-                  Use All
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-canyon text-canyon hover:bg-canyon hover:text-white"
-                  onClick={() => setShowCustomInput(true)}
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  Custom
-                </Button>
-              </div>
-            )
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-green-600">Wallet Applied</span>
-                <span className="text-green-600 font-semibold">-{formatINR(walletAmountToUse)}</span>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full text-xs"
-                onClick={() => {
-                  setWalletAmountToUse(0);
-                  toast.info('Wallet removed');
-                }}
-              >
-                Remove Wallet
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-      
       <Separator />
       
       <div className="flex justify-between font-semibold">
         <span>Total</span>
         <span>{formatINR(getFinalTotal())}</span>
       </div>
+
+      {/* Wallet Balance Section - Compact */}
+      {user && walletBalance > 0 && (
+        <div className="py-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Switch 
+                checked={walletAmountToUse > 0}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setWalletAmountToUse(Math.min(walletBalance, getFinalTotal()));
+                    toast.success('Wallet applied');
+                  } else {
+                    setWalletAmountToUse(0);
+                    setShowCustomInput(false);
+                  }
+                }}
+              />
+              <span className="text-sm font-medium text-foreground">
+                Use Wallet {walletAmountToUse > 0 && <span className="text-canyon font-mono ml-1">({formatINR(walletBalance)})</span>}
+              </span>
+            </div>
+          </div>
+
+          {/* Active Wallet Deduction Line Item */}
+          {walletAmountToUse > 0 && (
+            <div className="flex justify-between items-center text-sm pl-14">
+              {showCustomInput ? (
+                <div className="flex gap-2 items-center animate-in fade-in flex-1">
+                  <Input
+                    type="number"
+                    placeholder="Amount"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    className="h-7 w-full bg-white text-xs"
+                    min="1"
+                    max={Math.min(walletBalance, getFinalTotal())}
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    className="h-7 text-[10px] bg-canyon text-white hover:bg-canyon/90 px-2"
+                    onClick={handleApplyCustomAmount}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground"
+                    onClick={() => {
+                      setShowCustomInput(false);
+                      setCustomAmount('');
+                    }}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setShowCustomInput(true)}
+                    className="text-[10px] text-muted-foreground hover:text-canyon underline decoration-dotted underline-offset-2 transition-colors"
+                  >
+                    Edit Amount
+                  </button>
+                  <span className="font-medium text-green-600">-{formatINR(walletAmountToUse)}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {walletAmountToUse > 0 && (
         <div className="flex justify-between font-bold text-lg text-canyon">

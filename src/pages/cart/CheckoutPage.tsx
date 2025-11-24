@@ -958,70 +958,53 @@ export function CheckoutPage() {
     setIsProcessingPayment(true);
     
     try {
-      // Generate transaction ID for UPI reference
-      const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-      console.log('Generated transaction ID:', transactionId);
-      
-      // Create order in database (UUID and display_order_id will be auto-generated via triggers)
-      const orderData = {
-        user_id: user.id,
-        status: 'placed',
-        // Store amounts as decimal values
-        subtotal: totalPrice,
-        tax: 0,
-        shipping: shippingCost,
-        total: finalTotal,
-        discount: totalDiscountAmount,
-        discount_id: appliedDiscount?.discount_id || null,
-        discount_code: appliedDiscount?.discount_code || null,
-        payment_method: 'UPI',
-        payment_confirmed: true,
-        payment_confirmed_at: new Date().toISOString(),
-        payment_verified: 'NO', // Requires admin verification
-        transaction_id: transactionId,
-        shipping_name: formData.fullName,
-        shipping_address: formData.address,
-        shipping_city: formData.city,
-        shipping_state: formData.state,
-        shipping_zip_code: formData.pincode,
-        shipping_country: formData.country,
-        shipping_phone: `${countryCode} ${formData.phone}`,
-        estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        // Log payment link details
-        payment_link_email: paymentLinkEmail || null,
-        payment_link_phone: paymentLinkPhone || null,
-      };
-      
-      console.log('Order data:', orderData);
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = items.map((item: any) => ({
-        order_id: order.id,
+      // Prepare items for RPC
+      const rpcItems = items.map((item: any) => ({
         product_id: item.id,
-        product_name: item.name,
-        product_brand: item.brand,
-        product_price: getCartItemPrice(item),
-        product_image: item.gallery_images?.[0] || item.image,
         quantity: item.quantity,
-        variant_id: item.variant_id,
-        variant_name: item.variant_name,
-        combo_id: item.combo_id,
-        combo_name: item.combo_name,
+        variant_id: item.variant_id || null,
+        combo_id: item.combo_id || null
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+      // Prepare shipping address for RPC
+      const rpcAddress = {
+        full_name: formData.fullName,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode,
+        country: formData.country || 'India',
+        phone: `${countryCode} ${formData.phone}`
+      };
 
-      if (itemsError) throw itemsError;
+      // Call secure create_order RPC
+      const { data, error } = await supabase.rpc('create_order', {
+        p_items: rpcItems,
+        p_shipping_address: rpcAddress,
+        p_shipping_method: formData.shippingMethod,
+        p_coupon_code: appliedDiscount?.discount_code || null,
+        p_lucky_discount: randomDiscount,
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error creating order:', error);
+        throw new Error(error.message || 'Failed to create order');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Failed to create order');
+      }
+
+      // Construct order object from response
+      const order = {
+        id: data.order_id,
+        display_order_id: data.display_order_id,
+        total: data.total,
+        subtotal: data.subtotal,
+        discount: data.discount,
+        transaction_id: `TXN${Date.now().toString().slice(-8)}` // Temporary, updated later if needed
+      };
 
       // Always try to save address on successful order (with duplicate prevention)
       if (user) {

@@ -16,7 +16,6 @@ export const ROUTES = {
   // Payment & Orders
   PAYMENT: '/payment',
   TRANSACTION: '/transaction',
-  ORDER_SUCCESS: '/order-success',
   ORDERS: '/orders',
   
   // User
@@ -117,7 +116,6 @@ export const ROUTE_GROUPS = {
     ROUTES.MOBILE_CHECKOUT,
     ROUTES.PAYMENT,
     ROUTES.TRANSACTION,
-    ROUTES.ORDER_SUCCESS,
   ],
   
   LEGAL: [

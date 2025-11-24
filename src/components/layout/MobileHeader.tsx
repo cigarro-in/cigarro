@@ -133,13 +133,13 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
   return (
     <>
       {/* Mobile Header */}
-      <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-[9999] bg-creme">
-        <div className="px-3 py-2">
-        <div className="bg-creme border border-coyote rounded-lg h-12 sm:h-14 flex items-center justify-between">
+      <header className="mobile-header lg:hidden fixed top-0 left-0 right-0 z-[9999] bg-transparent pointer-events-none">
+        <div className="px-3 py-2 pointer-events-auto">
+        <div className="bg-creme/90 backdrop-blur-sm border border-coyote/30 rounded-lg h-12 sm:h-14 flex items-center justify-between shadow-sm">
           {/* Menu Button - Touch-friendly */}
           <button 
             type="button" 
-            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-r border-coyote rounded-l-lg hover:bg-creme-light active:bg-coyote/20 transition-colors duration-200"
+            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-r border-coyote/30 rounded-l-lg hover:bg-coyote/10 active:bg-coyote/20 transition-colors duration-200"
             onClick={onMenuToggle}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
           >
@@ -160,7 +160,7 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
           {/* Search Button - Touch-friendly */}
           <button 
             type="button"
-            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-l border-coyote rounded-r-lg hover:bg-creme-light active:bg-coyote/20 transition-colors duration-200"
+            className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 border-l border-coyote/30 rounded-r-lg hover:bg-coyote/10 active:bg-coyote/20 transition-colors duration-200"
             onClick={() => setIsSearchOpen(true)}
             aria-label="Search"
           >
@@ -170,42 +170,42 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
         </div>
       </header>
 
-      {/* Search Sidebar - Standardized Mobile Sidebar */}
+      {/* Search Sidebar - Reverted to Sidebar but "Better" (Solid Luxury) */}
       <div
         className={`md:hidden fixed inset-0 z-[99999] transition-opacity duration-300 ${isSearchOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         aria-hidden={!isSearchOpen}
         onClick={handleSearchClose}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
-        {/* Right-side drawer - Standardized Mobile Sidebar */}
+        {/* Right-side Sidebar */}
         <div
-          className={`fixed right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-background border-l border-border shadow-xl transform transition-transform duration-300 ease-out will-change-transform flex flex-col ${isSearchOpen ? 'translate-x-0' : 'translate-x-full'}`}
+          className={`fixed right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-background border-l border-coyote shadow-2xl transform transition-transform duration-300 ease-out will-change-transform flex flex-col ${isSearchOpen ? 'translate-x-0' : 'translate-x-full'}`}
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
         >
             
-            {/* FROZEN HEADER */}
-            <div className="flex-shrink-0 p-4 border-b border-border bg-background/95 backdrop-blur-sm">
+            {/* Header */}
+            <div className="flex-shrink-0 p-4 bg-background">
               <div className="flex items-center gap-3 mb-3">
                 <button
                   onClick={handleSearchClose}
-                  className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors duration-200 hover:bg-muted/50"
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-muted/10 hover:bg-muted/20 transition-colors text-foreground"
                   aria-label="Close search"
                 >
-                  <X className="w-6 h-6 text-foreground" />
+                  <X className="w-5 h-5" />
                 </button>
-                <h2 className="text-foreground font-sans font-semibold text-lg flex-1">Search Products</h2>
+                <h2 className="text-foreground font-serif text-xl flex-1">Search</h2>
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search products..."
-                  className="w-full pl-10 pr-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+                  placeholder="What are you looking for?"
+                  className="w-full pl-10 pr-4 py-3 bg-input border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -215,15 +215,15 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
               </div>
             </div>
 
-          {/* SCROLLABLE CONTENT */}
-          <div className="flex-1 overflow-y-auto overscroll-y-bounce">
+          {/* Content Area */}
+          <div className="flex-1 overflow-y-auto overscroll-y-bounce bg-background">
             {showResults ? (
               <>
                 {searchResults.length > 0 ? (
                   <div className="p-4">
-                    <div className="mb-4">
-                      <h3 className="text-foreground font-sans font-semibold text-base">
-                        {searchResults.length} {searchResults.length === 1 ? 'product' : 'products'} found
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-muted-foreground font-sans font-bold text-xs uppercase tracking-widest">
+                        Results ({searchResults.length})
                       </h3>
                     </div>
                     <div className="space-y-3">
@@ -231,14 +231,14 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
                         <Link
                           key={`${result.item_type}-${result.id}`}
                           to={`/product/${result.slug}`}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors border border-border/20 hover:border-border/40"
+                          className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40 shadow-sm hover:border-primary/50 transition-all"
                           onClick={handleSearchClose}
                         >
-                          <div className="flex-shrink-0">
+                          <div className="flex-shrink-0 border border-border/10 rounded-lg overflow-hidden">
                             <img
                               src={getProductImageUrl(result.gallery_images?.[0])}
                               alt={result.name}
-                              className="w-12 h-12 rounded-lg object-cover bg-white"
+                              className="w-14 h-14 object-cover bg-muted/20"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.src = getProductImageUrl();
@@ -246,13 +246,13 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-accent text-xs font-semibold uppercase tracking-wider font-sans truncate">
+                            <p className="text-primary text-[10px] font-bold uppercase tracking-wider font-sans truncate mb-1">
                               {result.brand || 'Premium'}
                             </p>
-                            <h4 className="text-foreground font-sans font-semibold text-sm leading-tight line-clamp-2">
+                            <h4 className="text-foreground font-sans font-medium text-sm leading-tight line-clamp-2 mb-1">
                               {result.name}
                             </h4>
-                            <div className="text-foreground font-bold text-base font-sans mt-1">
+                            <div className="text-foreground font-bold text-base font-sans">
                               {formatINR(result.base_price)}
                             </div>
                           </div>
@@ -261,48 +261,48 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
                     </div>
                   </div>
                 ) : searchQuery.trim() && !isSearching ? (
-                  <div className="p-8 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/20 flex items-center justify-center">
+                  <div className="p-8 text-center flex flex-col items-center justify-center h-64">
+                    <div className="w-16 h-16 mb-4 rounded-full bg-muted/10 flex items-center justify-center">
                       <Search className="w-8 h-8 text-muted-foreground" />
                     </div>
-                    <h3 className="text-foreground font-sans font-semibold text-lg mb-2">No products found</h3>
-                    <p className="text-muted-foreground font-sans mb-4">
-                      Try searching with different keywords
+                    <h3 className="text-foreground font-serif text-lg mb-2">No matches found</h3>
+                    <p className="text-muted-foreground font-sans text-sm">
+                      Try checking your spelling or use different keywords
                     </p>
                   </div>
                 ) : null}
               </>
             ) : (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/20 flex items-center justify-center">
+              <div className="p-8 text-center flex flex-col items-center justify-center h-64">
+                <div className="w-16 h-16 mb-4 rounded-full bg-muted/10 flex items-center justify-center">
                   <Search className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-foreground font-sans font-semibold text-lg mb-2">Start typing to search</h3>
-                <p className="text-muted-foreground font-sans">
-                  Find your favorite tobacco products
+                <h3 className="text-foreground font-serif text-lg mb-2">Start typing...</h3>
+                <p className="text-muted-foreground font-sans text-sm">
+                  Search for your favorite brands or products
                 </p>
               </div>
             )}
           </div>
 
-          {/* FROZEN FOOTER */}
+          {/* Footer */}
           {showResults && searchResults.length >= 6 && (
-            <div className="flex-shrink-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="flex-shrink-0 p-4 bg-background">
               <Link
                 to={`/products?search=${encodeURIComponent(searchQuery)}`}
-                className="block w-full text-center bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors duration-300 text-sm uppercase tracking-wide"
+                className="block w-full text-center bg-primary text-primary-foreground py-3.5 rounded-full font-medium hover:bg-primary/90 transition-colors duration-300 text-sm uppercase tracking-wide shadow-lg"
                 onClick={handleSearchClose}
               >
-                View all results for "{searchQuery}"
+                View all results
               </Link>
             </div>
           )}
           
           {showResults && searchQuery.trim() && !isSearching && searchResults.length === 0 && (
-            <div className="flex-shrink-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="flex-shrink-0 p-4 bg-background">
               <Link
                 to="/products"
-                className="block w-full text-center bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors duration-300 text-sm uppercase tracking-wide"
+                className="block w-full text-center bg-primary text-primary-foreground py-3.5 rounded-full font-medium hover:bg-primary/90 transition-colors duration-300 text-sm uppercase tracking-wide shadow-lg"
                 onClick={handleSearchClose}
               >
                 Browse All Products

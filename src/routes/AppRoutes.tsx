@@ -15,7 +15,6 @@ const MobileCheckoutPage = lazy(() => import('../pages/cart/MobileCheckoutPage')
 // Payment & Orders
 const UPIPaymentPage = lazy(() => import('../pages/cart/UPIPaymentPage').then(m => ({ default: m.UPIPaymentPage })));
 const TransactionProcessingPage = lazy(() => import('../pages/transaction/TransactionProcessingPage').then(m => ({ default: m.TransactionProcessingPage })));
-const OrderSuccessPage = lazy(() => import('../pages/order/OrderSuccessPage').then(m => ({ default: m.OrderSuccessPage })));
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
 
 // User
@@ -77,7 +76,6 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       {/* Payment & Orders */}
       <Route path={ROUTES.PAYMENT} element={<UPIPaymentPage />} />
       <Route path={ROUTES.TRANSACTION} element={<TransactionProcessingPage />} />
-      <Route path={ROUTES.ORDER_SUCCESS} element={<OrderSuccessPage />} />
       <Route path={ROUTES.ORDERS} element={<OrdersPage />} />
       
       {/* User */}

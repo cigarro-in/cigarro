@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Tag, MapPin, Smartphone, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode } from 'lucide-react';
-import QRCodeLib from 'qrcode';
+import { Tag, MapPin, Smartphone, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -22,22 +21,20 @@ export function MobileCheckoutPage() {
   const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
 
-  // Check URL params to determine checkout type
-  const searchParams = new URLSearchParams(window.location.search);
-  const urlRetryParam = searchParams.get('retry') === 'true';
-  const urlBuyNowParam = searchParams.get('buynow') === 'true';
-  
-  console.log('🔗 URL Params:', {
-    url: window.location.href,
-    retry: urlRetryParam,
-    buynow: urlBuyNowParam,
-    cartItemsCount: cartItems.length
+  // Determine checkout flow type using URL params as source of truth, initialized once
+  const [isBuyNow] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('buynow') === 'true' || sessionStorage.getItem('isBuyNow') === 'true';
   });
 
+  const [isRetryPayment] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('retry') === 'true' || sessionStorage.getItem('isRetryPayment') === 'true';
+  });
 
   const normalizeString = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-
+  
   const userMetadata = ((user as unknown) as { user_metadata?: Record<string, unknown> })?.user_metadata ?? {};
 
   const metadataNameFromParts = normalizeString(
@@ -57,87 +54,38 @@ export function MobileCheckoutPage() {
     normalizeString(userMetadata.contact) ??
     '';
 
-  // Log sessionStorage state BEFORE any logic
-  console.log('📦 SessionStorage BEFORE logic:', {
-    isRetryPayment: sessionStorage.getItem('isRetryPayment'),
-    hasRetryOrder: !!sessionStorage.getItem('retryOrder'),
-    isBuyNow: sessionStorage.getItem('isBuyNow'),
-    hasBuyNowItem: !!sessionStorage.getItem('buyNowItem')
-  });
-
-  // Determine checkout flow type using URL params as source of truth
-  // URL params are more reliable than sessionStorage for flow control
-  const isBuyNow = urlBuyNowParam || sessionStorage.getItem('isBuyNow') === 'true';
-  const isRetryPayment = urlRetryParam || sessionStorage.getItem('isRetryPayment') === 'true';
-
-  console.log('🎯 Flow Detection:', {
-    isBuyNow,
-    isRetryPayment,
-    isNormalCheckout: !isBuyNow && !isRetryPayment,
-    source: {
-      buyNowFromURL: urlBuyNowParam,
-      buyNowFromStorage: sessionStorage.getItem('isBuyNow') === 'true',
-      retryFromURL: urlRetryParam,
-      retryFromStorage: sessionStorage.getItem('isRetryPayment') === 'true'
-    }
-  });
+  // URL params for effects
+  const searchParams = new URLSearchParams(window.location.search);
+  const urlRetryParam = searchParams.get('retry') === 'true';
+  const urlBuyNowParam = searchParams.get('buynow') === 'true';
 
   // Clear sessionStorage on mount if this is a normal cart checkout (no URL params)
   useEffect(() => {
-    console.log('🔄 Cleanup effect running:', { urlRetryParam, urlBuyNowParam });
     if (!urlRetryParam && !urlBuyNowParam) {
       // This is a normal cart checkout - clear any stale flow data
-      const hadStaleData = {
-        isRetryPayment: sessionStorage.getItem('isRetryPayment'),
-        retryOrder: !!sessionStorage.getItem('retryOrder'),
-        isBuyNow: sessionStorage.getItem('isBuyNow'),
-        buyNowItem: !!sessionStorage.getItem('buyNowItem')
-      };
-      
       sessionStorage.removeItem('isRetryPayment');
       sessionStorage.removeItem('retryOrder');
       sessionStorage.removeItem('isBuyNow');
       sessionStorage.removeItem('buyNowItem');
-      
-      console.log('🧹 Normal cart checkout - cleared sessionStorage:', hadStaleData);
-      console.log('📦 SessionStorage AFTER cleanup:', {
-        isRetryPayment: sessionStorage.getItem('isRetryPayment'),
-        hasRetryOrder: !!sessionStorage.getItem('retryOrder'),
-        isBuyNow: sessionStorage.getItem('isBuyNow'),
-        hasBuyNowItem: !!sessionStorage.getItem('buyNowItem')
-      });
-    } else {
-      console.log('⏭️ Special flow detected - keeping sessionStorage');
     }
   }, [urlRetryParam, urlBuyNowParam]);
 
   // Get flow-specific data from sessionStorage
   const buyNowItemData = sessionStorage.getItem('buyNowItem');
-  const buyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
+  const initialBuyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
+  
+  // Local state for Buy Now item to handle quantity updates
+  const [localBuyNowItem, setLocalBuyNowItem] = useState(initialBuyNowItem);
 
-  console.log('🛒 Buy Now Data:', {
-    isBuyNow,
-    hasBuyNowItemData: !!buyNowItemData,
-    buyNowItem: buyNowItem ? {
-      id: buyNowItem.id,
-      name: buyNowItem.name,
-      quantity: buyNowItem.quantity
-    } : null
-  });
+  // Update local state if sessionStorage changes (e.g. initial load)
+  useEffect(() => {
+    if (initialBuyNowItem) {
+      setLocalBuyNowItem(initialBuyNowItem);
+    }
+  }, [buyNowItemData]);
 
   const retryOrderData = sessionStorage.getItem('retryOrder');
   const retryOrder = isRetryPayment && retryOrderData ? JSON.parse(retryOrderData) : null;
-
-  console.log('🔄 Retry Payment Data:', {
-    isRetryPayment,
-    hasRetryOrderData: !!retryOrderData,
-    retryOrder: retryOrder ? {
-      orderId: retryOrder.orderId,
-      displayOrderId: retryOrder.displayOrderId,
-      itemsCount: retryOrder.items?.length,
-      total: retryOrder.total
-    } : null
-  });
 
   // Retry order derived values
   const retrySubtotal = isRetryPayment && retryOrder
@@ -158,47 +106,57 @@ export function MobileCheckoutPage() {
     ? retryOrder.displayOrderId || null
     : null;
 
+  // Redirect if retry param exists but session data is missing (e.g. Back button after transaction)
+  useEffect(() => {
+    if (urlRetryParam && !retryOrderData) {
+      console.warn('⚠️ Retry param present but session data missing. Redirecting to orders.');
+      toast.error('Retry session expired. Please try again.');
+      navigate('/orders');
+    }
+  }, [urlRetryParam, retryOrderData, navigate]);
+
   // Use Retry Order, Buy Now item, or cart items
   const items = isRetryPayment && retryOrder 
     ? retryOrder.items 
-    : (isBuyNow && buyNowItem ? [buyNowItem] : cartItems);
+    : (isBuyNow && localBuyNowItem ? [localBuyNowItem] : cartItems);
   
-  console.log('📋 Items Selection Logic:', {
-    isRetryPayment,
-    hasRetryOrder: !!retryOrder,
-    retryOrderItems: retryOrder?.items?.length,
-    isBuyNow,
-    hasBuyNowItem: !!buyNowItem,
-    cartItemsCount: cartItems.length,
-    selectedItemsCount: items.length,
-    selectedFrom: isRetryPayment && retryOrder ? 'RETRY_ORDER' : (isBuyNow && buyNowItem ? 'BUY_NOW' : 'CART')
-  });
+  // Handle quantity updates for both Cart and Buy Now flows
+  const handleUpdateQuantity = async (productId: string, quantity: number, variantId?: string, comboId?: string) => {
+    // Check if we should update locally
+    // Normalize undefined/null to null for comparison
+    const targetVariantId = variantId || null;
+    const targetComboId = comboId || null;
+    const localVariantId = localBuyNowItem?.variant_id || null;
+    const localComboId = localBuyNowItem?.combo_id || null;
+
+    const isLocalUpdate = localBuyNowItem && 
+                          localBuyNowItem.id === productId && 
+                          localVariantId === targetVariantId &&
+                          localComboId === targetComboId;
+
+    if (isLocalUpdate) {
+      if (quantity <= 0) {
+        // Return to product page if quantity becomes 0
+        sessionStorage.removeItem('buyNowItem');
+        sessionStorage.removeItem('isBuyNow');
+        navigate(-1);
+        return;
+      }
+
+      const updatedItem = { ...localBuyNowItem, quantity };
+      setLocalBuyNowItem(updatedItem);
+      sessionStorage.setItem('buyNowItem', JSON.stringify(updatedItem));
+    } else {
+      // Normal cart update
+      await updateQuantity(productId, quantity, variantId, comboId);
+    }
+  };
   
   const totalPrice = isRetryPayment && retrySubtotal !== null
     ? retrySubtotal
-    : (isBuyNow && buyNowItem 
-      ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
+    : (isBuyNow && localBuyNowItem 
+      ? (localBuyNowItem.variant_price || localBuyNowItem.price) * localBuyNowItem.quantity 
       : cartTotalPrice);
-
-  console.log('💰 Price Calculation:', {
-    isRetryPayment,
-    retrySubtotal,
-    isBuyNow,
-    buyNowPrice: buyNowItem ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity : null,
-    cartTotalPrice,
-    finalTotalPrice: totalPrice,
-    priceSource: isRetryPayment && retrySubtotal !== null ? 'RETRY_ORDER' : (isBuyNow && buyNowItem ? 'BUY_NOW' : 'CART')
-  });
-
-  // Final state summary
-  console.log('✅ FINAL CHECKOUT STATE:', {
-    flowType: isRetryPayment ? '🔄 RETRY PAYMENT' : (isBuyNow ? '🛒 BUY NOW' : '🛍️ NORMAL CART'),
-    itemsCount: items.length,
-    totalPrice,
-    hasUser: !!user,
-    retryOrderId: retryOrder?.displayOrderId,
-    buyNowItemId: buyNowItem?.id
-  });
 
   // State management
   const [selectedShipping, setSelectedShipping] = useState('standard');
@@ -399,76 +357,57 @@ export function MobileCheckoutPage() {
     }
   };
 
-  // Save order to database
+  // Save order to database securely using RPC
   const saveOrderToDatabase = async (txnId: string, status: string) => {
     if (!user || !selectedAddress) return null;
 
-    const orderCreatedAt = new Date().toISOString();
-    const finalTotal = getFinalTotal();
-    const shipping = getShippingCost();
-    const discount = randomDiscount + (appliedDiscount?.discount_value || 0);
-
-    const orderData = {
-      user_id: user.id,
-      transaction_id: txnId,
-      status,
-      subtotal: totalPrice,
-      shipping,
-      discount,
-      tax: 0,
-      total: finalTotal,
-      discount_code: appliedDiscount?.discount_code || null,
-      discount_id: appliedDiscount?.discount_id || null,
-      payment_method: walletAmountToUse > 0 ? 'wallet' : 'upi',
-      shipping_name: selectedAddress.full_name || defaultUserName,
-      shipping_address: selectedAddress.address,
-      shipping_city: selectedAddress.city,
-      shipping_state: selectedAddress.state,
-      shipping_zip_code: selectedAddress.pincode,
-      shipping_country: selectedAddress.country || 'India',
-      shipping_phone: selectedAddress.phone || defaultUserPhone,
-      estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      created_at: orderCreatedAt
-    };
-
     try {
-      // Create order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Error saving order:', orderError);
-        throw new Error('Failed to save order');
-      }
-
-      // Create order items
-      const orderItems = items.map((item: any) => ({
-        order_id: order.id,
+      // Prepare items for RPC
+      const rpcItems = items.map((item: any) => ({
         product_id: item.id,
-        product_name: item.name,
-        product_brand: item.brand || 'Premium',
-        product_price: item.variant_price || item.price,
-        product_image: item.image || (item.gallery_images && item.gallery_images[0]) || '',
         quantity: item.quantity,
         variant_id: item.variant_id || null,
-        variant_name: item.variant_name || null,
-        combo_id: item.combo_id || null,
-        combo_name: item.combo_name || null
+        combo_id: item.combo_id || null
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+      // Prepare shipping address for RPC
+      const rpcAddress = {
+        full_name: selectedAddress.full_name || defaultUserName,
+        address: selectedAddress.address,
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        pincode: selectedAddress.pincode,
+        country: selectedAddress.country || 'India',
+        phone: selectedAddress.phone || defaultUserPhone
+      };
 
-      if (itemsError) {
-        console.error('Error saving order items:', itemsError);
-        throw new Error('Failed to save order items');
+      // Call secure create_order RPC
+      const { data, error } = await supabase.rpc('create_order', {
+        p_items: rpcItems,
+        p_shipping_address: rpcAddress,
+        p_shipping_method: selectedShipping,
+        p_coupon_code: appliedDiscount?.discount_code || null,
+        p_lucky_discount: randomDiscount,
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error creating order:', error);
+        throw new Error(error.message || 'Failed to create order');
       }
 
-      return order;
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Failed to create order');
+      }
+
+      // Return order object compatible with existing code
+      return {
+        id: data.order_id,
+        display_order_id: data.display_order_id,
+        total: data.total,
+        transaction_id: txnId // Note: transaction_id will be updated by process_order_payment
+      };
+
     } catch (error) {
       console.error('Error in saveOrderToDatabase:', error);
       throw error;
@@ -515,29 +454,69 @@ export function MobileCheckoutPage() {
     const walletAmountUsed = usingWallet ? walletAmountToUse : 0;
     const remainingAmount = finalTotal - walletAmountUsed;
     
+    const shouldClearCart = !isBuyNow && !isRetryPayment;
+    
+    console.log('💳 Payment Handler Debug:', {
+      isRetryPayment,
+      retryOrderExists: !!retryOrder,
+      retryOrderId: retryOrder?.orderId,
+      retryOrderData: retryOrder
+    });
+
     console.log('💳 Payment Handler:', {
       finalTotal,
       walletAmountToUse,
       walletAmountUsed,
       remainingAmount,
       usingWallet,
-      isFullWalletPayment: remainingAmount === 0
+      isFullWalletPayment: remainingAmount === 0,
+      shouldClearCart
     });
 
     setIsProcessing(true);
+    setIsCompletingOrder(true);
 
     try {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
       
-      console.log('💰 Creating order with transaction ID:', txnId);
+      console.log('💰 Processing payment with transaction ID:', txnId);
       
-      // Save order first
-      const order = await saveOrderToDatabase(txnId, 'pending');
-      if (!order) {
-        throw new Error('Failed to create order');
+      let order;
+      
+      // Check if this is a retry for an existing order
+      if (isRetryPayment && retryOrder?.orderId) {
+        console.log('🔄 Fetching existing order for retry:', retryOrder.orderId);
+        
+        // Fetch existing order instead of updating (avoids RLS issues)
+        // The process_order_payment RPC should handle the transaction ID update if needed
+        const { data: existingOrder, error: fetchError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', retryOrder.orderId)
+          .maybeSingle();
+          
+        if (fetchError) {
+          console.error('Error fetching retry order:', fetchError);
+          console.log('⚠️ Fetch failed, creating new order');
+          order = await saveOrderToDatabase(txnId, 'pending');
+        } else if (!existingOrder) {
+          console.log('⚠️ Order not found, creating new order');
+          order = await saveOrderToDatabase(txnId, 'pending');
+        } else {
+          console.log('✅ Found existing order to retry:', existingOrder.id);
+          order = existingOrder;
+        }
+      } else {
+        // Create new order
+        console.log('✨ Creating new order');
+        order = await saveOrderToDatabase(txnId, 'pending');
       }
 
-      console.log('✅ Order saved:', order.id);
+      if (!order) {
+        throw new Error('Failed to process order record');
+      }
+
+      console.log('✅ Order record ready:', order.id);
 
       // Process payment with wallet if applicable
       const { data: result, error } = await supabase.rpc('process_order_payment', {
@@ -573,9 +552,10 @@ export function MobileCheckoutPage() {
       if (remainingAmount === 0) {
         console.log('✅ Full payment from wallet - Order complete!');
         console.log('📝 Order ID:', order.id);
-        console.log('✅ Order status updated by database function');
-
-        // Show processing state
+        
+        // Navigate to transaction processing page for seamless experience
+        // We don't clear cart here to avoid flash of empty state
+        // TransactionProcessingPage will handle cleanup
         navigate('/transaction', {
           state: {
             type: 'wallet_payment',
@@ -584,45 +564,17 @@ export function MobileCheckoutPage() {
             orderId: order.id,
             displayOrderId: order.display_order_id,
             paymentMethod: 'wallet',
+            autoComplete: true, // Signals that payment is already verified
             walletAmountUsed: walletAmountUsed,
-            autoComplete: true, // Flag to auto-complete after processing
+            shouldClearCart,
             metadata: {
-              wallet_payment: true,
-              items_count: items.length
+                items_count: items.length,
+                shipping_cost: getShippingCost(),
+                discount: randomDiscount + (appliedDiscount?.discount_value || 0)
             }
-          }
+          },
+          replace: true
         });
-
-        // Process in background
-        setTimeout(async () => {
-          try {
-            // Verify wallet was deducted
-            const newBalance = await supabase.rpc('get_wallet_balance', { p_user_id: user.id });
-            console.log('💰 Wallet balance after payment:', {
-              before: walletBalance,
-              after: newBalance.data,
-              deducted: walletBalance - (newBalance.data || 0),
-              expected: walletAmountUsed
-            });
-
-            // Clear cart (both database and UI state)
-            console.log('🗑️ Clearing cart...');
-            await clearCart();
-            console.log('✅ Cart cleared from database and UI');
-            
-            // Clear session storage
-            sessionStorage.removeItem('buyNowItem');
-            sessionStorage.removeItem('isBuyNow');
-            sessionStorage.removeItem('retryOrder');
-            sessionStorage.removeItem('isRetryPayment');
-            
-            // Refresh wallet balance in state
-            setWalletBalance(newBalance.data || 0);
-            setWalletAmountToUse(0);
-          } catch (error) {
-            console.error('Error in background processing:', error);
-          }
-        }, 100);
         
         return;
       }
@@ -652,6 +604,7 @@ export function MobileCheckoutPage() {
           orderId: order.id,
           paymentMethod: 'upi',
           upiUrl,
+          shouldClearCart,
           metadata: {
             wallet_amount_used: walletAmountUsed,
             is_partial_payment: usingWallet,
@@ -665,6 +618,7 @@ export function MobileCheckoutPage() {
     } catch (error) {
       console.error('❌ Payment error:', error);
       toast.error('Payment failed. Please try again.');
+      setIsCompletingOrder(false);
     } finally {
       setIsProcessing(false);
     }
@@ -696,16 +650,51 @@ export function MobileCheckoutPage() {
     try {
       const txnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
       const paymentAmount = amount || Math.max(0, getFinalTotal() - walletAmountToUse);
+      const shouldClearCart = !isBuyNow && !isRetryPayment;
+
+      console.log('💳 UPI Payment Debug:', {
+        isRetryPayment,
+        retryOrderExists: !!retryOrder,
+        retryOrderId: retryOrder?.orderId,
+        existingTxnId
+      });
 
       if (!existingTxnId) {
-        const order = await saveOrderToDatabase(txnId, 'pending');
-        if (!order) {
-          toast.error('Failed to create order');
-          return;
+        // Check if this is a retry for an existing order
+        if (isRetryPayment && retryOrder?.orderId) {
+          console.log('🔄 Fetching existing order for UPI retry:', retryOrder.orderId);
+          
+          // Fetch existing order instead of updating (avoids RLS issues)
+          const { data: existingOrder, error: fetchError } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', retryOrder.orderId)
+            .maybeSingle();
+            
+          if (fetchError || !existingOrder) {
+            console.error('Error fetching retry order or not found:', fetchError);
+            // Fallback to new order
+            const order = await saveOrderToDatabase(txnId, 'pending');
+            if (!order) {
+               toast.error('Failed to create order');
+               return;
+            }
+            triggerPaymentWebhook(txnId, order.id, paymentAmount);
+          } else {
+            console.log('✅ Found existing order to retry:', existingOrder.id);
+            // Trigger webhook for the existing order
+            triggerPaymentWebhook(txnId, existingOrder.id, paymentAmount);
+          }
+        } else {
+          // Create new order
+          const order = await saveOrderToDatabase(txnId, 'pending');
+          if (!order) {
+            toast.error('Failed to create order');
+            return;
+          }
+          // Trigger webhook
+          triggerPaymentWebhook(txnId, order.id, paymentAmount);
         }
-
-        // Trigger webhook
-        triggerPaymentWebhook(txnId, order.id, paymentAmount);
       }
 
       // Generate UPI URL
@@ -720,6 +709,7 @@ export function MobileCheckoutPage() {
           orderId: existingTxnId ? undefined : txnId,
           paymentMethod: 'upi',
           upiUrl: upiUrl,
+          shouldClearCart,
           metadata: {
             items_count: items.length,
             shipping_cost: getShippingCost(),
@@ -752,11 +742,45 @@ export function MobileCheckoutPage() {
     try {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
       const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
+      const shouldClearCart = !isBuyNow && !isRetryPayment;
+      
+      console.log('💳 QR Payment Debug:', {
+        isRetryPayment,
+        retryOrderExists: !!retryOrder,
+        retryOrderId: retryOrder?.orderId
+      });
+      
+      let order;
 
-      // Save order first
-      const order = await saveOrderToDatabase(txnId, 'pending');
+      // Check if this is a retry for an existing order
+      if (isRetryPayment && retryOrder?.orderId) {
+        console.log('🔄 Fetching existing order for QR retry:', retryOrder.orderId);
+        
+        // Fetch existing order instead of updating (avoids RLS issues)
+        const { data: existingOrder, error: fetchError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', retryOrder.orderId)
+          .maybeSingle();
+          
+        if (fetchError) {
+          console.error('Error fetching retry order:', fetchError);
+          // Fallback to new order
+          order = await saveOrderToDatabase(txnId, 'pending');
+        } else if (!existingOrder) {
+          console.log('⚠️ Order not found, creating new order');
+          order = await saveOrderToDatabase(txnId, 'pending');
+        } else {
+          console.log('✅ Found existing order to retry:', existingOrder.id);
+          order = existingOrder;
+        }
+      } else {
+        // Save order first
+        order = await saveOrderToDatabase(txnId, 'pending');
+      }
+
       if (!order) {
-        throw new Error('Failed to create order');
+        throw new Error('Failed to process order record');
       }
 
       // Process QR payment
@@ -789,7 +813,9 @@ export function MobileCheckoutPage() {
           transactionId: txnId,
           amount: paymentAmount,
           orderId: order.id,
+          displayOrderId: order.display_order_id,
           paymentMethod: 'qr',
+          shouldClearCart,
           metadata: {
             items_count: items.length,
             shipping_cost: getShippingCost(),
@@ -856,14 +882,14 @@ export function MobileCheckoutPage() {
                   <div className="flex items-center gap-2">
                     <button
                       className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                      onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id)}
+                      onClick={() => handleUpdateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id, item.combo_id)}
                     >
                       <Minus className="w-3 h-3" />
                     </button>
                     <span className="text-sm font-semibold w-8 text-center">{item.quantity}</span>
                     <button
                       className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                      onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id)}
+                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, item.variant_id, item.combo_id)}
                     >
                       <Plus className="w-3 h-3" />
                     </button>

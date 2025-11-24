@@ -14,7 +14,7 @@ function Switch({
       data-slot="switch"
       className={cn(
         // Track: explicit ON/OFF colors using theme tokens
-        "peer inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-all outline-none",
+        "peer inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-all outline-none",
         // Visible borders and backgrounds for both states
         "border data-[state=unchecked]:bg-[var(--color-coyote)] data-[state=checked]:bg-[var(--color-canyon)] border-[var(--color-coyote)]",
         // Focus ring in accent color
@@ -29,9 +29,9 @@ function Switch({
         data-slot="switch-thumb"
         className={cn(
           // Knob uses light background and translates clearly between states
-          "pointer-events-none block size-4 rounded-full ring-0 transition-transform",
+          "pointer-events-none block size-5 rounded-full ring-0 transition-transform",
           "bg-[var(--color-creme-light)]",
-          "data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0",
+          "data-[state=checked]:translate-x-[22px] data-[state=unchecked]:translate-x-0.5",
         )}
       />
     </SwitchPrimitive.Root>

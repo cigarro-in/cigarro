@@ -417,7 +417,7 @@ export function OrdersPage() {
                     {/* Order ID and Status */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0 pr-3">
-                        <h3 className="font-serif text-base md:text-lg text-foreground font-medium mb-1">
+                        <h3 className="font-mono tracking-tight text-base md:text-lg text-foreground font-bold mb-1">
                           Order #{order.displayOrderId}
                         </h3>
                         <p className="text-xs text-muted-foreground">

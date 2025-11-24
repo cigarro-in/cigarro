@@ -4,12 +4,15 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Chrome } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Chrome, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { validateEmail, validatePassword, validateName, authRateLimiter } from '../../utils/validation';
 import { supabase } from '../../lib/supabase/client';
+import { BottomDrawer } from '../ui/BottomDrawer';
+import { Link } from 'react-router-dom';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 interface AuthDialogProps {
   open: boolean;
@@ -18,11 +21,21 @@ interface AuthDialogProps {
   context?: 'checkout' | 'general';
 }
 
+// Proper Google Logo Component
+const GoogleLogo = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
 export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'general' }: AuthDialogProps) {
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const [isVisible, setIsVisible] = useState(false);
   const [formData, setFormData] = useState<{
     email: string;
     password: string;
@@ -34,19 +47,6 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
   });
 
   const { signIn, signUp, signInWithGoogle } = useAuth();
-
-  // Prevent flicker by managing visibility
-  React.useEffect(() => {
-    if (open) {
-      setIsVisible(true);
-    } else {
-      // Delay hiding to allow exit animation
-      const timer = setTimeout(() => setIsVisible(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
-  if (!isVisible) return null;
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +161,6 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (error: any) {
-      // Enhanced error handling for better user experience
       const errorMessage = error?.message || '';
       
       if (errorMessage.includes('Password should be at least')) {
@@ -169,17 +168,9 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
       } else if (errorMessage.includes('Email address already in use') || 
                  errorMessage.includes('User already registered')) {
         toast.error('This email is already registered. Please sign in instead.');
-      } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
-        toast.error('Please enter a valid email address. Try using a real email format like user@example.com');
-      } else if (errorMessage.includes('SignUp not allowed for new users')) {
-        toast.error('New user registration is currently disabled. Please contact support.');
-      } else if (errorMessage.includes('Only an email address is accepted as an email') || 
-                 errorMessage.includes('Email address') && errorMessage.includes('invalid')) {
-        toast.error('Please use a valid email address. Avoid generic test emails.');
       } else {
-        // Log the full error for debugging while showing a generic message
         console.error('Signup error details:', error);
-        toast.error('Failed to create account. Please try again or contact support.');
+        toast.error('Failed to create account. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -190,247 +181,223 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      // User will be redirected to Google OAuth page
-      // After successful auth, they'll be redirected back to the app
     } catch (error: any) {
       toast.error(error?.message || 'Failed to sign in with Google');
       setIsLoading(false);
     }
   };
 
+  if (isMobile) {
+    return (
+      <BottomDrawer
+        open={open}
+        onOpenChange={onOpenChange}
+        className="h-auto min-h-[280px]"
+        showCloseButton={false}
+      >
+        <div className="flex flex-col h-full p-6 pb-10 bg-creme">
+          <div className="flex-1 flex flex-col justify-center gap-8 mt-4">
+              {/* Description or Prompt */}
+              <div className="space-y-1 text-center">
+                  <p className="font-sans text-dark/80 text-lg font-medium">
+                      Please login to continue with your order
+                  </p>
+              </div>
+
+              {/* Google Login Button - Styled as White Card with Border */}
+              <Button
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoading}
+                  className="w-full h-14 bg-white hover:bg-gray-50 text-dark border border-coyote/30 font-sans font-medium text-base rounded-lg shadow-sm flex items-center justify-center gap-3 transition-all hover:shadow-md"
+              >
+                  {isLoading ? (
+                      <span>Connecting...</span>
+                  ) : (
+                      <>
+                          <GoogleLogo />
+                          <span>Continue with Google</span>
+                      </>
+                  )}
+              </Button>
+
+              {/* Terms Footer */}
+              <p className="text-center text-xs text-dark/50 font-sans mt-2 leading-relaxed">
+                  By clicking, I accept the{' '}
+                  <Link 
+                      to="/terms" 
+                      className="font-bold text-dark/80 hover:underline"
+                      onClick={() => onOpenChange(false)}
+                  >
+                      Terms & Conditions
+                  </Link>
+                  {' '}&{' '}
+                  <Link 
+                      to="/privacy" 
+                      className="font-bold text-dark/80 hover:underline"
+                      onClick={() => onOpenChange(false)}
+                  >
+                      Privacy Policy
+                  </Link>
+              </p>
+          </div>
+        </div>
+      </BottomDrawer>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-creme border border-coyote rounded-lg max-w-2xl w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] sm:max-w-2xl p-0 overflow-hidden">
+      <DialogContent className="bg-creme border border-coyote rounded-lg max-w-md p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle className="font-serif font-normal text-2xl sm:text-3xl lg:text-4xl text-center text-dark tracking-tight leading-tight">
-            {context === 'checkout' ? 'Complete Your Order' : 'Welcome'}
+          <DialogTitle className="font-serif font-normal text-3xl text-center text-dark tracking-tight">
+            {context === 'checkout' ? 'Complete Your Order' : 'Welcome Back'}
           </DialogTitle>
-          <DialogDescription className="font-sans text-center text-coyote text-sm sm:text-base lg:text-lg mt-4 max-w-2xl mx-auto leading-relaxed">
-            {context === 'checkout' 
-              ? 'Sign in to your account or create a new one to proceed with checkout and complete your order.'
-              : 'Sign in to your account or create a new one to access our curated tobacco collection.'
-            }
+          <DialogDescription className="font-sans text-center text-coyote mt-2">
+            Sign in to access your account
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6">
+        <div className="px-6 pb-6">
           <Tabs defaultValue="signin" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-secondary border border-coyote/20 rounded-lg h-12 mb-6">
+            <TabsList className="grid w-full grid-cols-2 bg-creme-light border border-coyote/20 rounded-lg h-12 mb-6">
               <TabsTrigger 
                 value="signin" 
-                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light data-[state=active]:shadow-sm transition-all duration-200"
+                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light transition-all duration-200"
               >
                 Sign In
               </TabsTrigger>
               <TabsTrigger 
                 value="signup" 
-                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light data-[state=active]:shadow-sm transition-all duration-200"
+                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light transition-all duration-200"
               >
                 Sign Up
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="signin" className="space-y-6">
-              <motion.form
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                onSubmit={handleSignIn}
-                className="space-y-6"
-              >
+            <TabsContent value="signin" className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="font-sans text-dark text-sm sm:text-base lg:text-lg font-medium">
-                    Email Address
-                  </Label>
+                  <Label htmlFor="signin-email">Email Address</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-coyote" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
                     <Input
                       id="signin-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="name@example.com"
                       value={formData.email}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      className="pl-10 sm:pl-12 lg:pl-14 h-10 sm:h-12 lg:h-14 text-sm sm:text-base lg:text-lg bg-creme-light border-2 border-coyote rounded-lg font-sans text-dark placeholder:text-coyote focus:border-dark transition-colors"
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      className="pl-10 bg-white border-coyote/30"
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="font-sans text-dark text-sm sm:text-base lg:text-lg font-medium">
-                    Password
-                  </Label>
+                  <Label htmlFor="signin-password">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-coyote" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
                     <Input
                       id="signin-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={formData.password}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                      className="pl-10 sm:pl-12 lg:pl-14 pr-10 sm:pr-12 lg:pr-14 h-10 sm:h-12 lg:h-14 text-sm sm:text-base lg:text-lg bg-creme-light border-2 border-coyote rounded-lg font-sans text-dark placeholder:text-coyote focus:border-dark transition-colors"
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      className="pl-10 pr-10 bg-white border-coyote/30"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-coyote hover:text-dark transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-coyote hover:text-dark"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full h-10 sm:h-12 lg:h-14 bg-dark text-creme-light font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light hover:text-dark transition-all duration-300 group mt-8 shadow-lg hover:shadow-xl"
-                >
+                <Button type="submit" className="w-full bg-dark text-creme-light hover:bg-canyon" disabled={isLoading}>
                   {isLoading ? 'Signing In...' : 'Sign In'}
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ml-2 sm:ml-3 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              </motion.form>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-coyote/30"></div>
-                </div>
-                <div className="relative flex justify-center text-xs sm:text-sm uppercase">
-                  <span className="bg-creme px-2 text-coyote font-sans">Or continue with</span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                variant="outline"
-                className="w-full h-10 sm:h-12 lg:h-14 bg-white border-2 border-coyote text-dark font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light transition-all duration-300 shadow-sm hover:shadow-md"
-              >
-                <Chrome className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 mr-2 sm:mr-3" />
-                {isLoading ? 'Connecting...' : 'Sign in with Google'}
-              </Button>
+              </form>
             </TabsContent>
 
-            <TabsContent value="signup" className="space-y-6">
-              <motion.form
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                onSubmit={handleSignUp}
-                className="space-y-6"
-              >
+            <TabsContent value="signup" className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="font-sans text-dark text-sm sm:text-base lg:text-lg font-medium">
-                    Full Name
-                  </Label>
+                  <Label htmlFor="signup-name">Full Name</Label>
                   <div className="relative">
-                    <User className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-coyote" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
                     <Input
                       id="signup-name"
-                      type="text"
-                      placeholder="Enter your full name"
+                      placeholder="John Doe"
                       value={formData.name}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                      className="pl-10 sm:pl-12 lg:pl-14 h-10 sm:h-12 lg:h-14 text-sm sm:text-base lg:text-lg bg-creme-light border-2 border-coyote rounded-lg font-sans text-dark placeholder:text-coyote focus:border-dark transition-colors"
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="pl-10 bg-white border-coyote/30"
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="font-sans text-dark text-sm sm:text-base lg:text-lg font-medium">
-                    Email Address
-                  </Label>
+                  <Label htmlFor="signup-email">Email Address</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-coyote" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
                     <Input
                       id="signup-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="name@example.com"
                       value={formData.email}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      className="pl-10 sm:pl-12 lg:pl-14 h-10 sm:h-12 lg:h-14 text-sm sm:text-base lg:text-lg bg-creme-light border-2 border-coyote rounded-lg font-sans text-dark placeholder:text-coyote focus:border-dark transition-colors"
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      className="pl-10 bg-white border-coyote/30"
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="font-sans text-dark text-sm sm:text-base lg:text-lg font-medium">
-                    Password
-                  </Label>
+                  <Label htmlFor="signup-password">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-coyote" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
                     <Input
                       id="signup-password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Create a password (min. 6 characters)"
+                      placeholder="Min 6 characters"
                       value={formData.password}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                      className="pl-10 sm:pl-12 lg:pl-14 pr-10 sm:pr-12 lg:pr-14 h-10 sm:h-12 lg:h-14 text-sm sm:text-base lg:text-lg bg-creme-light border-2 border-coyote rounded-lg font-sans text-dark placeholder:text-coyote focus:border-dark transition-colors"
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      className="pl-10 pr-10 bg-white border-coyote/30"
                       required
                       minLength={6}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-coyote hover:text-dark transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-coyote hover:text-dark"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-
-
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full h-10 sm:h-12 lg:h-14 bg-dark text-creme-light font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light hover:text-dark transition-all duration-300 group mt-8 shadow-lg hover:shadow-xl"
-                >
+                <Button type="submit" className="w-full bg-dark text-creme-light hover:bg-canyon" disabled={isLoading}>
                   {isLoading ? 'Creating Account...' : 'Create Account'}
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ml-2 sm:ml-3 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              </motion.form>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-coyote/30"></div>
-                </div>
-                <div className="relative flex justify-center text-xs sm:text-sm uppercase">
-                  <span className="bg-creme px-2 text-coyote font-sans">Or continue with</span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                variant="outline"
-                className="w-full h-10 sm:h-12 lg:h-14 bg-white border-2 border-coyote text-dark font-sans font-medium text-sm sm:text-base lg:text-lg rounded-lg hover:bg-creme-light transition-all duration-300 shadow-sm hover:shadow-md"
-              >
-                <Chrome className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 mr-2 sm:mr-3" />
-                {isLoading ? 'Connecting...' : 'Sign up with Google'}
-              </Button>
+              </form>
             </TabsContent>
-          </Tabs>
-        </div>
 
-        <div className="text-center px-6 sm:px-8 py-4 sm:py-6 border-t border-coyote mt-8">
-          {context === 'checkout' && (
-            <div className="mb-4">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                className="w-full sm:w-auto"
-              >
-                I'm Just Browsing
-              </Button>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-coyote/30"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-creme px-2 text-coyote">Or continue with</span>
+              </div>
             </div>
-          )}
-          <p className="font-sans text-sm sm:text-base lg:text-lg text-coyote leading-relaxed">
-            By continuing, you agree to our Terms of Service and confirm you are of legal smoking age.
-          </p>
+
+            <Button
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              className="w-full bg-white border-coyote/30 hover:bg-gray-50 gap-2"
+              disabled={isLoading}
+            >
+              <GoogleLogo />
+              Continue with Google
+            </Button>
+          </Tabs>
         </div>
       </DialogContent>
     </Dialog>

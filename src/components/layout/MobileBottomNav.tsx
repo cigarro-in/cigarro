@@ -78,7 +78,7 @@ export const MobileBottomNav = () => {
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-background border-t border-border">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[9999] mobile-bottom-nav">
         <div className="flex items-center justify-around h-16">
           {navItems.map((item, index) => {
             const Icon = item.icon as any;
@@ -101,7 +101,14 @@ export const MobileBottomNav = () => {
               <Link
                 key={index}
                 to={item.path}
-                onClick={(item as any).onClick}
+                onClick={(e) => {
+                  if (active) {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  } else if ((item as any).onClick) {
+                    (item as any).onClick(e);
+                  }
+                }}
                 className={`flex flex-col items-center justify-center flex-1 h-full relative ${active ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 <div

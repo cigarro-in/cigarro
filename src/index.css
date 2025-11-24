@@ -707,6 +707,13 @@ html {
   border: 1px solid rgba(67, 60, 53, 0.1);
 }
 
+/* Bottom Navigation - Solid Background */
+.mobile-bottom-nav {
+  background-color: var(--color-creme);
+  border-top: 1px solid var(--color-coyote);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Component-specific styles that can't be easily converted to utilities */
 .submenu {
   position: absolute;
