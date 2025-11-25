@@ -19,6 +19,9 @@ const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ de
 
 // User
 const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const ProfileSettingsPage = lazy(() => import('../pages/user/ProfileSettingsPage').then(m => ({ default: m.ProfileSettingsPage })));
+const AddressesPage = lazy(() => import('../pages/user/AddressesPage').then(m => ({ default: m.AddressesPage })));
+const ReviewsPage = lazy(() => import('../pages/user/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
 const WalletPage = lazy(() => import('../pages/wallet/WalletPage').then(m => ({ default: m.WalletPage })));
 const WishlistPage = lazy(() => import('../pages/user/WishlistPage').then(m => ({ default: m.WishlistPage })));
 const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
@@ -80,6 +83,9 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       
       {/* User */}
       <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+      <Route path={ROUTES.PROFILE_SETTINGS} element={<ProfileSettingsPage />} />
+      <Route path={ROUTES.ADDRESSES} element={<AddressesPage />} />
+      <Route path={ROUTES.REVIEWS} element={<ReviewsPage />} />
       <Route path={ROUTES.WALLET} element={<WalletPage />} />
       <Route path={ROUTES.WISHLIST} element={<WishlistPage />} />
       <Route path={ROUTES.REFERRALS} element={<ReferralPage />} />

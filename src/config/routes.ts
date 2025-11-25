@@ -20,6 +20,9 @@ export const ROUTES = {
   
   // User
   PROFILE: '/profile',
+  PROFILE_SETTINGS: '/profile/settings',
+  ADDRESSES: '/addresses',
+  REVIEWS: '/reviews',
   WALLET: '/wallet',
   WISHLIST: '/wishlist',
   REFERRALS: '/referrals',

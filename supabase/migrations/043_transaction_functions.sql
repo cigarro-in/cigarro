@@ -599,16 +599,7 @@ DECLARE
     v_referred_balance DECIMAL(12,2);
     v_referrer_txn_id UUID;
     v_referred_txn_id UUID;
-    v_referrer_name TEXT;
-    v_referred_name TEXT;
 BEGIN
-    -- Get user names
-    SELECT COALESCE(name, email) INTO v_referrer_name
-    FROM auth.users WHERE id = p_referrer_id;
-    
-    SELECT COALESCE(name, email) INTO v_referred_name
-    FROM auth.users WHERE id = p_referred_id;
-    
     -- Get current balances
     v_referrer_balance := get_wallet_balance(p_referrer_id);
     v_referred_balance := get_wallet_balance(p_referred_id);
@@ -631,7 +622,7 @@ BEGIN
         'completed',
         'system',
         'REFBONUS' || FLOOR(RANDOM() * 100000000)::TEXT,
-        'Referral bonus for referring ' || v_referred_name,
+        'Referral bonus',
         p_order_id,
         p_referral_id,
         p_referred_id,
@@ -659,7 +650,7 @@ BEGIN
         'completed',
         'system',
         'REFBONUS' || FLOOR(RANDOM() * 100000000)::TEXT,
-        'Welcome bonus for joining via referral',
+        'Referral welcome bonus',
         p_order_id,
         p_referral_id,
         p_referrer_id,

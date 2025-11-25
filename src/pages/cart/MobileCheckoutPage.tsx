@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, MapPin, Smartphone, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode } from 'lucide-react';
+import { Tag, MapPin, Smartphone, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode, Gift, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -177,6 +177,88 @@ export function MobileCheckoutPage() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  // Referral state (Late Attachment)
+  const [referralCode, setReferralCode] = useState('');
+  const [isReferralEligible, setIsReferralEligible] = useState(false);
+  const [isApplyingReferral, setIsApplyingReferral] = useState(false);
+  const [showReferralInput, setShowReferralInput] = useState(false);
+  const [referralApplied, setReferralApplied] = useState(false);
+
+  // Check referral eligibility on mount
+  useEffect(() => {
+    const checkEligibility = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('referrals')
+          .select('referred_by_user_id, first_order_completed')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+           console.error('Error checking referral status:', error);
+           return;
+        }
+        
+        // Eligible if record exists but no referrer and no first order
+        if (data) {
+          // If they already have a referrer, maybe we should show that?
+          // For now, only eligible if they DON'T have one.
+          setIsReferralEligible(!data.referred_by_user_id && !data.first_order_completed);
+          if (data.referred_by_user_id) {
+            // Optionally set referralApplied to true if we want to show it for existing users
+            // setReferralApplied(true); 
+          }
+        } else {
+           // If no referral record found, they are eligible (will be created on attach)
+           setIsReferralEligible(true); 
+        }
+      } catch (err) {
+        console.error('Referral check error:', err);
+      }
+    };
+    
+    checkEligibility();
+  }, [user]);
+
+  const handleApplyReferral = async () => {
+    if (!referralCode.trim()) {
+      toast.error('Please enter a referral code');
+      return;
+    }
+    
+    setIsApplyingReferral(true);
+    try {
+      const { data, error } = await supabase.rpc('attach_referral_code_late', {
+        p_user_id: user!.id,
+        p_referral_code: referralCode.trim()
+      });
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success('Referral code applied successfully!');
+        setReferralApplied(true);
+        setShowReferralInput(false);
+        setReferralCode('');
+      } else {
+        if (data.error === 'already_has_referrer_or_first_order') {
+          toast.error('Not eligible for referral code');
+          setIsReferralEligible(false);
+        } else if (data.error === 'invalid_or_self') {
+          toast.error('Invalid referral code');
+        } else {
+          toast.error('Failed to apply referral code');
+        }
+      }
+    } catch (error) {
+      console.error('Error applying referral:', error);
+      toast.error('Failed to apply referral code');
+    } finally {
+      setIsApplyingReferral(false);
+    }
+  };
 
   // Lucky discount - use original discount for retry orders
   const [randomDiscount] = useState(() => {
@@ -939,6 +1021,55 @@ export function MobileCheckoutPage() {
                 </div>
               )}
             </div>
+
+            {/* Referral Code Section - Late Attachment */}
+            {(isReferralEligible || referralApplied) && (
+              <div className="mb-4 pt-3 border-t border-dashed border-border/40">
+                {referralApplied ? (
+                  <div className="flex items-center gap-2 text-xs text-green-600 font-medium animate-in fade-in duration-300">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Referral code activated</span>
+                  </div>
+                ) : !showReferralInput ? (
+                  <button 
+                    onClick={() => setShowReferralInput(true)}
+                    className="text-sm text-accent hover:text-accent-dark font-medium flex items-center gap-2 transition-colors w-full"
+                  >
+                    <Gift className="w-4 h-4" />
+                    Have a referral code?
+                  </button>
+                ) : (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="REFERRAL CODE"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        className="flex-1 uppercase h-9 placeholder:text-xs"
+                        maxLength={10}
+                      />
+                      <Button 
+                        onClick={handleApplyReferral} 
+                        variant="secondary" 
+                        size="sm"
+                        disabled={isApplyingReferral || !referralCode.trim()}
+                        className="min-w-[70px] h-9 text-xs uppercase font-semibold tracking-wider"
+                      >
+                        {isApplyingReferral ? '...' : 'Apply'}
+                      </Button>
+                    </div>
+                    <div className="flex justify-end">
+                       <button 
+                         onClick={() => setShowReferralInput(false)}
+                         className="text-[10px] text-muted-foreground hover:text-foreground"
+                       >
+                         Cancel
+                       </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <OrderSummary
               items={items}

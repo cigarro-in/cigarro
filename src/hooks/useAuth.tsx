@@ -31,6 +31,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, []);
 
+  const refreshUserData = async (authUser: any) => {
+    try {
+      // Get user profile from profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+        
+      if (profileError) {
+        // If profile doesn't exist, create a basic user object from session
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+          isAdmin: authUser.user_metadata?.isAdmin || false
+        });
+      } else if (profile) {
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          isAdmin: profile.is_admin
+        });
+      }
+    } catch (error) {
+      logger.error('User data refresh error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const checkSession = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -38,36 +70,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       
       if (session?.user) {
-        // Get user profile from profiles table
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-          
-        if (profileError) {
-          logger.warn('Profile fetch error:', profileError);
-          // If profile doesn't exist, create a basic user object from session
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-            isAdmin: session.user.user_metadata?.isAdmin || false
-          });
-        } else if (profile) {
-          setUser({
-            id: profile.id,
-            email: profile.email,
-            name: profile.name,
-            isAdmin: profile.is_admin
-          });
-        }
+        await refreshUserData(session.user);
+      } else {
+        setIsLoading(false);
       }
     } catch (error) {
       // Log error securely without exposing sensitive information
       logger.error('Session check error:', error);
-    } finally {
       setIsLoading(false);
+    } finally {
       setIsInitialized(true);
     }
   };
@@ -133,20 +144,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const payload = {
         email,
         password,
         options: {
           data: {
             name,
-            isAdmin: false, // Always set to false - admin accounts cannot be created through signup
+            isAdmin: false,
           }
         }
-      });
+      };
+
+      const { data, error } = await supabase.auth.signUp(payload);
 
       if (error) throw error;
 
-      if (data.user) {
+      if (data.user && data.session) {
         // The profile will be created automatically by the trigger
         // Wait a moment for the trigger to complete, then get the profile
         setTimeout(async () => {
@@ -158,7 +171,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
           let newUser: User;
           if (profileError) {
-            logger.warn('Profile fetch error after signup:', profileError);
             // Use the data we have from signup
             newUser = {
               id: data.user!.id,
@@ -183,7 +195,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const shouldTransfer = await shouldTransferGuestData(newUser.id);
             if (shouldTransfer) {
-              logger.info('Transferring guest data to new user account');
               await transferGuestDataToUser(newUser.id);
             }
           } catch (error) {

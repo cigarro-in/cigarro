@@ -247,157 +247,220 @@ export function AuthDialog({ open, onOpenChange, onAuthSuccess, context = 'gener
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-creme border border-coyote rounded-lg max-w-md p-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle className="font-serif font-normal text-3xl text-center text-dark tracking-tight">
-            {context === 'checkout' ? 'Complete Your Order' : 'Welcome Back'}
-          </DialogTitle>
-          <DialogDescription className="font-sans text-center text-coyote mt-2">
-            Sign in to access your account
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="bg-creme border-none rounded-3xl max-w-md p-0 overflow-hidden shadow-2xl">
+        {/* Ambient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-coyote/5 pointer-events-none" />
+        
+        <div className="relative">
+          {/* Header */}
+          <DialogHeader className="px-8 pt-10 pb-6 text-center">
+            <DialogTitle className="font-serif text-4xl text-dark mb-2 tracking-tight">
+              {context === 'checkout' ? 'Complete Order' : 'Welcome'}
+            </DialogTitle>
+            <DialogDescription className="font-sans text-coyote/80 text-sm">
+              {activeTab === 'signin' ? 'Sign in to your sanctuary' : 'Begin your journey'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="px-6 pb-6">
-          <Tabs defaultValue="signin" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-creme-light border border-coyote/20 rounded-lg h-12 mb-6">
-              <TabsTrigger 
-                value="signin" 
-                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light transition-all duration-200"
-              >
-                Sign In
-              </TabsTrigger>
-              <TabsTrigger 
-                value="signup" 
-                className="font-sans text-sm font-medium text-dark data-[state=active]:bg-dark data-[state=active]:text-creme-light transition-all duration-200"
-              >
-                Sign Up
-              </TabsTrigger>
-            </TabsList>
+          <div className="px-8 pb-8">
+            {/* Custom Segmented Toggle */}
+            <div className="relative bg-white/30 backdrop-blur-sm rounded-full p-1 mb-8">
+              <motion.div
+                className="absolute top-1 bottom-1 bg-white rounded-full shadow-md"
+                initial={false}
+                animate={{
+                  left: activeTab === 'signin' ? '4px' : '50%',
+                  right: activeTab === 'signin' ? '50%' : '4px',
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              />
+              <div className="relative grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('signin')}
+                  className={`relative z-10 py-3 text-sm font-medium transition-colors duration-200 ${
+                    activeTab === 'signin' ? 'text-dark' : 'text-coyote hover:text-dark'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('signup')}
+                  className={`relative z-10 py-3 text-sm font-medium transition-colors duration-200 ${
+                    activeTab === 'signup' ? 'text-dark' : 'text-coyote hover:text-dark'
+                  }`}
+                >
+                  Sign Up
+                </button>
+              </div>
+            </div>
 
-            <TabsContent value="signin" className="space-y-4">
-              <form onSubmit={handleSignIn} className="space-y-4">
+            {/* Sign In Form */}
+            {activeTab === 'signin' && (
+              <motion.form
+                key="signin"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                onSubmit={handleSignIn}
+                className="space-y-5"
+              >
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email Address</Label>
+                  <Label htmlFor="signin-email" className="text-dark/80 text-sm font-medium">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote/60" />
                     <Input
                       id="signin-email"
                       type="email"
-                      placeholder="name@example.com"
+                      placeholder="you@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      className="pl-10 bg-white border-coyote/30"
+                      className="pl-11 h-12 bg-white/50 backdrop-blur-sm border-white/60 rounded-xl font-sans text-dark placeholder:text-coyote/50 focus:bg-white focus:border-canyon/50 focus:ring-2 focus:ring-canyon/20 transition-all"
                       required
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
+                  <Label htmlFor="signin-password" className="text-dark/80 text-sm font-medium">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote/60" />
                     <Input
                       id="signin-password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder="••••••••"
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      className="pl-10 pr-10 bg-white border-coyote/30"
+                      className="pl-11 pr-11 h-12 bg-white/50 backdrop-blur-sm border-white/60 rounded-xl font-sans text-dark placeholder:text-coyote/50 focus:bg-white focus:border-canyon/50 focus:ring-2 focus:ring-canyon/20 transition-all"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-coyote hover:text-dark"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-coyote/60 hover:text-dark transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-                <Button type="submit" className="w-full bg-dark text-creme-light hover:bg-canyon" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-12 bg-dark hover:bg-canyon text-creme rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 mt-6"
+                >
                   {isLoading ? 'Signing In...' : 'Sign In'}
                 </Button>
-              </form>
-            </TabsContent>
+              </motion.form>
+            )}
 
-            <TabsContent value="signup" className="space-y-4">
-              <form onSubmit={handleSignUp} className="space-y-4">
+            {/* Sign Up Form */}
+            {activeTab === 'signup' && (
+              <motion.form
+                key="signup"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                onSubmit={handleSignUp}
+                className="space-y-5"
+              >
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
+                  <Label htmlFor="signup-name" className="text-dark/80 text-sm font-medium">Full Name</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote/60" />
                     <Input
                       id="signup-name"
                       placeholder="John Doe"
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="pl-10 bg-white border-coyote/30"
+                      className="pl-11 h-12 bg-white/50 backdrop-blur-sm border-white/60 rounded-xl font-sans text-dark placeholder:text-coyote/50 focus:bg-white focus:border-canyon/50 focus:ring-2 focus:ring-canyon/20 transition-all"
                       required
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email Address</Label>
+                  <Label htmlFor="signup-email" className="text-dark/80 text-sm font-medium">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote/60" />
                     <Input
                       id="signup-email"
                       type="email"
-                      placeholder="name@example.com"
+                      placeholder="you@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      className="pl-10 bg-white border-coyote/30"
+                      className="pl-11 h-12 bg-white/50 backdrop-blur-sm border-white/60 rounded-xl font-sans text-dark placeholder:text-coyote/50 focus:bg-white focus:border-canyon/50 focus:ring-2 focus:ring-canyon/20 transition-all"
                       required
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password" className="text-dark/80 text-sm font-medium">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote" />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-coyote/60" />
                     <Input
                       id="signup-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Min 6 characters"
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      className="pl-10 pr-10 bg-white border-coyote/30"
+                      className="pl-11 pr-11 h-12 bg-white/50 backdrop-blur-sm border-white/60 rounded-xl font-sans text-dark placeholder:text-coyote/50 focus:bg-white focus:border-canyon/50 focus:ring-2 focus:ring-canyon/20 transition-all"
                       required
                       minLength={6}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-coyote hover:text-dark"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-coyote/60 hover:text-dark transition-colors"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
-                <Button type="submit" className="w-full bg-dark text-creme-light hover:bg-canyon" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-12 bg-dark hover:bg-canyon text-creme rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 mt-6"
+                >
                   {isLoading ? 'Creating Account...' : 'Create Account'}
                 </Button>
-              </form>
-            </TabsContent>
+              </motion.form>
+            )}
 
-            <div className="relative my-6">
+            {/* Divider */}
+            <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-coyote/30"></div>
+                <div className="w-full border-t border-coyote/20"></div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-creme px-2 text-coyote">Or continue with</span>
+              <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                <span className="bg-creme px-3 text-coyote/60 font-medium">Or</span>
               </div>
             </div>
 
+            {/* Google Sign In */}
             <Button
+              type="button"
               variant="outline"
               onClick={handleGoogleSignIn}
-              className="w-full bg-white border-coyote/30 hover:bg-gray-50 gap-2"
               disabled={isLoading}
+              className="w-full h-12 bg-white hover:bg-white/80 border-coyote/20 text-dark rounded-full font-medium shadow-sm hover:shadow-md transition-all duration-300 gap-3"
             >
               <GoogleLogo />
-              Continue with Google
+              <span>Continue with Google</span>
             </Button>
-          </Tabs>
+          </div>
+
+          {/* Footer */}
+          {context === 'checkout' && (
+            <div className="px-8 pb-6 text-center">
+              <button
+                onClick={() => onOpenChange(false)}
+                className="text-sm text-coyote hover:text-dark transition-colors underline underline-offset-2"
+              >
+                Continue browsing
+              </button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

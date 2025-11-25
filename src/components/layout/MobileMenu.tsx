@@ -19,7 +19,8 @@ import {
   Star,
   X,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
 interface MobileMenuProps {
@@ -46,6 +47,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
       items: user ? [
         { icon: Package, label: 'My Orders', path: '/orders' },
         { icon: Heart, label: 'My Wishlist', path: '/wishlist' },
+        { icon: Sparkles, label: 'Refer & Earn', path: '/referrals' },
         ...(user.isAdmin ? [{ icon: User, label: 'Admin Dashboard', path: '/admin' }] : []),
       ] : [
         { icon: User, label: 'Sign In / Register', path: '/auth', action: 'auth' },
