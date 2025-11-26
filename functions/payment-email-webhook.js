@@ -606,7 +606,8 @@ async function parsePaymentEmail(email, env) {
     upiReference,
     senderVPA: 'N/A',
     receiverVPA: 'N/A',
-    timestamp: new Date()
+    timestamp: new Date(),
+    rawBody: body // Include raw body for audit trail
   };
 }
 
@@ -649,7 +650,8 @@ async function updateOrderStatus(env, orderId, status, paymentDetails) {
       p_bank_name: paymentDetails.bankName || null,
       p_upi_reference: paymentDetails.upiReference || null,
       p_verification_method: 'email_parse',
-      p_email_verification_id: null
+      p_email_verification_id: null,
+      p_raw_message: paymentDetails.rawBody || null
     };
     rpcEndpoint = 'verify_order_payment';
     console.log('🛒 Detected order payment transaction');

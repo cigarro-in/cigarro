@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Check, Smartphone, RefreshCw, Wallet, ArrowRight, X, ShoppingBag } from 'lucide-react';
+import { Check, Smartphone, RefreshCw, Wallet, ArrowRight, X, ShoppingBag, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase/client';
@@ -39,9 +39,12 @@ export function TransactionProcessingPage() {
   const [qrCode, setQrCode] = useState<string>('');
   const [showQR, setShowQR] = useState(false);
   const [verifiedData, setVerifiedData] = useState<any>(null);
+  const [isTimeout, setIsTimeout] = useState(false);
   
   // Polling ref to clear interval on unmount
   const pollingRef = useRef<{ interval: NodeJS.Timeout | null }>({ interval: null });
+  // Timeout ref
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!transactionData || !user) {
@@ -50,8 +53,18 @@ export function TransactionProcessingPage() {
     }
 
     initializeTransaction();
+    
+    // Set global timeout (5 minutes = 300,000 ms)
+    timeoutRef.current = setTimeout(() => {
+        if (status === 'processing') {
+            setIsTimeout(true);
+            if (pollingRef.current.interval) clearInterval(pollingRef.current.interval);
+        }
+    }, 300000);
+
     return () => {
       if (pollingRef.current.interval) clearInterval(pollingRef.current.interval);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -83,10 +96,12 @@ export function TransactionProcessingPage() {
       // --- EXTERNAL PAYMENTS (UPI/QR) ---
       
       // ALWAYS Generate QR Code for non-wallet payments
-      const upiString = transactionData.upiUrl || 
-        `upi://pay?pa=payments@cigarro.in&pn=Cigarro&am=${transactionData.amount}&cu=INR&tn=Order-${transactionData.transactionId}`;
-      const qrDataUrl = await QRCode.toDataURL(upiString);
-      setQrCode(qrDataUrl);
+      // Use the UPI URL provided by backend (which uses system_settings UPI ID)
+      const upiString = transactionData.upiUrl;
+      if (upiString) {
+        const qrDataUrl = await QRCode.toDataURL(upiString);
+        setQrCode(qrDataUrl);
+      }
       
       if (transactionData.paymentMethod === 'qr') setShowQR(true);
 
@@ -111,24 +126,33 @@ export function TransactionProcessingPage() {
         let isSuccess = false;
         let data = null;
 
-        if (transactionData.type === 'wallet_load') {
-            const { data: tx } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('internal_transaction_id', transactionData.transactionId)
-                .eq('user_id', user!.id)
+        // console.log('Polling status for:', transactionData);
+
+        // For all orders (including wallet loads), we MUST use the Order UUID (orderId) as the single source of truth.
+        // The transactionId might be an external string (TXN...) which doesn't match the DB UUID.
+        const targetId = transactionData.orderId;
+        
+        if (targetId) {
+             const { data: order } = await supabase
+                .from('orders')
+                .select('*, order_items(*)')
+                .eq('id', targetId)
                 .single();
-            if (tx && tx.status === 'completed') {
-                isSuccess = true;
-                data = tx;
-            }
+             
+             if (order && (order.payment_verified === 'YES' || order.payment_confirmed === true)) {
+                 isSuccess = true;
+                 data = order;
+             }
         } else {
+            // Fallback ONLY if orderId is missing (legacy/edge case)
+            // Try to find order by transaction_id column directly
             const { data: order } = await supabase
                 .from('orders')
                 .select('*, order_items(*)')
                 .eq('transaction_id', transactionData.transactionId)
                 .single();
-            if (order && order.payment_verified === 'YES') {
+
+            if (order && (order.payment_verified === 'YES' || order.payment_confirmed === true)) {
                 isSuccess = true;
                 data = order;
             }
@@ -140,7 +164,7 @@ export function TransactionProcessingPage() {
             await finalizeSuccess();
         }
     } catch (error) {
-        console.error('Polling error', error);
+        console.error('Polling check failed (retrying...):', error);
     }
   };
 
@@ -250,6 +274,50 @@ export function TransactionProcessingPage() {
                 </div>
             )}
         </div>
+      </div>
+    );
+  }
+
+  if (isTimeout) {
+    return (
+      <div className="fixed inset-0 z-50 min-h-screen bg-creme flex flex-col items-center justify-center p-6">
+        <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center max-w-sm w-full"
+        >
+            <div className="w-24 h-24 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Clock className="w-12 h-12" strokeWidth={2.5} />
+            </div>
+            
+            <h2 className="text-3xl font-serif text-dark mb-2">Verification Timeout</h2>
+            <p className="text-coyote mb-8 text-sm leading-relaxed px-4">
+                We haven't received the payment confirmation yet. It might just be delayed.
+            </p>
+
+            <div className="space-y-3">
+                <Button 
+                    onClick={() => window.location.reload()}
+                    className="w-full bg-dark text-creme-light hover:bg-canyon h-14 rounded-xl shadow-lg transition-transform active:scale-95"
+                >
+                    <RefreshCw className="w-5 h-5 mr-2" /> Check Status Again
+                </Button>
+                <Button 
+                    variant="outline"
+                    onClick={() => window.open('https://wa.me/919000000000', '_blank')}
+                    className="w-full border-coyote text-coyote hover:text-dark hover:border-dark h-14 rounded-xl"
+                >
+                    Contact Support
+                </Button>
+                <Button 
+                    variant="ghost"
+                    onClick={() => navigate('/orders')}
+                    className="w-full text-coyote hover:text-dark"
+                >
+                    Check My Orders
+                </Button>
+            </div>
+        </motion.div>
       </div>
     );
   }

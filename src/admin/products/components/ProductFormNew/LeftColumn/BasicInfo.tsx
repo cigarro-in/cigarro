@@ -38,7 +38,7 @@ export function BasicInfo({ formData, onChange }: BasicInfoProps) {
         {/* Title */}
         <div className="space-y-2">
           <Label className="text-[var(--color-dark)] font-medium">
-            Title <span className="text-[var(--color-canyon)]">*</span>
+            Title <span className="text-red-500">*</span>
           </Label>
           <Input
             value={formData.name}

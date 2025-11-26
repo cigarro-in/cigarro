@@ -1,54 +1,23 @@
 import { useState, useEffect } from 'react';
 import {
-  Plus,
-  Edit,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
-  Eye,
-  EyeOff,
   Package,
   Save,
   X,
-  AlertCircle,
-  CheckCircle,
   Search,
-  Filter,
-  Monitor
+  CheckCircle,
+  Monitor,
+  Loader2
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { Textarea } from '../../../components/ui/textarea';
-import { Switch } from '../../../components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
-import { Alert, AlertDescription } from '../../../components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../components/ui/dropdown-menu';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import { Checkbox } from '../../../components/ui/checkbox';
+import { Switch } from '../../../components/ui/switch';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
 import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  price: number;
-  gallery_images?: string[];
-  is_active: boolean;
-  is_showcase: boolean;
-  showcase_order?: number | null;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-}
 
 interface ProductShowcaseManagerProps {
   open: boolean;
@@ -56,19 +25,30 @@ interface ProductShowcaseManagerProps {
   onUpdate: () => void;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  gallery_images?: string[];
+  is_active: boolean;
+}
+
 export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: ProductShowcaseManagerProps) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Collection State
+  const [collectionId, setCollectionId] = useState<string | null>(null);
   const [sectionConfig, setSectionConfig] = useState({
     title: 'Discover Our Most Celebrated Collections',
     background_image: '' as string | null,
     is_enabled: true
   });
+  
+  // Products State
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [collectionProducts, setCollectionProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -79,288 +59,230 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [productsResult, categoriesResult, configResult] = await Promise.all([
-        supabase
-          .from('products')
-          .select('id, name, slug, price, gallery_images, is_active, is_showcase, showcase_order')
-          .order('name'),
-        supabase
-          .from('categories')
-          .select('id, name, slug')
-          .order('name'),
-        supabase
-          .from('section_configurations')
-          .select('title, background_image, is_enabled')
-          .eq('section_name', 'product_showcase')
-          .single()
-      ]);
+      // 1. Load Showcase Collection
+      const { data: collectionData, error: collectionError } = await supabase
+        .from('collections')
+        .select('id, title, image_url')
+        .eq('slug', 'product-showcase')
+        .single();
 
-      if (productsResult.error) throw productsResult.error;
-      if (categoriesResult.error) throw categoriesResult.error;
+      if (collectionError && collectionError.code !== 'PGRST116') throw collectionError;
 
-      setProducts(productsResult.data || []);
-      setCategories(categoriesResult.data || []);
-      
-      // Load section configuration
-      if (configResult.data) {
-        setSectionConfig({
-          title: configResult.data.title || 'Discover Our Most Celebrated Collections',
-          background_image: configResult.data.background_image || '',
-          is_enabled: configResult.data.is_enabled !== false
-        });
-      } else if (configResult.error && configResult.error.code !== 'PGRST116') {
-        console.error('Error loading section config:', configResult.error);
+      // If collection doesn't exist, we'll create it on save or handle it gracefully
+      if (collectionData) {
+        setCollectionId(collectionData.id);
+        setSectionConfig(prev => ({
+          ...prev,
+          title: collectionData.title,
+          background_image: collectionData.image_url
+        }));
+
+        // 2. Load Products in this Collection
+        const { data: productLinks, error: linksError } = await supabase
+          .from('collection_products')
+          .select('product_id, sort_order, products(id, name, price, gallery_images, is_active)')
+          .eq('collection_id', collectionData.id)
+          .order('sort_order');
+
+        if (linksError) throw linksError;
+
+        const linkedProducts = (productLinks?.map(link => link.products) || [])
+          .filter((p: any) => !!p && !Array.isArray(p))
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            gallery_images: p.gallery_images,
+            is_active: p.is_active
+          }));
+        
+        setCollectionProducts(linkedProducts);
       }
+
+      // 3. Load All Products for Selection
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, price, gallery_images, is_active')
+        .order('name');
+
+      if (productsError) throw productsError;
+      setAllProducts(productsData || []);
+
+      // 4. Load Section Config (Legacy/Overlay settings if needed)
+      const { data: configData } = await supabase
+        .from('section_configurations')
+        .select('is_enabled')
+        .eq('section_name', 'product_showcase')
+        .single();
+      
+      if (configData) {
+        setSectionConfig(prev => ({ ...prev, is_enabled: configData.is_enabled }));
+      }
+
     } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load data');
+      console.error('Error loading showcase data:', error);
+      toast.error('Failed to load showcase data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || 
-      (product as any).category?.id === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && product.is_active) ||
-      (statusFilter === 'inactive' && !product.is_active);
-    
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
-
-  const handleToggleShowcase = async (productId: string, isShowcase: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ 
-          is_showcase: isShowcase,
-          showcase_order: isShowcase ? (products.filter(p => p.is_showcase).length + 1) : null
-        })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, is_showcase: isShowcase, showcase_order: isShowcase ? (products.filter(p => p.is_showcase).length + 1) : null } : p
-      ));
-
-      toast.success(`Product ${isShowcase ? 'added to' : 'removed from'} showcase`);
-      onUpdate();
-    } catch (error) {
-      console.error('Error updating product:', error);
-      toast.error('Failed to update product');
-    }
-  };
-
-
-  const handleReorderShowcase = async (productId: string, direction: 'up' | 'down') => {
-    const showcaseProducts = products.filter(p => p.is_showcase).sort((a, b) => (a.showcase_order || 0) - (b.showcase_order || 0));
-    const currentIndex = showcaseProducts.findIndex(p => p.id === productId);
-    
-    if (currentIndex === -1) return;
-    
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= showcaseProducts.length) return;
-
-    // Swap the products
-    const reorderedProducts = [...showcaseProducts];
-    [reorderedProducts[currentIndex], reorderedProducts[newIndex]] = [reorderedProducts[newIndex], reorderedProducts[currentIndex]];
-
-    // Update the showcase_order for all affected products
-    const updates = reorderedProducts.map((product, index) => ({
-      id: product.id,
-      showcase_order: index + 1
-    }));
-
-    try {
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('products')
-          .update({ showcase_order: update.showcase_order })
-          .eq('id', update.id);
-
-        if (error) throw error;
-      }
-
-      setProducts(prev => prev.map(p => {
-        const update = updates.find(u => u.id === p.id);
-        return update ? { ...p, showcase_order: update.showcase_order } : p;
-      }));
-
-      toast.success('Showcase order updated');
-      onUpdate();
-    } catch (error) {
-      console.error('Error reordering showcase:', error);
-      toast.error('Failed to reorder showcase');
-    }
-  };
-
-  const handleSaveSectionConfig = async () => {
+  const handleSave = async () => {
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      let targetCollectionId = collectionId;
+
+      // 1. Create/Update Collection Record
+      const collectionPayload = {
+        title: sectionConfig.title,
+        slug: 'product-showcase', // Fixed slug for homepage usage
+        description: 'Homepage Product Showcase Section',
+        image_url: sectionConfig.background_image,
+        type: 'manual',
+        is_active: true,
+        updated_at: new Date().toISOString()
+      };
+
+      if (targetCollectionId) {
+        const { error } = await supabase
+          .from('collections')
+          .update(collectionPayload)
+          .eq('id', targetCollectionId);
+        if (error) throw error;
+      } else {
+        const { data: newCol, error } = await supabase
+          .from('collections')
+          .insert([{ ...collectionPayload, created_at: new Date().toISOString() }])
+          .select()
+          .single();
+        if (error) throw error;
+        targetCollectionId = newCol.id;
+        setCollectionId(newCol.id);
+      }
+
+      // 2. Update Section Config (Enabled/Disabled state)
+      const { error: configError } = await supabase
         .from('section_configurations')
         .upsert({
-          section_name: 'product_showcase',
-          title: sectionConfig.title,
-          background_image: sectionConfig.background_image,
-          is_enabled: sectionConfig.is_enabled,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'section_name'
-        });
+            section_name: 'product_showcase',
+            is_enabled: sectionConfig.is_enabled,
+            title: sectionConfig.title, // Sync title
+            background_image: sectionConfig.background_image // Sync image
+        }, { onConflict: 'section_name' });
 
-      if (error) throw error;
+      if (configError) throw configError;
 
-      toast.success('Section configuration saved successfully');
+      // 3. Update Product Links
+      // First, remove all existing links for this collection
+      await supabase.from('collection_products').delete().eq('collection_id', targetCollectionId);
+
+      // Then insert new links
+      if (collectionProducts.length > 0) {
+        const links = collectionProducts.map((p, index) => ({
+          collection_id: targetCollectionId,
+          product_id: p.id,
+          sort_order: index + 1,
+          created_at: new Date().toISOString()
+        }));
+        
+        const { error: linksError } = await supabase.from('collection_products').insert(links);
+        if (linksError) throw linksError;
+      }
+
+      toast.success('Showcase updated successfully');
       onUpdate();
+      onOpenChange(false);
+
     } catch (error) {
-      console.error('Error saving section config:', error);
-      toast.error('Failed to save section configuration');
+      console.error('Error saving showcase:', error);
+      toast.error('Failed to save showcase');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const showcaseProducts = products.filter(p => p.is_showcase).sort((a, b) => (a.showcase_order || 0) - (b.showcase_order || 0));
+  const toggleProductSelection = (product: Product) => {
+    if (collectionProducts.find(p => p.id === product.id)) {
+      setCollectionProducts(prev => prev.filter(p => p.id !== product.id));
+    } else {
+      setCollectionProducts(prev => [...prev, product]);
+    }
+  };
+
+  const filteredAllProducts = allProducts.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Monitor className="h-5 w-5" />
             Product Showcase Management
           </DialogTitle>
           <DialogDescription>
-            Manage which products appear in the Product Showcase section on your homepage. Select specific products, reorder them, and configure the section content.
+            Configure the "Celebrated Collections" section on the homepage.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          <Alert>
-            <Package className="h-4 w-4" />
-            <AlertDescription>
-              Manage which products appear in the Product Showcase section on your homepage. You can select specific products and reorder them.
-            </AlertDescription>
-          </Alert>
-
-          {/* Section Content Settings */}
+          {/* Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Section Content</CardTitle>
+              <CardTitle>Section Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="section_title">Section Title</Label>
-                  <Input
-                    id="section_title"
-                    value={sectionConfig.title}
-                    onChange={(e) => setSectionConfig(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter section title"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="section_enabled"
-                    checked={sectionConfig.is_enabled}
-                    onCheckedChange={(checked: boolean) => setSectionConfig(prev => ({ ...prev, is_enabled: checked }))}
-                  />
-                  <Label htmlFor="section_enabled">Enable Section</Label>
-                </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="enabled">Enable Section</Label>
+                <Switch
+                  id="enabled"
+                  checked={sectionConfig.is_enabled}
+                  onCheckedChange={(checked) => setSectionConfig(prev => ({ ...prev, is_enabled: checked }))}
+                />
               </div>
-              <div>
-                <Label>Featured Image</Label>
-                <div className="space-y-2">
-                  <ImageUpload
+              
+              <div className="space-y-2">
+                <Label>Section Title</Label>
+                <Input
+                  value={sectionConfig.title}
+                  onChange={(e) => setSectionConfig(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Discover Our Most Celebrated Collections"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Featured Image (Left Column)</Label>
+                <ImageUpload
                     imageUrl={sectionConfig.background_image}
-                    onImageUrlChange={(url: string | null) => {
-                      setSectionConfig(prev => ({ ...prev, background_image: url || '' }));
-                    }}
+                    onImageUrlChange={(url) => setSectionConfig(prev => ({ ...prev, background_image: url }))}
                     showSelector={true}
-                    title="Select Featured Image"
-                    description="Choose a featured image for the first column of the product showcase section"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This image will be displayed in the first column of the showcase section. Recommended size: 800x1000px
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handleSaveSectionConfig}
-                  disabled={isSaving}
-                  className="flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  {isSaving ? 'Saving...' : 'Save Section Settings'}
-                </Button>
+                    title="Showcase Image"
+                />
               </div>
             </CardContent>
           </Card>
 
-          {/* Current Showcase Products */}
+          {/* Products */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Current Showcase Products ({showcaseProducts.length})</span>
-                <Badge variant="outline">
-                  {showcaseProducts.length} Products
-                </Badge>
+              <CardTitle className="flex justify-between items-center">
+                <span>Selected Products ({collectionProducts.length})</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {showcaseProducts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No products in showcase yet</p>
-                  <p className="text-sm">Select products below to add them to the showcase</p>
+              {collectionProducts.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
+                  No products selected. Choose products below.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {showcaseProducts.map((product, index) => (
-                    <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-muted rounded-lg overflow-hidden">
-                          <img
-                            src={product.gallery_images && product.gallery_images.length > 0 ? product.gallery_images[0] : '/placeholder-product.jpg'}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">₹{product.price.toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReorderShowcase(product.id, 'up')}
-                          disabled={index === 0}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReorderShowcase(product.id, 'down')}
-                          disabled={index === showcaseProducts.length - 1}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleShowcase(product.id, false)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {collectionProducts.map((p, idx) => (
+                    <div key={p.id} className="flex items-center justify-between p-2 border rounded bg-muted/20">
+                      <span className="truncate font-medium text-sm">{idx + 1}. {p.name}</span>
+                      <Button size="sm" variant="ghost" onClick={() => toggleProductSelection(p)}>
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -368,123 +290,57 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
             </CardContent>
           </Card>
 
-          {/* Product Selection */}
+          {/* Product Selector */}
           <Card>
             <CardHeader>
-              <CardTitle>Select Products for Showcase</CardTitle>
+              <CardTitle>Add Products</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      placeholder="Search products..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+               <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products to add..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
                 </div>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active Only</SelectItem>
-                    <SelectItem value="inactive">Inactive Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-
-              {/* Products Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {isLoading ? (
-                  <div className="col-span-full text-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="col-span-full text-center py-8 text-muted-foreground">
-                    No products found
-                  </div>
-                ) : (
-                  filteredProducts.map(product => (
-                    <div key={product.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-16 h-16 bg-muted rounded overflow-hidden flex-shrink-0">
-                          <img
-                            src={product.gallery_images && product.gallery_images.length > 0 ? product.gallery_images[0] : '/placeholder-product.jpg'}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
+                
+                <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
+                  {isLoading ? (
+                    <div className="flex justify-center py-4"><Loader2 className="animate-spin" /></div>
+                  ) : filteredAllProducts.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">No products found</div>
+                  ) : (
+                    filteredAllProducts.map(product => {
+                      const isSelected = collectionProducts.some(p => p.id === product.id);
+                      return (
+                        <div key={product.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded cursor-pointer" onClick={() => !isSelected && toggleProductSelection(product)}>
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <div className="h-8 w-8 bg-muted rounded overflow-hidden flex-shrink-0">
+                                    {product.gallery_images?.[0] && <img src={product.gallery_images[0]} className="h-full w-full object-cover" />}
+                                </div>
+                                <div className="truncate text-sm">
+                                    <div className="font-medium truncate">{product.name}</div>
+                                    <div className="text-xs text-muted-foreground">₹{product.price}</div>
+                                </div>
+                            </div>
+                            <Button size="sm" variant={isSelected ? "secondary" : "outline"} disabled={isSelected}>
+                                {isSelected ? <CheckCircle className="h-4 w-4 text-green-600" /> : "Add"}
+                            </Button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium truncate">{product.name}</h3>
-                          <p className="text-sm text-muted-foreground">₹{product.price.toLocaleString()}</p>
-                          <Badge variant={product.is_active ? "default" : "secondary"} className="text-xs">
-                            {product.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Switch
-                          checked={product.is_showcase}
-                          onCheckedChange={(checked: boolean) => handleToggleShowcase(product.id, checked)}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleShowcase(product.id, !product.is_showcase)}
-                          className="flex items-center gap-2"
-                        >
-                          {product.is_showcase ? (
-                            <>
-                              <Trash2 className="h-4 w-4" />
-                              Remove
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="h-4 w-4" />
-                              Add
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                      );
+                    })
+                  )}
+                </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-between gap-2">
-            <Button 
-              onClick={handleSaveSectionConfig}
-              disabled={isSaving}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save All Changes'}
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4 mr-2" />
-              Close
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
             </Button>
           </div>
         </div>

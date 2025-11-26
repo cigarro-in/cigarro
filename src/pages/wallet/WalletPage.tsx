@@ -92,23 +92,27 @@ export function WalletPage() {
 
     setIsProcessing(true);
     try {
-      const txnId = `TXN${Date.now().toString().slice(-8)}`;
-
-      // Process wallet load
-      const { data: result, error } = await supabase.rpc('process_wallet_load', {
+      // Create wallet load order using create_order RPC
+      const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
+        p_items: [{
+          product_id: '00000000-0000-0000-0000-000000000001', // Wallet Credit product
+          quantity: 1,
+          custom_amount: amount // Dynamic price
+        }],
+        p_shipping_address: null, // Not needed for wallet loads
+        p_shipping_method: null,
+        p_coupon_code: null,
+        p_lucky_discount: 0,
         p_user_id: user.id,
-        p_amount: amount,
-        p_payment_method: 'upi',
-        p_transaction_id: txnId,
-        p_metadata: {
-          source: 'wallet_page'
-        }
+        p_is_wallet_load: true
       });
 
-      if (error) throw error;
+      if (orderError) throw orderError;
+      if (!orderResult || !orderResult.success) {
+        throw new Error(orderResult?.message || 'Failed to create wallet load order');
+      }
 
-      // Generate UPI URL
-      const upiUrl = `upi://pay?pa=payments@cigarro.in&pn=Cigarro&am=${amount}&cu=INR&tn=Wallet%20Load%20${txnId}`;
+      console.log('✅ Wallet load order created:', orderResult);
 
       setShowLoadDialog(false);
       setLoadAmount('');
@@ -116,13 +120,15 @@ export function WalletPage() {
       // Navigate to unified transaction page
       navigate('/transaction', {
         state: {
-          type: 'wallet_load',
-          transactionId: txnId,
+          type: 'order', // Now it's an order, not wallet_load
+          transactionId: orderResult.transaction_id,
           amount: amount,
+          orderId: orderResult.order_id,
           paymentMethod: 'upi',
-          upiUrl: upiUrl,
+          upiUrl: orderResult.upi_deep_link, // Backend-generated UPI link
           metadata: {
-            source: 'wallet_page'
+            source: 'wallet_page',
+            is_wallet_load: true
           }
         }
       });

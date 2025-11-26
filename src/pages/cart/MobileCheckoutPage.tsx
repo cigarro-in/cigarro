@@ -487,7 +487,8 @@ export function MobileCheckoutPage() {
         id: data.order_id,
         display_order_id: data.display_order_id,
         total: data.total,
-        transaction_id: txnId // Note: transaction_id will be updated by process_order_payment
+        transaction_id: data.transaction_id || txnId, // Use backend-generated transaction ID
+        upi_deep_link: data.upi_deep_link // Backend-generated UPI deep link
       };
 
     } catch (error) {
@@ -667,8 +668,8 @@ export function MobileCheckoutPage() {
       // Trigger webhook
       triggerPaymentWebhook(txnId, order.id, remainingAmount);
       
-      // Generate UPI link
-      const upiUrl = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${remainingAmount}&cu=INR&tn=Order%20${order.display_order_id}%20${txnId}`;
+      // Use backend-provided UPI link (already generated with correct UPI ID from settings)
+      const upiUrl = order.upi_deep_link || `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${remainingAmount}&cu=INR&tn=Order%20${order.display_order_id}%20${txnId}`;
       
       // Open UPI app
       try {
@@ -730,9 +731,15 @@ export function MobileCheckoutPage() {
 
     setIsProcessing(true);
     try {
-      const txnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
+      // Fallback ID generation (in case backend doesn't return it yet)
+      const clientTxnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
       const paymentAmount = amount || Math.max(0, getFinalTotal() - walletAmountToUse);
       const shouldClearCart = !isBuyNow && !isRetryPayment;
+      
+      let currentOrderId = existingTxnId ? undefined : undefined;
+      let finalTxnId = clientTxnId;
+      let finalUpiUrl = '';
+      let orderData: any = null;
 
       console.log('💳 UPI Payment Debug:', {
         isRetryPayment,
@@ -744,9 +751,8 @@ export function MobileCheckoutPage() {
       if (!existingTxnId) {
         // Check if this is a retry for an existing order
         if (isRetryPayment && retryOrder?.orderId) {
-          console.log('🔄 Fetching existing order for UPI retry:', retryOrder.orderId);
-          
-          // Fetch existing order instead of updating (avoids RLS issues)
+           // ... existing retry logic ...
+           // (Abbreviated for clarity - keeping existing retry logic same but capturing ID)
           const { data: existingOrder, error: fetchError } = await supabase
             .from('orders')
             .select('*')
@@ -754,44 +760,65 @@ export function MobileCheckoutPage() {
             .maybeSingle();
             
           if (fetchError || !existingOrder) {
-            console.error('Error fetching retry order or not found:', fetchError);
             // Fallback to new order
-            const order = await saveOrderToDatabase(txnId, 'pending');
+            const order = await saveOrderToDatabase(clientTxnId, 'pending');
             if (!order) {
                toast.error('Failed to create order');
                return;
             }
-            triggerPaymentWebhook(txnId, order.id, paymentAmount);
+            currentOrderId = order.id;
+            orderData = order;
+            // Use backend returned values if available
+            if (order.transaction_id) finalTxnId = order.transaction_id;
+            if (order.upi_deep_link) finalUpiUrl = order.upi_deep_link;
+            
+            // Clear cart immediately after successful order creation
+            if (shouldClearCart) await clearCart();
+            
+            triggerPaymentWebhook(finalTxnId, order.id, paymentAmount);
           } else {
-            console.log('✅ Found existing order to retry:', existingOrder.id);
-            // Trigger webhook for the existing order
-            triggerPaymentWebhook(txnId, existingOrder.id, paymentAmount);
+            currentOrderId = existingOrder.id;
+            // Ensure we use the existing transaction ID if present
+            if (existingOrder.transaction_id) finalTxnId = existingOrder.transaction_id;
+            triggerPaymentWebhook(finalTxnId, existingOrder.id, paymentAmount);
           }
         } else {
           // Create new order
-          const order = await saveOrderToDatabase(txnId, 'pending');
+          const order = await saveOrderToDatabase(clientTxnId, 'pending');
           if (!order) {
             toast.error('Failed to create order');
             return;
           }
+          currentOrderId = order.id;
+          orderData = order;
+          
+          // Use backend returned values if available
+          if (order.transaction_id) finalTxnId = order.transaction_id;
+          if (order.upi_deep_link) finalUpiUrl = order.upi_deep_link;
+          
+          // Clear cart immediately after successful order creation
+          if (shouldClearCart) await clearCart();
+
           // Trigger webhook
-          triggerPaymentWebhook(txnId, order.id, paymentAmount);
+          triggerPaymentWebhook(finalTxnId, order.id, paymentAmount);
         }
       }
 
-      // Generate UPI URL
-      const upiUrl = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${paymentAmount}&cu=INR&tn=Order%20${txnId}`;
+      // Use backend-provided UPI link, fallback to hardcoded if not available
+      if (!finalUpiUrl) {
+        finalUpiUrl = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${paymentAmount}&cu=INR&tn=Order%20${finalTxnId}`;
+      }
 
       // Navigate to unified transaction page
       navigate('/transaction', {
         state: {
           type: 'order',
-          transactionId: txnId,
+          transactionId: finalTxnId,
           amount: paymentAmount,
-          orderId: existingTxnId ? undefined : txnId,
+          orderId: currentOrderId || (existingTxnId ? undefined : finalTxnId), // Use UUID if available
           paymentMethod: 'upi',
-          upiUrl: upiUrl,
-          shouldClearCart,
+          upiUrl: finalUpiUrl,
+          shouldClearCart: false, // Cart already cleared
           metadata: {
             items_count: items.length,
             shipping_cost: getShippingCost(),

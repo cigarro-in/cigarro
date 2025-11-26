@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { Switch } from '../../../components/ui/switch';
 import { Badge } from '../../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { HeroSectionManager } from '../../components/modals/HeroSectionManager';
 import { FeaturedProductsManager } from '../../components/modals/FeaturedProductsManager';
 import { ProductShowcaseManager } from '../../components/modals/ProductShowcaseManager';
@@ -46,6 +47,12 @@ interface HomepageComponent {
   };
 }
 
+interface CollectionOption {
+  id: string;
+  title: string;
+  slug: string;
+}
+
 interface HomepageStats {
   totalSlides: number;
   activeSlides: number;
@@ -63,6 +70,8 @@ export default function HomepageManager() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [collections, setCollections] = useState<CollectionOption[]>([]);
+  const [isCollectionsLoading, setIsCollectionsLoading] = useState(false);
   // Modal states
   const [showHeroManager, setShowHeroManager] = useState(false);
   const [showFeaturedManager, setShowFeaturedManager] = useState(false);
@@ -89,6 +98,18 @@ export default function HomepageManager() {
       if (componentsError) throw componentsError;
       setComponents(componentsData || []);
 
+      // Load available collections for attachable sections
+      setIsCollectionsLoading(true);
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from('collections')
+        .select('id, title, slug')
+        .eq('is_active', true)
+        .order('title');
+
+      if (collectionsError) throw collectionsError;
+      setCollections(collectionsData || []);
+      setIsCollectionsLoading(false);
+
       // Load hero slides stats
       const { data: slidesData, error: slidesError } = await supabase
         .from('hero_slides')
@@ -112,6 +133,42 @@ export default function HomepageManager() {
       toast.error('Failed to load homepage data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAttachCollection = async (componentId: string, collectionId: string | null) => {
+    setIsSaving(true);
+    try {
+      const targetComponent = components.find(c => c.id === componentId);
+      if (!targetComponent) return;
+
+      const newConfig = {
+        ...(targetComponent.config || {}),
+        collection_id: collectionId,
+      };
+
+      const { error } = await supabase
+        .from('homepage_component_config')
+        .update({ 
+          config: newConfig,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', componentId);
+
+      if (error) throw error;
+
+      setComponents(prev =>
+        prev.map(comp =>
+          comp.id === componentId ? { ...comp, config: newConfig } : comp
+        )
+      );
+
+      toast.success('Collection attached successfully');
+    } catch (error) {
+      console.error('Error attaching collection:', error);
+      toast.error('Failed to attach collection');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -321,9 +378,9 @@ export default function HomepageManager() {
           <div className="space-y-3">
             {components.map((component, index) => (
               <div key={component.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
                   {/* Reorder Buttons */}
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 self-start">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -343,21 +400,48 @@ export default function HomepageManager() {
                       <ArrowDown className="h-3 w-3" />
                     </Button>
                   </div>
-                  
-                  {/* Component Info */}
-                  <div className="flex items-center gap-3">
-                    {getComponentIcon(component.component_name)}
-                    <div>
-                      <h3 className="font-medium text-lg">{component.component_name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {getComponentDescription(component.component_name)}
-                      </p>
+
+                  {/* Component Info + Collection Selector */}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-3">
+                      {getComponentIcon(component.component_name)}
+                      <div>
+                        <h3 className="font-medium text-lg">{component.component_name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {getComponentDescription(component.component_name)}
+                        </p>
+                      </div>
                     </div>
+
+                    {(component.component_name === 'FeaturedProducts' || component.component_name === 'ProductShowcase' || component.component_name === 'CategoriesGrid') && (
+                      <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attached Collection</span>
+                        <div className="w-full md:max-w-xs">
+                          <Select
+                            value={component.config?.collection_id || '_none'}
+                            onValueChange={(value) => handleAttachCollection(component.id, value === '_none' ? null : value)}
+                            disabled={isCollectionsLoading || isSaving}
+                          >
+                            <SelectTrigger className="w-full h-8 text-sm">
+                              <SelectValue placeholder={isCollectionsLoading ? 'Loading collections...' : 'Select collection'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">No collection attached</SelectItem>
+                              {collections.map(col => (
+                                <SelectItem key={col.id} value={col.id}>
+                                  {col.title || col.slug}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col items-end gap-3 ml-4">
                   <Button
                     variant="outline"
                     size="sm"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Package, Tags, Building2, FileText, BarChart3, Users, ShoppingCart, Percent, Settings as SettingsIcon } from 'lucide-react';
+import { Settings, Package, Tags, Building2, FileText, BarChart3, Users, ShoppingCart, Percent, Settings as SettingsIcon, FolderOpen } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 
@@ -14,6 +14,7 @@ import { AssetManager } from './modules/assets';
 import { BrandManager } from './modules/brands';
 import { CombosManager } from './modules/combos';
 import { BlogManager, HomepageManager } from './modules/content';
+import { CollectionsManager } from './modules/collections';
 import { CustomersManager } from './modules/customers';
 import { DiscountsManager } from './modules/discounts';
 import { OrdersManager } from './modules/orders';
@@ -143,6 +144,10 @@ export function AdminDashboard({ onStatsUpdate }: AdminDashboardProps) {
               <Building2 className="h-4 w-4" />
               Brands
             </TabsTrigger>
+            <TabsTrigger value="collections" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Collections
+            </TabsTrigger>
             <TabsTrigger value="content" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Content
@@ -202,6 +207,11 @@ export function AdminDashboard({ onStatsUpdate }: AdminDashboardProps) {
           {/* Brands Tab */}
           <TabsContent value="brands" className="mt-6">
             <BrandManager onStatsUpdate={onStatsUpdate} />
+          </TabsContent>
+
+          {/* Collections Tab */}
+          <TabsContent value="collections" className="mt-6">
+            <CollectionsManager />
           </TabsContent>
 
           {/* Content Tab */}

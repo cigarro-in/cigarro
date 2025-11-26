@@ -18,30 +18,59 @@ export function ProductShowcase() {
     is_enabled: true
   });
 
-  useEffect(() => {
-    fetchShowcaseProducts();
-    fetchSectionConfig();
-  }, []);
-
-  const fetchShowcaseProducts = async () => {
+  const fetchShowcaseProducts = async (collectionId?: string) => {
     try {
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at, is_showcase, showcase_order')
-        .eq('is_active', true)
-        .eq('is_showcase', true)
-        .order('showcase_order', { ascending: true })
-        .limit(6); // 6 products for the grid layout
+      if (collectionId) {
+        // Fetch from collection
+        const { data: collectionData, error: collectionError } = await supabase
+          .from('collection_products')
+          .select(`
+            product_id,
+            products (
+              id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at, is_showcase, showcase_order
+            )
+          `)
+          .eq('collection_id', collectionId)
+          .order('sort_order', { ascending: true })
+          .limit(6);
 
-      if (error) throw error;
-      setShowcaseProducts(products || []);
+        if (collectionError) throw collectionError;
+
+        const products = collectionData
+          ?.map(item => item.products)
+          .filter((p): p is any => !!p && typeof p === 'object' && 'id' in p && (p as any).is_active);
+
+        setShowcaseProducts(products || []);
+      } else {
+        // Legacy fallback: fetch by is_showcase flag
+        const { data: products, error } = await supabase
+          .from('products')
+          .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at, is_showcase, showcase_order')
+          .eq('is_active', true)
+          .eq('is_showcase', true)
+          .order('showcase_order', { ascending: true })
+          .limit(6); // 6 products for the grid layout
+
+        if (error) throw error;
+        setShowcaseProducts(products || []);
+      }
     } catch (error) {
       console.error('Error fetching showcase products:', error);
     }
   };
 
-  const fetchSectionConfig = async () => {
+  const loadData = async () => {
     try {
+      // 1. Get Component Config to find attached collection
+      const { data: componentConfig, error: configError } = await supabase
+        .from('homepage_component_config')
+        .select('config')
+        .eq('component_name', 'ProductShowcase')
+        .single();
+      
+      const attachedCollectionId = componentConfig?.config?.collection_id;
+
+      // 2. Fetch Section UI Config
       const { data: config, error } = await supabase
         .from('section_configurations')
         .select('title, background_image, button_text, button_url, is_enabled')
@@ -59,10 +88,18 @@ export function ProductShowcase() {
           is_enabled: config.is_enabled !== false
         });
       }
+
+      // 3. Fetch Products
+      await fetchShowcaseProducts(attachedCollectionId);
+
     } catch (error) {
-      console.error('Error fetching section config:', error);
+      console.error('Error loading showcase data:', error);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleAddToCart = async (product: Product) => {
     try {

@@ -32,10 +32,18 @@ export function ProductDNA({ formData, onChange }: ProductDNAProps) {
         <div className="grid grid-cols-2 gap-6">
           {/* Brand */}
           <div className="space-y-2">
-            <Label className="text-[var(--color-dark)] font-medium">Brand</Label>
+            <Label className="text-[var(--color-dark)] font-medium">
+              Brand <span className="text-red-500">*</span>
+            </Label>
             <Select 
               value={formData.brand} 
-              onValueChange={(value: string) => onChange({ brand: value })}
+              onValueChange={(value: string) => {
+                const selectedBrand = brands.find(b => b.name === value);
+                onChange({ 
+                  brand: value,
+                  brand_id: selectedBrand?.id 
+                });
+              }}
             >
               <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
                 <SelectValue placeholder="Select Brand" />
@@ -67,11 +75,19 @@ export function ProductDNA({ formData, onChange }: ProductDNAProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="India">🇮🇳 India</SelectItem>
-                <SelectItem value="USA">🇺🇸 USA (Imported)</SelectItem>
+                <SelectItem value="USA">🇺🇸 USA</SelectItem>
                 <SelectItem value="Switzerland">🇨🇭 Switzerland</SelectItem>
-                <SelectItem value="Indonesia">🇮🇩 Indonesia (Clove)</SelectItem>
+                <SelectItem value="Indonesia">🇮🇩 Indonesia</SelectItem>
                 <SelectItem value="UK">🇬🇧 UK</SelectItem>
                 <SelectItem value="UAE">🇦🇪 UAE</SelectItem>
+                <SelectItem value="South Korea">🇰🇷 South Korea</SelectItem>
+                <SelectItem value="Spain">🇪🇸 Spain</SelectItem>
+                <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
+                <SelectItem value="Japan">🇯🇵 Japan</SelectItem>
+                <SelectItem value="Turkey">🇹🇷 Turkey</SelectItem>
+                <SelectItem value="China">🇨🇳 China</SelectItem>
+                <SelectItem value="Brazil">🇧🇷 Brazil</SelectItem>
+                <SelectItem value="Netherlands">🇳🇱 Netherlands</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -20,7 +20,9 @@ export function PricingCard({ formData, onChange }: PricingCardProps) {
         
         {/* Price */}
         <div className="space-y-2">
-          <Label className="text-xs text-[var(--color-dark)]/60">Base Price</Label>
+          <Label className="text-xs text-[var(--color-dark)]/60">
+            Base Price <span className="text-red-500">*</span>
+          </Label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
             <Input

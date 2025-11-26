@@ -18,6 +18,7 @@ interface SiteSettings {
   meta_description: string;
 }
 
+
 export function SiteSettingsPage() {
   const navigate = useNavigate();
   const { signOut, adminProfile } = useAdminAuth();
@@ -30,9 +31,13 @@ export function SiteSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingSitemap, setIsGeneratingSitemap] = useState(false);
   const [performanceResults, setPerformanceResults] = useState<any>(null);
+  const [upiId, setUpiId] = useState('');
+  const [isSavingUpi, setIsSavingUpi] = useState(false);
+  const [upiLastUpdated, setUpiLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
+    fetchPaymentSettings();
   }, []);
 
   const fetchSettings = async () => {
@@ -84,6 +89,62 @@ export function SiteSettingsPage() {
 
   const handleInputChange = (field: keyof SiteSettings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const fetchPaymentSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('upi_id, updated_at')
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setUpiId(data.upi_id || '');
+        setUpiLastUpdated(data.updated_at);
+      }
+    } catch (error) {
+      console.error('Error fetching payment settings:', error);
+      // Don't show error toast on initial load if table doesn't exist yet
+    }
+  };
+
+  const handleSaveUpiId = async () => {
+    if (!upiId.trim()) {
+      toast.error('UPI ID cannot be empty');
+      return;
+    }
+
+    // Basic UPI ID validation (alphanumeric@provider)
+    const upiPattern = /^[\w.-]+@[\w.-]+$/;
+    if (!upiPattern.test(upiId.trim())) {
+      toast.error('Invalid UPI ID format. Expected format: username@provider');
+      return;
+    }
+
+    setIsSavingUpi(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('site_settings')
+        .update({ 
+          upi_id: upiId.trim(),
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id
+        });
+
+      if (error) throw error;
+
+      toast.success('UPI ID updated successfully');
+      await fetchPaymentSettings(); // Refresh to get updated timestamp
+    } catch (error) {
+      console.error('Error updating UPI ID:', error);
+      toast.error('Failed to update UPI ID');
+    } finally {
+      setIsSavingUpi(false);
+    }
   };
 
   const handlePurgeSitemapCache = async () => {
@@ -164,6 +225,71 @@ export function SiteSettingsPage() {
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Settings'}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Settings Card */}
+      <Card className="bg-creme-light border-coyote">
+        <CardHeader>
+          <CardTitle className="font-serif-premium text-dark">Payment Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <Label className="text-dark">UPI ID</Label>
+            <Input
+              value={upiId}
+              onChange={(e) => setUpiId(e.target.value)}
+              placeholder="username@upi"
+              className="bg-white border-coyote max-w-md"
+            />
+            <p className="text-sm text-dark/60 mt-2">
+              This UPI ID will be used for all payment transactions. Format: username@provider
+            </p>
+            {upiLastUpdated && (
+              <p className="text-xs text-dark/40 mt-1">
+                Last updated: {new Date(upiLastUpdated).toLocaleString()}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              onClick={handleSaveUpiId}
+              disabled={isSavingUpi}
+              className="bg-canyon hover:bg-canyon/90 text-creme"
+            >
+              {isSavingUpi ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save UPI ID
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={fetchPaymentSettings}
+              disabled={isSavingUpi}
+              className="border-coyote text-dark hover:bg-coyote/10"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="p-4 bg-white rounded-lg border border-coyote/50">
+            <h4 className="font-medium text-dark mb-2">Important Notes</h4>
+            <ul className="list-disc list-inside space-y-1 text-sm text-dark/70">
+              <li>Changing the UPI ID will affect all new orders immediately</li>
+              <li>Existing pending orders will continue to use the old UPI ID</li>
+              <li>Make sure the UPI ID is active and can receive payments</li>
+              <li>Test the new UPI ID with a small transaction before going live</li>
+            </ul>
           </div>
         </CardContent>
       </Card>

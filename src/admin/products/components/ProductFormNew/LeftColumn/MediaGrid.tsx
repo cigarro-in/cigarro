@@ -11,7 +11,9 @@ export function MediaGrid({ formData, onChange }: MediaGridProps) {
   return (
     <Card className="bg-[var(--color-creme-light)] border-[var(--color-coyote)] shadow-sm">
       <CardHeader className="pb-4 border-b border-[var(--color-coyote)]/20">
-        <CardTitle className="text-lg font-sans text-[var(--color-dark)]">Media</CardTitle>
+        <CardTitle className="text-lg font-sans text-[var(--color-dark)]">
+          Media <span className="text-red-500">*</span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="pt-6">
         <MultipleImageUpload

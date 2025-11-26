@@ -4,6 +4,7 @@ import { FormHeader } from "./FormHeader";
 import { BasicInfo } from "./LeftColumn/BasicInfo";
 import { MediaGrid } from "./LeftColumn/MediaGrid";
 import { ProductDNA } from "./LeftColumn/ProductDNA";
+import { Specifications } from "./LeftColumn/Specifications";
 import { SmartVariants } from "./LeftColumn/SmartVariants";
 import { SEOPreview } from "./LeftColumn/SEOPreview";
 import { StatusCard } from "./RightColumn/StatusCard";
@@ -103,6 +104,7 @@ export function ProductFormNew({ initialData, onSave, onCancel, onDelete }: Prod
           <BasicInfo formData={formData} onChange={handleChange} />
           <MediaGrid formData={formData} onChange={handleChange} />
           <ProductDNA formData={formData} onChange={handleChange} />
+          <Specifications formData={formData} onChange={handleChange} />
           <SmartVariants formData={formData} onChange={handleChange} />
           <SEOPreview formData={formData} onChange={handleChange} />
         </div>

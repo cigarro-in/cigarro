@@ -11,7 +11,7 @@ export async function saveProduct(data: ProductFormData, existingId?: string) {
       name: data.name,
       slug: data.slug,
       brand: data.brand,
-      // brand_id: data.brand_id, // TODO: lookup if needed
+      brand_id: data.brand_id,
       description: data.description,
       short_description: data.short_description,
       price: data.price,

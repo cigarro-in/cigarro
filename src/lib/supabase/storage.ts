@@ -18,7 +18,7 @@ export function getStorageUrl(bucket: string, path: string): string {
  */
 export function getProductImageUrl(imagePath?: string): string {
   if (!imagePath) {
-    return getStorageUrl('products', 'placeholder.webp');
+    return 'https://placehold.co/600x600/f5f5f5/a3a3a3?text=No+Image';
   }
   
   // If it's already a full URL, return as is

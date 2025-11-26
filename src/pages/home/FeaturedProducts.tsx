@@ -29,33 +29,85 @@ export function FeaturedProducts() {
     is_enabled: true
   });
 
-  useEffect(() => {
-    fetchFeaturedProducts();
-    fetchSectionConfig();
-  }, []);
-
-  const fetchSectionConfig = async () => {
+  const fetchFeaturedProducts = async (collectionId?: string) => {
     try {
-      const { data: config, error } = await supabase
+      setIsLoadingProducts(true);
+      
+      if (collectionId) {
+        // Fetch from collection
+        const { data: collectionData, error: collectionError } = await supabase
+          .from('collection_products')
+          .select(`
+            product_id,
+            products (
+              id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at
+            )
+          `)
+          .eq('collection_id', collectionId)
+          .order('sort_order', { ascending: true });
+
+        if (collectionError) throw collectionError;
+
+        // Transform data to match Product interface
+        const products = collectionData
+          ?.map(item => item.products)
+          .filter((p): p is any => !!p && typeof p === 'object' && 'id' in p && (p as any).is_active); // strict type guard and active check
+
+        setFeaturedProducts(products || []);
+      } else {
+        // Legacy fallback: fetch by is_featured flag
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+          .eq('is_featured', true)
+          .eq('is_active', true)
+          .order('featured_order', { ascending: true })
+          .limit(6);
+
+        if (productsError) throw productsError;
+        setFeaturedProducts(products || []);
+      }
+    } catch (error) {
+      console.error('Error fetching featured products:', error);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      // 1. Get Component Config to find attached collection
+      const { data: componentConfig, error: configError } = await supabase
+        .from('homepage_component_config')
+        .select('config')
+        .eq('component_name', 'FeaturedProducts')
+        .single();
+      
+      const attachedCollectionId = componentConfig?.config?.collection_id;
+
+      // 2. Fetch Section UI Config (title, subtitle etc)
+      const { data: sectionConfigData, error: sectionError } = await supabase
         .from('section_configurations')
         .select('title, subtitle, description, button_text, button_url, is_enabled')
         .eq('section_name', 'featured_products')
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (config) {
+      if (sectionConfigData) {
         setSectionConfig({
-          title: config.title || 'Curated Selection of Premium Tobacco',
-          subtitle: config.subtitle || 'Featured Products',
-          description: config.description || 'Discover our handpicked selection of premium tobacco products',
-          button_text: config.button_text || 'View All Products',
-          button_url: config.button_url || '/products',
-          is_enabled: config.is_enabled !== false
+          title: sectionConfigData.title || 'Curated Selection of Premium Tobacco',
+          subtitle: sectionConfigData.subtitle || 'Featured Products',
+          description: sectionConfigData.description || 'Discover our handpicked selection of premium tobacco products',
+          button_text: sectionConfigData.button_text || 'View All Products',
+          button_url: sectionConfigData.button_url || '/products',
+          is_enabled: sectionConfigData.is_enabled !== false
         });
       }
+
+      // 3. Fetch Products (using collection ID if available)
+      await fetchFeaturedProducts(attachedCollectionId);
+
     } catch (error) {
-      console.error('Error fetching section config:', error);
+      console.error('Error loading featured products data:', error);
     }
   };
 
@@ -68,25 +120,9 @@ export function FeaturedProducts() {
     }
   };
 
-  const fetchFeaturedProducts = async () => {
-    try {
-      setIsLoadingProducts(true);
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
-        .eq('is_featured', true)
-        .eq('is_active', true)
-        .order('featured_order', { ascending: true })
-        .limit(3);
-
-      if (productsError) throw productsError;
-      setFeaturedProducts(products || []);
-    } catch (error) {
-      console.error('Error fetching featured products:', error);
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // Optimized scroll handler using IntersectionObserver for center item detection
   useEffect(() => {
