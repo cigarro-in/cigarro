@@ -8,14 +8,11 @@ export interface Product {
   name: string;
   slug: string;
   brand: string;
-  price: number;
   description: string;
-  stock: number;
   is_active: boolean;
   rating: number;
   review_count: number;
   origin: string;
-  pack_size: string;
   specifications: Record<string, string>;
   gallery_images: string[];
   meta_title: string;
@@ -34,6 +31,10 @@ export interface Product {
   categories?: { name: string };
   image_url?: string;
   created_at: string;
+  // Legacy fields (will be removed in future)
+  price?: number;
+  stock?: number;
+  pack_size?: string;
 }
 
 export interface ProductVariant {
@@ -44,9 +45,10 @@ export interface ProductVariant {
   price: number;
   stock: number;
   is_active: boolean;
+  is_default?: boolean;
   sort_order: number;
   attributes: Record<string, string>;
-  variant_images?: Array<{ id: string; image_url: string; sort_order: number }>;
+  images?: string[];
   products?: { name: string };
 }
 
@@ -57,9 +59,10 @@ export interface VariantFormData {
   price: number;
   stock: number;
   is_active: boolean;
+  is_default?: boolean;
   sort_order: number;
   attributes: Record<string, string>;
-  variant_images: string[];
+  variant_images: string[]; // Will be saved to images field
 }
 
 export interface DashboardAnalytics {

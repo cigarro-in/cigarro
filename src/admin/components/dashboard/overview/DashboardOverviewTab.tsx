@@ -3,7 +3,7 @@ import { Package, Plus, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
-import { Product, DashboardTab } from '../types/index';
+import { Product, ProductVariant, DashboardTab } from '../types/index';
 
 interface DashboardOverviewTabProps {
   products: Product[];
@@ -16,6 +16,22 @@ export function DashboardOverviewTab({
   onTabChange, 
   onAddVariant 
 }: DashboardOverviewTabProps) {
+  // Helper: derive price/stock from default variant or first variant; fall back to legacy fields
+  const getSummaryFromProduct = (product: Product & { product_variants?: ProductVariant[] }) => {
+    const variants = (product as any).product_variants as ProductVariant[] | undefined;
+    if (variants && variants.length > 0) {
+      const def = variants.find(v => v.is_default) || variants[0];
+      return {
+        price: def.price,
+        stock: def.stock
+      };
+    }
+    return {
+      price: (product as any).price || 0,
+      stock: (product as any).stock || 0
+    };
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
@@ -24,7 +40,9 @@ export function DashboardOverviewTab({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {products.slice(0, 5).map(product => (
+            {products.slice(0, 5).map(product => {
+              const summary = getSummaryFromProduct(product as any);
+              return (
               <div key={product.id} className="flex items-center gap-3">
                 {product.image_url && (
                   <img 
@@ -36,14 +54,14 @@ export function DashboardOverviewTab({
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    ₹{product.price} • Stock: {product.stock}
+                    ₹{summary.price} • Stock: {summary.stock}
                   </p>
                 </div>
                 <Badge variant={product.is_active ? "default" : "secondary"}>
                   {product.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
-            ))}
+            );})}
             {products.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />

@@ -14,36 +14,28 @@ import { toast } from 'sonner';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { VariantSelector } from '../../components/variants/VariantSelector';
 import { ComboDisplayComponent } from '../../components/variants/VariantSelector';
-import { ProductVariant, ProductCombo } from '../../types/variants';
+import { ProductCombo } from '../../types/variants';
+import { ProductVariant } from '../../types/product';
 import { formatINR } from '../../utils/currency';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 
+// Updated to match new schema - images now on variants, brand via brand_id
 interface ProductDetails {
   id: string;
   name: string;
   slug: string;
-  brand: string;
-  price: number;
+  brand_id?: string;
+  brand?: { id: string; name: string };
   description: string;
   short_description?: string;
-  stock: number;
   is_active: boolean;
-  rating: number;
-  review_count: number;
   origin?: string;
-  pack_size?: string;
   specifications?: any;
-  gallery_images: string[];
-  meta_title: string;
-  meta_description: string;
-  og_title?: string;
-  og_description?: string;
-  og_image?: string;
-  twitter_title?: string;
-  twitter_description?: string;
-  twitter_image?: string;
+  meta_title?: string;
+  meta_description?: string;
+  canonical_url?: string;
 }
 
 function ProductPage() {
@@ -86,10 +78,10 @@ function ProductPage() {
       if (!slug) return;
       
       try {
-        // Fetch product details
+        // Fetch product details with brand relation
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, description, short_description, stock, is_active, rating, review_count, origin, pack_size, specifications, gallery_images, meta_title, meta_description, og_title, og_description, og_image, twitter_title, twitter_description, twitter_image')
+          .select('id, name, slug, brand_id, brand:brands(id, name), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url')
           .eq('slug', slug)
           .single();
 
@@ -98,36 +90,45 @@ function ProductPage() {
           return;
         }
 
-        setProduct(productData);
+        // Transform brand from array to single object (Supabase returns array for single relation)
+        const transformedProduct = {
+          ...productData,
+          brand: Array.isArray(productData.brand) ? productData.brand[0] : productData.brand
+        };
+        setProduct(transformedProduct);
 
-        // Fetch variants
+        // Fetch variants (images stored directly in images column)
         const { data: variantsData, error: variantsError } = await supabase
           .from('product_variants')
-          .select(`
-            *,
-            variant_images (*)
-          `)
+          .select('*')
           .eq('product_id', productData.id)
           .eq('is_active', true)
-          .order('sort_order');
+          .order('is_default', { ascending: false });
 
         if (!variantsError && variantsData) {
           setVariants(variantsData);
+          
+          // Auto-select default variant if available
+          const defaultVariant = variantsData.find((v: any) => v.is_default) || variantsData[0];
+          if (defaultVariant) {
+            setSelectedVariant(defaultVariant);
+          }
         }
 
-        // Fetch combos that include this product
+        // Fetch combos that include variants of this product
         const { data: combosData, error: combosError } = await supabase
-          .from('product_combos')
+          .from('combos')
           .select(`
             *,
             combo_items (
               *,
-              products (*),
-              product_variants (*)
+              variant:product_variants (
+                *,
+                product:products (*)
+              )
             )
           `)
-          .eq('is_active', true)
-          .contains('combo_items.product_id', [productData.id]);
+          .eq('is_active', true);
 
         if (!combosError && combosData) {
           setCombos(combosData);
@@ -138,7 +139,7 @@ function ProductPage() {
         toast.error('Failed to load product details.');
       }
     };
-    
+
     fetchProduct();
   }, [slug]);
 
@@ -150,8 +151,13 @@ function ProductPage() {
       try {
         const { data: brandData, error: brandError } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, gallery_images, rating')
-          .eq('brand', product.brand)
+          .select(`
+            id, name, slug, brand_id, brand:brands(id, name),
+            product_variants (
+              id, product_id, variant_name, variant_type, price, is_default, is_active, images
+            )
+          `)
+          .eq('brand_id', product.brand_id)
           .neq('id', product.id)
           .eq('is_active', true)
           .limit(3);
@@ -175,7 +181,12 @@ function ProductPage() {
       try {
         const { data: allProducts, error: allProductsError } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, gallery_images, rating')
+          .select(`
+            id, name, slug, brand_id, brand:brands(id, name), is_active,
+            product_variants (
+              id, product_id, variant_name, variant_type, price, is_default, is_active, images
+            )
+          `)
           .neq('id', product.id)
           .eq('is_active', true)
           .limit(20);
@@ -239,7 +250,7 @@ function ProductPage() {
       const endLeft = targetRect.left + (targetRect.width - width) / 2;
       const endTop = targetRect.top + (targetRect.height - height) / 2;
 
-      const imgUrl = product.gallery_images?.[0] || '';
+      const imgUrl = gallery[0] || '';
       const circle = document.createElement('div');
       circle.style.position = 'fixed';
       circle.style.left = `${startLeft}px`;
@@ -300,21 +311,32 @@ function ProductPage() {
         await addVariantToCart(product, selectedVariant, quantity);
         toast.success(`Added ${quantity}x ${product.name} (${selectedVariant.variant_name}) to cart`);
       } else {
-        // Add base product to cart
-        console.log('Adding base product to cart');
-        const productForCart = {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          brand: product.brand,
-          price: product.price,
-          description: product.description,
-          is_active: product.is_active,
-          gallery_images: product.gallery_images,
-          rating: product.rating,
-          review_count: product.review_count,
-        };
-        await addToCart(productForCart, quantity);
+        // Add default variant to cart
+        console.log('Adding default variant to cart');
+        const defaultVariant = variants.find(v => v.is_default);
+        if (defaultVariant) {
+          await addVariantToCart(product, defaultVariant, quantity);
+        } else if (variants.length > 0) {
+          // Fallback to first variant
+          await addVariantToCart(product, variants[0], quantity);
+        } else {
+          // No variants available - create product with variant structure
+          const productForCart = {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            brand: product.brand,
+            description: product.description || '',
+            is_active: product.is_active,
+            product_variants: [{
+              id: product.id,
+              variant_name: 'Default',
+              price: getCurrentPrice(),
+              images: gallery
+            }]
+          };
+          await addToCart(productForCart as any, quantity);
+        }
         toast.success(`Added ${quantity}x ${product.name} to cart`);
       }
       
@@ -366,22 +388,39 @@ function ProductPage() {
     return <div className="min-h-screen bg-background flex items-center justify-center"><p>Loading...</p></div>;
   }
 
+  // Helper: get price from a product's variants (default variant or first), fallback to 0
+  const getVariantPrice = (prod: any): number => {
+    const variants = prod?.product_variants || [];
+    if (!Array.isArray(variants) || variants.length === 0) return 0;
+    const def = variants.find((v: any) => v.is_default) || variants[0];
+    return def?.price ?? 0;
+  };
+
   const getCurrentPrice = () => {
     if (selectedVariant) {
       return selectedVariant.price;
     }
-    return product.price;
+    
+    // If no variant is selected, find the default variant
+    const defaultVariant = variants.find(v => v.is_default);
+    if (defaultVariant) {
+      return defaultVariant.price;
+    }
+    
+    // Fallback to first variant or 0
+    return variants.length > 0 ? variants[0].price : 0;
   };
 
   const getCurrentImages = () => {
+    // Only use variant images - stored directly in images array
     if (selectedVariant) {
-      const anyVariant: any = selectedVariant as any;
-      const imgs = anyVariant.variant_images || anyVariant.images || [];
+      const imgs = (selectedVariant as any).images || [];
       if (Array.isArray(imgs) && imgs.length > 0) {
-        return imgs.map((img: any) => img.image_url).filter(Boolean);
+        // Images are stored as string URLs directly
+        return imgs.filter(Boolean);
       }
     }
-    return product.gallery_images || [];
+    return [];
   };
 
   const gallery = getCurrentImages();
@@ -407,43 +446,41 @@ function ProductPage() {
     }
   };
 
+  // Helper to get brand name safely
+  const brandName = product.brand?.name || 'Premium';
+  const brandSlug = brandName.toLowerCase().replace(/\s+/g, '-');
+
   return (
-    <>
+    <div>
       <SEOHead
         title={selectedVariant 
-          ? `${product.name} - ${selectedVariant.variant_name} | ${product.brand}`
-          : product.meta_title || `${product.name} | ${product.brand} | Cigarro`
+          ? `${product.name} - ${selectedVariant.variant_name} | ${brandName}`
+          : product.meta_title || `${product.name} | ${brandName} | Cigarro`
         }
-        description={(selectedVariant as any)?.meta_description || product.meta_description || product.short_description || product.description}
+        description={product.meta_description || product.short_description || product.description}
         keywords={[
-          product.brand,
+          brandName,
           product.name,
           'premium cigarettes',
           'buy online India',
           'authentic tobacco',
           selectedVariant?.variant_name || '',
           product.origin || ''
-        ].filter(Boolean)}
-        image={gallery[0] || product.gallery_images[0]}
+        ].filter(Boolean) as string[]}
+        image={gallery[0] || 'https://cigarro.in/logo.png'}
         url={`https://cigarro.in${location.pathname}`}
         type="product"
         price={getCurrentPrice().toString()}
         currency="INR"
-        availability={product.stock > 0 ? 'in stock' : 'out of stock'}
-        brand={product.brand}
-        category={product.pack_size || 'Cigarettes'}
-        ogTitle={product.og_title}
-        ogDescription={product.og_description}
-        ogImage={product.og_image}
-        twitterTitle={product.twitter_title}
-        twitterDescription={product.twitter_description}
-        twitterImage={product.twitter_image}
+        availability="in stock"
+        brand={brandName}
+        category={selectedVariant?.variant_type || 'Cigarettes'}
       />
       <BreadcrumbSchema
         items={[
           { name: 'Home', url: 'https://cigarro.in' },
           { name: 'Products', url: 'https://cigarro.in/products' },
-          { name: product.brand, url: `https://cigarro.in/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}` },
+          { name: brandName, url: `https://cigarro.in/brand/${brandSlug}` },
           { name: product.name, url: `https://cigarro.in/product/${product.slug}` }
         ]}
       />
@@ -480,7 +517,7 @@ function ProductPage() {
                   maxWidth: '90%'
                 }}
               >
-                <span>{product.brand}</span>
+                <span>{brandName}</span>
               </motion.p>
               
               <button
@@ -530,7 +567,8 @@ function ProductPage() {
             </div>
           </motion.div>
 
-          {/* Mobile Gallery - Carousel */}
+          {/* Mobile Gallery - Carousel (only when variant has images) */}
+          {gallery.length > 0 && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -627,6 +665,7 @@ function ProductPage() {
               )}
             </div>
           </motion.div>
+          )}
 
           {/* Mobile Product Details */}
           <motion.div 
@@ -657,22 +696,21 @@ function ProductPage() {
                 transition={{ delay: 0.7 }}
                 className="pt-6 border-t border-coyote/30 space-y-3"
               >
-                <VariantSelector
-                  variants={variants}
-                  selectedVariant={selectedVariant}
-                  onVariantSelect={setSelectedVariant}
-                  basePrice={product.price}
-                  productName={product.name}
-                />
+                {/* Only show variant selector if more than one variant */}
+                {variants.length > 1 && (
+                  <VariantSelector
+                    variants={variants}
+                    selectedVariant={selectedVariant}
+                    onVariantSelect={setSelectedVariant}
+                    basePrice={getCurrentPrice()}
+                    productName={product.name}
+                  />
+                )}
                 
-                {/* Variant Attributes - Names Only */}
-                {selectedVariant && selectedVariant.attributes && Object.keys(selectedVariant.attributes).length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pt-2 pb-1 -mx-6 pl-6 scrollbar-hide">
-                    {Object.entries(selectedVariant.attributes).map(([key]) => (
-                      <div key={key} className="flex-shrink-0 bg-creme/50 rounded-lg px-0 py-2 border border-coyote/10">
-                        <span className="text-sm text-dark font-medium">{key.replace(/_/g, ' ')}</span>
-                      </div>
-                    ))}
+                {/* Variant Info - always show if variant has units info */}
+                {selectedVariant && selectedVariant.units_contained && (
+                  <div className="pt-2 pb-1">
+                    <span className="text-sm text-dark font-medium">{selectedVariant.units_contained} {selectedVariant.unit || 'units'} per {selectedVariant.variant_name || selectedVariant.variant_type || 'unit'}</span>
                   </div>
                 )}
               </motion.div>
@@ -707,32 +745,24 @@ function ProductPage() {
                     style={{ overflow: "hidden" }}
                   >
                     <div className="space-y-3 bg-creme/50 rounded-2xl p-5 border border-coyote/20">
-                {product.brand && (
-                  <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
-                    <span className="text-sm text-dark/60 font-medium">Brand</span>
-                    <span className="text-sm text-dark font-semibold">{product.brand}</span>
-                  </div>
-                )}
-                {product.origin && (
-                  <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
-                    <span className="text-sm text-dark/60 font-medium">Origin</span>
-                    <span className="text-sm text-dark font-semibold">{product.origin}</span>
-                  </div>
-                )}
-                {product.pack_size && (
-                  <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
-                    <span className="text-sm text-dark/60 font-medium">Pack Size</span>
-                    <span className="text-sm text-dark font-semibold">{product.pack_size}</span>
-                  </div>
-                )}
-                {product.stock !== undefined && (
-                  <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
-                    <span className="text-sm text-dark/60 font-medium">Availability</span>
-                    <span className={`text-sm font-semibold ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
-                    </span>
-                  </div>
-                )}
+                      {brandName && (
+                        <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
+                          <span className="text-sm text-dark/60 font-medium">Brand</span>
+                          <span className="text-sm text-dark font-semibold">{brandName}</span>
+                        </div>
+                      )}
+                      {product.origin && (
+                        <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
+                          <span className="text-sm text-dark/60 font-medium">Origin</span>
+                          <span className="text-sm text-dark font-semibold">{product.origin}</span>
+                        </div>
+                      )}
+                      {selectedVariant?.variant_type && (
+                        <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
+                          <span className="text-sm text-dark/60 font-medium">Type</span>
+                          <span className="text-sm text-dark font-semibold">{selectedVariant.variant_type}</span>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -847,35 +877,35 @@ function ProductPage() {
                   {/* Brand Header */}
                   <div className="mb-6">
                     <Link 
-                      to={`/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
+                      to={`/brand/${brandSlug}`}
                       className="flex items-center gap-4 mb-3 group"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-dark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
                         <span className="text-creme text-2xl font-bold">
-                          {product.brand.charAt(0).toUpperCase()}
+                          {brandName.charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-dark uppercase tracking-wide group-hover:text-canyon transition-colors">{product.brand}</h3>
+                        <h3 className="text-xl font-bold text-dark uppercase tracking-wide group-hover:text-canyon transition-colors">{brandName}</h3>
                         <p className="text-sm text-dark/60 mt-0.5">Premium Quality Products</p>
                       </div>
                     </Link>
                     <p className="text-sm text-dark/70 leading-relaxed mb-4">
-                      Discover the finest selection from {product.brand}, known for exceptional quality and craftsmanship. Each product is carefully curated to meet the highest standards.
+                      Discover the finest selection from {brandName}, known for exceptional quality and craftsmanship. Each product is carefully curated to meet the highest standards.
                     </p>
                   </div>
 
                   {/* Brand Products - 2.5 cards visible */}
                   {brandProducts.length > 0 && (
                 <div className="mb-4">
-                  <h4 className="text-sm uppercase tracking-[0.2em] text-canyon font-semibold mb-4">More from {product.brand}</h4>
+                  <h4 className="text-sm uppercase tracking-[0.2em] text-canyon font-semibold mb-4">More from {brandName}</h4>
                   <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory scrollbar-hide">
                     {brandProducts.map((brandProduct, index) => (
                       <div key={brandProduct.id} className="flex-shrink-0 w-[calc(40%-6px)] snap-start">
                         <ProductCard 
                           product={brandProduct} 
                           index={index}
-                          onAddToCart={(prod) => addToCart(prod, 1)}
+                          onAddToCart={(prod) => addToCart(prod as any, 1)}
                         />
                       </div>
                     ))}
@@ -885,10 +915,10 @@ function ProductPage() {
 
                   {/* Visit Brand Page Button */}
                   <Link
-                    to={`/brand/${product.brand.toLowerCase().replace(/\s+/g, '-')}`}
+                    to={`/brand/${brandSlug}`}
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-dark text-creme rounded-xl font-semibold text-sm uppercase tracking-wide hover:bg-dark/90 transition-all group"
                   >
-                    <span>Explore {product.brand}</span>
+                    <span>Explore {brandName}</span>
                     <svg 
                       width="16" 
                       height="16" 
@@ -931,8 +961,9 @@ function ProductPage() {
         {/* Desktop Layout - Preserved */}
         <div className="hidden md:block w-full">
           <div className="px-8 py-16">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-24">
-              {/* Large Image Gallery - More breathing room */}
+            <div className={`grid gap-24 ${gallery.length > 0 ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1 max-w-2xl mx-auto'}`}>
+              {/* Large Image Gallery - Only show when variant has images */}
+              {gallery.length > 0 && (
               <div className="space-y-8">
                 <div className="relative group">
                   <div className="aspect-square overflow-hidden bg-white rounded-2xl">
@@ -985,13 +1016,14 @@ function ProductPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Clean Product Details */}
               <div className="space-y-12 py-8">
                 {/* Brand and Product Name */}
                 <div className="space-y-6">
                   <div className="text-sm uppercase tracking-widest text-dark/60 font-medium">
-                    {product.brand}
+                    {brandName}
                   </div>
                   
                   <div className="space-y-2">
@@ -1004,9 +1036,9 @@ function ProductPage() {
                       <span className="text-3xl font-medium text-dark">
                         {formatINR(getCurrentPrice())}
                       </span>
-                      {selectedVariant && selectedVariant.price !== product.price && (
+                      {selectedVariant && selectedVariant.compare_at_price && (
                         <span className="text-xl text-dark/40 line-through">
-                          {formatINR(product.price)}
+                          {formatINR(selectedVariant.compare_at_price)}
                         </span>
                       )}
                     </div>
@@ -1021,7 +1053,7 @@ function ProductPage() {
                       variants={variants}
                       selectedVariant={selectedVariant}
                       onVariantSelect={setSelectedVariant}
-                      basePrice={product.price}
+                      basePrice={getCurrentPrice()}
                       productName={product.name}
                     />
                   </div>
@@ -1082,25 +1114,23 @@ function ProductPage() {
                 <div className="space-y-4">
                   <h3 className="text-sm uppercase tracking-widest text-dark/60 font-medium">Details</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center py-2 border-b border-coyote/10">
-                      <span className="text-sm text-dark/60">Origin</span>
-                      <span className="text-sm text-dark">{product.origin}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-coyote/10">
-                      <span className="text-sm text-dark/60">Pack Size</span>
-                      <span className="text-sm text-dark">{product.pack_size}</span>
+                    {selectedVariant?.variant_type && (
+                      <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
+                        <span className="text-sm text-dark/60 font-medium">Type</span>
+                        <span className="text-sm text-dark font-semibold">{selectedVariant.variant_type}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
+                      <span className="text-sm text-dark/60 font-medium">Availability</span>
+                      <span className="text-sm font-semibold text-green-600">In Stock</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Brand Section */}
-            <div className="mt-32 py-16 border-t border-coyote/20">
-              <div className="text-center space-y-8">
-                <h2 className="text-2xl font-light text-dark">About {product.brand}</h2>
+                <div className="text-center space-y-8">
+                <h2 className="text-2xl font-light text-dark">About {brandName}</h2>
                 <p className="text-dark/60 max-w-2xl mx-auto leading-relaxed">
-                  Discover the heritage and craftsmanship behind {product.brand}. Each product represents decades of tradition and commitment to excellence.
+                  Discover the heritage and craftsmanship behind {brandName}. Each product represents decades of tradition and commitment to excellence.
                 </p>
                 <div className="text-sm text-dark/40 uppercase tracking-widest">
                   More about this brand coming soon
@@ -1113,7 +1143,7 @@ function ProductPage() {
               <div className="mt-32 py-16 border-t border-coyote/20">
                 <div className="text-center mb-16">
                   <h2 className="text-2xl font-light text-dark mb-4">You might also like</h2>
-                  <p className="text-dark/60">More from {product.brand}</p>
+                  <p className="text-dark/60">More from {brandName}</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
                   {similarProducts.map((similarProduct) => (
@@ -1129,7 +1159,7 @@ function ProductPage() {
                         <h3 className="text-base font-light text-dark group-hover:text-canyon transition-colors">
                           {similarProduct.name}
                         </h3>
-                        <p className="text-sm text-dark/60">{formatINR(similarProduct.price)}</p>
+                        <p className="text-sm text-dark/60">{formatINR(getVariantPrice(similarProduct))}</p>
                       </div>
                     </div>
                   ))}
@@ -1176,8 +1206,9 @@ function ProductPage() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Mobile Sticky CTA Bar */}
+      {/* Mobile Sticky CTA Bar */}
         <motion.div 
           initial={{ y: 100 }}
           animate={{ y: 0 }}
@@ -1213,8 +1244,8 @@ function ProductPage() {
 
                 <button
                   type="button"
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={quantity >= product.stock}
+                  onClick={() => setQuantity(quantity + 1)}
+                  disabled={false}
                   className="w-10 h-10 rounded-full border-2 border-dark/40 flex items-center justify-center disabled:opacity-30 transition-all hover:border-dark/60 active:bg-dark/5"
                 >
                   <svg width="16" height="16" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1318,7 +1349,7 @@ function ProductPage() {
           </div>
         </motion.div>
       </div>
-    </>
+    </div>
   );
 }
 

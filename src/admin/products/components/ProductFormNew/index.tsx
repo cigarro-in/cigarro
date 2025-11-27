@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Product, ProductFormData } from "../../../../types/product";
+import { Product, ProductFormData, VariantFormData } from "../../../../types/product";
 import { FormHeader } from "./FormHeader";
 import { BasicInfo } from "./LeftColumn/BasicInfo";
-import { MediaGrid } from "./LeftColumn/MediaGrid";
 import { ProductDNA } from "./LeftColumn/ProductDNA";
 import { Specifications } from "./LeftColumn/Specifications";
 import { SmartVariants } from "./LeftColumn/SmartVariants";
@@ -26,25 +25,29 @@ export function ProductFormNew({ initialData, onSave, onCancel, onDelete }: Prod
   const defaultFormData: ProductFormData = {
     name: '',
     slug: '',
-    brand: '',
+    brand_id: undefined,
     description: '',
-    price: 0,
-    stock: 0,
-    track_inventory: true,
-    continue_selling_when_out_of_stock: false,
-    gallery_images: [],
+    short_description: '',
     is_active: true,
-    is_featured: false,
-    is_showcase: false,
     specifications: [],
-    variants: [],
+    variants: [{
+      variant_name: 'Packet',
+      variant_type: 'pack',
+      units_contained: 20,
+      unit: 'sticks',
+      price: 0,
+      stock: 0,
+      track_inventory: true,
+      is_active: true,
+      is_default: true,
+      images: []
+    }],
     collections: [],
-    // Defaults
-    pack_size: '',
+    categories: [],
     origin: ''
   };
 
-  const [formData, setFormData] = useState<ProductFormData>(
+  const [formData, setFormData] = useState<ProductFormData>(() =>
     initialData ? mapProductToFormData(initialData) : defaultFormData
   );
 
@@ -67,8 +70,22 @@ export function ProductFormNew({ initialData, onSave, onCancel, onDelete }: Prod
       toast.error("Product name is required");
       return;
     }
-    if (formData.price <= 0) {
-      toast.error("Price must be greater than 0");
+    
+    // Check if there's at least one default variant with a valid price
+    const defaultVariant = formData.variants.find(v => v.is_default);
+    if (!defaultVariant) {
+      toast.error("At least one default variant is required");
+      return;
+    }
+    
+    if (defaultVariant.price <= 0) {
+      toast.error("Default variant price must be greater than 0");
+      return;
+    }
+    
+    // Check if default variant has at least one image
+    if (!defaultVariant.images || defaultVariant.images.length === 0) {
+      toast.error("Default variant must have at least one image");
       return;
     }
 
@@ -102,7 +119,6 @@ export function ProductFormNew({ initialData, onSave, onCancel, onDelete }: Prod
         {/* LEFT COLUMN (Main Content) */}
         <div className="space-y-6">
           <BasicInfo formData={formData} onChange={handleChange} />
-          <MediaGrid formData={formData} onChange={handleChange} />
           <ProductDNA formData={formData} onChange={handleChange} />
           <Specifications formData={formData} onChange={handleChange} />
           <SmartVariants formData={formData} onChange={handleChange} />
@@ -123,49 +139,46 @@ export function ProductFormNew({ initialData, onSave, onCancel, onDelete }: Prod
 
 // Helper to convert DB Product to Form Data
 function mapProductToFormData(product: Product): ProductFormData {
-  console.log('Mapping product to form data:', product.name);
-  const mappedVariants = product.product_variants?.map(v => ({
-    ...v,
+  const mappedVariants: VariantFormData[] = product.product_variants?.map(v => ({
+    id: v.id,
     variant_name: v.variant_name,
-    variant_type: v.variant_type || 'packaging',
-    attributes: v.attributes 
-      ? Object.entries(v.attributes).map(([key, value]) => ({ key, value: String(value) }))
-      : [],
-    assigned_images: v.images || [],
-    packaging: v.packaging || 'pack',
-    units_contained: v.units_contained || 1,
-    track_inventory: v.track_inventory ?? true
+    variant_slug: v.variant_slug,
+    variant_type: v.variant_type || 'pack',
+    is_default: v.is_default || false,
+    // Map images
+    images: v.images || [],
+    image_alt_text: v.image_alt_text,
+    // Tobacco specifics
+    units_contained: v.units_contained || 20,
+    unit: v.unit || 'sticks',
+    // Pricing/Inventory
+    price: v.price,
+    compare_at_price: v.compare_at_price,
+    cost_price: v.cost_price,
+    stock: v.stock || 0,
+    track_inventory: v.track_inventory ?? true,
+    is_active: v.is_active
   })) || [];
-  console.log('Mapped variants:', mappedVariants);
 
   return {
     name: product.name,
     slug: product.slug,
-    brand: product.brand,
     brand_id: product.brand_id,
     description: product.description || '',
     short_description: product.short_description,
-    price: product.price,
-    compare_at_price: product.compare_at_price,
-    cost_price: product.cost_price,
-    stock: product.stock,
-    track_inventory: product.track_inventory ?? true,
-    continue_selling_when_out_of_stock: product.continue_selling_when_out_of_stock ?? false,
-    gallery_images: product.gallery_images || [],
     is_active: product.is_active,
-    is_featured: product.is_featured || false,
-    is_showcase: product.is_showcase || false,
     origin: product.origin,
-    pack_size: product.pack_size,
     specifications: product.specifications 
       ? Object.entries(product.specifications).map(([key, value]) => ({ key, value }))
       : [],
     variants: mappedVariants,
-    collections: product.collections?.map(c => c.id) || [],
+    collections: product.collections?.map((c: any) => c.id) || [],
+    // Handle categories from join table format (category_id) or direct format (id)
+    categories: product.categories?.map((c: any) => c.category_id || c.id) || [],
     
     // SEO
     meta_title: product.meta_title,
     meta_description: product.meta_description,
-    meta_keywords: product.meta_keywords,
+    canonical_url: product.canonical_url,
   };
 }

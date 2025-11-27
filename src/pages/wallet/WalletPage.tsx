@@ -93,18 +93,16 @@ export function WalletPage() {
     setIsProcessing(true);
     try {
       // Create wallet load order using create_order RPC
+      // Updated to use the new robust implementation (no fake products)
       const { data: orderResult, error: orderError } = await supabase.rpc('create_order', {
-        p_items: [{
-          product_id: '00000000-0000-0000-0000-000000000001', // Wallet Credit product
-          quantity: 1,
-          custom_amount: amount // Dynamic price
-        }],
-        p_shipping_address: null, // Not needed for wallet loads
+        p_items: [], // No items needed for wallet load
+        p_shipping_address: null,
         p_shipping_method: null,
         p_coupon_code: null,
         p_lucky_discount: 0,
         p_user_id: user.id,
-        p_is_wallet_load: true
+        p_is_wallet_load: true,
+        p_custom_amount: amount // New parameter for direct amount
       });
 
       if (orderError) throw orderError;
@@ -116,6 +114,15 @@ export function WalletPage() {
 
       setShowLoadDialog(false);
       setLoadAmount('');
+
+      // Try to open UPI app immediately
+      if (orderResult.upi_deep_link) {
+        try {
+          window.location.href = orderResult.upi_deep_link;
+        } catch (e) {
+          console.error('Failed to open UPI link:', e);
+        }
+      }
 
       // Navigate to unified transaction page
       navigate('/transaction', {

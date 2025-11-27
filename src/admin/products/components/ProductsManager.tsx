@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, Package, Star, DollarSign, Upload, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Package, DollarSign, Upload, Download } from 'lucide-react';
 import { Switch } from '../../../components/ui/switch';
 import { Label } from '../../../components/ui/label';
 import { Button } from '../../../components/ui/button';
@@ -32,10 +32,10 @@ export function ProductsManager() {
     try {
       setLoading(true);
       
-      // 1. Fetch Products
+      // 1. Fetch Products with brand relation and categories
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*, collections(id)')
+        .select('*, brand:brands(id, name), collections(id), categories:product_categories(category_id)')
         .order('created_at', { ascending: false });
 
       if (productsError) throw productsError;
@@ -164,23 +164,28 @@ export function ProductsManager() {
 
   const columns = [
     {
-      key: 'gallery_images',
+      key: 'product_variants',
       label: 'Image',
-      render: (images: string[]) => (
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
-          {images && images.length > 0 ? (
-            <ImageWithFallback
-              src={images[0]}
-              alt="Product"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package className="h-6 w-6 text-gray-400" />
-            </div>
-          )}
-        </div>
-      )
+      render: (_: any, product: Product) => {
+        // Get image from default variant or first variant
+        const defaultVariant = product.product_variants?.find(v => v.is_default);
+        const images = defaultVariant?.images || product.product_variants?.[0]?.images || [];
+        return (
+          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+            {images && images.length > 0 ? (
+              <ImageWithFallback
+                src={images[0]}
+                alt="Product"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Package className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'name',
@@ -189,7 +194,7 @@ export function ProductsManager() {
       render: (name: string, product: Product) => (
         <div>
           <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{product.brand}</div>
+          <div className="text-sm text-gray-500">{product.brand?.name || ''}</div>
         </div>
       )
     },
@@ -203,33 +208,33 @@ export function ProductsManager() {
       )
     },
     {
-      key: 'price',
+      key: 'product_variants',
       label: 'Price',
-      sortable: true,
-      render: (price: number) => (
-        <div className="font-medium">{formatINR(price)}</div>
-      )
+      render: (_: any, product: Product) => {
+        // Find default variant
+        const defaultVariant = product.product_variants?.find(v => v.is_default);
+        if (defaultVariant) {
+          return <div className="font-medium">{formatINR(defaultVariant.price)}</div>;
+        }
+        // Fallback to first variant or show dash
+        return product.product_variants && product.product_variants.length > 0 ? 
+          <div className="font-medium">{formatINR(product.product_variants[0].price)}</div> :
+          <div className="text-gray-400">-</div>;
+      }
     },
     {
-      key: 'stock',
+      key: 'product_variants',
       label: 'Stock',
-      sortable: true,
-      render: (stock: number) => (
-        <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'}>
-          {stock} units
-        </Badge>
-      )
-    },
-    {
-      key: 'rating',
-      label: 'Rating',
-      render: (rating: number, product: Product) => (
-        <div className="flex items-center space-x-1">
-          <Star className="h-4 w-4 text-yellow-400 fill-current" />
-          <span className="text-sm font-medium">{rating.toFixed(1)}</span>
-          <span className="text-xs text-gray-500">({product.review_count})</span>
-        </div>
-      )
+      render: (_: any, product: Product) => {
+        // Find default variant
+        const defaultVariant = product.product_variants?.find(v => v.is_default);
+        const stock = defaultVariant?.stock ?? product.product_variants?.[0]?.stock ?? 0;
+        return (
+          <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'}>
+            {stock} units
+          </Badge>
+        );
+      }
     },
     {
       key: 'is_active',
@@ -278,12 +283,12 @@ export function ProductsManager() {
       ]
     },
     {
-      key: 'brand',
+      key: 'brand.name',
       label: 'Brand',
-      options: [...new Set(products.map(p => p.brand).filter(brand => brand && brand.trim()))]
-        .map(brand => ({
-          value: brand,
-          label: brand
+      options: [...new Set(products.map(p => p.brand?.name).filter((name): name is string => !!name && name.trim() !== ''))]
+        .map(brandName => ({
+          value: brandName,
+          label: brandName
         }))
     }
   ];

@@ -31,14 +31,19 @@ import { Checkbox } from '../../../components/ui/checkbox';
 import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 
+interface ProductVariantLite {
+  id: string;
+  price: number;
+  is_default?: boolean;
+}
+
 interface Product {
   id: string;
   name: string;
   slug: string;
-  price: number;
-  gallery_images?: string[];
+  price?: number; // legacy
   is_active: boolean;
-  is_featured: boolean;
+  product_variants?: ProductVariantLite[];
 }
 
 interface Category {
@@ -74,7 +79,7 @@ export function FeaturedProductsManager({ open, onOpenChange, onUpdate }: Featur
       const [productsResult, categoriesResult] = await Promise.all([
         supabase
           .from('products')
-          .select('id, name, slug, price, gallery_images, is_active, is_featured')
+          .select('id, name, slug, is_active, product_variants(id, price, is_default, images)')
           .order('name'),
         supabase
           .from('categories')
@@ -105,28 +110,20 @@ export function FeaturedProductsManager({ open, onOpenChange, onUpdate }: Featur
   });
 
   const handleToggleFeatured = async (productId: string, isFeatured: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_featured: isFeatured })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, is_featured: isFeatured } : p
-      ));
-
-      toast.success(`Product ${isFeatured ? 'added to' : 'removed from'} featured collection`);
-      onUpdate();
-    } catch (error) {
-      console.error('Error updating product:', error);
-      toast.error('Failed to update product');
-    }
+    toast.info("Featured status is now managed via Collections. This feature is being migrated.");
+    // Legacy logic removed as column is dropped
   };
 
 
-  const featuredProducts = products.filter(p => p.is_featured);
+  const featuredProducts = []; // specific featured column is removed
+
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants && product.product_variants.length > 0) {
+      const def = product.product_variants.find(v => v.is_default) || product.product_variants[0];
+      return def.price;
+    }
+    return product.price || 0;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,9 +210,9 @@ export function FeaturedProductsManager({ open, onOpenChange, onUpdate }: Featur
                 <div key={product.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-16 h-16 bg-muted rounded overflow-hidden flex-shrink-0">
-                      {product.gallery_images && product.gallery_images.length > 0 ? (
+                      {(product as any).product_variants?.[0]?.images?.[0] ? (
                         <img
-                          src={product.gallery_images[0]}
+                          src={(product as any).product_variants[0].images[0]}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
@@ -227,34 +224,21 @@ export function FeaturedProductsManager({ open, onOpenChange, onUpdate }: Featur
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">{product.name}</h3>
-                      <p className="text-sm text-muted-foreground">₹{product.price.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">₹{getProductPrice(product).toLocaleString()}</p>
                       <Badge variant={product.is_active ? "default" : "secondary"} className="text-xs">
                         {product.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Switch
-                      checked={product.is_featured}
-                      onCheckedChange={(checked: boolean) => handleToggleFeatured(product.id, checked)}
-                    />
+                  <div className="flex items-center justify-end">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleToggleFeatured(product.id, !product.is_featured)}
+                      onClick={() => toast.info("Use Collections to manage featured products")}
                       className="flex items-center gap-2"
                     >
-                      {product.is_featured ? (
-                        <>
-                          <X className="h-4 w-4" />
-                          Remove
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4" />
-                          Add
-                        </>
-                      )}
+                      <Plus className="h-4 w-4" />
+                      Manage
                     </Button>
                   </div>
                 </div>

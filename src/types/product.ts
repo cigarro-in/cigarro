@@ -7,59 +7,23 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  brand: string;
   brand_id?: string;
-  
-  // Pricing
-  price: number;
-  compare_at_price?: number; // Original price for discount display
-  cost_price?: number; // Your cost (for profit calculations)
-  
-  // Inventory
-  stock: number;
-  track_inventory?: boolean;
-  continue_selling_when_out_of_stock?: boolean;
   
   // Content
   description: string;
   short_description?: string;
   
-  // Media
-  gallery_images: string[];
-  image_url?: string;
-  image_alt_text?: string;
+  // Product Details
+  origin?: string;
+  specifications?: Record<string, string>;
   
   // Organization
   is_active: boolean;
   
-  // Legacy/Deprecated (Moved to Collections)
-  is_featured?: boolean;
-  is_showcase?: boolean;
-  featured_order?: number;
-  showcase_order?: number;
-  
-  // Product Details
-  origin?: string;
-  pack_size?: string;
-  specifications?: Record<string, string>;
-  
-  // Ratings & Reviews
-  rating: number;
-  review_count: number;
-  
-  // SEO
+  // SEO (simplified)
   meta_title?: string;
   meta_description?: string;
-  meta_keywords?: string;
   canonical_url?: string;
-  og_title?: string;
-  og_description?: string;
-  og_image?: string;
-  twitter_title?: string;
-  twitter_description?: string;
-  twitter_image?: string;
-  structured_data?: Record<string, any>;
-  seo_score?: number;
   
   // Timestamps
   created_at: string;
@@ -67,7 +31,7 @@ export interface Product {
   
   // Relations (loaded via joins)
   product_variants?: ProductVariant[];
-  brand_relation?: Brand;
+  brand?: Brand; // Joined from brand_id
   categories?: Category[];
   collections?: Collection[];
 }
@@ -90,17 +54,19 @@ export interface Collection {
 
 export interface ProductVariant {
   id: string;
-  product_id: string;
+  product_id?: string; // Optional for display contexts
   
   // Variant Identity
   variant_name: string;
   variant_slug?: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
+  variant_type?: string; // pack, carton, box, bundle, etc. (optional for display)
+  is_default?: boolean;
 
   // Tobacco Specifics
-  packaging?: 'pack' | 'carton' | 'box' | 'bundle';
   units_contained?: number;
-  images?: string[]; // Variant specific images
+  unit?: string; // sticks, packs, pieces, etc.
+  images?: string[];
+  image_alt_text?: string;
   
   // Pricing
   price: number;
@@ -108,55 +74,29 @@ export interface ProductVariant {
   cost_price?: number;
   
   // Inventory
-  stock: number;
+  stock?: number;
   track_inventory?: boolean;
   
-  // Physical Properties
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-    unit: 'cm' | 'in';
-  };
+  // Status (optional for display contexts)
+  is_active?: boolean;
   
-  // Attributes (flexible key-value pairs)
-  attributes: Record<string, string>;
-  
-  // Status
-  is_active: boolean;
-  sort_order: number;
-  
-  // SEO (optional per-variant SEO)
-  meta_title?: string;
-  meta_description?: string;
-  meta_keywords?: string;
-  og_title?: string;
-  og_description?: string;
-  structured_data?: Record<string, any>;
-  
-  // Timestamps
-  created_at: string;
-  updated_at: string;
+  // Timestamps (optional for display contexts where not loaded)
+  created_at?: string;
+  updated_at?: string;
   
   // Relations
-  variant_images?: VariantImage[];
   product?: Product;
 }
 
+// Note: VariantImage table was removed - images are now stored in product_variants.images[]
+// Keeping this for backward compatibility during transition
 export interface VariantImage {
   id: string;
   variant_id?: string;
-  product_id?: string;
   image_url: string;
   alt_text?: string;
-  title?: string;
-  caption?: string;
-  meta_description?: string;
   sort_order: number;
   is_primary: boolean;
-  lazy_load: boolean;
-  created_at: string;
 }
 
 export interface Brand {
@@ -167,13 +107,11 @@ export interface Brand {
   logo_url?: string;
   website_url?: string;
   country_of_origin?: string;
-  tier?: 'budget' | 'standard' | 'premium' | 'luxury';
+  heritage?: Record<string, any>;
   is_active: boolean;
-  is_featured: boolean;
   sort_order: number;
   meta_title?: string;
   meta_description?: string;
-  meta_keywords?: string;
   created_at: string;
   updated_at: string;
 }
@@ -199,50 +137,25 @@ export interface ProductFormData {
   // Basic Info
   name: string;
   slug: string;
-  brand: string;
   brand_id?: string;
   description: string;
   short_description?: string;
   
-  // Pricing
-  price: number;
-  compare_at_price?: number;
-  cost_price?: number;
-  
-  // Inventory
-  stock: number;
-  track_inventory: boolean;
-  continue_selling_when_out_of_stock: boolean;
-  
-  // Media
-  gallery_images: string[];
-  image_alt_text?: string;
-  
   // Organization
   is_active: boolean;
-  is_featured: boolean;
-  is_showcase: boolean;
   collections: string[]; // Collection IDs
+  categories: string[]; // Category IDs
   
   // Product Details
   origin?: string;
-  pack_size?: string;
   specifications: Array<{ key: string; value: string }>;
   
-  // SEO
+  // SEO (simplified)
   meta_title?: string;
   meta_description?: string;
-  meta_keywords?: string;
   canonical_url?: string;
-  og_title?: string;
-  og_description?: string;
-  og_image?: string;
-  twitter_title?: string;
-  twitter_description?: string;
-  twitter_image?: string;
-  structured_data?: Record<string, any>;
   
-  // Variants
+  // Variants (variants own images now)
   variants: VariantFormData[];
 }
 
@@ -250,11 +163,16 @@ export interface VariantFormData {
   id?: string;
   variant_name: string;
   variant_slug?: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
+  variant_type: string; // pack, carton, box, bundle, etc.
+  is_default?: boolean;
   
   // Tobacco Specifics
-  packaging: 'pack' | 'carton' | 'box' | 'bundle';
   units_contained: number;
+  unit: string; // sticks, packs, pieces, etc.
+  
+  // Images (variant owns its images now)
+  images: string[];
+  image_alt_text?: string;
   
   // Pricing
   price: number;
@@ -265,32 +183,8 @@ export interface VariantFormData {
   stock: number;
   track_inventory: boolean;
   
-  // Physical
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-    unit: 'cm' | 'in';
-  };
-  
-  // Attributes
-  attributes: Array<{ key: string; value: string }>;
-  
   // Status
   is_active: boolean;
-  sort_order: number;
-  
-  // Images (URLs from product gallery assigned to this variant)
-  assigned_images: string[];
-  
-  // SEO (optional)
-  meta_title?: string;
-  meta_description?: string;
-  meta_keywords?: string;
-  og_title?: string;
-  og_description?: string;
-  structured_data?: Record<string, any>;
 }
 
 // ============================================================================
@@ -317,12 +211,11 @@ export interface ProductFilters {
   status?: 'all' | 'active' | 'inactive';
   category?: string;
   brand?: string;
+  collection?: string;
   stock_status?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
   price_min?: number;
   price_max?: number;
-  has_variants?: boolean;
-  is_featured?: boolean;
-  sort_by?: 'created_at' | 'name' | 'price' | 'stock' | 'rating';
+  sort_by?: 'created_at' | 'name' | 'price' | 'stock';
   sort_order?: 'asc' | 'desc';
 }
 
@@ -346,7 +239,7 @@ export function calculateDiscount(price: number, compareAtPrice?: number): Price
   };
 }
 
-export function getInventoryStatus(stock: number, continueSellingWhenOutOfStock: boolean = false): InventoryStatus {
+export function getInventoryStatus(stock: number): InventoryStatus {
   const stock_level = stock;
   let stock_status: 'in_stock' | 'low_stock' | 'out_of_stock';
   
@@ -359,10 +252,10 @@ export function getInventoryStatus(stock: number, continueSellingWhenOutOfStock:
   }
   
   return {
-    in_stock: stock > 0 || continueSellingWhenOutOfStock,
+    in_stock: stock > 0,
     stock_level,
     stock_status,
-    can_backorder: continueSellingWhenOutOfStock
+    can_backorder: false
   };
 }
 

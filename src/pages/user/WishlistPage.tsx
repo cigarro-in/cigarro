@@ -62,7 +62,7 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
         {/* Product Image */}
         <Link to={`/product/${product.slug}`} className="relative w-20 h-20 bg-muted rounded-lg overflow-hidden flex-shrink-0">
           <img
-            src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
+            src={!imageError ? getProductImageUrl((product as any).product_variants?.[0]?.images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
             className="w-full h-full object-cover"
@@ -76,8 +76,10 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
               {product.name}
             </h3>
           </Link>
-          <p className="text-sm text-muted-foreground mt-1">{product.brand}</p>
-          <p className="text-lg font-semibold text-foreground mt-2">₹{formatIndianPrice(product.price)}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium'}
+          </p>
+          <p className="text-lg font-semibold text-foreground mt-2">₹{formatIndianPrice(product.price || 0)}</p>
         </div>
 
         {/* Action Buttons */}
@@ -191,7 +193,13 @@ export function WishlistPage() {
 
       const { data: products, error } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select(`
+          id, name, slug, brand_id, description, is_active, created_at,
+          brands!inner(id, name),
+          product_variants (
+            id, product_id, variant_name, variant_type, price, is_default, is_active, stock, images
+          )
+        `)
         .in('id', wishlistItems)
         .eq('is_active', true);
 
@@ -200,7 +208,17 @@ export function WishlistPage() {
         toast.error('Failed to load wishlist products');
         setWishlistProducts([]);
       } else {
-        setWishlistProducts(products || []);
+        // Transform data to match expected format
+        const transformedProducts = (products || []).map(product => ({
+          ...product,
+          brand: product.brands?.[0] || { id: 'unknown', name: 'Unknown' },
+          price: product.product_variants?.find(v => v.is_default)?.price || 0,
+          product_variants: product.product_variants?.map(variant => ({
+            ...variant,
+            images: variant.images || []
+          })) || []
+        }));
+        setWishlistProducts(transformedProducts);
       }
     } catch (error) {
       console.error('Error loading wishlist:', error);

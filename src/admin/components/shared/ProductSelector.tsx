@@ -14,10 +14,14 @@ interface Product {
   id: string;
   name: string;
   slug: string;
-  brand: string;
-  price: number;
-  gallery_images?: string[];
+  brand?: { name: string };
   is_active: boolean;
+  product_variants?: Array<{
+    id: string;
+    price: number;
+    is_default?: boolean;
+    images?: string[];
+  }>;
 }
 
 interface SelectedProduct extends Product {
@@ -31,6 +35,35 @@ interface ProductSelectorProps {
   title?: string;
   description?: string;
 }
+
+  // Helper function to get product price (from default variant if available)
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants?.length) {
+      const defaultVariant = product.product_variants.find(v => v.is_default);
+      if (defaultVariant) {
+        return defaultVariant.price;
+      }
+      // Fallback to first variant
+      if (product.product_variants[0]) {
+        return product.product_variants[0].price;
+      }
+    }
+    return 0;
+  };
+
+  // Helper function to get product image
+  const getProductImage = (product: Product): string => {
+    if (product.product_variants?.length) {
+      const defaultVariant = product.product_variants.find(v => v.is_default);
+      if (defaultVariant?.images?.length) {
+        return defaultVariant.images[0];
+      }
+      if (product.product_variants[0]?.images?.length) {
+        return product.product_variants[0].images[0];
+      }
+    }
+    return '';
+  };
 
 export function ProductSelector({
   selectedProducts,
@@ -51,14 +84,22 @@ export function ProductSelector({
   const loadProducts = async () => {
     setIsLoading(true);
     try {
+      // Fetch products with their variants
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, gallery_images, is_active')
+        .select('id, name, slug, is_active, brand:brands(name), product_variants(id, price, is_default, images)')
         .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
-      setAllProducts(data || []);
+      
+      // Normalize data to match Product interface
+      const normalizedData = (data || []).map((item: any) => ({
+        ...item,
+        brand: Array.isArray(item.brand) ? item.brand[0] : item.brand
+      }));
+
+      setAllProducts(normalizedData);
     } catch (error) {
       console.error('Error loading products:', error);
       toast.error('Failed to load products');
@@ -68,8 +109,9 @@ export function ProductSelector({
   };
 
   const filteredProducts = allProducts.filter(product => {
+    const brandName = product.brand?.name || '';
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand.toLowerCase().includes(searchTerm.toLowerCase());
+                         brandName.toLowerCase().includes(searchTerm.toLowerCase());
     const notSelected = !selectedProducts.some(selected => selected.id === product.id);
     return matchesSearch && notSelected;
   });
@@ -173,7 +215,7 @@ export function ProductSelector({
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
                               <ImageWithFallback
-                                src={product.gallery_images?.[0] || ''}
+                                src={getProductImage(product)}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                                 width={48}
@@ -182,8 +224,8 @@ export function ProductSelector({
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium truncate">{product.name}</h3>
-                              <p className="text-sm text-muted-foreground">{product.brand}</p>
-                              <p className="text-sm font-medium">₹{product.price.toLocaleString()}</p>
+                              <p className="text-sm text-muted-foreground">{product.brand?.name}</p>
+                              <p className="text-sm font-medium">₹{getProductPrice(product).toLocaleString()}</p>
                             </div>
                           </div>
                           <Button
@@ -220,7 +262,7 @@ export function ProductSelector({
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-muted rounded overflow-hidden">
                       <ImageWithFallback
-                        src={product.gallery_images?.[0] || ''}
+                        src={getProductImage(product)}
                         alt={product.name}
                         className="w-full h-full object-cover"
                         width={48}
@@ -234,8 +276,8 @@ export function ProductSelector({
                         </Badge>
                         <h3 className="font-medium">{product.name}</h3>
                       </div>
-                      <p className="text-sm text-muted-foreground">{product.brand}</p>
-                      <p className="text-sm font-medium">₹{product.price.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">{product.brand?.name}</p>
+                      <p className="text-sm font-medium">₹{getProductPrice(product).toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

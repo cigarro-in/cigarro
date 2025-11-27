@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
-import { ProductVariant } from '../../types/variants';
+import { ProductVariant } from '../../types/product';
 import { formatINR } from '../../utils/currency';
 
 interface VariantSelectorProps {
@@ -55,7 +55,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   };
 
   const isVariantAvailable = (variant: ProductVariant): boolean => {
-    return variant.stock ? variant.stock > 0 : (variant.stock_quantity ? variant.stock_quantity > 0 : true);
+    // Check if variant has stock
+    return (variant.stock || 0) > 0;
   };
 
   return (
@@ -87,9 +88,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   `}
                 >
                   {variant.variant_name}
-                  {!isAvailable && (
-                    <span className="ml-2 text-xs">(Out of stock)</span>
-                  )}
                 </button>
               );
             })}
@@ -112,8 +110,9 @@ export const ComboDisplayComponent: React.FC<ComboDisplayProps> = ({
   combo,
   onAddToCart
 }) => {
-  const savings = combo.original_price - combo.combo_price;
-  const savingsPercentage = Math.round((savings / combo.original_price) * 100);
+  const originalPrice = combo.original_price || 0;
+  const savings = originalPrice - combo.combo_price;
+  const savingsPercentage = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
 
   return (
     <Card className="border-2 border-accent/20 bg-gradient-to-br from-accent/5 to-accent/10">
@@ -135,14 +134,18 @@ export const ComboDisplayComponent: React.FC<ComboDisplayProps> = ({
               <span className="text-2xl font-bold text-accent">
                 {formatINR(combo.combo_price)}
               </span>
-              <span className="text-lg text-muted-foreground line-through">
-                {formatINR(combo.original_price)}
-              </span>
+              {originalPrice > 0 && (
+                <span className="text-lg text-muted-foreground line-through">
+                  {formatINR(originalPrice)}
+                </span>
+              )}
             </div>
             
-            <Badge className="bg-green-100 text-green-800 text-sm">
-              Save {formatINR(savings)} ({savingsPercentage}% off)
-            </Badge>
+            {savings > 0 && (
+              <Badge className="bg-green-100 text-green-800 text-sm">
+                Save {formatINR(savings)} ({savingsPercentage}% off)
+              </Badge>
+            )}
           </div>
           
           {/* Included Items */}
@@ -152,13 +155,12 @@ export const ComboDisplayComponent: React.FC<ComboDisplayProps> = ({
             </h4>
             
             <div className="space-y-2">
-              {combo.items.map((item, index) => (
+              {(combo.combo_items || []).map((item, index) => (
                 <div key={index} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-accent rounded-full"></div>
                     <span className="text-foreground">
-                      {item.product?.name || 'Product'}
-                      {item.variant?.variant_name && ` (${item.variant.variant_name})`}
+                      {item.variant?.variant_name ? `${item.variant.variant_name}` : 'Product'}
                     </span>
                     <span className="text-muted-foreground">
                       × {item.quantity}
@@ -166,7 +168,7 @@ export const ComboDisplayComponent: React.FC<ComboDisplayProps> = ({
                   </div>
                   
                   <span className="text-muted-foreground">
-                    {formatINR((item.variant?.price || item.product?.price || 0) * item.quantity)}
+                    {formatINR((item.variant?.price || 0) * item.quantity)}
                   </span>
                 </div>
               ))}

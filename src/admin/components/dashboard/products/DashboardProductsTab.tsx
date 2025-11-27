@@ -62,8 +62,12 @@ export function DashboardProductsTab({
 
   // Filter products
   const filteredProducts = products.filter(product => {
+    const brandName = Array.isArray(product.brand) 
+      ? product.brand[0]?.name 
+      : (product.brand as any)?.name;
+      
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
+                         (brandName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'active' && product.is_active) ||
                          (statusFilter === 'inactive' && !product.is_active);
@@ -95,10 +99,24 @@ export function DashboardProductsTab({
   // Handle edit product - fetch fresh data from database
   const handleEditProduct = async (product: Product) => {
     try {
-      // Fetch fresh product data from database INCLUDING VARIANTS
+      // Fetch fresh product data from database INCLUDING VARIANTS, BRAND, COLLECTIONS, CATEGORIES
+      // Explicitly select columns to avoid querying removed columns like 'rating' or 'gallery_images'
       const { data: freshProduct, error } = await supabase
         .from('products')
-        .select('*, product_variants(*), collections(id)')
+        .select(`
+          id, name, slug, brand_id, description, short_description, 
+          is_active, origin, specifications, meta_title, meta_description, 
+          canonical_url, created_at, updated_at,
+          product_variants(
+            id, product_id, variant_name, variant_slug, variant_type,
+            units_contained, unit, price, compare_at_price, cost_price,
+            stock, track_inventory, is_active, is_default, images,
+            created_at, updated_at
+          ),
+          brand:brands(id, name),
+          collections(id),
+          categories:product_categories(category_id)
+        `)
         .eq('id', product.id)
         .single();
 
@@ -348,9 +366,41 @@ export function DashboardProductsTab({
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{product.brand || '-'}</TableCell>
-                      <TableCell>{formatINR(product.price)}</TableCell>
-                      <TableCell>{product.stock || 0}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          // Handle brand as object or array (Supabase quirk)
+                          const brandName = Array.isArray(product.brand) 
+                            ? product.brand[0]?.name 
+                            : (product.brand as any)?.name;
+                          return brandName || '-';
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        {/* Find default variant price */}
+                        {(() => {
+                          const defaultVariant = productVariants.find(v => v.is_default);
+                          if (defaultVariant) {
+                            return formatINR(defaultVariant.price);
+                          }
+                          // Fallback to first variant or show dash
+                          return productVariants.length > 0 ? 
+                            formatINR(productVariants[0].price) : 
+                            '-';
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        {/* Find default variant stock */}
+                        {(() => {
+                          const defaultVariant = productVariants.find(v => v.is_default);
+                          if (defaultVariant) {
+                            return defaultVariant.stock || 0;
+                          }
+                          // Fallback to first variant or show 0
+                          return productVariants.length > 0 ? 
+                            productVariants[0].stock || 0 : 
+                            0;
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={product.is_active ? 'default' : 'secondary'}>
                           {product.is_active ? 'Active' : 'Inactive'}

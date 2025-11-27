@@ -97,32 +97,80 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
 
       setProgress(50);
 
-      // Transform data for export
-      const exportData = products?.map(product => ({
-        'Product Name': product.name,
-        'Description': product.description || '',
-        'Short Description': product.short_description || '',
-        'Price': product.price,
-        'Compare Price': product.compare_price || '',
-        'Cost Price': product.cost_price || '',
-        'Stock': product.stock,
-        'Category': product.category?.name || '',
-        'Brand': product.brand?.name || '',
-        'Origin': product.origin || '',
-        'Pack Size': product.pack_size || '',
-        'Image URL': product.image_url || '',
-        'Gallery Images': (product.gallery_images || []).join(', '),
-        'Specifications': product.specifications ? Object.entries(product.specifications).map(([k, v]) => `${k}:${v}`).join('; ') : '',
-        'Is Active': product.is_active ? 'Yes' : 'No',
-        'Is Featured': product.is_featured ? 'Yes' : 'No',
-        'Meta Title': product.meta_title || '',
-        'Meta Description': product.meta_description || '',
-        // Variant fields (empty for main product row)
-        'Variant Name': '',
-        'Variant Type': '',
-        'Variant Price': '',
-        'Variant Stock': ''
-      })) || [];
+      // Get variants for each product
+      const { data: allVariants } = await supabase
+        .from('product_variants')
+        .select('*')
+        .in('product_id', products?.map(p => p.id) || []);
+
+      // Group variants by product_id
+      const variantsByProduct: Record<string, any[]> = {};
+      allVariants?.forEach(variant => {
+        if (!variantsByProduct[variant.product_id]) {
+          variantsByProduct[variant.product_id] = [];
+        }
+        variantsByProduct[variant.product_id].push(variant);
+      });
+
+      // Transform data for export - one row per product+variant
+      const exportData: any[] = [];
+      
+      if (products) {
+        products.forEach(product => {
+          const variants = variantsByProduct[product.id] || [];
+          const defaultVariant = variants.find(v => v.is_default);
+          
+          // If no variants, create a row with just the product
+          if (variants.length === 0) {
+            exportData.push({
+              'Product Name': product.name,
+              'Description': product.description || '',
+              'Short Description': product.short_description || '',
+              'Category': product.category?.name || '',
+              'Brand': product.brand?.name || '',
+              'Origin': product.origin || '',
+              'Image URL': product.image_url || '',
+              'Gallery Images': (product.gallery_images || []).join(', '),
+              'Specifications': product.specifications ? Object.entries(product.specifications).map(([k, v]) => `${k}:${v}`).join('; ') : '',
+              'Is Active': product.is_active ? 'Yes' : 'No',
+              'Is Featured': product.is_featured ? 'Yes' : 'No',
+              'Meta Title': product.meta_title || '',
+              'Meta Description': product.meta_description || '',
+              // Empty variant fields
+              'Variant Name': '',
+              'Variant Type': '',
+              'Variant Price': '',
+              'Variant Stock': '',
+              'Is Default Variant': ''
+            });
+          } else {
+            // Create a row for each variant
+            variants.forEach(variant => {
+              exportData.push({
+                'Product Name': product.name,
+                'Description': product.description || '',
+                'Short Description': product.short_description || '',
+                'Category': product.category?.name || '',
+                'Brand': product.brand?.name || '',
+                'Origin': product.origin || '',
+                'Image URL': product.image_url || '',
+                'Gallery Images': (product.gallery_images || []).join(', '),
+                'Specifications': product.specifications ? Object.entries(product.specifications).map(([k, v]) => `${k}:${v}`).join('; ') : '',
+                'Is Active': product.is_active ? 'Yes' : 'No',
+                'Is Featured': product.is_featured ? 'Yes' : 'No',
+                'Meta Title': product.meta_title || '',
+                'Meta Description': product.meta_description || '',
+                // Variant fields
+                'Variant Name': variant.variant_name || '',
+                'Variant Type': variant.variant_type || '',
+                'Variant Price': variant.price || '',
+                'Variant Stock': variant.stock || '',
+                'Is Default Variant': variant.is_default ? 'Yes' : 'No'
+              });
+            });
+          }
+        });
+      }
 
       setProgress(75);
 
@@ -428,14 +476,9 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
               name: sanitizeString(productName),
               description: sanitizeString(mainRow['Description'] || ''),
               short_description: sanitizeString(mainRow['Short Description'] || ''),
-              price: parseFloat(mainRow['Price']),
-              compare_at_price: mainRow['Compare Price'] ? parseFloat(mainRow['Compare Price']) : null,
-              cost_price: mainRow['Cost Price'] ? parseFloat(mainRow['Cost Price']) : null,
-              stock: parseInt(mainRow['Stock']) || 0,
               brand_id: brandId,
               brand: mainRow['Brand'] ? sanitizeString(mainRow['Brand']) : null, // Populate legacy brand column
               origin: sanitizeString(mainRow['Origin'] || ''),
-              pack_size: sanitizeString(mainRow['Pack Size'] || ''),
               image_url: sanitizeString(mainRow['Image URL'] || ''),
               gallery_images: galleryImages,
               specifications: specifications,
@@ -494,20 +537,40 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
             // A row is a variant if it has 'Variant Name' OR if there are multiple rows
             // Strategy: Iterate ALL rows. If 'Variant Name' is present, create variant.
             const variantsToInsert = [];
+            let hasDefaultVariant = false;
             
             for (const row of productRows) {
               if (row['Variant Name']) {
+                const isDefault = row['Is Default Variant']?.toLowerCase() === 'yes';
+                if (isDefault) hasDefaultVariant = true;
+                
                 variantsToInsert.push({
                   product_id: insertedProduct.id,
                   variant_name: sanitizeString(row['Variant Name']),
                   variant_type: sanitizeString(row['Variant Type'] || 'packaging'),
-                  price: parseFloat(row['Variant Price'] || row['Price']), // Fallback to product price
+                  price: parseFloat(row['Variant Price'] || '0'),
                   stock: parseInt(row['Variant Stock']) || 0,
-                  compare_at_price: row['Compare Price'] ? parseFloat(row['Compare Price']) : null, // Inherit or override? Let's assume inherit if not present? No, simple for now.
+                  compare_at_price: row['Compare Price'] ? parseFloat(row['Compare Price']) : null,
                   cost_price: row['Cost Price'] ? parseFloat(row['Cost Price']) : null,
-                  is_active: true
+                  is_active: true,
+                  is_default: isDefault
                 });
               }
+            }
+            
+            // If no variants or no default variant, create a default variant
+            if (variantsToInsert.length === 0 || !hasDefaultVariant) {
+              variantsToInsert.push({
+                product_id: insertedProduct.id,
+                variant_name: 'Default',
+                variant_type: 'packaging',
+                price: parseFloat(mainRow['Price'] || '0'),
+                stock: parseInt(mainRow['Stock']) || 0,
+                compare_at_price: mainRow['Compare Price'] ? parseFloat(mainRow['Compare Price']) : null,
+                cost_price: mainRow['Cost Price'] ? parseFloat(mainRow['Cost Price']) : null,
+                is_active: true,
+                is_default: true
+              });
             }
 
             if (variantsToInsert.length > 0) {
@@ -580,14 +643,9 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         'Product Name': 'Marlboro Red',
         'Description': 'Premium quality cigarettes with rich tobacco flavor',
         'Short Description': 'Classic Marlboro Red cigarettes',
-        'Price': 450,
-        'Compare Price': 500,
-        'Cost Price': 350,
-        'Stock': 100,
         'Category': 'Premium Cigarettes',
         'Brand': 'Marlboro',
         'Origin': 'USA',
-        'Pack Size': 'Pack of 20',
         'Image URL': 'https://example.com/marlboro.jpg',
         'Gallery Images': 'https://example.com/img1.jpg, https://example.com/img2.jpg',
         'Specifications': 'Strength:Strong; Ring Gauge:20',
@@ -598,20 +656,16 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         'Variant Name': 'Single Pack',
         'Variant Type': 'packaging',
         'Variant Price': 450,
-        'Variant Stock': 100
+        'Variant Stock': 100,
+        'Is Default Variant': 'Yes'
       },
       {
         'Product Name': 'Marlboro Red',
         'Description': 'SAME PRODUCT - NEW VARIANT',
         'Short Description': '',
-        'Price': 450,
-        'Compare Price': '',
-        'Cost Price': '',
-        'Stock': '',
         'Category': '',
         'Brand': '',
         'Origin': '',
-        'Pack Size': '',
         'Image URL': '',
         'Gallery Images': '',
         'Specifications': '',
@@ -622,7 +676,8 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         'Variant Name': 'Carton (10 Packs)',
         'Variant Type': 'packaging',
         'Variant Price': 4200,
-        'Variant Stock': 10
+        'Variant Stock': 20,
+        'Is Default Variant': 'No'
       }
     ];
 

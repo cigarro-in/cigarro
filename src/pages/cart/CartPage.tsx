@@ -23,7 +23,7 @@ interface CartItemProps {
   isLoading: boolean;
 }
 
-const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCart, isLoading }) => {
+const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, updateQuantity, removeFromCart, isLoading }, ref) => {
   const [imageError, setImageError] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -58,6 +58,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -68,7 +69,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
         {/* Product Image */}
         <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-coyote/10">
           <img
-            src={!imageError ? getProductImageUrl(item.gallery_images?.[0]) : getProductImageUrl()}
+            src={!imageError ? getProductImageUrl((item as any).image || (item as any).product_variants?.[0]?.images?.[0] || (item as any).gallery_images?.[0]) : getProductImageUrl()}
             alt={item.name}
             onError={() => setImageError(true)}
             className="w-full h-full object-cover"
@@ -164,7 +165,9 @@ const CartItem: React.FC<CartItemProps> = ({ item, updateQuantity, removeFromCar
       </AnimatePresence>
     </motion.div>
   );
-};
+});
+
+CartItem.displayName = 'CartItem';
 
 const EmptyCart: React.FC = () => (
   <motion.div

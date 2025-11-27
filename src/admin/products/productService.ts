@@ -7,38 +7,26 @@ export async function saveProduct(data: ProductFormData, existingId?: string) {
     if (!user) throw new Error("User not authenticated");
 
     // 1. Prepare Product Data
+    // Ensure slug is unique
+    const uniqueSlug = await ensureUniqueSlug(data.slug, existingId);
+
     const productPayload = {
       name: data.name,
-      slug: data.slug,
-      brand: data.brand,
+      slug: uniqueSlug,
       brand_id: data.brand_id,
+      // brand: data.brand, // Removed - join table used
       description: data.description,
       short_description: data.short_description,
-      price: data.price,
-      compare_at_price: data.compare_at_price,
-      cost_price: data.cost_price,
-      stock: data.stock, // Base stock (if no variants)
-      track_inventory: data.track_inventory,
-      continue_selling_when_out_of_stock: data.continue_selling_when_out_of_stock,
-      gallery_images: data.gallery_images,
       is_active: data.is_active,
       
       // Tobacco Details
       origin: data.origin,
-      pack_size: data.pack_size,
       specifications: data.specifications.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {}),
       
       // SEO
       meta_title: data.meta_title,
       meta_description: data.meta_description,
-      meta_keywords: data.meta_keywords,
       canonical_url: data.canonical_url,
-      og_title: data.og_title,
-      og_description: data.og_description,
-      og_image: data.og_image,
-      twitter_title: data.twitter_title,
-      twitter_description: data.twitter_description,
-      twitter_image: data.twitter_image,
       
       updated_at: new Date().toISOString(),
     };
@@ -87,23 +75,23 @@ export async function saveProduct(data: ProductFormData, existingId?: string) {
         product_id: productId,
         variant_name: variant.variant_name || 'Untitled Variant',
         variant_slug: variant.variant_slug || `${data.slug}-${(variant.variant_name || 'variant').toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(7)}`,
-        variant_type: variant.variant_type || 'packaging',
-        packaging: variant.packaging || 'pack',
+        variant_type: variant.variant_type || 'pack',
         units_contained: variant.units_contained || 1,
+        unit: variant.unit || 'sticks',
         price: variant.price || 0,
         compare_at_price: variant.compare_at_price,
         cost_price: variant.cost_price,
         stock: variant.stock || 0,
         track_inventory: variant.track_inventory ?? true,
-        weight: variant.weight,
-        dimensions: variant.dimensions,
-        attributes: variant.attributes ? variant.attributes.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {}) : {},
         is_active: variant.is_active ?? true,
-        sort_order: variant.sort_order || 0,
-        images: variant.assigned_images || [], // Save variant images
+        is_default: variant.is_default ?? false,
+        images: variant.images || [], // Save variant images
         updated_at: new Date().toISOString()
       };
 
+      // Debug: Log the exact payload being sent
+      console.log('Variant payload being sent:', JSON.stringify(variantPayload, null, 2));
+      
       let error;
       if (variant.id) {
         const result = await supabase.from('product_variants').update(variantPayload).eq('id', variant.id);
@@ -133,10 +121,62 @@ export async function saveProduct(data: ProductFormData, existingId?: string) {
       await supabase.from('collection_products').insert(collectionLinks);
     }
 
+    // 4. Handle Categories
+    // Delete existing links
+    await supabase.from('product_categories').delete().eq('product_id', productId);
+    
+    // Insert new links
+    if (data.categories && data.categories.length > 0) {
+      // Ensure uniqueness and valid UUIDs
+      const uniqueCategories = [...new Set(data.categories)].filter(id => id && id.length > 0);
+      
+      if (uniqueCategories.length > 0) {
+        const categoryLinks = uniqueCategories.map(catId => ({
+          category_id: catId,
+          product_id: productId
+        }));
+        
+        const { error: catError } = await supabase.from('product_categories').insert(categoryLinks);
+        
+        if (catError) {
+          console.error("Error saving categories:", catError);
+          // Don't throw here, just log - we want the product to be saved even if categories fail
+          // throw catError; 
+        }
+      }
+    }
+
     return productId;
 
   } catch (error) {
     console.error("Error saving product:", error);
     throw error;
+  }
+}
+
+async function ensureUniqueSlug(slug: string, existingId?: string): Promise<string> {
+  let uniqueSlug = slug;
+  let counter = 1;
+  
+  while (true) {
+    let query = supabase
+      .from('products')
+      .select('id')
+      .eq('slug', uniqueSlug);
+      
+    if (existingId) {
+      query = query.neq('id', existingId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return uniqueSlug;
+    }
+    
+    uniqueSlug = `${slug}-${counter}`;
+    counter++;
   }
 }

@@ -56,17 +56,54 @@ const Header = () => {
     setFuseInstance(fuse);
   };
 
+  // Helper: get default-variant price (or first variant), fallback to legacy product.price
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants && product.product_variants.length > 0) {
+      const def = product.product_variants.find(v => v.is_default) || product.product_variants[0];
+      return def.price;
+    }
+    return product.price || 0;
+  };
+
+  // Helper to normalize brand from database (can be array or object from join)
+  const normalizeBrand = (brand: any): { id: string; name: string } | undefined => {
+    if (!brand) return undefined;
+    if (Array.isArray(brand) && brand.length > 0) return brand[0];
+    if (typeof brand === 'object' && brand.id) return brand;
+    return undefined;
+  };
+
+  // Helper to get brand name as string
+  const getBrandName = (product: Product): string => {
+    if (product.brand) {
+      return product.brand.name || '';
+    }
+    return '';
+  };
+
   // Fetch all products for client-side fuzzy search
   const fetchAllProducts = async () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select(`
+          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+          product_variants (
+            id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
+          )
+        `)
         .eq('is_active', true);
 
       if (error) throw error;
-      setAllProducts(data || []);
-      initializeFuse(data || []);
+      
+      // Normalize brand from array to object
+      const normalizedData = (data || []).map(p => ({
+        ...p,
+        brand: normalizeBrand(p.brand)
+      })) as Product[];
+      
+      setAllProducts(normalizedData);
+      initializeFuse(normalizedData);
     } catch (error) {
       console.error('Error fetching products for search:', error);
     }
@@ -96,7 +133,7 @@ const Header = () => {
   const calculateSearchScore = (product: Product, query: string): number => {
     const queryLower = query.toLowerCase();
     const nameLower = product.name.toLowerCase();
-    const brandLower = (product.brand || '').toLowerCase();
+    const brandLower = getBrandName(product).toLowerCase();
     const descriptionLower = (product.description || '').toLowerCase();
     
     let score = 0;
@@ -119,12 +156,12 @@ const Header = () => {
     const brandWords = brandLower.split(/\s+/);
     const queryWords = queryLower.split(/\s+/);
     
-    queryWords.forEach(queryWord => {
-      nameWords.forEach(nameWord => {
+    queryWords.forEach((queryWord: string) => {
+      nameWords.forEach((nameWord: string) => {
         if (nameWord.startsWith(queryWord)) score += 150;
         if (nameWord.includes(queryWord)) score += 75;
       });
-      brandWords.forEach(brandWord => {
+      brandWords.forEach((brandWord: string) => {
         if (brandWord.startsWith(queryWord)) score += 120;
         if (brandWord.includes(queryWord)) score += 60;
       });
@@ -156,14 +193,21 @@ const Header = () => {
       // Use Fuse.js for fuzzy search if available (most reliable)
       if (fuseInstance) {
         const fuseResults = fuseInstance.search(query);
-          const results = fuseResults
+          const results: SearchResult[] = fuseResults
             .slice(0, 8)
             .map(result => ({
-              ...result.item,
+              id: result.item.id,
+              name: result.item.name,
+              slug: result.item.slug,
+              brand: getBrandName(result.item),
+              brand_id: result.item.brand_id,
+              description: result.item.description,
+              gallery_images: result.item.gallery_images,
+              is_active: result.item.is_active,
               item_type: 'product' as const,
               search_score: result.score || 0,
-              searchable_text: `${result.item.name} ${result.item.brand} ${result.item.description || ''}`,
-              base_price: result.item.price,
+              searchable_text: `${result.item.name} ${getBrandName(result.item)} ${result.item.description || ''}`,
+              base_price: getProductPrice(result.item),
               created_at: result.item.created_at || new Date().toISOString(),
               variant_id: undefined,
               variant_name: undefined,
@@ -173,27 +217,45 @@ const Header = () => {
               combo_price: undefined,
               original_price: undefined,
               matched_variant: undefined,
-              matched_combo: undefined
+              matched_combo: undefined,
+              product_variants: result.item.product_variants
             }));
         
         setSearchResults(results);
         setShowResults(true);
       } else {
-        // Fallback to database search
+        // Fallback to database search - use brand_id join instead of brand column
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+          .select(`
+            id, name, slug, brand_id, brand:brands(id, name), description, is_active, gallery_images, rating, created_at,
+            product_variants (
+              id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
+            )
+          `)
           .eq('is_active', true)
-          .or(`name.ilike.%${query}%,brand.ilike.%${query}%,description.ilike.%${query}%`);
+          .or(`name.ilike.%${query}%,description.ilike.%${query}%`);
 
         if (error) throw error;
 
-          const basicResults = (data || []).map(product => ({
-            ...product,
+        // Normalize brand and create proper SearchResult objects
+        const basicResults: SearchResult[] = (data || []).map(product => {
+          const normalizedBrand = normalizeBrand(product.brand);
+          const brandName = normalizedBrand?.name || '';
+          const normalizedProduct = { ...product, brand: normalizedBrand } as Product;
+          return {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            brand: brandName,
+            brand_id: product.brand_id,
+            description: product.description,
+            gallery_images: product.gallery_images,
+            is_active: product.is_active,
             item_type: 'product' as const,
-            search_score: calculateSearchScore(product, query),
-            searchable_text: `${product.name} ${product.brand} ${product.description || ''}`,
-            base_price: product.price,
+            search_score: calculateSearchScore(normalizedProduct, query),
+            searchable_text: `${product.name} ${brandName} ${product.description || ''}`,
+            base_price: getProductPrice(normalizedProduct),
             created_at: product.created_at || new Date().toISOString(),
             variant_id: undefined,
             variant_name: undefined,
@@ -203,8 +265,10 @@ const Header = () => {
             combo_price: undefined,
             original_price: undefined,
             matched_variant: undefined,
-            matched_combo: undefined
-          }));
+            matched_combo: undefined,
+            product_variants: product.product_variants
+          };
+        });
 
         setSearchResults(basicResults.slice(0, 8));
         setShowResults(true);

@@ -11,102 +11,113 @@ import { toast } from 'sonner';
 import { supabase } from '../../../lib/supabase/client';
 import { formatINR } from '../../../utils/currency';
 
-interface ProductCombo {
+// Updated to use new combos + combo_items schema (variant-based)
+interface Combo {
   id: string;
   name: string;
-  description: string;
+  slug: string;
+  description?: string;
   combo_price: number;
-  original_price: number;
-  discount_percentage: number;
+  original_price?: number;
+  discount_percentage?: number;
+  image?: string;
+  gallery_images?: string[];
   is_active: boolean;
-  valid_from: string;
-  valid_until: string;
+  created_at: string;
+  updated_at: string;
   combo_items?: Array<{
-    product_id: string;
+    id: string;
+    variant_id: string;
     quantity: number;
-    product: {
-      name: string;
-      brand: string;
+    variant?: {
+      id: string;
+      variant_name: string;
       price: number;
+      product?: {
+        name: string;
+        brand?: { name: string };
+      };
     };
   }>;
 }
 
 interface ComboFormProps {
-  combo?: ProductCombo | null;
+  combo?: Combo | null;
   onSave: () => void;
   onCancel: () => void;
 }
 
 interface ComboFormData {
   name: string;
+  slug: string;
   description: string;
   combo_price: number;
   is_active: boolean;
-  valid_from: string;
-  valid_until: string;
   items: Array<{
-    product_id: string;
+    variant_id: string;
     quantity: number;
   }>;
 }
 
+// Helper to generate slug from name
+const generateSlug = (name: string) => {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+};
+
 export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
   const [formData, setFormData] = useState<ComboFormData>({
     name: '',
+    slug: '',
     description: '',
     combo_price: 0,
     is_active: true,
-    valid_from: '',
-    valid_until: '',
-    items: [{ product_id: '', quantity: 1 }]
+    items: [{ variant_id: '', quantity: 1 }]
   });
-  const [products, setProducts] = useState<any[]>([]);
+  const [variants, setVariants] = useState<any[]>([]); // All product variants
   const [loading, setLoading] = useState(false);
   const [originalPrice, setOriginalPrice] = useState(0);
   const [discountPercentage, setDiscountPercentage] = useState(0);
 
   useEffect(() => {
-    fetchProducts();
+    fetchVariants();
     if (combo) {
       setFormData({
         name: combo.name,
-        description: combo.description,
+        slug: combo.slug,
+        description: combo.description || '',
         combo_price: combo.combo_price,
         is_active: combo.is_active,
-        valid_from: combo.valid_from.split('T')[0],
-        valid_until: combo.valid_until.split('T')[0],
         items: combo.combo_items?.map(item => ({
-          product_id: item.product_id,
+          variant_id: item.variant_id,
           quantity: item.quantity
-        })) || [{ product_id: '', quantity: 1 }]
+        })) || [{ variant_id: '', quantity: 1 }]
       });
     }
   }, [combo]);
 
   useEffect(() => {
     calculatePricing();
-  }, [formData.items, products, formData.combo_price]);
+  }, [formData.items, variants, formData.combo_price]);
 
-  const fetchProducts = async () => {
+  const fetchVariants = async () => {
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('id, name, brand, price')
+        .from('product_variants')
+        .select('id, variant_name, price, is_active, products(id, name, brand:brands(name))')
         .eq('is_active', true)
-        .order('name');
+        .order('variant_name');
 
       if (error) throw error;
-      setProducts(data || []);
+      setVariants(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching variants:', error);
     }
   };
 
   const calculatePricing = () => {
     const total = formData.items.reduce((sum, item) => {
-      const product = products.find(p => p.id === item.product_id);
-      return sum + (product ? product.price * item.quantity : 0);
+      const variant = variants.find(v => v.id === item.variant_id);
+      return sum + (variant ? variant.price * item.quantity : 0);
     }, 0);
     
     setOriginalPrice(total);
@@ -119,7 +130,7 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
     }
   };
 
-  const handleItemChange = (index: number, field: 'product_id' | 'quantity', value: string | number) => {
+  const handleItemChange = (index: number, field: 'variant_id' | 'quantity', value: string | number) => {
     setFormData(prev => ({
       ...prev,
       items: prev.items.map((item, i) =>
@@ -131,7 +142,7 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { product_id: '', quantity: 1 }]
+      items: [...prev.items, { variant_id: '', quantity: 1 }]
     }));
   };
 
@@ -147,21 +158,21 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
     setLoading(true);
 
     try {
+      const slug = formData.slug || generateSlug(formData.name);
       const comboData = {
         name: formData.name,
-        description: formData.description,
+        slug,
+        description: formData.description || null,
         combo_price: formData.combo_price,
         original_price: originalPrice,
         discount_percentage: discountPercentage,
-        is_active: formData.is_active,
-        valid_from: new Date(formData.valid_from).toISOString(),
-        valid_until: new Date(formData.valid_until).toISOString()
+        is_active: formData.is_active
       };
 
       let comboId;
       if (combo) {
         const { error } = await supabase
-          .from('product_combos')
+          .from('combos')
           .update(comboData)
           .eq('id', combo.id);
 
@@ -169,7 +180,7 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
         comboId = combo.id;
       } else {
         const { data, error } = await supabase
-          .from('product_combos')
+          .from('combos')
           .insert([comboData])
           .select()
           .single();
@@ -187,13 +198,14 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
           .eq('combo_id', combo.id);
       }
 
-      // Insert new items
+      // Insert new items (variant-based)
       const itemsData = formData.items
-        .filter(item => item.product_id && item.quantity > 0)
-        .map(item => ({
+        .filter(item => item.variant_id && item.quantity > 0)
+        .map((item, index) => ({
           combo_id: comboId,
-          product_id: item.product_id,
-          quantity: item.quantity
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          sort_order: index
         }));
 
       if (itemsData.length > 0) {
@@ -243,25 +255,14 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="valid_from">Valid From *</Label>
+              <Label htmlFor="slug">Slug (URL)</Label>
               <Input
-                id="valid_from"
-                type="date"
-                value={formData.valid_from}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, valid_from: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="valid_until">Valid Until *</Label>
-              <Input
-                id="valid_until"
-                type="date"
-                value={formData.valid_until}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, valid_until: e.target.value }))}
-                required
+                id="slug"
+                value={formData.slug}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                placeholder="auto-generated-from-name"
               />
             </div>
             <div className="flex items-end">
@@ -281,20 +282,66 @@ export function ComboForm({ combo, onSave, onCancel }: ComboFormProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Combo Products</CardTitle>
+            <CardTitle>Combo Variants</CardTitle>
             <Button type="button" variant="outline" size="sm" onClick={addItem}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              Add Variant
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-dark/60 mb-4">Product selection will be managed here</p>
-            <p className="text-sm text-dark/50">
-              Select products to include in this combo offer
-            </p>
-          </div>
+        <CardContent className="space-y-3">
+          {formData.items.map((item, index) => {
+            const selectedVariant = variants.find(v => v.id === item.variant_id);
+            return (
+              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <Select
+                    value={item.variant_id}
+                    onValueChange={(value) => handleItemChange(index, 'variant_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a variant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {variants.map(variant => (
+                        <SelectItem key={variant.id} value={variant.id}>
+                          {variant.products?.name} - {variant.variant_name} ({formatINR(variant.price)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-24">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                    placeholder="Qty"
+                  />
+                </div>
+                <div className="w-24 text-right text-sm font-medium">
+                  {selectedVariant ? formatINR(selectedVariant.price * item.quantity) : '-'}
+                </div>
+                {formData.items.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeItem(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          {formData.items.length === 0 && (
+            <div className="text-center py-4 text-gray-500">
+              No variants added. Click "Add Variant" to start building your combo.
+            </div>
+          )}
         </CardContent>
       </Card>
 

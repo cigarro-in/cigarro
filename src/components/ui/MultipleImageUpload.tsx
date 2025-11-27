@@ -115,15 +115,6 @@ export function MultipleImageUpload({
     onImageUrlsChange(newImageUrls);
   };
 
-  // Suppress react-beautiful-dnd defaultProps warning
-  const originalConsoleError = console.error;
-  console.error = (...args) => {
-    if (typeof args[0] === 'string' && args[0].includes('defaultProps')) {
-      return;
-    }
-    originalConsoleError.apply(console, args);
-  };
-
   return (
     <div className="space-y-4">
       <DragDropContext onDragEnd={onDragEnd}>

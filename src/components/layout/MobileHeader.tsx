@@ -23,6 +23,31 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
   const [fuseInstance, setFuseInstance] = useState<Fuse<Product> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper: get default-variant price (or first), fallback to legacy product.price
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants && product.product_variants.length > 0) {
+      const def = product.product_variants.find(v => v.is_default) || product.product_variants[0];
+      return def.price;
+    }
+    return product.price || 0;
+  };
+
+  // Helper to normalize brand from database (can be array or object from join)
+  const normalizeBrand = (brand: any): { id: string; name: string } | undefined => {
+    if (!brand) return undefined;
+    if (Array.isArray(brand) && brand.length > 0) return brand[0];
+    if (typeof brand === 'object' && brand.id) return brand;
+    return undefined;
+  };
+
+  // Helper to get brand name as string
+  const getBrandName = (product: Product): string => {
+    if (product.brand) {
+      return product.brand.name || '';
+    }
+    return '';
+  };
+
   // Initialize Fuse.js for fuzzy search
   const initializeFuse = (products: Product[]) => {
     const fuse = new Fuse(products, {
@@ -48,12 +73,24 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select(`
+          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+          product_variants (
+            id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
+          )
+        `)
         .eq('is_active', true);
 
       if (error) throw error;
-      setAllProducts(data || []);
-      initializeFuse(data || []);
+      
+      // Normalize brand from array to object
+      const normalizedData = (data || []).map(p => ({
+        ...p,
+        brand: normalizeBrand(p.brand)
+      })) as Product[];
+      
+      setAllProducts(normalizedData);
+      initializeFuse(normalizedData);
     } catch (error) {
       console.error('Error fetching products for search:', error);
     }
@@ -71,25 +108,39 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
     try {
       if (fuseInstance) {
         const fuseResults = fuseInstance.search(query);
-        const results = fuseResults
+        const results: SearchResult[] = fuseResults
           .slice(0, 6) // Limit to 6 results for mobile
-          .map(result => ({
-            ...result.item,
-            item_type: 'product' as const,
-            search_score: result.score || 0,
-            searchable_text: `${result.item.name} ${result.item.brand} ${result.item.description || ''}`,
-            base_price: result.item.price,
-            created_at: result.item.created_at || new Date().toISOString(),
-            variant_id: undefined,
-            variant_name: undefined,
-            variant_price: undefined,
-            combo_id: undefined,
-            combo_name: undefined,
-            combo_price: undefined,
-            original_price: undefined,
-            matched_variant: undefined,
-            matched_combo: undefined
-          }));
+          .map(result => {
+            // Get images from variants
+            const defaultVariant = result.item.product_variants?.find(v => v.is_default) || result.item.product_variants?.[0];
+            const displayImages = defaultVariant?.images || [];
+
+            return {
+              id: result.item.id,
+              name: result.item.name,
+              slug: result.item.slug,
+              brand: getBrandName(result.item),
+              brand_id: result.item.brand_id,
+              description: result.item.description,
+              gallery_images: displayImages,
+              is_active: result.item.is_active,
+              item_type: 'product' as const,
+              search_score: result.score || 0,
+              searchable_text: `${result.item.name} ${getBrandName(result.item)} ${result.item.description || ''}`,
+              base_price: getProductPrice(result.item),
+              created_at: result.item.created_at || new Date().toISOString(),
+              variant_id: undefined,
+              variant_name: undefined,
+              variant_price: undefined,
+              combo_id: undefined,
+              combo_name: undefined,
+              combo_price: undefined,
+              original_price: undefined,
+              matched_variant: undefined,
+              matched_combo: undefined,
+              product_variants: result.item.product_variants
+            };
+          });
         
         setSearchResults(results);
         setShowResults(true);

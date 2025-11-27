@@ -40,9 +40,9 @@ export function VariantManagementTable({
           <TableRow key={variant.id}>
             <TableCell>
               <div className="flex items-center gap-3">
-                {variant.variant_images?.[0] && (
+                {variant.images?.[0] && (
                   <img 
-                    src={variant.variant_images[0].image_url} 
+                    src={variant.images[0]} 
                     alt={variant.variant_name}
                     className="w-10 h-10 rounded object-cover"
                   />

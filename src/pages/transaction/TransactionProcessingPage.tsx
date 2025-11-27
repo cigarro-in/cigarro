@@ -3,11 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Check, Smartphone, RefreshCw, Wallet, ArrowRight, X, ShoppingBag, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
+import { useCart } from '../../hooks/useCart';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import QRCode from 'qrcode';
-import { useCart } from '../../hooks/useCart';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type TransactionType = 'order' | 'wallet_load' | 'order_retry' | 'wallet_payment';
@@ -41,10 +41,36 @@ export function TransactionProcessingPage() {
   const [verifiedData, setVerifiedData] = useState<any>(null);
   const [isTimeout, setIsTimeout] = useState(false);
   
+  // 5 minute countdown timer (300 seconds)
+  const [timeLeft, setTimeLeft] = useState(300); 
+  
   // Polling ref to clear interval on unmount
   const pollingRef = useRef<{ interval: NodeJS.Timeout | null }>({ interval: null });
-  // Timeout ref
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Format time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Timer effect
+  useEffect(() => {
+    if (status !== 'processing') return;
+
+    if (timeLeft <= 0) {
+      setIsTimeout(true);
+      setStatus('failed');
+      if (pollingRef.current.interval) clearInterval(pollingRef.current.interval);
+      return;
+    }
+
+    const timerId = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [timeLeft, status]);
 
   useEffect(() => {
     if (!transactionData || !user) {
@@ -52,19 +78,23 @@ export function TransactionProcessingPage() {
       return;
     }
 
+    // Handle cart clearing here instead of checkout page to prevent flicker
+    // Add a small delay to ensure the previous page (Checkout) has fully unmounted
+    // before we clear the global cart state. This prevents the Checkout page's
+    // "empty cart redirect" effect from firing during the transition.
+    if (transactionData.shouldClearCart) {
+      setTimeout(() => {
+        console.log('🛒 Clearing cart in transaction page...');
+        clearCart().catch(err => console.error('Error clearing cart:', err));
+      }, 500);
+    }
+
     initializeTransaction();
     
-    // Set global timeout (5 minutes = 300,000 ms)
-    timeoutRef.current = setTimeout(() => {
-        if (status === 'processing') {
-            setIsTimeout(true);
-            if (pollingRef.current.interval) clearInterval(pollingRef.current.interval);
-        }
-    }, 300000);
-
+    // NOTE: Global timeout is now handled by the timeLeft effect above
+    
     return () => {
       if (pollingRef.current.interval) clearInterval(pollingRef.current.interval);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -169,11 +199,7 @@ export function TransactionProcessingPage() {
   };
 
   const finalizeSuccess = async () => {
-    // Only clear cart if explicitly allowed (default to true for normal checkout)
-    // shouldClearCart is undefined for normal checkout (legacy), so check for false explicitly
-    if (transactionData.shouldClearCart !== false) {
-      await clearCart();
-    }
+    // Cart already cleared on page load, just clean up session storage
     sessionStorage.removeItem('buyNowItem');
     sessionStorage.removeItem('isBuyNow');
     sessionStorage.removeItem('retryOrder');
@@ -227,6 +253,18 @@ export function TransactionProcessingPage() {
                         : 'Please approve the request on your UPI app'
                     }
                 </p>
+                
+                {/* Countdown Timer */}
+                {status === 'processing' && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="inline-flex items-center gap-2 bg-canyon/10 px-3 py-1 rounded-full text-canyon font-mono font-medium text-sm mt-2"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    {formatTime(timeLeft)}
+                  </motion.div>
+                )}
             </div>
 
             {/* Amount */}

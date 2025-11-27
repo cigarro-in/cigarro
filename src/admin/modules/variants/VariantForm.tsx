@@ -109,17 +109,12 @@ export function VariantForm({ variant, onSave, onCancel }: VariantFormProps) {
     setLoading(true);
 
     try {
-      const attributes = formData.attributes
-        .filter(attr => attr.key && attr.value)
-        .reduce((acc, attr) => ({ ...acc, [attr.key]: attr.value }), {});
-
       const variantData = {
         product_id: formData.product_id,
         variant_name: formData.variant_name,
         variant_type: formData.variant_type,
         price: formData.price,
         stock: formData.stock,
-        attributes,
         is_active: formData.is_active
       };
 

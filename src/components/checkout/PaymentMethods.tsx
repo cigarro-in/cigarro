@@ -1,10 +1,9 @@
-import { ChevronRight, Smartphone, QrCode, Wallet, ExternalLink } from 'lucide-react';
+import { ChevronRight, QrCode, Wallet, ExternalLink } from 'lucide-react';
 
 interface PaymentMethodsProps {
   selectedPaymentMethod: string;
   setSelectedPaymentMethod: (method: string) => void;
   setShowPaymentDialog: (show: boolean) => void;
-  handleUPIPayment: () => void;
   handleQRPayment: () => void;
   handleWalletPayment: () => void;
   walletBalance: number;
@@ -15,7 +14,6 @@ export function PaymentMethods({
   selectedPaymentMethod,
   setSelectedPaymentMethod,
   setShowPaymentDialog,
-  handleUPIPayment,
   handleQRPayment,
   handleWalletPayment,
   walletBalance,
@@ -23,27 +21,6 @@ export function PaymentMethods({
 }: PaymentMethodsProps) {
   return (
     <div className="space-y-3">
-      {/* UPI Apps Option */}
-      <button
-        onClick={() => {
-          setSelectedPaymentMethod('upi');
-          setShowPaymentDialog(false);
-          handleUPIPayment();
-        }}
-        className="w-full p-4 bg-creme-light border-2 border-coyote/30 rounded-xl hover:border-canyon hover:bg-creme transition-all active:scale-95 group"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-dark flex items-center justify-center flex-shrink-0 group-hover:bg-canyon transition-colors">
-            <Smartphone className="w-6 h-6 text-creme-light" />
-          </div>
-          <div className="text-left flex-1">
-            <p className="font-semibold text-dark text-sm">UPI Apps</p>
-            <p className="text-xs text-dark/60 mt-0.5">GPay, PhonePe, Paytm & more</p>
-          </div>
-          <ChevronRight className="w-5 h-5 text-dark/40 group-hover:text-canyon transition-colors" />
-        </div>
-      </button>
-
       {/* QR Code Option */}
       <button
         onClick={() => {

@@ -25,7 +25,7 @@ export interface ProductVariant {
   is_active: boolean;
   sort_order: number;
   attributes: Record<string, string>;
-  variant_images?: Array<{ image_url: string; sort_order: number }>;
+  images?: string[];
   products?: { name: string; brand?: { name: string } };
 }
 
@@ -38,7 +38,7 @@ export interface VariantFormData {
   is_active: boolean;
   sort_order: number;
   attributes: Record<string, string>;
-  variant_images: string[];
+  variant_images: string[]; // Will be saved to images field
 }
 
 export interface DashboardAnalytics {

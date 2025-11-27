@@ -66,7 +66,12 @@ export function CategoryShowcases() {
       // 3. Fetch the actual products (bulk)
       const { data: allProducts, error: productsError } = await supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select(`
+          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+          product_variants (
+            id, product_id, variant_name, variant_type, price, is_default, is_active, images
+          )
+        `)
         .in('id', allProductIds)
         .eq('is_active', true)
         .order('created_at', { ascending: false });

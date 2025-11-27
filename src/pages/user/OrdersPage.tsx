@@ -61,6 +61,7 @@ interface Order {
   };
   paymentMethod: string;
   upiId?: string;
+  orderType?: 'standard' | 'wallet_load';
 }
 
 export function OrdersPage() {
@@ -156,19 +157,20 @@ export function OrdersPage() {
         deliveryNotes: order.delivery_notes,
         deliveryProofUrl: order.delivery_proof_url,
         shippingAddress: {
-          name: order.shipping_name,
-          full_name: order.shipping_name,
-          phone: order.shipping_phone,
-          address: order.shipping_address,
-          city: order.shipping_city,
-          state: order.shipping_state,
-          zipCode: order.shipping_zip_code,
-          pincode: order.shipping_zip_code,
+          name: order.shipping_name || 'N/A',
+          full_name: order.shipping_name || 'N/A',
+          phone: order.shipping_phone || '',
+          address: order.shipping_address || '',
+          city: order.shipping_city || '',
+          state: order.shipping_state || '',
+          zipCode: order.shipping_zip_code || '',
+          pincode: order.shipping_zip_code || '',
           country: order.shipping_country || 'India',
           label: order.shipping_method || 'Saved address',
         },
         paymentMethod: order.payment_method,
-        upiId: order.upi_id
+        upiId: order.upi_id,
+        orderType: order.order_type || (order.order_items.length === 1 && order.order_items[0].product_name === 'Wallet Credit' ? 'wallet_load' : 'standard')
       })) || [];
 
       if (reset) {
@@ -272,13 +274,22 @@ export function OrdersPage() {
       const productsToAdd = order.items.map(item => ({
         id: item.id,
         name: item.name,
-        brand: item.brand,
+        brand: { id: 'unknown', name: item.brand },
         price: item.price,
         image: item.image,
         slug: item.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
         description: '',
         is_active: true,
-        gallery_images: [item.image],
+        product_variants: [{
+          id: 'default',
+          variant_name: 'Default',
+          variant_type: 'standard',
+          images: [item.image],
+          price: item.price,
+          is_default: true,
+          is_active: true,
+          stock: 100
+        }],
         rating: 0,
         review_count: 0,
         created_at: new Date().toISOString()
@@ -296,6 +307,45 @@ export function OrdersPage() {
   const handleRetryPayment = async (order: Order) => {
     if (!user) {
       toast.error('Please sign in to retry payment');
+      return;
+    }
+
+    // Special handling for Wallet Loads - Go directly to transaction page
+    if (order.orderType === 'wallet_load') {
+      // Need to fetch the UPI link again? Actually we can just reuse the order details
+      // But the transaction page expects 'transactionId' and 'upiUrl' in state.
+      // The order object has 'transactionId' and 'upiId' (which is just the VPA, not the full link).
+      // Wait, create_order returns 'upi_deep_link'. Does the order record store the full deep link?
+      // The DB schema for 'orders' doesn't seem to store the full 'upi_deep_link', only 'upi_id' (the VPA).
+      // However, we can reconstruct the link or fetch it.
+      // Actually, the 'TransactionProcessingPage' generates the QR from 'upiUrl'.
+      // If we don't have the full link, we might need to regenerate it.
+      // Let's see... create_order generates it.
+      // But we can just construct it: upi://pay?pa=...
+      
+      const upiLink = `upi://pay?pa=${order.upiId || 'hrejuh@upi'}&pn=Cigarro&am=${order.total}&cu=INR&tn=Order-${order.transactionId}`;
+      
+      // Try to open UPI app immediately
+      try {
+        window.location.href = upiLink;
+      } catch (e) {
+        console.error('Failed to open UPI link:', e);
+      }
+
+      navigate('/transaction', {
+        state: {
+          type: 'order',
+          transactionId: order.transactionId,
+          amount: order.total,
+          orderId: order.id,
+          displayOrderId: order.displayOrderId,
+          paymentMethod: 'upi',
+          upiUrl: upiLink,
+          metadata: {
+            is_wallet_load: true
+          }
+        }
+      });
       return;
     }
 
@@ -400,6 +450,7 @@ export function OrdersPage() {
             {orders.map((order, index) => {
               const isExpanded = expandedOrderId === order.id;
               const isLastOrder = orders.length === index + 1;
+              const isWalletLoad = order.orderType === 'wallet_load';
               
               return (
                 <div 
@@ -420,13 +471,19 @@ export function OrdersPage() {
                         <h3 className="font-mono tracking-tight text-base md:text-lg text-foreground font-bold mb-1">
                           Order #{order.displayOrderId}
                         </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{new Date(order.createdAt).toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric',
-                          })}
-                        </p>
+                          })}</span>
+                          {isWalletLoad && (
+                            <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 flex items-center gap-1 px-1.5 py-0.5 h-5">
+                              <Wallet className="w-3 h-3" />
+                              <span>Wallet Load</span>
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <Badge className={`${getStatusColor(order.status)} flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0`}>
                         {getStatusIcon(order.status)}
@@ -436,7 +493,21 @@ export function OrdersPage() {
 
                     {/* Product Preview */}
                     <div className="flex items-center gap-3 mb-3">
-                      {order.items && order.items.length > 0 ? (
+                      {isWalletLoad ? (
+                        <>
+                          <div className="w-14 h-14 rounded-lg overflow-hidden bg-emerald-100/50 flex-shrink-0 flex items-center justify-center border border-emerald-200/50">
+                            <Wallet className="w-6 h-6 text-emerald-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-sans text-sm text-foreground font-medium truncate">
+                              Wallet Credit
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Cigarro Wallet • {formatINR(order.total)}
+                            </p>
+                          </div>
+                        </>
+                      ) : order.items && order.items.length > 0 ? (
                         <>
                           <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
                             <ImageWithFallback
@@ -510,84 +581,87 @@ export function OrdersPage() {
                   {isExpanded && (
                     <div className="border-t-2 border-border/40 bg-muted/10 animate-in slide-in-from-top-2 duration-300">
                       <div className="p-4 md:p-5 space-y-4">
-                        {/* All Order Items */}
-                        <div>
-                          <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                            <Package className="w-4 h-4" />
-                            Order Items ({order.items.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border/30 shadow-sm">
-                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
-                                  <ImageWithFallback
-                                    src={item.image}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover"
-                                  />
+                        
+                        {/* All Order Items - Hide for Wallet Loads */}
+                        {!isWalletLoad && (
+                          <div>
+                            <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                              <Package className="w-4 h-4" />
+                              Order Items ({order.items.length})
+                            </h4>
+                            <div className="space-y-3">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border/30 shadow-sm">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
+                                    <ImageWithFallback
+                                      src={item.image}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-sans text-sm text-foreground font-medium truncate">
+                                      {item.name}{item.variant_name && ` (${item.variant_name})`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.brand} • Qty: {item.quantity}
+                                    </p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className="font-sans text-sm font-semibold text-foreground">
+                                      {formatINR(item.price * item.quantity)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatINR(item.price)} each
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-sans text-sm text-foreground font-medium truncate">
-                                    {item.name}{item.variant_name && ` (${item.variant_name})`}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.brand} • Qty: {item.quantity}
-                                  </p>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="font-sans text-sm font-semibold text-foreground">
-                                    {formatINR(item.price * item.quantity)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatINR(item.price)} each
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
+                            <Separator className="my-4 bg-border/20" />
                           </div>
-                        </div>
+                        )}
 
-                        <Separator className="bg-border/20" />
-
-                        {/* Order Summary */}
-                        <div>
-                          <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">
-                            Order Summary
-                          </h4>
-                          <div className="space-y-2 text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Subtotal</span>
-                              <span className="text-foreground font-medium">{formatINR(order.subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Shipping</span>
-                              <span className="text-foreground font-medium">
-                                {order.shipping === 0 ? 'Free' : formatINR(order.shipping)}
-                              </span>
-                            </div>
-                            {order.discount && order.discount > 0 && (
+                        {/* Order Summary - Simplified for Wallet Loads */}
+                        {!isWalletLoad && (
+                          <div>
+                            <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">
+                              Order Summary
+                            </h4>
+                            <div className="space-y-2 text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm">
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Discount</span>
-                                <span className="text-green-600 font-medium">-{formatINR(order.discount)}</span>
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span className="text-foreground font-medium">{formatINR(order.subtotal)}</span>
                               </div>
-                            )}
-                            {order.tax > 0 && (
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Tax</span>
-                                <span className="text-foreground font-medium">{formatINR(order.tax)}</span>
+                                <span className="text-muted-foreground">Shipping</span>
+                                <span className="text-foreground font-medium">
+                                  {order.shipping === 0 ? 'Free' : formatINR(order.shipping)}
+                                </span>
                               </div>
-                            )}
-                            <Separator className="my-2 bg-border/20" />
-                            <div className="flex justify-between text-base">
-                              <span className="text-foreground font-semibold">Total</span>
-                              <span className="text-foreground font-bold">{formatINR(order.total)}</span>
+                              {order.discount && order.discount > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Discount</span>
+                                  <span className="text-green-600 font-medium">-{formatINR(order.discount)}</span>
+                                </div>
+                              )}
+                              {order.tax > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Tax</span>
+                                  <span className="text-foreground font-medium">{formatINR(order.tax)}</span>
+                                </div>
+                              )}
+                              <Separator className="my-2 bg-border/20" />
+                              <div className="flex justify-between text-base">
+                                <span className="text-foreground font-semibold">Total Amount</span>
+                                <span className="text-foreground font-bold">{formatINR(order.total)}</span>
+                              </div>
                             </div>
+                            <Separator className="bg-border/20" />
                           </div>
-                        </div>
+                        )}
 
-                        <Separator className="bg-border/20" />
-
-                        {/* Shipping Tracking */}
+                        {/* Shipping Tracking - Hide for Wallet Loads */}
                         {(order.shippingCompany || order.trackingId || order.trackingLink) && (
                           <>
                             <div>
@@ -654,59 +728,62 @@ export function OrdersPage() {
                         )}
 
                         {/* Delivery Address */}
-                        <div>
-                          <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            Delivery Address
-                          </h4>
-                          <div className="text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm space-y-1">
-                            <p className="text-foreground font-medium">{order.shippingAddress.name}</p>
-                            <p className="text-muted-foreground">{order.shippingAddress.address}</p>
-                            <p className="text-muted-foreground">
-                              {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
-                            </p>
-                          </div>
-                        </div>
-
-                        <Separator className="bg-border/20" />
-
-                        {/* Payment Information */}
-                        <div>
-                          <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                            <PaymentIcon className="w-4 h-4" />
-                            Payment
-                          </h4>
-                          <div className="text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">Method:</span>
-                              <span className="text-foreground font-medium">{order.paymentMethod}</span>
+                        {!isWalletLoad && (
+                          <div>
+                            <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                              <MapPin className="w-4 h-4" />
+                              Delivery Address
+                            </h4>
+                            <div className="text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm space-y-1">
+                              <p className="text-foreground font-medium">{order.shippingAddress.name}</p>
+                              <p className="text-muted-foreground">{order.shippingAddress.address}</p>
+                              <p className="text-muted-foreground">
+                                {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
+                              </p>
                             </div>
-                            {order.upiId && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">UPI ID:</span>
-                                <span className="text-foreground font-mono text-xs">{order.upiId}</span>
-                              </div>
-                            )}
-                            {order.paymentVerified === 'YES' && (
-                              <div className="flex items-center gap-2 text-green-600">
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                <span className="font-medium">Payment Verified</span>
-                              </div>
-                            )}
-                            {order.paymentVerified === 'NO' && order.paymentConfirmed && (
-                              <div className="flex items-center gap-2 text-yellow-600">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                <span className="font-medium">Pending Verification</span>
-                              </div>
-                            )}
-                            {order.paymentVerified === 'REJECTED' && (
-                              <div className="flex items-center gap-2 text-red-600">
-                                <XCircle className="w-3.5 h-3.5" />
-                                <span className="font-medium">Payment Rejected</span>
-                              </div>
-                            )}
+                            <Separator className="bg-border/20" />
                           </div>
-                        </div>
+                        )}
+
+                        {/* Payment Information - Simplified for Wallet Loads */}
+                        {!isWalletLoad && (
+                          <div>
+                            <h4 className="font-sans font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                              <PaymentIcon className="w-4 h-4" />
+                              Payment
+                            </h4>
+                            <div className="text-sm bg-card rounded-lg p-3 border border-border/30 shadow-sm space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground">Method:</span>
+                                <span className="text-foreground font-medium">{order.paymentMethod}</span>
+                              </div>
+                              {order.upiId && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">UPI ID:</span>
+                                  <span className="text-foreground font-mono text-xs">{order.upiId}</span>
+                                </div>
+                              )}
+                              {order.paymentVerified === 'YES' && (
+                                <div className="flex items-center gap-2 text-green-600">
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <span className="font-medium">Payment Verified</span>
+                                </div>
+                              )}
+                              {order.paymentVerified === 'NO' && order.paymentConfirmed && (
+                                <div className="flex items-center gap-2 text-yellow-600">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span className="font-medium">Pending Verification</span>
+                                </div>
+                              )}
+                              {order.paymentVerified === 'REJECTED' && (
+                                <div className="flex items-center gap-2 text-red-600">
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span className="font-medium">Payment Rejected</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-2">

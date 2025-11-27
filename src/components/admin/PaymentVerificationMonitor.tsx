@@ -9,29 +9,26 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock, 
-  Mail, 
   DollarSign,
   FileText,
   AlertCircle,
-  Eye,
-  Search
+  Eye
 } from 'lucide-react';
 import { formatINR } from '../../utils/currency';
 
-interface PaymentLog {
+// Using transactions table instead of dropped payment_verification_logs
+interface Transaction {
   id: string;
-  order_id: string;
-  transaction_id: string;
+  internal_transaction_id: string;
+  order_id?: string;
+  user_id: string;
   amount: number;
-  status: 'pending' | 'verified' | 'failed';
-  email_found: boolean;
-  email_parsed: boolean;
-  amount_matched: boolean;
-  bank_name: string | null;
-  upi_reference: string | null;
-  error_message: string | null;
+  type: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  payment_method?: string;
+  verified: boolean;
   created_at: string;
-  verified_at: string | null;
+  completed_at?: string;
   order?: {
     id: string;
     status: string;
@@ -49,7 +46,7 @@ interface VerificationStats {
 }
 
 export function PaymentVerificationMonitor() {
-  const [logs, setLogs] = useState<PaymentLog[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<VerificationStats>({
     total: 0,
     verified: 0,
@@ -58,24 +55,24 @@ export function PaymentVerificationMonitor() {
     success_rate: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedLog, setSelectedLog] = useState<PaymentLog | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    fetchLogs();
+    fetchTransactions();
     
     // Set up real-time subscription
     const channel = supabase
-      .channel('payment_verification_logs')
+      .channel('transactions_monitor')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'payment_verification_logs'
+          table: 'transactions'
         },
         () => {
-          fetchLogs();
+          fetchTransactions();
         }
       )
       .subscribe();
@@ -85,53 +82,55 @@ export function PaymentVerificationMonitor() {
     };
   }, []);
 
-  const fetchLogs = async () => {
+  const fetchTransactions = async () => {
     setIsLoading(true);
     try {
-      console.log('Fetching payment verification logs...');
-      // Fetch logs with order details
-      const { data: logsData, error: logsError } = await supabase
-        .from('payment_verification_logs')
+      // Fetch transactions with order details
+      const { data, error } = await supabase
+        .from('transactions')
         .select(`
           *,
-          order:orders!payment_verification_logs_order_id_fkey (
+          order:orders (
             id,
             status,
             shipping_name,
             shipping_phone
           )
         `)
+        .in('type', ['order_payment', 'order_partial_gateway', 'wallet_load_upi'])
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (logsError) {
-        console.error('Error fetching logs:', logsError);
-        throw logsError;
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        throw error;
       }
 
-      console.log('Fetched logs:', logsData);
-      setLogs(logsData || []);
+      setTransactions(data || []);
 
       // Calculate stats
-      const total = logsData?.length || 0;
-      const verified = logsData?.filter(l => l.status === 'verified').length || 0;
-      const pending = logsData?.filter(l => l.status === 'pending').length || 0;
-      const failed = logsData?.filter(l => l.status === 'failed').length || 0;
+      const total = data?.length || 0;
+      const verified = data?.filter(t => t.status === 'completed' && t.verified).length || 0;
+      const pending = data?.filter(t => t.status === 'pending').length || 0;
+      const failed = data?.filter(t => t.status === 'failed').length || 0;
       const success_rate = total > 0 ? (verified / total) * 100 : 0;
 
       setStats({ total, verified, pending, failed, success_rate });
     } catch (error) {
-      console.error('Error fetching logs:', error);
-      toast.error('Failed to fetch verification logs');
+      console.error('Error fetching transactions:', error);
+      toast.error('Failed to fetch transactions');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, verified: boolean) => {
+    if (status === 'completed' && verified) {
+      return <Badge className="bg-green-500 text-white"><CheckCircle2 className="w-3 h-3 mr-1" />Verified</Badge>;
+    }
     switch (status) {
-      case 'verified':
-        return <Badge className="bg-green-500 text-white"><CheckCircle2 className="w-3 h-3 mr-1" />Verified</Badge>;
+      case 'completed':
+        return <Badge className="bg-blue-500 text-white"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-500 text-white"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
       case 'failed':
@@ -141,16 +140,8 @@ export function PaymentVerificationMonitor() {
     }
   };
 
-  const getStepStatus = (completed: boolean) => {
-    return completed ? (
-      <CheckCircle2 className="w-5 h-5 text-green-500" />
-    ) : (
-      <XCircle className="w-5 h-5 text-red-500" />
-    );
-  };
-
-  const viewDetails = (log: PaymentLog) => {
-    setSelectedLog(log);
+  const viewDetails = (txn: Transaction) => {
+    setSelectedTransaction(txn);
     setShowDetails(true);
   };
 
@@ -219,12 +210,12 @@ export function PaymentVerificationMonitor() {
         </Card>
       </div>
 
-      {/* Logs Table */}
+      {/* Transactions Table */}
       <Card className="bg-creme-light border-coyote">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="font-serif-premium text-dark">Recent Verification Logs</CardTitle>
+          <CardTitle className="font-serif-premium text-dark">Recent Payment Transactions</CardTitle>
           <Button
-            onClick={fetchLogs}
+            onClick={fetchTransactions}
             disabled={isLoading}
             size="sm"
             variant="outline"
@@ -239,10 +230,10 @@ export function PaymentVerificationMonitor() {
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="w-8 h-8 animate-spin text-canyon" />
             </div>
-          ) : logs.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <div className="text-center py-12 text-dark/60">
               <AlertCircle className="w-12 h-12 mx-auto mb-3 text-dark/40" />
-              <p>No verification logs yet</p>
+              <p>No transactions yet</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -250,20 +241,19 @@ export function PaymentVerificationMonitor() {
                 <thead>
                   <tr className="border-b border-coyote">
                     <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Time</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Order ID</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Transaction ID</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Customer</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Amount</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Type</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Steps</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Bank</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-dark">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-coyote/30 hover:bg-creme transition-colors">
+                  {transactions.map((txn) => (
+                    <tr key={txn.id} className="border-b border-coyote/30 hover:bg-creme transition-colors">
                       <td className="py-3 px-4 text-sm text-dark">
-                        {new Date(log.created_at).toLocaleString('en-IN', {
+                        {new Date(txn.created_at).toLocaleString('en-IN', {
                           day: '2-digit',
                           month: 'short',
                           hour: '2-digit',
@@ -272,43 +262,27 @@ export function PaymentVerificationMonitor() {
                       </td>
                       <td className="py-3 px-4">
                         <code className="text-xs bg-coyote/20 px-2 py-1 rounded">
-                          {log.transaction_id}
+                          {txn.internal_transaction_id}
                         </code>
                       </td>
                       <td className="py-3 px-4 text-sm text-dark">
                         <div>
-                          <p className="font-medium">{log.order?.shipping_name || 'N/A'}</p>
-                          <p className="text-xs text-dark/60">{log.order?.shipping_phone || 'N/A'}</p>
+                          <p className="font-medium">{txn.order?.shipping_name || 'N/A'}</p>
+                          <p className="text-xs text-dark/60">{txn.order?.shipping_phone || 'N/A'}</p>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm font-semibold text-dark">
-                        {formatINR(log.amount)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {getStatusBadge(log.status)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1" title="Email Found">
-                            <Mail className="w-4 h-4 text-dark/40" />
-                            {getStepStatus(log.email_found)}
-                          </div>
-                          <div className="flex items-center gap-1" title="Email Parsed">
-                            <Search className="w-4 h-4 text-dark/40" />
-                            {getStepStatus(log.email_parsed)}
-                          </div>
-                          <div className="flex items-center gap-1" title="Amount Matched">
-                            <DollarSign className="w-4 h-4 text-dark/40" />
-                            {getStepStatus(log.amount_matched)}
-                          </div>
-                        </div>
+                        {formatINR(txn.amount)}
                       </td>
                       <td className="py-3 px-4 text-sm text-dark">
-                        {log.bank_name || '-'}
+                        <Badge variant="outline">{txn.type.replace(/_/g, ' ')}</Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        {getStatusBadge(txn.status, txn.verified)}
                       </td>
                       <td className="py-3 px-4">
                         <Button
-                          onClick={() => viewDetails(log)}
+                          onClick={() => viewDetails(txn)}
                           size="sm"
                           variant="ghost"
                           className="text-canyon hover:text-canyon hover:bg-canyon/10"
@@ -326,12 +300,12 @@ export function PaymentVerificationMonitor() {
       </Card>
 
       {/* Details Modal */}
-      {showDetails && selectedLog && (
+      {showDetails && selectedTransaction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle className="font-serif-premium text-dark flex items-center justify-between">
-                <span>Verification Details</span>
+                <span>Transaction Details</span>
                 <Button
                   onClick={() => setShowDetails(false)}
                   size="sm"
@@ -342,98 +316,69 @@ export function PaymentVerificationMonitor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Order Info */}
+              {/* Transaction Info */}
               <div className="bg-creme-light p-4 rounded-lg border border-coyote">
-                <h3 className="font-semibold text-dark mb-3">Order Information</h3>
+                <h3 className="font-semibold text-dark mb-3">Transaction Information</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-dark/60">Transaction ID</p>
-                    <code className="text-dark font-mono">{selectedLog.transaction_id}</code>
+                    <code className="text-dark font-mono">{selectedTransaction.internal_transaction_id}</code>
                   </div>
                   <div>
                     <p className="text-dark/60">Amount</p>
-                    <p className="text-dark font-semibold">{formatINR(selectedLog.amount)}</p>
+                    <p className="text-dark font-semibold">{formatINR(selectedTransaction.amount)}</p>
                   </div>
                   <div>
-                    <p className="text-dark/60">Customer</p>
-                    <p className="text-dark">{selectedLog.order?.shipping_name || 'N/A'}</p>
+                    <p className="text-dark/60">Type</p>
+                    <p className="text-dark">{selectedTransaction.type.replace(/_/g, ' ')}</p>
                   </div>
                   <div>
-                    <p className="text-dark/60">Phone</p>
-                    <p className="text-dark text-xs">{selectedLog.order?.shipping_phone || 'N/A'}</p>
+                    <p className="text-dark/60">Payment Method</p>
+                    <p className="text-dark">{selectedTransaction.payment_method || 'N/A'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Verification Steps */}
-              <div className="bg-white p-4 rounded-lg border border-coyote">
-                <h3 className="font-semibold text-dark mb-3">Verification Process</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    {getStepStatus(selectedLog.email_found)}
-                    <div>
-                      <p className="font-medium text-dark">Email Found</p>
-                      <p className="text-xs text-dark/60">
-                        {selectedLog.email_found ? 'Payment email received in inbox' : 'No matching email found'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {getStepStatus(selectedLog.email_parsed)}
-                    <div>
-                      <p className="font-medium text-dark">Email Parsed</p>
-                      <p className="text-xs text-dark/60">
-                        {selectedLog.email_parsed ? 'Successfully extracted payment details' : 'Failed to parse email content'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {getStepStatus(selectedLog.amount_matched)}
-                    <div>
-                      <p className="font-medium text-dark">Amount Matched</p>
-                      <p className="text-xs text-dark/60">
-                        {selectedLog.amount_matched ? 'Payment amount matches order total' : 'Amount mismatch detected'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Details */}
-              {selectedLog.bank_name && (
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <h3 className="font-semibold text-dark mb-3">Payment Details</h3>
+              {/* Order Info */}
+              {selectedTransaction.order && (
+                <div className="bg-white p-4 rounded-lg border border-coyote">
+                  <h3 className="font-semibold text-dark mb-3">Order Information</h3>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-dark/60">Bank</p>
-                      <p className="text-dark font-medium">{selectedLog.bank_name}</p>
+                      <p className="text-dark/60">Customer</p>
+                      <p className="text-dark">{selectedTransaction.order.shipping_name}</p>
                     </div>
-                    {selectedLog.upi_reference && (
-                      <div>
-                        <p className="text-dark/60">UPI Reference</p>
-                        <code className="text-dark text-xs">{selectedLog.upi_reference}</code>
-                      </div>
-                    )}
-                    {selectedLog.verified_at && (
-                      <div>
-                        <p className="text-dark/60">Verified At</p>
-                        <p className="text-dark">{new Date(selectedLog.verified_at).toLocaleString('en-IN')}</p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-dark/60">Phone</p>
+                      <p className="text-dark">{selectedTransaction.order.shipping_phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-dark/60">Order Status</p>
+                      <p className="text-dark">{selectedTransaction.order.status}</p>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Error Message */}
-              {selectedLog.error_message && (
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <h3 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    Error Details
-                  </h3>
-                  <p className="text-sm text-red-800">{selectedLog.error_message}</p>
+              {/* Status */}
+              <div className={`p-4 rounded-lg border ${selectedTransaction.verified ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <h3 className="font-semibold text-dark mb-3">Verification Status</h3>
+                <div className="flex items-center gap-3">
+                  {selectedTransaction.verified ? (
+                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  ) : (
+                    <Clock className="w-6 h-6 text-yellow-500" />
+                  )}
+                  <div>
+                    <p className="font-medium text-dark">
+                      {selectedTransaction.verified ? 'Payment Verified' : 'Awaiting Verification'}
+                    </p>
+                    <p className="text-xs text-dark/60">
+                      Status: {selectedTransaction.status}
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Timeline */}
               <div className="bg-creme-light p-4 rounded-lg border border-coyote">
@@ -441,20 +386,12 @@ export function PaymentVerificationMonitor() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-dark/60">Created</span>
-                    <span className="text-dark">{new Date(selectedLog.created_at).toLocaleString('en-IN')}</span>
+                    <span className="text-dark">{new Date(selectedTransaction.created_at).toLocaleString('en-IN')}</span>
                   </div>
-                  {selectedLog.verified_at && (
+                  {selectedTransaction.completed_at && (
                     <div className="flex justify-between">
-                      <span className="text-dark/60">Verified</span>
-                      <span className="text-dark">{new Date(selectedLog.verified_at).toLocaleString('en-IN')}</span>
-                    </div>
-                  )}
-                  {selectedLog.verified_at && (
-                    <div className="flex justify-between">
-                      <span className="text-dark/60">Duration</span>
-                      <span className="text-dark font-semibold">
-                        {Math.round((new Date(selectedLog.verified_at).getTime() - new Date(selectedLog.created_at).getTime()) / 1000)}s
-                      </span>
+                      <span className="text-dark/60">Completed</span>
+                      <span className="text-dark">{new Date(selectedTransaction.completed_at).toLocaleString('en-IN')}</span>
                     </div>
                   )}
                 </div>

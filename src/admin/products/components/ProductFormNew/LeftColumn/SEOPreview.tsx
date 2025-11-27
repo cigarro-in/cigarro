@@ -50,7 +50,7 @@ export function SEOPreview({ formData, onChange }: SEOPreviewProps) {
         {isExpanded && (
           <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
             
-            <div className="space-y-2">
+             <div className="space-y-2">
               <Label className="text-[var(--color-dark)] font-medium">Meta Title</Label>
               <Input
                 value={formData.meta_title || ''}
@@ -76,26 +76,6 @@ export function SEOPreview({ formData, onChange }: SEOPreviewProps) {
               <p className="text-xs text-[var(--color-dark)]/50 text-right">
                 {(formData.meta_description?.length || 0)}/160
               </p>
-            </div>
-
-             <div className="space-y-2">
-              <Label className="text-[var(--color-dark)] font-medium">Meta Keywords</Label>
-              <Input
-                value={formData.meta_keywords || ''}
-                onChange={(e) => onChange({ meta_keywords: e.target.value })}
-                placeholder="cigars, tobacco, premium..."
-                className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
-              />
-            </div>
-
-             <div className="space-y-2">
-              <Label className="text-[var(--color-dark)] font-medium">OG Image URL (Social Media)</Label>
-              <Input
-                value={formData.og_image || ''}
-                onChange={(e) => onChange({ og_image: e.target.value })}
-                placeholder="https://..."
-                className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
-              />
             </div>
 
           </div>

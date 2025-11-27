@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, MapPin, Smartphone, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode, Gift, CheckCircle } from 'lucide-react';
+import { Tag, MapPin, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode, Gift, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -273,6 +273,11 @@ export function MobileCheckoutPage() {
   // QR code state
   const [qrCode, setQrCode] = useState<string>('');
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  
+  // Use ref for navigation state to avoid race conditions with empty cart redirect
+  // on slower devices where state updates might lag behind context updates
+  const isNavigatingRef = useRef(false);
+
 
   // Saved addresses state
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
@@ -601,6 +606,18 @@ export function MobileCheckoutPage() {
 
       console.log('✅ Order record ready:', order.id);
 
+      // Set navigating state FIRST to lock UI and prevent redirect effects
+      isNavigatingRef.current = true;
+
+      // NOTE: Cart clearing moved to TransactionProcessingPage to prevent empty cart flicker
+      // if (shouldClearCart) {
+      //   try {
+      //     await clearCart();
+      //   } catch (err) {
+      //     console.error('Failed to clear cart (proceeding with navigation):', err);
+      //   }
+      // }
+
       // Process payment with wallet if applicable
       const { data: result, error } = await supabase.rpc('process_order_payment', {
         p_user_id: user.id,
@@ -637,8 +654,6 @@ export function MobileCheckoutPage() {
         console.log('📝 Order ID:', order.id);
         
         // Navigate to transaction processing page for seamless experience
-        // We don't clear cart here to avoid flash of empty state
-        // TransactionProcessingPage will handle cleanup
         navigate('/transaction', {
           state: {
             type: 'wallet_payment',
@@ -702,6 +717,7 @@ export function MobileCheckoutPage() {
       console.error('❌ Payment error:', error);
       toast.error('Payment failed. Please try again.');
       setIsCompletingOrder(false);
+      isNavigatingRef.current = false;
     } finally {
       setIsProcessing(false);
     }
@@ -714,124 +730,6 @@ export function MobileCheckoutPage() {
     setWalletAmountToUse(finalTotal);
     // Proceed with payment
     await handlePayment();
-  };
-
-  // Handle UPI payment
-  const handleUPIPayment = async (amount?: number, existingTxnId?: string) => {
-    if (!user) {
-      toast.error('Please sign in to continue');
-      return;
-    }
-
-    if (!selectedAddress) {
-      toast.error('Please select a delivery address');
-      setShowAddressDialog(true);
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      // Fallback ID generation (in case backend doesn't return it yet)
-      const clientTxnId = existingTxnId || `TXN${Date.now().toString().slice(-8)}`;
-      const paymentAmount = amount || Math.max(0, getFinalTotal() - walletAmountToUse);
-      const shouldClearCart = !isBuyNow && !isRetryPayment;
-      
-      let currentOrderId = existingTxnId ? undefined : undefined;
-      let finalTxnId = clientTxnId;
-      let finalUpiUrl = '';
-      let orderData: any = null;
-
-      console.log('💳 UPI Payment Debug:', {
-        isRetryPayment,
-        retryOrderExists: !!retryOrder,
-        retryOrderId: retryOrder?.orderId,
-        existingTxnId
-      });
-
-      if (!existingTxnId) {
-        // Check if this is a retry for an existing order
-        if (isRetryPayment && retryOrder?.orderId) {
-           // ... existing retry logic ...
-           // (Abbreviated for clarity - keeping existing retry logic same but capturing ID)
-          const { data: existingOrder, error: fetchError } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('id', retryOrder.orderId)
-            .maybeSingle();
-            
-          if (fetchError || !existingOrder) {
-            // Fallback to new order
-            const order = await saveOrderToDatabase(clientTxnId, 'pending');
-            if (!order) {
-               toast.error('Failed to create order');
-               return;
-            }
-            currentOrderId = order.id;
-            orderData = order;
-            // Use backend returned values if available
-            if (order.transaction_id) finalTxnId = order.transaction_id;
-            if (order.upi_deep_link) finalUpiUrl = order.upi_deep_link;
-            
-            // Clear cart immediately after successful order creation
-            if (shouldClearCart) await clearCart();
-            
-            triggerPaymentWebhook(finalTxnId, order.id, paymentAmount);
-          } else {
-            currentOrderId = existingOrder.id;
-            // Ensure we use the existing transaction ID if present
-            if (existingOrder.transaction_id) finalTxnId = existingOrder.transaction_id;
-            triggerPaymentWebhook(finalTxnId, existingOrder.id, paymentAmount);
-          }
-        } else {
-          // Create new order
-          const order = await saveOrderToDatabase(clientTxnId, 'pending');
-          if (!order) {
-            toast.error('Failed to create order');
-            return;
-          }
-          currentOrderId = order.id;
-          orderData = order;
-          
-          // Use backend returned values if available
-          if (order.transaction_id) finalTxnId = order.transaction_id;
-          if (order.upi_deep_link) finalUpiUrl = order.upi_deep_link;
-          
-          // Clear cart immediately after successful order creation
-          if (shouldClearCart) await clearCart();
-
-          // Trigger webhook
-          triggerPaymentWebhook(finalTxnId, order.id, paymentAmount);
-        }
-      }
-
-      // Use backend-provided UPI link, fallback to hardcoded if not available
-      if (!finalUpiUrl) {
-        finalUpiUrl = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${paymentAmount}&cu=INR&tn=Order%20${finalTxnId}`;
-      }
-
-      // Navigate to unified transaction page
-      navigate('/transaction', {
-        state: {
-          type: 'order',
-          transactionId: finalTxnId,
-          amount: paymentAmount,
-          orderId: currentOrderId || (existingTxnId ? undefined : finalTxnId), // Use UUID if available
-          paymentMethod: 'upi',
-          upiUrl: finalUpiUrl,
-          shouldClearCart: false, // Cart already cleared
-          metadata: {
-            items_count: items.length,
-            shipping_cost: getShippingCost(),
-            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
-          }
-        }
-      });
-    } catch (error) {
-      console.error('UPI payment error:', error);
-      toast.error('Failed to initiate payment');
-    } finally {
-      setIsProcessing(false);
-    }
   };
 
   // Handle QR payment
@@ -948,12 +846,24 @@ export function MobileCheckoutPage() {
     }
   }, [user]);
 
-  // Redirect if no items (but not during order completion or retry payment)
+  // Redirect if no items (but not during order completion, navigation, or retry payment)
   useEffect(() => {
+    // Check ref directly - safe even if component is unmounting or state is stale
+    if (isNavigatingRef.current) return;
+
     if (items.length === 0 && !isCompletingOrder && !isBuyNow && !isRetryPayment) {
       navigate('/cart');
     }
   }, [items, navigate, isCompletingOrder, isBuyNow, isRetryPayment]);
+
+  // REMOVED: Full page loading state to keep user on checkout page during processing
+  // if (isCompletingOrder || isNavigating) {
+  //   return (
+  //     <div className="min-h-screen bg-background flex items-center justify-center">
+  //       ...
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -1173,7 +1083,6 @@ export function MobileCheckoutPage() {
             selectedPaymentMethod={selectedPaymentMethod}
             setSelectedPaymentMethod={setSelectedPaymentMethod}
             setShowPaymentDialog={setShowPaymentDialog}
-            handleUPIPayment={handleUPIPayment}
             handleQRPayment={handleQRPayment}
             handleWalletPayment={handleWalletPayment}
             walletBalance={walletBalance}

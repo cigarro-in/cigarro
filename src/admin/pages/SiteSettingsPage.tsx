@@ -12,6 +12,7 @@ import { LogOut, Save, RefreshCw, FileText } from 'lucide-react';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
 
 interface SiteSettings {
+  id?: string;
   site_name: string;
   favicon_url: string;
   meta_title: string;
@@ -54,12 +55,21 @@ export function SiteSettingsPage() {
   };
 
   const handleSaveSettings = async () => {
+    if (!settings.id) {
+      toast.error('Settings not loaded yet');
+      return;
+    }
     setIsSaving(true);
     try {
       const { error } = await supabase
         .from('site_settings')
-        .update(settings)
-        .eq('id', 1);
+        .update({
+          site_name: settings.site_name,
+          favicon_url: settings.favicon_url,
+          meta_title: settings.meta_title,
+          meta_description: settings.meta_description
+        })
+        .eq('id', settings.id);
 
       if (error) {
         toast.error('Failed to save site settings');
@@ -127,13 +137,23 @@ export function SiteSettingsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get settings ID if not available in state
+      let settingsId = settings.id;
+      if (!settingsId) {
+        const { data } = await supabase.from('site_settings').select('id').single();
+        if (data) settingsId = data.id;
+      }
+
+      if (!settingsId) throw new Error('Could not find settings ID');
+
       const { error } = await supabase
         .from('site_settings')
         .update({ 
           upi_id: upiId.trim(),
           updated_at: new Date().toISOString(),
           updated_by: user?.id
-        });
+        })
+        .eq('id', settingsId);
 
       if (error) throw error;
 

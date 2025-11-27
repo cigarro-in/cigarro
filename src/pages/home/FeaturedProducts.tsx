@@ -40,7 +40,10 @@ export function FeaturedProducts() {
           .select(`
             product_id,
             products (
-              id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at
+              id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+              product_variants (
+                id, product_id, variant_name, variant_type, price, is_default, is_active, images
+              )
             )
           `)
           .eq('collection_id', collectionId)
@@ -55,13 +58,17 @@ export function FeaturedProducts() {
 
         setFeaturedProducts(products || []);
       } else {
-        // Legacy fallback: fetch by is_featured flag
+        // Legacy fallback: fetch active products
         const { data: products, error: productsError } = await supabase
           .from('products')
-          .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
-          .eq('is_featured', true)
+          .select(`
+            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+            product_variants (
+              id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
+            )
+          `)
           .eq('is_active', true)
-          .order('featured_order', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(6);
 
         if (productsError) throw productsError;

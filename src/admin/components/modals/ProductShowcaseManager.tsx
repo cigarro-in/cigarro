@@ -25,12 +25,18 @@ interface ProductShowcaseManagerProps {
   onUpdate: () => void;
 }
 
+interface ProductVariantLite {
+  id: string;
+  price: number;
+  is_default?: boolean;
+}
+
 interface Product {
   id: string;
   name: string;
-  price: number;
-  gallery_images?: string[];
+  price?: number; // legacy
   is_active: boolean;
+  product_variants?: ProductVariantLite[];
 }
 
 export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: ProductShowcaseManagerProps) {
@@ -80,7 +86,7 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
         // 2. Load Products in this Collection
         const { data: productLinks, error: linksError } = await supabase
           .from('collection_products')
-          .select('product_id, sort_order, products(id, name, price, gallery_images, is_active)')
+          .select('product_id, sort_order, products(id, name, is_active, product_variants(id, price, is_default, images))')
           .eq('collection_id', collectionData.id)
           .order('sort_order');
 
@@ -92,8 +98,8 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
             id: p.id,
             name: p.name,
             price: p.price,
-            gallery_images: p.gallery_images,
-            is_active: p.is_active
+            is_active: p.is_active,
+            product_variants: p.product_variants
           }));
         
         setCollectionProducts(linkedProducts);
@@ -102,7 +108,7 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
       // 3. Load All Products for Selection
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, price, gallery_images, is_active')
+        .select('id, name, is_active, product_variants(id, price, is_default, images)')
         .order('name');
 
       if (productsError) throw productsError;
@@ -207,6 +213,14 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
     } else {
       setCollectionProducts(prev => [...prev, product]);
     }
+  };
+
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants && product.product_variants.length > 0) {
+      const def = product.product_variants.find(v => v.is_default) || product.product_variants[0];
+      return def.price;
+    }
+    return product.price || 0;
   };
 
   const filteredAllProducts = allProducts.filter(p => 
@@ -318,11 +332,11 @@ export function ProductShowcaseManager({ open, onOpenChange, onUpdate }: Product
                         <div key={product.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded cursor-pointer" onClick={() => !isSelected && toggleProductSelection(product)}>
                             <div className="flex items-center gap-2 overflow-hidden">
                                 <div className="h-8 w-8 bg-muted rounded overflow-hidden flex-shrink-0">
-                                    {product.gallery_images?.[0] && <img src={product.gallery_images[0]} className="h-full w-full object-cover" />}
+                                    {(product as any).product_variants?.[0]?.images?.[0] && <img src={(product as any).product_variants[0].images[0]} className="h-full w-full object-cover" />}
                                 </div>
                                 <div className="truncate text-sm">
                                     <div className="font-medium truncate">{product.name}</div>
-                                    <div className="text-xs text-muted-foreground">₹{product.price}</div>
+                                    <div className="text-xs text-muted-foreground">₹{getProductPrice(product)}</div>
                                 </div>
                             </div>
                             <Button size="sm" variant={isSelected ? "secondary" : "outline"} disabled={isSelected}>

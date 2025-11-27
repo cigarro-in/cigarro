@@ -64,7 +64,10 @@ export function CategoriesGrid() {
         .select(`
           product_id,
           products (
-            id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at
+            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
+            product_variants (
+              id, product_id, variant_name, variant_type, price, is_default, is_active, images
+            )
           )
         `)
         .eq('collection_id', collectionId)

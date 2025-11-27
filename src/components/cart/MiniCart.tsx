@@ -20,7 +20,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   // Debug: Log cart items to identify any issues
-  React.useEffect(() => {
+  /* React.useEffect(() => {
     if (items.length > 0) {
       console.log('MiniCart items:', items.map((item, index) => ({
         index,
@@ -30,7 +30,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
         combo_id: item.combo_id
       })));
     }
-  }, [items]);
+  }, [items]); */
 
   const handleRemoveItem = (productId: string, variantId?: string, comboId?: string) => {
     removeFromCart(productId, variantId, comboId);
@@ -80,7 +80,11 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                             {/* Product Image */}
                             <div className="mini-cart__product-image-container flex-shrink-0">
                               <img
-                                src={getProductImageUrl(item.gallery_images?.[0] || item.image)}
+                                src={getProductImageUrl(
+                                  (item as any).product_variants?.[0]?.images?.[0] || 
+                                  (item as any).gallery_images?.[0] || 
+                                  (item as any).image
+                                )}
                                 alt={item.name}
                                 className="mini-cart__product-image w-[68px] h-[71px] rounded-[5px] bg-white block object-cover"
                               />
@@ -221,7 +225,11 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                               {/* Product Image */}
                               <div className="flex-shrink-0">
                                 <img
-                                  src={getProductImageUrl(item.gallery_images?.[0] || item.image)}
+                                  src={getProductImageUrl(
+                                    (item as any).product_variants?.[0]?.images?.[0] || 
+                                    (item as any).gallery_images?.[0] || 
+                                    (item as any).image
+                                  )}
                                   alt={item.name}
                                   className="w-16 h-16 rounded-lg object-cover bg-white"
                                 />

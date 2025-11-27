@@ -45,7 +45,10 @@ export function OrganizationCard({ formData, onChange }: OrganizationCardProps) 
         {/* Category */}
         <div className="space-y-2">
           <Label className="text-xs text-[var(--color-dark)]/60">Product Category</Label>
-          <Select>
+          <Select
+            value={formData.categories?.[0] || ''}
+            onValueChange={(val) => onChange({ categories: [val] })}
+          >
             <SelectTrigger className="w-full bg-[var(--color-creme)] border-[var(--color-coyote)]">
               <SelectValue placeholder="Select Category" />
             </SelectTrigger>

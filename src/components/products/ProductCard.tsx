@@ -4,7 +4,13 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { getProductImageUrl } from '../../lib/supabase/storage';
-import { Product } from '../../hooks/useCart';
+import { Product as CartProduct } from '../../hooks/useCart';
+import { Product as DBProduct, ProductVariant } from '../../types/product';
+
+// Extended product type that includes variants
+type ProductWithVariants = CartProduct & {
+  product_variants?: ProductVariant[];
+};
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -12,8 +18,8 @@ const formatIndianPrice = (priceINR: number): string => {
 };
 
 interface ProductCardProps {
-  product: Product;
-  onAddToCart?: (product: Product) => void;
+  product: ProductWithVariants;
+  onAddToCart?: (product: ProductWithVariants, variantId?: string) => void;
   isLoading?: boolean;
   index?: number;
   variant?: 'default' | 'list' | 'featured';
@@ -79,7 +85,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       // Create circle with product image fill
       const circle = document.createElement('div');
-      const imgUrl = !imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl();
+      // Get image from first variant or fallback
+      const variantImages = product.product_variants?.[0]?.images;
+      const imgUrl = !imageError ? getProductImageUrl(variantImages?.[0]) : getProductImageUrl();
       circle.style.position = 'fixed';
       circle.style.left = `${startLeft}px`;
       circle.style.top = `${startTop}px`;
@@ -118,11 +126,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  // Get default variant if available
+  const defaultVariant = product.product_variants?.find((v: ProductVariant) => v.is_default);
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (onAddToCart) {
-      onAddToCart(product);
+      // Pass default variant ID if available
+      onAddToCart(product, defaultVariant?.id);
       toast.success(`${product.name} added to cart`);
       // trigger mobile-only drop-to-cart animation
       animateDropToCart();
@@ -184,7 +196,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="relative aspect-square overflow-hidden bg-white">
           <img
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            src={!imageError ? getProductImageUrl(product.gallery_images?.[0]) : getProductImageUrl()}
+            src={!imageError ? getProductImageUrl(product.product_variants?.[0]?.images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
             ref={imgRef}
@@ -196,7 +208,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="p-2 sm:p-2.5 md:p-3">
           <div className="mb-1.5 sm:mb-2">
             <p className="text-canyon text-[9px] sm:text-[10px] font-medium uppercase tracking-wider mb-0.5">
-              {product.brand || 'Premium'}
+              {typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium'}
             </p>
             <h3 className="text-dark font-semibold text-xs sm:text-sm md:text-base leading-tight hover:text-canyon transition-colors line-clamp-2 min-h-[1rem]" title={product.name}>
               {product.name}
@@ -205,7 +217,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           
           <div className="flex items-center justify-between gap-1.5">
             <p className="text-dark font-bold text-sm sm:text-base md:text-lg">
-              ₹{formatIndianPrice(product.price)}
+              ₹{formatIndianPrice(defaultVariant?.price || product.product_variants?.[0]?.price || 0)}
             </p>
             
             {/* Add to Cart Button - Compact */}

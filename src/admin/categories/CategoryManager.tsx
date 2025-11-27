@@ -60,10 +60,15 @@ interface Product {
   id: string;
   name: string;
   slug: string;
-  price: number;
+  price?: number; // legacy fallback
   image_url?: string;
   gallery_images?: string[];
   brand?: string;
+  product_variants?: Array<{
+    id: string;
+    price: number;
+    is_default?: boolean;
+  }>;
 }
 
 interface CategoryFormData {
@@ -120,6 +125,16 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     loadAllProducts();
   }, []);
 
+  // Helper: get product price from default variant (or first variant), fallback to legacy price
+  const getProductPrice = (product: Product): number => {
+    if (product.product_variants && product.product_variants.length > 0) {
+      const def = product.product_variants.find(v => v.is_default);
+      if (def) return def.price;
+      return product.product_variants[0].price;
+    }
+    return product.price || 0;
+  };
+
   useEffect(() => {
     filterCategories();
     calculateAnalytics();
@@ -174,7 +189,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, price, image_url, gallery_images, brand')
+        .select('id, name, slug, is_active, product_variants(id, price, is_default, images)')
         .eq('is_active', true)
         .order('name');
 
@@ -193,7 +208,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
         .select(`
           product_id,
           products (
-            id, name, slug, price, image_url, gallery_images, brand
+            id, name, slug, is_active, product_variants(id, price, is_default, images)
           )
         `)
         .eq('category_id', categoryId);
@@ -750,7 +765,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{product.price}</p>
+                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{getProductPrice(product)}</p>
                           </div>
                           <Button
                             type="button"
@@ -792,7 +807,7 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{product.price}</p>
+                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{getProductPrice(product)}</p>
                           </div>
                           <Button
                             type="button"

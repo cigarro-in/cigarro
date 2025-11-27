@@ -1,3 +1,4 @@
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../../components/ui/card";
 import { Button } from "../../../../../components/ui/button";
 import { Input } from "../../../../../components/ui/input";
@@ -14,39 +15,47 @@ interface SmartVariantsProps {
 }
 
 export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
+  // Get default variant price (if exists)
+  const getDefaultVariantPrice = (): number => {
+    const defaultVariant = formData.variants.find(v => v.is_default);
+    return defaultVariant?.price || 0;
+  };
   
   const addVariant = (type: 'carton' | 'custom') => {
-    const basePrice = formData.price || 0;
+    const basePrice = getDefaultVariantPrice();
+    const isFirstVariant = formData.variants.length === 0;
     
     let newVariant: VariantFormData = {
       variant_name: '',
-      variant_type: 'packaging',
-      packaging: 'pack',
-      units_contained: 1,
+      variant_type: 'pack',
+      units_contained: 20,
+      unit: 'sticks',
       price: basePrice,
       stock: 0,
-      track_inventory: true,
+      track_inventory: false, // Default to false as requested
       is_active: true,
-      sort_order: formData.variants.length,
-      attributes: [],
-      assigned_images: []
+      is_default: isFirstVariant, // First variant is default
+      images: [],
+      compare_at_price: 0,
+      cost_price: 0
     };
 
     if (type === 'carton') {
       newVariant = {
         ...newVariant,
-        variant_name: 'Carton (10 Packs)',
-        packaging: 'carton',
+        variant_name: 'Carton',
+        variant_type: 'carton',
         units_contained: 10,
+        unit: 'packs',
         price: basePrice * 10 * 0.95, // 5% discount default
         compare_at_price: basePrice * 10
       };
     } else {
       newVariant = {
         ...newVariant,
-        variant_name: 'Custom Variant',
-        packaging: 'bundle',
-        units_contained: 1
+        variant_name: 'Custom',
+        variant_type: 'pack',
+        units_contained: 20
       };
     }
 
@@ -55,12 +64,30 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
 
   const updateVariant = (index: number, updates: Partial<VariantFormData>) => {
     const newVariants = [...formData.variants];
+    
+    // Handle default variant changes
+    if (updates.is_default === true) {
+      // Unset any other default variants
+      newVariants.forEach((v, i) => {
+        if (i !== index && v.is_default) {
+          newVariants[i] = { ...v, is_default: false };
+        }
+      });
+    }
+    
     newVariants[index] = { ...newVariants[index], ...updates };
     onChange({ variants: newVariants });
   };
 
   const removeVariant = (index: number) => {
+    const variantToRemove = formData.variants[index];
     const newVariants = formData.variants.filter((_, i) => i !== index);
+    
+    // If removing the default variant, set the first remaining variant as default
+    if (variantToRemove.is_default && newVariants.length > 0) {
+      newVariants[0] = { ...newVariants[0], is_default: true };
+    }
+    
     onChange({ variants: newVariants });
   };
 
@@ -76,13 +103,13 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
           <div className="text-center py-8 border-2 border-dashed border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)]/50">
             <Package className="w-12 h-12 mx-auto text-[var(--color-coyote)] mb-3" />
             <p className="text-[var(--color-dark)] font-medium">No variants added</p>
-            <p className="text-sm text-[var(--color-dark)]/60 mb-4">The base product is sold as a single unit.</p>
+            <p className="text-sm text-[var(--color-dark)]/60 mb-4">Add at least one variant to define the product.</p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => addVariant('carton')} variant="outline" className="border-[var(--color-coyote)]">
-                + Add Carton (10x)
+              <Button onClick={() => addVariant('custom')} variant="outline" className="border-[var(--color-coyote)]">
+                + Add Default Variant
               </Button>
-              <Button onClick={() => addVariant('custom')} variant="ghost">
-                + Add Custom
+              <Button onClick={() => addVariant('carton')} variant="ghost">
+                + Add Carton (10x)
               </Button>
             </div>
           </div>
@@ -94,27 +121,55 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
              const discount = calculateDiscount(variant.price, variant.compare_at_price);
              
              return (
-              <div key={index} className="p-4 bg-[var(--color-creme)] border border-[var(--color-coyote)] rounded-lg">
+              <div key={index} className={`p-4 bg-[var(--color-creme)] border ${variant.is_default ? 'border-canyon border-2' : 'border-[var(--color-coyote)]'} rounded-lg`}>
                 
                 <div className="grid grid-cols-[1fr_120px_120px_auto] gap-4 items-start mb-4">
+                  {/* Default Variant Toggle */}
+                  <div className="absolute -top-3 -right-3">
+                    <div 
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${variant.is_default ? 'bg-canyon text-white' : 'bg-gray-100 text-gray-500'}`}
+                      onClick={() => updateVariant(index, { is_default: true })}
+                    >
+                      {variant.is_default ? 'Default Variant' : 'Make Default'}
+                    </div>
+                  </div>
                   {/* Info */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-[var(--color-dark)]/60">Variant Name</Label>
+                    <Label className="text-xs text-[var(--color-dark)]/60">
+                      {variant.is_default ? 'Default Variant Name' : 'Variant Name'}
+                    </Label>
                     <div className="flex gap-2">
                       <Input
                         value={variant.variant_name}
                         onChange={(e) => updateVariant(index, { variant_name: e.target.value })}
                         className="h-9 bg-white border-[var(--color-coyote)]/50"
+                        placeholder="e.g. Packet"
                       />
-                      <div className="flex items-center gap-1 px-2 py-1 bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/30 rounded text-xs">
-                        <Box className="w-3 h-3" />
-                        <input 
-                          type="number" 
-                          value={variant.units_contained} 
-                          onChange={(e) => updateVariant(index, { units_contained: parseInt(e.target.value) })}
-                          className="w-8 bg-transparent text-center focus:outline-none"
-                        />
-                        <span className="text-[var(--color-dark)]/50">units</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/30 rounded text-xs">
+                          <Box className="w-3 h-3" />
+                          <input 
+                            type="number" 
+                            value={variant.units_contained} 
+                            onChange={(e) => updateVariant(index, { units_contained: parseInt(e.target.value) })}
+                            className="w-10 bg-transparent text-center focus:outline-none"
+                          />
+                        </div>
+                        <Select
+                          value={variant.unit}
+                          onValueChange={(val) => updateVariant(index, { unit: val })}
+                        >
+                          <SelectTrigger className="h-9 w-[100px] text-xs bg-white border-[var(--color-coyote)]/50">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sticks">Sticks</SelectItem>
+                            <SelectItem value="packs">Packs</SelectItem>
+                            <SelectItem value="cartons">Cartons</SelectItem>
+                            <SelectItem value="bundles">Bundles</SelectItem>
+                            <SelectItem value="pieces">Pieces</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -138,12 +193,22 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
                   {/* Stock */}
                   <div className="space-y-2">
                     <Label className="text-xs text-[var(--color-dark)]/60">Stock</Label>
-                    <Input
-                      type="number"
-                      value={variant.stock}
-                      onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) })}
-                      className="h-9 bg-white border-[var(--color-coyote)]/50"
-                    />
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        type="number"
+                        value={variant.stock}
+                        onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) })}
+                        className="h-9 bg-white border-[var(--color-coyote)]/50"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Switch 
+                          checked={variant.track_inventory} 
+                          onCheckedChange={(c) => updateVariant(index, { track_inventory: c })}
+                          className="scale-75 origin-left"
+                        />
+                        <span className="text-[10px] text-muted-foreground">Track</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Actions */}
@@ -159,24 +224,24 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
                   </div>
                 </div>
 
-                {/* Variant Image */}
+                {/* Variant Images */}
                 <div className="border-t border-[var(--color-coyote)]/20 pt-4">
-                  <Label className="text-xs text-[var(--color-dark)]/60 block mb-2">Variant Image (Optional)</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="scale-75 origin-top-left -mb-4 -mr-4">
-                      <MultipleImageUpload
-                        imageUrls={variant.assigned_images || []}
-                        onImageUrlsChange={(images) => updateVariant(index, { assigned_images: images })}
-                        showSelector={true}
-                        maxImages={1}
-                        id={`variant-image-${index}`}
-                      />
-                    </div>
-                    <div className="text-xs text-[var(--color-dark)]/40 italic">
-                      Upload an image specifically for this variant (e.g. Red Box). <br/>
-                      If left empty, the main product image will be used.
-                    </div>
-                  </div>
+                  <Label className="text-xs text-[var(--color-dark)]/60 block mb-2">
+                    {variant.is_default ? (
+                      <>Product Images <span className="text-red-500">*</span> <span className="text-canyon">(Primary variant - these are the main product images)</span></>
+                    ) : (
+                      'Variant Images (Optional)'
+                    )}
+                  </Label>
+                  <MultipleImageUpload
+                    imageUrls={variant.images || []}
+                    onImageUrlsChange={(images) => updateVariant(index, { images: images })}
+                    showSelector={true}
+                    id={`variant-image-${index}`}
+                  />
+                  {variant.is_default && (!variant.images || variant.images.length === 0) && (
+                    <p className="text-xs text-red-500 mt-2">Default variant must have at least one image</p>
+                  )}
                 </div>
 
               </div>

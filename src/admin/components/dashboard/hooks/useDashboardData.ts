@@ -17,7 +17,7 @@ export function useDashboardData() {
   });
   const [loading, setLoading] = useState(false);
 
-  // Load products with optimized query
+  // Load products (no price/stock in new schema)
   const loadProducts = useCallback(async () => {
     try {
       const { data: products, error } = await supabase
@@ -25,11 +25,11 @@ export function useDashboardData() {
         .select(`
           id,
           name,
-          brand,
-          price,
-          stock,
+          slug,
+          brand_id,
+          brand:brands(id, name),
+          description,
           is_active,
-          image_url,
           created_at,
           categories(name)
         `)
@@ -59,14 +59,8 @@ export function useDashboardData() {
           price,
           stock,
           is_active,
-          sort_order,
-          attributes,
           products!inner(name),
-          variant_images(
-            id,
-            image_url,
-            sort_order
-          )
+          images
         `)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -84,23 +78,25 @@ export function useDashboardData() {
   // Load analytics with optimized query
   const loadAnalytics = useCallback(async () => {
     try {
-      // Single query to get all analytics data
+      // Products for counts
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('price, stock, is_active');
+        .select('id, is_active');
 
+      // Variants for inventory/value
       const { data: variants, error: variantsError } = await supabase
         .from('product_variants')
-        .select('id');
+        .select('id, price, stock, is_active');
 
       if (productsError) throw productsError;
       if (variantsError) throw variantsError;
 
       if (products) {
         const totalProducts = products.length;
-        const activeProducts = products.filter(p => p.is_active).length;
-        const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
-        const lowStockProducts = products.filter(p => p.stock < 10).length;
+        const activeProducts = products.filter((p: any) => p.is_active).length;
+
+        const totalValue = (variants || []).reduce((sum: number, v: any) => sum + (v.price * v.stock), 0);
+        const lowStockProducts = (variants || []).filter((v: any) => v.stock < 10).length;
         const totalVariants = variants?.length || 0;
 
         const newAnalytics = {
@@ -160,9 +156,7 @@ export function useDashboardData() {
           variant_type: variantForm.variant_type,
           price: variantForm.price,
           stock: variantForm.stock,
-          is_active: variantForm.is_active,
-          sort_order: variantForm.sort_order,
-          attributes: variantForm.attributes
+          is_active: variantForm.is_active
         };
         
         const { error } = await supabase
@@ -172,24 +166,12 @@ export function useDashboardData() {
 
         if (error) throw error;
 
-        // Handle variant images separately
+        // Update variant images directly
         if (variantForm.variant_images.length > 0) {
-          // Delete existing images
           await supabase
-            .from('variant_images')
-            .delete()
-            .eq('variant_id', editingVariant.id);
-
-          // Insert new images
-          const imageData = variantForm.variant_images.map((url, index) => ({
-            variant_id: editingVariant.id,
-            image_url: url,
-            sort_order: index
-          }));
-
-          await supabase
-            .from('variant_images')
-            .insert(imageData);
+            .from('product_variants')
+            .update({ images: variantForm.variant_images })
+            .eq('id', editingVariant.id);
         }
 
         toast.success('Variant updated successfully');
@@ -201,9 +183,7 @@ export function useDashboardData() {
           variant_type: variantForm.variant_type,
           price: variantForm.price,
           stock: variantForm.stock,
-          is_active: variantForm.is_active,
-          sort_order: variantForm.sort_order,
-          attributes: variantForm.attributes
+          is_active: variantForm.is_active
         };
         
         const { data: newVariant, error: variantError } = await supabase
@@ -214,17 +194,12 @@ export function useDashboardData() {
 
         if (variantError) throw variantError;
 
-        // Insert variant images
+        // Set variant images directly
         if (variantForm.variant_images.length > 0 && newVariant) {
-          const imageData = variantForm.variant_images.map((url, index) => ({
-            variant_id: newVariant.id,
-            image_url: url,
-            sort_order: index
-          }));
-
           await supabase
-            .from('variant_images')
-            .insert(imageData);
+            .from('product_variants')
+            .update({ images: variantForm.variant_images })
+            .eq('id', newVariant.id);
         }
 
         toast.success('Variant created successfully');

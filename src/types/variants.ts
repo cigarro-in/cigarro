@@ -4,81 +4,65 @@ export interface ProductVariant {
   id: string;
   product_id: string;
   variant_name: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
-  variant_description?: string;
+  variant_slug?: string;
+  variant_type: string; // pack, carton, box, bundle, etc.
+  is_default?: boolean;
+  units_contained?: number;
+  unit?: string; // sticks, packs, pieces, etc.
+  images?: string[];
+  image_alt_text?: string;
   price: number;
-  stock: number;
-  stock_quantity?: number; // Keep for backward compatibility
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
-  attributes?: Record<string, any>; // JSONB field for variant attributes
+  compare_at_price?: number;
+  cost_price?: number;
+  stock?: number;
+  track_inventory?: boolean;
   is_active: boolean;
-  sort_order: number;
-  // New schema supports variant_images table; keep images for backward compat
-  images?: VariantImage[];
-  variant_images?: VariantImage[];
   created_at: string;
   updated_at: string;
-  products?: {
+  product?: {
     id: string;
     name: string;
-    brand: string;
+    brand?: { name: string };
   };
 }
 
-export interface VariantImage {
-  id: string;
-  variant_id: string;
-  image_url: string;
-  alt_text?: string;
-  sort_order: number;
-  is_primary: boolean;
-  created_at: string;
-}
-
-export interface ProductCombo {
+// Combo (renamed from product_combos)
+export interface Combo {
   id: string;
   name: string;
   slug: string;
   description?: string;
   combo_price: number;
-  original_price: number;
-  discount_percentage: number;
-  savings_amount?: number;
-  combo_image?: string;
-  gallery_images: string[];
+  original_price?: number;
+  discount_percentage?: number;
+  image?: string;
+  gallery_images?: string[];
   is_active: boolean;
-  sort_order?: number;
   created_at: string;
   updated_at: string;
-  items: ComboItem[];
   combo_items?: ComboItem[];
 }
+
+// Legacy alias
+export type ProductCombo = Combo;
 
 export interface ComboItem {
   id: string;
   combo_id: string;
-  product_id: string;
-  variant_id?: string;
+  variant_id: string;
   quantity: number;
-  sort_order: number;
+  sort_order?: number;
   created_at: string;
-  product?: Product;
   variant?: ProductVariant;
 }
 
-// Minimal Product type for references in combos and elsewhere
+// Minimal Product type for references
 export interface Product {
   id: string;
   name: string;
   slug?: string;
-  brand: string; // Made required again since we added it back to database
-  price?: number;
-  gallery_images?: string[];
+  brand_id?: string;
+  brand?: { id: string; name: string };
 }
 
 export interface Discount {
@@ -118,15 +102,14 @@ export interface SearchResult {
   id: string;
   name: string;
   slug: string;
-  brand: string; // Made required again since we added it back to database
+  brand?: string;
+  brand_id?: string;
   description?: string;
   base_price: number;
-  gallery_images: string[];
-  rating: number;
-  review_count: number;
+  gallery_images?: string[];
   is_active: boolean;
   created_at: string;
-  item_type: 'product' | 'variant' | 'combo';
+  item_type: 'product' | 'combo' | 'variant';
   variant_id?: string;
   variant_name?: string;
   variant_price?: number;
@@ -134,25 +117,28 @@ export interface SearchResult {
   combo_name?: string;
   combo_price?: number;
   original_price?: number;
-  searchable_text: string;
-  search_score: number;
   matched_variant?: string;
   matched_combo?: string;
+  search_score?: number;
+  searchable_text: string;
+  product_variants?: Array<{
+    id: string;
+    variant_name: string;
+    price: number;
+    images?: string[];
+    is_default?: boolean;
+  }>;
 }
 
 export interface CartItemWithVariant {
   id: string;
   name: string;
   slug: string;
-  brand: string; // Made required again since we added it back to database
+  brand_name?: string;
   price: number;
-  description: string;
+  description?: string;
   is_active: boolean;
-  gallery_images: string[];
-  rating: number;
-  review_count: number;
-  image?: string;
-  created_at?: string;
+  images?: string[];
   quantity: number;
   variant_id?: string;
   variant_name?: string;
@@ -181,16 +167,19 @@ export interface ProductWithVariants {
   id: string;
   name: string;
   slug: string;
-  brand: string; // Made required again since we added it back to database
-  price: number;
-  description: string;
+  brand_id?: string;
+  brand?: { id: string; name: string };
+  description?: string;
+  short_description?: string;
+  origin?: string;
+  specifications?: Record<string, string>;
   is_active: boolean;
-  gallery_images: string[];
-  rating: number;
-  review_count: number;
+  meta_title?: string;
+  meta_description?: string;
+  canonical_url?: string;
   created_at: string;
-  variants: ProductVariant[];
-  combos: ProductCombo[];
+  updated_at: string;
+  product_variants?: ProductVariant[];
 }
 
 // Discount calculation result
@@ -221,7 +210,7 @@ export interface VariantSelection {
   variant_id: string;
   variant_name: string;
   variant_price: number;
-  variant_images: string[];
+  images?: string[];
   is_available: boolean;
 }
 
@@ -254,16 +243,19 @@ export interface SearchQueryParse {
 // Admin interfaces for management
 export interface VariantFormData {
   variant_name: string;
-  variant_type: 'packaging' | 'color' | 'size' | 'material' | 'flavor' | 'other';
+  variant_slug?: string;
+  variant_type: string;
+  is_default?: boolean;
+  units_contained: number;
+  unit: string;
+  images: string[];
+  image_alt_text?: string;
   price: number;
-  weight?: number;
-  dimensions?: {
-    length: number;
-    width: number;
-    height: number;
-  };
+  compare_at_price?: number;
+  cost_price?: number;
+  stock: number;
+  track_inventory: boolean;
   is_active: boolean;
-  sort_order: number;
 }
 
 export interface ComboFormData {
@@ -271,12 +263,11 @@ export interface ComboFormData {
   slug: string;
   description?: string;
   combo_price: number;
-  combo_image?: File;
-  gallery_images: File[];
+  image?: string;
+  gallery_images?: string[];
   is_active: boolean;
   items: {
-    product_id: string;
-    variant_id?: string;
+    variant_id: string;
     quantity: number;
   }[];
 }

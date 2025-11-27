@@ -36,13 +36,9 @@ export function ProductDNA({ formData, onChange }: ProductDNAProps) {
               Brand <span className="text-red-500">*</span>
             </Label>
             <Select 
-              value={formData.brand} 
+              value={formData.brand_id || ''} 
               onValueChange={(value: string) => {
-                const selectedBrand = brands.find(b => b.name === value);
-                onChange({ 
-                  brand: value,
-                  brand_id: selectedBrand?.id 
-                });
+                onChange({ brand_id: value });
               }}
             >
               <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
@@ -50,7 +46,7 @@ export function ProductDNA({ formData, onChange }: ProductDNAProps) {
               </SelectTrigger>
               <SelectContent>
                 {brands.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.name}>
+                  <SelectItem key={brand.id} value={brand.id}>
                     {brand.name}
                     {brand.country_of_origin && (
                       <span className="ml-2 text-[var(--color-dark)]/50 text-xs">
@@ -90,19 +86,6 @@ export function ProductDNA({ formData, onChange }: ProductDNAProps) {
                 <SelectItem value="Netherlands">🇳🇱 Netherlands</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
-
-        {/* Pack Size */}
-        <div className="grid grid-cols-2 gap-6">
-           <div className="space-y-2">
-            <Label className="text-[var(--color-dark)] font-medium">Pack Size</Label>
-            <Input
-              value={formData.pack_size || ''}
-              onChange={(e) => onChange({ pack_size: e.target.value })}
-              placeholder="e.g. 20 Sticks"
-              className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
-            />
           </div>
         </div>
 

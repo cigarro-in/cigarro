@@ -74,6 +74,16 @@ export function ProductsPage() {
   const searchParams = new URLSearchParams(location.search);
   const urlSearchQuery = searchParams.get('search') || '';
 
+  // Helper: get price from default variant (or first), fallback to legacy product.price if present
+  const getProductPrice = (product: Product): number => {
+    if ((product as any).product_variants && (product as any).product_variants.length > 0) {
+      const variants = (product as any).product_variants as { price: number; is_default?: boolean }[];
+      const def = variants.find(v => v.is_default) || variants[0];
+      return def?.price ?? 0;
+    }
+    return (product as any).price ?? 0;
+  };
+
   useEffect(() => {
     if (!isInitialLoad) return; // Prevent multiple initial loads
     
@@ -182,21 +192,17 @@ export function ProductsPage() {
       // Fetch all filter data in parallel
       const [categoriesResult, brandsResult] = await Promise.all([
         supabase.from('categories').select('id, name, slug').order('name'),
-        supabase.from('products').select('brand').eq('is_active', true)
+        supabase.from('brands').select('name').eq('is_active', true).order('name')
       ]);
 
       const categoriesData = categoriesResult.data || [];
       const brandsData = brandsResult.data || [];
       
       if (brandsData) {
-        const brandCounts = brandsData.reduce((acc: Record<string, number>, product) => {
-          acc[product.brand] = (acc[product.brand] || 0) + 1;
-          return acc;
-        }, {});
-        
-        const brandsWithCounts = Object.entries(brandCounts)
-          .map(([brand, count]) => ({ brand, count }))
-          .sort((a, b) => a.brand.localeCompare(b.brand));
+        const brandsWithCounts = brandsData.map(brand => ({ 
+          brand: brand.name, 
+          count: 1 // We'll get actual counts from products later if needed
+        }));
         
         setBrands(brandsWithCounts);
       }
@@ -246,14 +252,18 @@ export function ProductsPage() {
       let query = supabase
         .from('products')
         .select(`
-          id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at,
-          categories (name)
+          id, name, slug, brand_id, description, is_active, created_at,
+          brands!inner(id, name),
+          categories (name),
+          product_variants (
+            id, product_id, variant_name, variant_type, price, is_default, is_active, stock, images
+          )
         `)
         .eq('is_active', true);
 
       // Apply search filter
       if (urlSearchQuery.trim()) {
-        query = query.or(`name.ilike.%${urlSearchQuery}%,brand.ilike.%${urlSearchQuery}%,description.ilike.%${urlSearchQuery}%`);
+        query = query.or(`name.ilike.%${urlSearchQuery}%,brands.name.ilike.%${urlSearchQuery}%,description.ilike.%${urlSearchQuery}%`);
       }
 
       // Apply category filter
@@ -264,7 +274,7 @@ export function ProductsPage() {
 
       // Apply brand filter
       if (selectedBrands.length > 0) {
-        query = query.in('brand', selectedBrands);
+        query = query.in('brands.name', selectedBrands);
       }
 
       // Apply price range filter
@@ -299,7 +309,24 @@ export function ProductsPage() {
         throw error;
       }
       
-      const products = data || [];
+      // Transform the data to match expected Product type
+      const products = (data || []).map(product => {
+        console.log('Product brand data:', { 
+          productId: product.id, 
+          brands: product.brands, 
+          brand_id: product.brand_id 
+        });
+        
+        return {
+          ...product,
+          brand: product.brands?.[0] || { id: 'unknown', name: 'Unknown' },
+          product_variants: product.product_variants?.map(variant => ({
+            ...variant,
+            images: variant.images || [] // Images are now directly on variants
+          })) || []
+        };
+      });
+      
       setProducts(products);
       
     } catch (error) {
@@ -309,6 +336,7 @@ export function ProductsPage() {
       setIsLoading(false); // Add this line to fix the loading issue
     }
   };
+
 
   const handleAddToCart = async (product: Product) => {
     try {
@@ -406,12 +434,19 @@ export function ProductsPage() {
 
   const sortedProducts = [...products].sort((a, b) => {
     switch (sortBy) {
-      case 'price-low':
-        return a.price - b.price;
-      case 'price-high':
-        return b.price - a.price;
+      case 'price-low': {
+        const aPrice = getProductPrice(a);
+        const bPrice = getProductPrice(b);
+        return aPrice - bPrice;
+      }
+      case 'price-high': {
+        const aPrice = getProductPrice(a);
+        const bPrice = getProductPrice(b);
+        return bPrice - aPrice;
+      }
       case 'rating':
-        return (b.rating || 0) - (a.rating || 0);
+        // Rating column was removed, sort by name instead
+        return a.name.localeCompare(b.name);
       case 'newest':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       default: // name
