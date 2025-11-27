@@ -26,6 +26,7 @@ export async function onRequest(context) {
     
   } catch (error) {
     console.error('Sitemap error:', error);
+    console.error('Stack trace:', error.stack);
     
     // Return fallback static sitemap on error
     const fallback = `<?xml version="1.0" encoding="UTF-8"?>
@@ -72,7 +73,7 @@ async function generateSitemap(supabase) {
   const [productsResult, categoriesResult, brandsResult, blogResult] = await Promise.allSettled([
     supabase
       .from('products')
-      .select('slug, updated_at, name, gallery_images')
+      .select('slug, updated_at, name, product_variants(images, is_active)')
       .eq('is_active', true)
       .limit(1000), // Limit for performance
     
@@ -137,8 +138,12 @@ async function generateSitemap(supabase) {
     <priority>0.8</priority>`;
     
     // Add product images (up to 5 per product for performance)
-    if (product.gallery_images && Array.isArray(product.gallery_images)) {
-      const images = product.gallery_images.slice(0, 5);
+    const gallery_images = product.product_variants
+      ?.filter(v => v.is_active !== false) // Handle null/undefined as true or strict checking
+      .flatMap(v => v.images || []) || [];
+      
+    if (gallery_images.length > 0) {
+      const images = gallery_images.slice(0, 5);
       images.forEach(imageUrl => {
         if (imageUrl) {
           xml += `
