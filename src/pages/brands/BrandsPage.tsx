@@ -30,7 +30,35 @@ export function BrandsPage() {
     try {
       setIsLoading(true);
 
-      // Fetch brands from database
+      // Try cached API first
+      try {
+        const response = await fetch('/api/brands');
+        if (response.ok) {
+          const brandsData = await response.json();
+          // Get product counts from cached products API
+          const productsResponse = await fetch('/api/products');
+          if (productsResponse.ok) {
+            const products = await productsResponse.json();
+            const brandsWithCounts = brandsData.map((brand: Brand) => ({
+              ...brand,
+              product_count: products.filter((p: any) => p.brand_id === brand.id).length
+            }));
+            const filteredBrands = brandsWithCounts
+              .filter((b: Brand) => b.product_count && b.product_count > 0)
+              .sort((a: Brand, b: Brand) => {
+                if (a.is_featured && !b.is_featured) return -1;
+                if (!a.is_featured && b.is_featured) return 1;
+                return (b.product_count || 0) - (a.product_count || 0);
+              });
+            setBrands(filteredBrands);
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.log('API not available, using Supabase fallback');
+      }
+
+      // Fallback: Fetch brands from database
       const { data: brandsData, error: brandsError } = await supabase
         .from('brands')
         .select('*')

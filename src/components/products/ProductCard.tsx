@@ -17,6 +17,20 @@ const formatIndianPrice = (priceINR: number): string => {
   return priceINR.toLocaleString('en-IN');
 };
 
+// Helper function to safely get brand name from various formats
+const getBrandName = (brand: any): string => {
+  if (!brand) return 'Premium';
+  if (typeof brand === 'string') return brand;
+  if (typeof brand === 'object') {
+    // Handle both {name: 'X'} and array [{name: 'X'}] formats
+    if (Array.isArray(brand)) {
+      return brand[0]?.name || 'Premium';
+    }
+    return brand.name || 'Premium';
+  }
+  return 'Premium';
+};
+
 interface ProductCardProps {
   product: ProductWithVariants;
   onAddToCart?: (product: ProductWithVariants, variantId?: string) => void;
@@ -208,7 +222,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="p-2 sm:p-2.5 md:p-3">
           <div className="mb-1.5 sm:mb-2">
             <p className="text-canyon text-[9px] sm:text-[10px] font-medium uppercase tracking-wider mb-0.5">
-              {typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium'}
+              {getBrandName(product.brand)}
             </p>
             <h3 className="text-dark font-semibold text-xs sm:text-sm md:text-base leading-tight hover:text-canyon transition-colors line-clamp-2 min-h-[1rem]" title={product.name}>
               {product.name}

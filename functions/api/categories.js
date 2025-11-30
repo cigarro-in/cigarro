@@ -29,8 +29,20 @@ export async function onRequest(context) {
       env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Call the optimized RPC function
-    const { data, error } = await supabase.rpc('get_categories_with_products');
+    // Fetch categories with products using direct query (not broken RPC)
+    const { data: rawData, error } = await supabase
+      .from('categories')
+      .select(`
+        id, name, slug, description, image,
+        products:product_categories(
+          products(
+            id, name, slug, brand_id, description, is_active, created_at,
+            brand:brands(id, name),
+            product_variants(id, price, images, is_active, is_default, variant_name)
+          )
+        )
+      `)
+      .order('name');
 
     if (error) {
       console.error('Supabase error:', error);
@@ -42,6 +54,28 @@ export async function onRequest(context) {
         }
       );
     }
+
+    // Transform data to flatten products and add image info
+    const data = (rawData || []).map(cat => {
+      const products = (cat.products || [])
+        .map(pc => pc.products)
+        .filter(p => p && p.is_active)
+        .map(p => {
+          const activeVariants = p.product_variants?.filter(v => v.is_active !== false) || [];
+          const images = activeVariants.flatMap(v => v.images || []);
+          return {
+            ...p,
+            brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
+            gallery_images: images,
+            image: images[0] || null
+          };
+        });
+      return {
+        ...cat,
+        products,
+        product_count: products.length
+      };
+    }).filter(cat => cat.products.length > 0);
 
     console.log(`✅ Fetched ${data?.length || 0} categories with products`);
 

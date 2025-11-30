@@ -82,11 +82,12 @@ async function generateSitemap(supabase) {
       .select('slug, updated_at')
       .limit(100),
     
+    // Use brands table directly instead of deprecated brand column
     supabase
-      .from('products')
-      .select('brand, updated_at')
+      .from('brands')
+      .select('slug, updated_at')
       .eq('is_active', true)
-      .not('brand', 'is', null),
+      .limit(100),
     
     supabase
       .from('blog_posts')
@@ -97,20 +98,7 @@ async function generateSitemap(supabase) {
 
   const products = productsResult.status === 'fulfilled' ? productsResult.value.data || [] : [];
   const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value.data || [] : [];
-  
-  // Process brands (deduplicate and create slugs)
-  const brandData = brandsResult.status === 'fulfilled' ? brandsResult.value.data || [] : [];
-  const brandMap = new Map();
-  brandData.forEach(({ brand, updated_at }) => {
-    if (!brandMap.has(brand)) {
-      brandMap.set(brand, {
-        slug: brand.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-        updated_at: updated_at
-      });
-    }
-  });
-  const brands = Array.from(brandMap.values());
-  
+  const brands = brandsResult.status === 'fulfilled' ? brandsResult.value.data || [] : [];
   const blogPosts = blogResult.status === 'fulfilled' ? blogResult.value.data || [] : [];
 
   // Generate XML

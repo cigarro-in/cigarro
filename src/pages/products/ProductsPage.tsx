@@ -89,7 +89,37 @@ export function ProductsPage() {
     
     const loadData = async () => {
       try {
-        // Test database connection first
+        // Try cached APIs first for faster initial load
+        try {
+          const [productsResponse, categoriesResponse, brandsResponse] = await Promise.all([
+            fetch('/api/products'),
+            fetch('/api/categories'),
+            fetch('/api/brands')
+          ]);
+          
+          if (productsResponse.ok && categoriesResponse.ok && brandsResponse.ok) {
+            const [productsData, categoriesData, brandsData] = await Promise.all([
+              productsResponse.json(),
+              categoriesResponse.json(),
+              brandsResponse.json()
+            ]);
+            
+            // Set products
+            setProducts(productsData);
+            
+            // Set filter data
+            setCategories(categoriesData.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug })));
+            setBrands(brandsData.map((b: any) => ({ brand: b.name, count: 1 })));
+            
+            setIsLoading(false);
+            setIsInitialLoad(false);
+            return;
+          }
+        } catch (apiError) {
+          console.log('API not available, using Supabase fallback');
+        }
+
+        // Fallback: Test database connection first
         console.log('Testing database connection...');
         const { data: testData, error: testError } = await supabase
           .from('products')
@@ -311,18 +341,23 @@ export function ProductsPage() {
       
       // Transform the data to match expected Product type
       const products = (data || []).map(product => {
-        console.log('Product brand data:', { 
-          productId: product.id, 
-          brands: product.brands, 
-          brand_id: product.brand_id 
-        });
+        // Extract brand - handle both array and object formats from Supabase
+        const brandData = product.brands;
+        let brand: { id: string; name: string };
+        if (Array.isArray(brandData)) {
+          brand = brandData[0] || { id: 'unknown', name: 'Premium' };
+        } else if (brandData && typeof brandData === 'object') {
+          brand = brandData as { id: string; name: string };
+        } else {
+          brand = { id: 'unknown', name: 'Premium' };
+        }
         
         return {
           ...product,
-          brand: product.brands?.[0] || { id: 'unknown', name: 'Unknown' },
+          brand,
           product_variants: product.product_variants?.map(variant => ({
             ...variant,
-            images: variant.images || [] // Images are now directly on variants
+            images: variant.images || []
           })) || []
         };
       });

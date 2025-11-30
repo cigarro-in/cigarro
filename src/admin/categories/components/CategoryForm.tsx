@@ -18,6 +18,8 @@ interface Category {
   image: string;
   image_alt_text: string;
   is_active: boolean;
+  meta_title?: string;
+  meta_description?: string;
 }
 
 interface CategoryFormProps {
@@ -34,6 +36,8 @@ interface CategoryFormData {
   image: string;
   image_alt_text: string;
   is_active: boolean;
+  meta_title: string;
+  meta_description: string;
 }
 
 export function CategoryForm({ category, onSave, onCancel, onDelete }: CategoryFormProps) {
@@ -43,7 +47,9 @@ export function CategoryForm({ category, onSave, onCancel, onDelete }: CategoryF
     description: '',
     image: '',
     image_alt_text: '',
-    is_active: true
+    is_active: true,
+    meta_title: '',
+    meta_description: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -55,7 +61,9 @@ export function CategoryForm({ category, onSave, onCancel, onDelete }: CategoryF
         description: category.description,
         image: category.image,
         image_alt_text: category.image_alt_text,
-        is_active: category.is_active
+        is_active: category.is_active,
+        meta_title: category.meta_title || '',
+        meta_description: category.meta_description || ''
       });
     }
   }, [category]);
@@ -86,7 +94,9 @@ export function CategoryForm({ category, onSave, onCancel, onDelete }: CategoryF
         description: formData.description,
         image: formData.image,
         image_alt_text: formData.image_alt_text,
-        is_active: formData.is_active
+        is_active: formData.is_active,
+        meta_title: formData.meta_title || null,
+        meta_description: formData.meta_description || null
       };
 
       let error;
@@ -185,6 +195,42 @@ export function CategoryForm({ category, onSave, onCancel, onDelete }: CategoryF
               onChange={(e) => setFormData(prev => ({ ...prev, image_alt_text: e.target.value }))}
               placeholder="Alt text for category image"
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-creme-light border-coyote">
+        <CardHeader>
+          <CardTitle className="text-dark">SEO Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="meta_title">Meta Title</Label>
+            <Input
+              id="meta_title"
+              value={formData.meta_title}
+              onChange={(e) => setFormData(prev => ({ ...prev, meta_title: e.target.value }))}
+              placeholder="SEO title (defaults to category name)"
+              maxLength={60}
+            />
+            <p className="text-xs text-dark/50 mt-1">
+              {formData.meta_title.length}/60 characters
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="meta_description">Meta Description</Label>
+            <Textarea
+              id="meta_description"
+              value={formData.meta_description}
+              onChange={(e) => setFormData(prev => ({ ...prev, meta_description: e.target.value }))}
+              placeholder="SEO description for search engines"
+              rows={3}
+              maxLength={160}
+            />
+            <p className="text-xs text-dark/50 mt-1">
+              {formData.meta_description.length}/160 characters
+            </p>
           </div>
         </CardContent>
       </Card>

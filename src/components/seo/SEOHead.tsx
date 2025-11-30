@@ -99,13 +99,13 @@ export function SEOHead({
           price,
           priceCurrency: currency,
           availability: `https://schema.org/${availability === 'in stock' ? 'InStock' : 'OutOfStock'}`,
-          url: canonicalUrl
-        },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: '4.5',
-          reviewCount: '100'
+          url: canonicalUrl,
+          seller: {
+            '@type': 'Organization',
+            name: 'Cigarro'
+          }
         }
+        // Note: Only add aggregateRating when you have real reviews
       };
     }
 
@@ -219,12 +219,9 @@ export function SEOHead({
             '@type': 'ContactPoint',
             contactType: 'Customer Service',
             availableLanguage: ['English', 'Hindi']
-          },
-          sameAs: [
-            'https://facebook.com/cigarro',
-            'https://twitter.com/cigarro',
-            'https://instagram.com/cigarro'
-          ]
+          }
+          // Add sameAs array when you have real social media profiles:
+          // sameAs: ['https://instagram.com/your-handle']
         })}
       </script>
     </Helmet>

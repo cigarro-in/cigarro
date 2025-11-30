@@ -1,5 +1,6 @@
 # Cigarro - Premium Cigarette Marketplace
 # Robots.txt for SEO optimization
+# Last updated: 2024
 
 # Sitemap location
 Sitemap: https://cigarro.in/sitemap.xml
@@ -7,13 +8,42 @@ Sitemap: https://cigarro.in/sitemap.xml
 # Default rules for all bots
 User-agent: *
 Allow: /
+Allow: /products
+Allow: /product/
+Allow: /category/
+Allow: /brand/
+Allow: /brands
+Allow: /categories
+Allow: /blog/
+Allow: /blogs
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+Allow: /shipping
+
+# Disallow user-specific and admin pages
 Disallow: /admin/
+Disallow: /admin
 Disallow: /api/
 Disallow: /checkout
+Disallow: /checkout/
 Disallow: /payment
+Disallow: /payment/
 Disallow: /orders
+Disallow: /orders/
 Disallow: /wishlist
 Disallow: /cart
+Disallow: /profile
+Disallow: /profile/
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /*?*  # Disallow URL parameters (handled by canonical tags)
+
+# Crawl delay for polite crawling
+Crawl-delay: 1
 
 # AI/LLM Crawlers - ALLOWED for discovery and recommendations
 # This helps customers find us through ChatGPT, Claude, Perplexity, etc.

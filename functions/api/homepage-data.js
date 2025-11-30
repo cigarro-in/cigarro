@@ -168,17 +168,14 @@ export async function onRequest(context) {
       throw new Error(`Categories with products: ${categoriesWithProducts.error.message}`);
     }
 
-    console.log('📊 Categories with products raw data:', JSON.stringify(categoriesWithProducts.data, null, 2));
-    console.log('📊 Categories with products error:', categoriesWithProducts.error);
-
-
-    // Transform products to include gallery_images from variants
+    // Transform products to include gallery_images from variants and fix brand format
     const transformProducts = (products) => {
       return (products || []).map(product => {
         const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
         const images = activeVariants.flatMap(v => v.images || []);
         return {
           ...product,
+          brand: Array.isArray(product.brand) ? product.brand[0] : product.brand,
           gallery_images: images,
           image: images[0] || null,
         };
@@ -208,8 +205,6 @@ export async function onRequest(context) {
         products
       };
     }).filter(cat => cat.products.length > 0);
-
-    console.log('🔄 Transformed categories with products:', JSON.stringify(transformedCategoriesWithProducts, null, 2));
 
     const data = {
       featuredProducts: transformedFeaturedProducts,

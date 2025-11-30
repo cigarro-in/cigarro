@@ -3,17 +3,28 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Package } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Package, Shield, CheckCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-// import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { AuthDialog } from '../../components/auth/AuthDialog';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { Card, CardContent } from '../../components/ui/card';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
   return priceINR.toLocaleString('en-IN');
+};
+
+// Helper function to safely get brand name from various formats
+const getBrandName = (brand: any): string => {
+  if (!brand) return '';
+  if (typeof brand === 'string') return brand;
+  if (typeof brand === 'object') {
+    if (Array.isArray(brand)) return brand[0]?.name || '';
+    return brand.name || '';
+  }
+  return '';
 };
 
 interface CartItemProps {
@@ -25,16 +36,12 @@ interface CartItemProps {
 
 const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, updateQuantity, removeFromCart, isLoading }, ref) => {
   const [imageError, setImageError] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleQuantityChange = async (newQuantity: number) => {
     if (newQuantity < 1) return;
-    // Don't set isUpdating to keep buttons responsive
     try {
-      console.log('🔄 Updating quantity:', { productId: item.id, quantity: newQuantity, variantId: item.variant_id, comboId: item.combo_id });
       await updateQuantity(item.id, newQuantity, item.variant_id, item.combo_id);
-      console.log('✅ Quantity updated successfully');
     } catch (error) {
       console.error('❌ Failed to update quantity:', error);
       toast.error('Failed to update quantity');
@@ -43,11 +50,9 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
 
   const handleRemove = async () => {
     try {
-      console.log('🗑️ Removing item:', { productId: item.id, variantId: item.variant_id, comboId: item.combo_id });
       await removeFromCart(item.id, item.variant_id, item.combo_id);
       toast.success('Item removed from cart');
       setShowDeleteConfirm(false);
-      console.log('✅ Item removed successfully');
     } catch (error) {
       console.error('❌ Failed to remove item:', error);
       toast.error('Failed to remove item');
@@ -63,102 +68,102 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100 }}
-      className="bg-background border-2 border-coyote/20 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-coyote/40 transition-all duration-200"
+      className="group relative bg-card border-2 border-border/40 rounded-xl p-4 shadow-sm hover:border-accent/40 transition-all duration-300"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex gap-4">
         {/* Product Image */}
-        <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-coyote/10">
+        <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-muted/20 rounded-lg overflow-hidden flex-shrink-0 border border-border/20">
           <img
             src={!imageError ? getProductImageUrl((item as any).image || (item as any).product_variants?.[0]?.images?.[0] || (item as any).gallery_images?.[0]) : getProductImageUrl()}
             alt={item.name}
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         </div>
 
-        {/* Product Info */}
-        <div className="flex-1 min-w-0">
-          <Link to={`/product/${item.slug}`} className="group">
-            <h3 className="font-semibold text-dark text-sm group-hover:text-canyon transition-colors duration-200 line-clamp-1 leading-tight">
-              {item.name}{item.variant_name && ` (${item.variant_name})`}
-            </h3>
-          </Link>
-          {item.brand && (
-            <p className="text-xs text-canyon font-medium uppercase tracking-wide mt-0.5">{item.brand}</p>
-          )}
-          <div className="flex items-center gap-2 mt-1.5">
-            <p className="text-base font-bold text-dark">₹{formatIndianPrice(item.price)}</p>
-            <span className="text-xs text-dark/50">× {item.quantity}</span>
-          </div>
-        </div>
-
-        {/* Quantity Controls & Remove */}
-        <div className="flex flex-col items-end gap-2">
-          {/* Quantity Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleQuantityChange(item.quantity - 1)}
-              disabled={item.quantity <= 1}
-              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 active:scale-95"
-              aria-label="Decrease quantity"
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <span className="w-8 text-center font-semibold text-dark text-sm">{item.quantity}</span>
-            <button
-              onClick={() => handleQuantityChange(item.quantity + 1)}
-              className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center active:scale-95"
-              aria-label="Increase quantity"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
+        {/* Product Info & Controls */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start gap-2">
+              <Link to={`/product/${item.slug}`} className="group/link">
+                <h3 className="font-sans font-bold text-foreground text-base sm:text-lg group-hover/link:text-accent transition-colors duration-200 line-clamp-2 leading-tight">
+                  {item.name}{item.variant_name && ` (${item.variant_name})`}
+                </h3>
+              </Link>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-muted-foreground hover:text-red-500 transition-colors duration-200 p-1 -mr-1 rounded-full hover:bg-red-500/10"
+                aria-label="Remove item"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+            {getBrandName(item.brand) && (
+              <p className="text-xs text-accent font-medium uppercase tracking-wide mt-1">
+                {getBrandName(item.brand)}
+              </p>
+            )}
           </div>
 
-          {/* Remove Button */}
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="text-canyon hover:text-red-600 transition-colors duration-200 p-1.5 hover:bg-canyon/10 rounded-lg active:scale-95"
-            title="Remove from cart"
-            aria-label="Remove item"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex justify-between items-end mt-3">
+            {/* Price */}
+            <div>
+              <p className="text-lg font-bold text-foreground">₹{formatIndianPrice(lineTotal)}</p>
+            </div>
+
+            {/* Modern Quantity Controls */}
+            <div className="flex items-center bg-muted/20 rounded-lg border border-border/20 overflow-hidden h-9">
+              <button
+                onClick={() => handleQuantityChange(item.quantity - 1)}
+                disabled={item.quantity <= 1}
+                className="w-9 h-full flex items-center justify-center text-foreground hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-foreground active:bg-accent/80"
+                aria-label="Decrease quantity"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <div className="w-8 h-full flex items-center justify-center font-sans font-semibold text-foreground text-sm border-x border-border/10 bg-background/50">
+                {item.quantity}
+              </div>
+              <button
+                onClick={() => handleQuantityChange(item.quantity + 1)}
+                className="w-9 h-full flex items-center justify-center text-foreground hover:bg-accent hover:text-white transition-colors active:bg-accent/80"
+                aria-label="Increase quantity"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Subtotal for this item */}
-      <div className="mt-3 pt-2.5 border-t border-coyote/20">
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-dark/60 font-medium uppercase tracking-wide">Item Total</span>
-          <span className="text-base font-bold text-dark">₹{formatIndianPrice(lineTotal)}</span>
-        </div>
-      </div>
-
-      {/* Delete Confirmation */}
+      {/* Delete Confirmation Overlay */}
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 pt-3 border-t border-coyote/20 bg-canyon/5 rounded-lg p-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-card/95 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 rounded-xl border-2 border-red-500/20"
           >
-            <p className="text-sm text-dark mb-3 font-medium">
-              Remove "{item.name}" from your cart?
+            <p className="text-sm font-medium text-foreground mb-4 text-center">
+              Remove this item from your cart?
             </p>
-            <div className="flex gap-2">
-              <button
+            <div className="flex gap-3 w-full max-w-[200px]">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-3 py-2 text-sm font-medium text-dark bg-creme-light border-2 border-coyote rounded-lg hover:bg-creme transition-all active:scale-95"
+                className="flex-1 h-9 border-border hover:bg-muted"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                size="sm"
                 onClick={handleRemove}
-                className="flex-1 px-3 py-2 text-sm font-medium text-creme-light bg-canyon rounded-lg hover:bg-red-600 transition-all active:scale-95"
+                className="flex-1 h-9 bg-red-500 hover:bg-red-600 text-white"
               >
                 Remove
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}
@@ -173,20 +178,21 @@ const EmptyCart: React.FC = () => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="text-center py-16 px-4"
+    className="text-center py-20 px-4"
   >
-    <div className="max-w-sm mx-auto">
-      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-        <ShoppingBag className="w-10 h-10 text-muted-foreground" />
+    <div className="max-w-md mx-auto">
+      <div className="w-24 h-24 bg-accent/5 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-accent/10">
+        <ShoppingBag className="w-10 h-10 text-accent" />
       </div>
-      <h2 className="text-xl font-semibold text-foreground mb-3">Your Cart is Empty</h2>
+      <h2 className="font-serif text-2xl md:text-3xl text-foreground mb-3">Your Cart is Empty</h2>
       <p className="text-muted-foreground mb-8 leading-relaxed">
-        Discover our premium collection and start adding products to your cart.
+        Looks like you haven't added any premium tobacco products yet. 
+        Explore our collection to find your perfect match.
       </p>
       <Link to="/products">
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 px-6 py-3 w-full sm:w-auto">
+        <Button className="bg-foreground text-background hover:bg-accent hover:text-white transition-all duration-300 px-8 py-6 h-auto text-base font-medium rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02]">
           Start Shopping
-          <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+          <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
         </Button>
       </Link>
     </div>
@@ -198,61 +204,75 @@ const CartSummary: React.FC<{
   totalItems: number;
   isLoading: boolean;
   onCheckout: () => void;
-}> = ({ totalPrice, totalItems, isLoading, onCheckout }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="bg-background border border-border rounded-lg p-4 shadow-sm"
-  >
-    <h2 className="font-medium text-foreground text-lg mb-4 flex items-center">
-      <Package className="w-5 h-5 mr-2 text-accent" />
-      Order Summary
-    </h2>
+  isMobile?: boolean;
+}> = ({ totalPrice, totalItems, isLoading, onCheckout, isMobile = false }) => {
+  if (isMobile) {
+    // Compact, single-row mobile summary (no Card wrapper)
+    return (
+      <div className="flex items-center gap-4">
+        <div className="flex-shrink-0">
+          <p className="text-xs text-muted-foreground font-medium mb-0.5">Total</p>
+          <p className="text-xl font-bold text-foreground font-serif leading-none">₹{formatIndianPrice(totalPrice)}</p>
+        </div>
 
-    <div className="space-y-3 mb-4">
-      <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
-        <span className="font-medium text-foreground">₹{formatIndianPrice(totalPrice)}</span>
+        <Button
+          className="flex-1 bg-foreground text-background hover:bg-accent hover:text-white transition-all duration-300 h-12 text-base font-bold rounded-xl shadow-md"
+          disabled={isLoading}
+          onClick={onCheckout}
+        >
+          Checkout
+          <ShoppingCart className="w-4 h-4 ml-2" />
+        </Button>
       </div>
+    );
+  }
 
-      <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">Shipping</span>
-        <span className="text-accent font-medium">Free</span>
-      </div>
+  return (
+    <Card className="border-2 border-border/40 bg-card">
+      <CardContent className="p-6">
+        <>
+          <h2 className="font-serif text-xl text-foreground mb-6 flex items-center">
+            <Package className="w-5 h-5 mr-2 text-accent" />
+            Order Summary
+          </h2>
 
-      <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">Tax</span>
-        <span className="text-muted-foreground">Calculated at checkout</span>
-      </div>
-    </div>
+          <div className="space-y-3 mb-6 text-sm">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
+              <span className="font-medium text-foreground">₹{formatIndianPrice(totalPrice)}</span>
+            </div>
 
-    <div className="border-t border-border pt-3 mb-4">
-      <div className="flex justify-between items-center">
-        <span className="text-lg font-medium text-foreground">Total</span>
-        <span className="text-xl font-bold text-foreground">₹{formatIndianPrice(totalPrice)}</span>
-      </div>
-    </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Shipping</span>
+              <span className="text-muted-foreground italic">Calculated at checkout</span>
+            </div>
+          </div>
 
-    <Button
-      className="w-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors duration-300 py-3 text-base font-medium touch-manipulation"
-      disabled={isLoading}
-      onClick={onCheckout}
-    >
-      <ShoppingCart className="w-5 h-5 mr-2" />
-      {isLoading ? 'Processing...' : 'Proceed to Checkout'}
-    </Button>
+          <div className="border-t border-border/40 pt-4 mb-6">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-bold text-foreground">Total</span>
+              <span className="text-2xl font-bold text-accent font-serif">₹{formatIndianPrice(totalPrice)}</span>
+            </div>
+          </div>
+        </>
 
-    {/* Security Badge */}
-    <div className="mt-3 text-center">
-      <p className="text-xs text-muted-foreground flex items-center justify-center">
-        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-        </svg>
-        Secure checkout
-      </p>
-    </div>
-  </motion.div>
-);
+        <Button
+          className="w-full bg-foreground text-background hover:bg-accent hover:text-white transition-all duration-300 h-12 sm:h-14 text-base font-bold rounded-xl shadow-md"
+          disabled={isLoading}
+          onClick={onCheckout}
+        >
+          <ShoppingCart className="w-5 h-5 mr-2" />
+          {isLoading ? 'Processing...' : 'Proceed to Checkout'}
+        </Button>
+
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/20 p-3 rounded-lg">
+          <Shield className="w-4 h-4 text-accent" />
+          <span>Secure checkout powered by Cigarro</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function CartPage() {
   const { items, totalPrice, isLoading, updateQuantity, removeFromCart, totalItems } = useCart();
@@ -275,70 +295,79 @@ export default function CartPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-[100dvh] bg-background pb-24">
-        <div className="main-container px-4">
-          {/* Page Header */}
-          <div className="text-center mb-4">
-            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
-              My Cart
-            </h1>
+      <div className="min-h-[100dvh] bg-background pb-32 sm:pb-20">
+        {/* Sticky Minimal Header */}
+        <div className="bg-background/95 backdrop-blur-sm sticky top-0 z-40 border-b border-transparent">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-2 sm:pb-4 pt-4">
+            <div className="text-center">
+              <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl text-foreground">
+                My Cart
+              </h1>
+            </div>
           </div>
+        </div>
 
-          {/* Content */}
+        <div className="main-container px-4 py-8">
           {items.length === 0 ? (
             <EmptyCart />
           ) : (
-            <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-8">
-              {/* Cart Items */}
-              <div className="lg:col-span-2 space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {items.map((item, index) => (
-                    <CartItem
-                      key={`${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}-${index}`}
-                      item={item}
-                      updateQuantity={updateQuantity}
-                      removeFromCart={removeFromCart}
-                      isLoading={isLoading}
-                    />
-                  ))}
-                </AnimatePresence>
+            <div className="max-w-6xl mx-auto">
+              <div className="lg:grid lg:grid-cols-12 lg:gap-10 items-start">
+                
+                {/* Cart Items List */}
+                <div className="lg:col-span-8 space-y-4">
+                  <AnimatePresence mode="popLayout">
+                    {items.map((item, index) => (
+                      <CartItem
+                        key={`${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}-${index}`}
+                        item={item}
+                        updateQuantity={updateQuantity}
+                        removeFromCart={removeFromCart}
+                        isLoading={isLoading}
+                      />
+                    ))}
+                  </AnimatePresence>
 
-                {/* Continue Shopping */}
-                <div className="text-center lg:text-left">
-                  <Link to="/products">
-                    <Button variant="outline" className="border-border text-foreground hover:bg-muted transition-colors duration-300 px-6 py-3">
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Continue Shopping
-                    </Button>
-                  </Link>
+                  <div className="pt-6 text-center sm:text-left">
+                    <Link to="/products">
+                      <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Continue Shopping
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-              </div>
 
-              {/* Desktop Sidebar Summary */}
-              <div className="hidden lg:block">
-                <CartSummary
-                  totalPrice={totalPrice}
-                  totalItems={totalItems}
-                  isLoading={isLoading}
-                  onCheckout={handleCheckout}
-                />
-              </div>
-
-              {/* Mobile Sticky Summary above bottom nav */}
-              <div className="lg:hidden sticky bottom-16 z-[90] -mx-4 px-4 py-3 bg-background/95 backdrop-blur-sm border-t border-border">
-                <CartSummary
-                  totalPrice={totalPrice}
-                  totalItems={totalItems}
-                  isLoading={isLoading}
-                  onCheckout={handleCheckout}
-                />
+                {/* Desktop Summary Sidebar */}
+                <div className="hidden lg:block lg:col-span-4 sticky top-28">
+                  <CartSummary
+                    totalPrice={totalPrice}
+                    totalItems={totalItems}
+                    isLoading={isLoading}
+                    onCheckout={handleCheckout}
+                  />
+                </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Mobile Bottom Sticky Summary */}
+        {items.length > 0 && (
+          <div className="lg:hidden fixed bottom-16 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border/60 p-4 pb-4 safe-area-pb">
+             <div className="max-w-md mx-auto">
+               <CartSummary
+                  totalPrice={totalPrice}
+                  totalItems={totalItems}
+                  isLoading={isLoading}
+                  onCheckout={handleCheckout}
+                  isMobile={true}
+                />
+             </div>
+          </div>
+        )}
       </div>
 
-      {/* Auth Dialog */}
       <AuthDialog
         open={showAuthDialog}
         onOpenChange={setShowAuthDialog}
@@ -351,3 +380,4 @@ export default function CartPage() {
     </>
   );
 }
+

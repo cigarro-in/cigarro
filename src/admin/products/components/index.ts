@@ -1,2 +1,2 @@
 export { ProductsManager } from './ProductsManager';
-export { ProductFormNew } from './ProductFormNew';
+export { ProductFormNew, ProductFormNew as ProductForm } from './ProductFormNew';

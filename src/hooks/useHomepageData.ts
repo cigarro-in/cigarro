@@ -86,15 +86,11 @@ export function useHomepageData() {
         const contentType = response.headers.get('content-type');
         if (response.ok && contentType?.includes('application/json')) {
           const result = await response.json();
-          console.log('🌐 API Response categoriesWithProducts:', result.categoriesWithProducts);
           setData(result);
           return;
         }
         
         // Fallback: fetch directly from Supabase (local development)
-        if (import.meta.env.DEV) {
-          console.log('📦 Using Supabase fallback (dev mode)');
-        }
         const fallbackData = await fetchFromSupabase();
         setData(fallbackData);
       } catch (err) {

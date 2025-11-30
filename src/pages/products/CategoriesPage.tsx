@@ -108,8 +108,8 @@ export function CategoriesPage() {
         <div className="space-y-16">
           {categories.map(category => (
             <section key={category.category_id}>
-              <h2 className="font-serif-premium text-3xl text-foreground mb-6">{category.category_name}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
+              <h2 className="font-serif-premium text-2xl sm:text-3xl text-foreground mb-4 sm:mb-6">{category.category_name}</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-8">
                 {category.products.map((product, index) => (
                   <ProductCard
                     key={product.id}

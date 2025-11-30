@@ -14,6 +14,18 @@ import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { validateCouponCode } from '../../utils/discounts';
+import { getProductImageUrl } from '../../lib/supabase/storage';
+
+// Helper function to safely get brand name from various formats
+const getBrandName = (brand: any): string => {
+  if (!brand) return '';
+  if (typeof brand === 'string') return brand;
+  if (typeof brand === 'object') {
+    if (Array.isArray(brand)) return brand[0]?.name || '';
+    return brand.name || '';
+  }
+  return '';
+};
 
 
 export function MobileCheckoutPage() {
@@ -926,14 +938,16 @@ export function MobileCheckoutPage() {
                 <div key={`${item.id}-${item.variant_id || 'default'}`} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-border/20">
                   <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
                     <img
-                      src={item.image || item.gallery_images?.[0] || '/placeholder-product.jpg'}
+                      src={getProductImageUrl(item.image || item.gallery_images?.[0] || item.product_variants?.[0]?.images?.[0])}
                       alt={item.name}
                       className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = getProductImageUrl(); }}
                     />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm truncate">{item.name}{item.variant_name && ` (${item.variant_name})`}</h4>
+                    {getBrandName(item.brand) && <p className="text-xs text-muted-foreground">{getBrandName(item.brand)}</p>}
                     <p className="text-sm font-semibold text-foreground">
                       {formatINR(item.variant_price || item.price)}
                     </p>

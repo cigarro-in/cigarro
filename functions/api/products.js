@@ -27,14 +27,17 @@ export async function onRequest(context) {
       env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Fetch all active products with variants and brand
+    // Fetch all active products with full details for product pages
     const { data: productsData, error } = await supabase
       .from('products')
       .select(`
-        id, name, slug, description,
+        id, name, slug, brand_id, description, short_description, 
+        is_active, origin, specifications, 
+        meta_title, meta_description, canonical_url,
         created_at, updated_at,
-        brand:brands(name, slug),
-        product_variants(id, variant_name, variant_type, price, images, is_active)
+        brand:brands(id, name, slug),
+        product_variants(id, variant_name, variant_type, price, stock, images, is_active, is_default),
+        categories:product_categories(category:categories(id, name, slug))
       `)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -48,18 +51,21 @@ export async function onRequest(context) {
     const formattedData = productsData.map(product => {
       // Find default or first active variant
       const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
-      const defaultVariant = activeVariants[0]; // Assuming order returned is sufficient or first is default enough
+      const defaultVariant = activeVariants.find(v => v.is_default) || activeVariants[0];
+      const images = activeVariants.flatMap(v => v.images || []);
+      
+      // Flatten categories
+      const categories = (product.categories || [])
+        .map(pc => pc.category)
+        .filter(Boolean);
       
       return {
         ...product,
-        brand: product.brand?.name || 'Unknown',
+        brand: Array.isArray(product.brand) ? product.brand[0] : product.brand,
+        categories,
         price: defaultVariant?.price || 0,
-        gallery_images: activeVariants.flatMap(v => v.images || []),
-        image: defaultVariant?.images?.[0] || null,
-        // Add dummy values for removed columns if needed by frontend types
-        rating: 0,
-        review_count: 0,
-        is_featured: false 
+        gallery_images: images,
+        image: images[0] || null
       };
     });
 

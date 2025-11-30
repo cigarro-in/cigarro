@@ -37,7 +37,7 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Switch } from '../../../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Separator } from '../../../components/ui/separator';
-import { EnhancedImageUpload } from '../../../components/ui/EnhancedImageUpload';
+import { ImageUpload } from '../../../components/ui/ImageUpload';
 import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { sanitizer } from '../../../utils/validation';
@@ -788,8 +788,9 @@ export default function EnhancedBrandManager({ onStatsUpdate }: EnhancedBrandMan
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  error={formErrors.name}
+                  className={formErrors.name ? 'border-red-500' : ''}
                 />
+                {formErrors.name && <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>}
               </div>
 
               <div>
@@ -799,8 +800,9 @@ export default function EnhancedBrandManager({ onStatsUpdate }: EnhancedBrandMan
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  error={formErrors.description}
+                  className={formErrors.description ? 'border-red-500' : ''}
                 />
+                {formErrors.description && <p className="text-sm text-red-500 mt-1">{formErrors.description}</p>}
               </div>
 
               <div>
@@ -811,20 +813,22 @@ export default function EnhancedBrandManager({ onStatsUpdate }: EnhancedBrandMan
                   value={formData.website_url}
                   onChange={(e) => setFormData(prev => ({ ...prev, website_url: e.target.value }))}
                   placeholder="https://example.com"
-                  error={formErrors.website_url}
+                  className={formErrors.website_url ? 'border-red-500' : ''}
                 />
+                {formErrors.website_url && <p className="text-sm text-red-500 mt-1">{formErrors.website_url}</p>}
               </div>
             </TabsContent>
 
             <TabsContent value="media" className="space-y-4">
-              <EnhancedImageUpload
-                imageUrl={formData.logo_url}
-                onImageUrlChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
-                label="Brand Logo"
-                folder="brands"
-                help="Upload or select a logo for this brand"
-                aspectRatio="square"
-              />
+              <div>
+                <Label>Brand Logo</Label>
+                <p className="text-sm text-muted-foreground mb-2">Upload or select a logo for this brand</p>
+                <ImageUpload
+                  imageUrl={formData.logo_url || null}
+                  onImageUrlChange={(url: string | null) => setFormData(prev => ({ ...prev, logo_url: url || '' }))}
+                  showSelector={true}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="heritage" className="space-y-4">

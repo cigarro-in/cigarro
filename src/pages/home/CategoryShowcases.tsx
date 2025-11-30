@@ -20,15 +20,6 @@ interface CategoryShowcasesProps {
 export function CategoryShowcases({ categoriesWithProducts = [], isLoading = false }: CategoryShowcasesProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
 
-  // Debug logging
-  console.log('🏷️ CategoryShowcases received data:', {
-    categoriesWithProducts,
-    count: categoriesWithProducts?.length,
-    isLoading,
-    firstCategory: categoriesWithProducts?.[0],
-    firstCategoryProducts: categoriesWithProducts?.[0]?.products
-  });
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleAddToCart = async (product: any) => {
     try {

@@ -19,11 +19,6 @@ const SectionFallback = ({ height = "h-96" }: { height?: string }) => (
 
 export function HomePage() {
   const { data, isLoading } = useHomepageData();
-  
-  console.log('🏠 HomePage data:', { 
-    categoriesWithProducts: data?.categoriesWithProducts,
-    isLoading 
-  });
 
   return (
     <>
@@ -59,8 +54,8 @@ export function HomePage() {
         </Suspense>
       </div>
       
-      {/* Category Showcases with Products - TEMP: Showing on all devices for debugging */}
-      <div className="">{/* Fixed syntax */}
+      {/* Mobile: Category Showcases with Products */}
+      <div className="md:hidden">
         <Suspense fallback={<SectionFallback height="h-[800px]" />}>
           <CategoryShowcases 
             categoriesWithProducts={data?.categoriesWithProducts} 

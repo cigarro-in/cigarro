@@ -18,7 +18,19 @@ import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../.
 import { AuthDialog } from '../../components/auth/AuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
+import { getProductImageUrl } from '../../lib/supabase/storage';
 import QRCode from 'qrcode';
+
+// Helper function to safely get brand name from various formats
+const getBrandName = (brand: any): string => {
+  if (!brand) return '';
+  if (typeof brand === 'string') return brand;
+  if (typeof brand === 'object') {
+    if (Array.isArray(brand)) return brand[0]?.name || '';
+    return brand.name || '';
+  }
+  return '';
+};
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -1588,13 +1600,14 @@ export function CheckoutPage() {
                       return (
                         <div key={itemKey} className="flex items-center space-x-4 p-4 border border-border/20 rounded-lg">
                           <img 
-                            src={item.gallery_images?.[0] || item.image} 
+                            src={getProductImageUrl(item.image || item.gallery_images?.[0] || item.product_variants?.[0]?.images?.[0])} 
                             alt={item.name}
-                            className="w-16 h-16 object-cover rounded"
+                            className="w-16 h-16 object-cover rounded bg-muted"
+                            onError={(e) => { (e.target as HTMLImageElement).src = getProductImageUrl(); }}
                           />
                           <div className="flex-1">
                             <h3 className="font-serif-premium text-foreground">{item.name}{item.variant_name && ` (${item.variant_name})`}</h3>
-                            <p className="text-sm text-muted-foreground">{item.brand}</p>
+                            {getBrandName(item.brand) && <p className="text-sm text-muted-foreground">{getBrandName(item.brand)}</p>}
                             
                             {/* Combo Info */}
                             

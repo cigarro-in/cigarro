@@ -73,12 +73,45 @@ function ProductPage() {
     setActiveImage(0);
   }, [selectedVariant]);
 
+  // Store all products for related product lookups
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchProduct = async () => {
       if (!slug) return;
       
       try {
-        // Fetch product details with brand relation
+        // Try cached API first for blazing fast load
+        try {
+          const response = await fetch('/api/products');
+          if (response.ok) {
+            const products = await response.json();
+            setAllProducts(products); // Store for related products
+            
+            const productData = products.find((p: any) => p.slug === slug);
+            if (productData) {
+              setProduct(productData);
+              
+              // Variants are already included in cached data
+              const activeVariants = (productData.product_variants || []).filter((v: any) => v.is_active !== false);
+              setVariants(activeVariants);
+              
+              // Auto-select default variant
+              const defaultVariant = activeVariants.find((v: any) => v.is_default) || activeVariants[0];
+              if (defaultVariant) {
+                setSelectedVariant(defaultVariant);
+              }
+              
+              // Combos still need separate fetch (complex nested data)
+              fetchCombos();
+              return;
+            }
+          }
+        } catch (apiError) {
+          console.log('API not available, using Supabase fallback');
+        }
+
+        // Fallback: Fetch product details with brand relation
         const { data: productData, error: productError } = await supabase
           .from('products')
           .select('id, name, slug, brand_id, brand:brands(id, name), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url')
@@ -90,14 +123,14 @@ function ProductPage() {
           return;
         }
 
-        // Transform brand from array to single object (Supabase returns array for single relation)
+        // Transform brand from array to single object
         const transformedProduct = {
           ...productData,
           brand: Array.isArray(productData.brand) ? productData.brand[0] : productData.brand
         };
         setProduct(transformedProduct);
 
-        // Fetch variants (images stored directly in images column)
+        // Fetch variants
         const { data: variantsData, error: variantsError } = await supabase
           .from('product_variants')
           .select('*')
@@ -107,46 +140,56 @@ function ProductPage() {
 
         if (!variantsError && variantsData) {
           setVariants(variantsData);
-          
-          // Auto-select default variant if available
           const defaultVariant = variantsData.find((v: any) => v.is_default) || variantsData[0];
           if (defaultVariant) {
             setSelectedVariant(defaultVariant);
           }
         }
 
-        // Fetch combos that include variants of this product
-        const { data: combosData, error: combosError } = await supabase
-          .from('combos')
-          .select(`
-            *,
-            combo_items (
-              *,
-              variant:product_variants (
-                *,
-                product:products (*)
-              )
-            )
-          `)
-          .eq('is_active', true);
-
-        if (!combosError && combosData) {
-          setCombos(combosData);
-        }
-
+        fetchCombos();
       } catch (error) {
         console.error('Error fetching product data:', error);
         toast.error('Failed to load product details.');
       }
     };
 
+    const fetchCombos = async () => {
+      const { data: combosData, error: combosError } = await supabase
+        .from('combos')
+        .select(`
+          *,
+          combo_items (
+            *,
+            variant:product_variants (
+              *,
+              product:products (*)
+            )
+          )
+        `)
+        .eq('is_active', true);
+
+      if (!combosError && combosData) {
+        setCombos(combosData);
+      }
+    };
+
     fetchProduct();
   }, [slug]);
 
-  // Lazy load brand products when section is visible
+  // Lazy load brand products when section is visible - use cached data
   useEffect(() => {
     if (!shouldLoadBrandSection || !product) return;
 
+    // Use cached allProducts if available (instant!)
+    if (allProducts.length > 0) {
+      const brandProds = allProducts
+        .filter((p: any) => p.brand_id === product.brand_id && p.id !== product.id)
+        .slice(0, 3);
+      setBrandProducts(brandProds);
+      return;
+    }
+
+    // Fallback to Supabase
     const fetchBrandProducts = async () => {
       try {
         const { data: brandData, error: brandError } = await supabase
@@ -171,15 +214,24 @@ function ProductPage() {
     };
 
     fetchBrandProducts();
-  }, [shouldLoadBrandSection, product]);
+  }, [shouldLoadBrandSection, product, allProducts]);
 
-  // Lazy load recommended products when section is visible
+  // Lazy load recommended products when section is visible - use cached data
   useEffect(() => {
     if (!shouldLoadRecommended || !product) return;
 
+    // Use cached allProducts if available (instant!)
+    if (allProducts.length > 0) {
+      const otherProducts = allProducts.filter((p: any) => p.id !== product.id);
+      const shuffled = otherProducts.sort(() => Math.random() - 0.5);
+      setSimilarProducts(shuffled.slice(0, 8));
+      return;
+    }
+
+    // Fallback to Supabase
     const fetchRecommendedProducts = async () => {
       try {
-        const { data: allProducts, error: allProductsError } = await supabase
+        const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select(`
             id, name, slug, brand_id, brand:brands(id, name), is_active,
@@ -191,8 +243,8 @@ function ProductPage() {
           .eq('is_active', true)
           .limit(20);
 
-        if (!allProductsError && allProducts) {
-          const shuffled = allProducts.sort(() => Math.random() - 0.5);
+        if (!productsError && productsData) {
+          const shuffled = productsData.sort(() => Math.random() - 0.5);
           setSimilarProducts(shuffled.slice(0, 8));
         }
       } catch (error) {
@@ -201,7 +253,7 @@ function ProductPage() {
     };
 
     fetchRecommendedProducts();
-  }, [shouldLoadRecommended, product]);
+  }, [shouldLoadRecommended, product, allProducts]);
 
   // Intersection Observer for lazy loading
   useEffect(() => {

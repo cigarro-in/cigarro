@@ -34,6 +34,8 @@ export interface CartItem extends CartItemWithVariant {
   // Inherits all properties from CartItemWithVariant
   // Ensure price is required but can be 0
   price: number;
+  // Explicitly define brand as string for UI display
+  brand?: string;
   // Add product_variants for type safety
   product_variants?: Array<{
     id: string;
@@ -176,11 +178,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const variantId = item.variant_id || undefined;
         const comboId = item.combo_id || undefined;
 
+        // Extract brand name - handle array format from Supabase relations
+        const getBrandName = (brand: any): string => {
+          if (!brand) return 'Premium';
+          if (typeof brand === 'string') return brand;
+          if (Array.isArray(brand)) return brand[0]?.name || 'Premium';
+          if (typeof brand === 'object') return brand.name || 'Premium';
+          return 'Premium';
+        };
+
         const cartItem = {
           id: product.id,
           name: product.name,
           slug: product.slug,
-          brand: typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium',
+          brand: getBrandName(product.brand),
           price: variant?.price || product.price || 0,
           description: product.description,
           is_active: product.is_active,
@@ -319,8 +330,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
     } else {
       // Create new cart item with variant/combo info
+      // Extract brand name - handle array format from Supabase relations
+      const extractBrand = (brand: any): string => {
+        if (!brand) return 'Premium';
+        if (typeof brand === 'string') return brand;
+        if (Array.isArray(brand)) return brand[0]?.name || 'Premium';
+        if (typeof brand === 'object') return brand.name || 'Premium';
+        return 'Premium';
+      };
+
       const newItem: CartItem = {
         ...product,
+        // Flatten brand object if present
+        brand: extractBrand(product.brand),
         // Get price from default variant or passed variant
         price: (product as any).variant_price || product.product_variants?.find(v => v.is_default)?.price || product.product_variants?.[0]?.price || 0,
         quantity,
@@ -382,6 +404,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Add new item
         newItems.push({
           ...product,
+          // Flatten brand object if present
+          brand: typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium',
           // Get price from default variant
           price: (product as any).variant_price || product.product_variants?.find(v => v.is_default)?.price || product.product_variants?.[0]?.price || 0,
           quantity,

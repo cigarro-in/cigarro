@@ -36,7 +36,7 @@ import { Switch } from '../../components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Separator } from '../../components/ui/separator';
-import { EnhancedImageUpload } from '../../components/ui/EnhancedImageUpload';
+import { ImageUpload } from '../../components/ui/ImageUpload';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { sanitizer } from '../../utils/validation';
@@ -701,13 +701,15 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
             </TabsContent>
 
             <TabsContent value="media" className="space-y-4">
-              <EnhancedImageUpload
-                imageUrl={formData.image}
-                onImageUrlChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
-                title="Category Image"
-                description="Upload or select an image for this category"
-                aspectRatio="square"
-              />
+              <div>
+                <Label>Category Image</Label>
+                <p className="text-sm text-muted-foreground mb-2">Upload or select an image for this category</p>
+                <ImageUpload
+                  imageUrl={formData.image || null}
+                  onImageUrlChange={(url: string | null) => setFormData(prev => ({ ...prev, image: url || '' }))}
+                  showSelector={true}
+                />
+              </div>
 
               <div>
                 <Label htmlFor="image_alt_text">Image Alt Text</Label>
