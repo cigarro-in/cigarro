@@ -1,5 +1,5 @@
 // Enhanced Search System for Variants and Combos
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../lib/supabase/client';
 import { logger } from './logger';
 import { SearchResult, SearchQueryParse } from '../types/variants';
 
@@ -14,11 +14,11 @@ const VARIANT_KEYWORDS = {
 // Parse search query to identify variant types and intent
 export const parseSearchQuery = (query: string): SearchQueryParse => {
   const queryLower = query.toLowerCase().trim();
-  
+
   // Determine if search is looking for specific variant
   let targetVariant: string | undefined;
   let isComboSearch = false;
-  
+
   // Check for variant keywords
   for (const [variant, keywords] of Object.entries(VARIANT_KEYWORDS)) {
     if (keywords.some(keyword => queryLower.includes(keyword))) {
@@ -30,13 +30,13 @@ export const parseSearchQuery = (query: string): SearchQueryParse => {
       break;
     }
   }
-  
+
   // Clean query by removing variant keywords
   let cleanQuery = queryLower;
   Object.values(VARIANT_KEYWORDS).flat().forEach(keyword => {
     cleanQuery = cleanQuery.replace(new RegExp(`\\b${keyword}\\b`, 'gi'), '').trim();
   });
-  
+
   return {
     original_query: query,
     clean_query: cleanQuery,
@@ -49,16 +49,16 @@ export const parseSearchQuery = (query: string): SearchQueryParse => {
 
 // Enhanced search scoring algorithm
 export const calculateEnhancedSearchScore = (
-  item: SearchResult, 
-  query: string, 
+  item: SearchResult,
+  query: string,
   targetVariant?: string,
   isComboSearch: boolean = false
 ): number => {
   const queryLower = query.toLowerCase();
   const nameLower = item.name.toLowerCase();
-  const brandLower = item.brand.toLowerCase();
+  const brandLower = (item.brand || '').toLowerCase();
   const variantLower = (item.variant_name || '').toLowerCase();
-  
+
   let score = 0;
 
   // Exact variant match gets highest priority
@@ -100,7 +100,7 @@ export const calculateEnhancedSearchScore = (
   });
 
   // Boost score for products with higher ratings
-  if (item.rating) score += item.rating * 10;
+  // Rating boost removed as column was dropped
 
   // Boost score for variants when searching for specific variant
   if (targetVariant && item.item_type === 'variant') {
@@ -120,7 +120,7 @@ export const searchProductsEnhanced = async (query: string): Promise<SearchResul
   if (!query.trim()) return [];
 
   const queryParse = parseSearchQuery(query);
-  
+
   try {
     // Use secure function instead of direct materialized view access
     const { data, error } = await supabase
@@ -134,14 +134,14 @@ export const searchProductsEnhanced = async (query: string): Promise<SearchResul
     }
 
     // Enhanced scoring algorithm
-    const scoredResults = (data || []).map(item => {
+    const scoredResults = (data || []).map((item: any) => {
       const score = calculateEnhancedSearchScore(
-        item as SearchResult, 
-        queryParse.clean_query, 
-        queryParse.target_variant, 
+        item as SearchResult,
+        queryParse.clean_query,
+        queryParse.target_variant,
         queryParse.is_combo_search
       );
-      
+
       return {
         ...item,
         search_score: score,
@@ -152,7 +152,7 @@ export const searchProductsEnhanced = async (query: string): Promise<SearchResul
 
     // Sort by score and return top results
     return scoredResults
-      .sort((a, b) => b.search_score - a.search_score)
+      .sort((a: SearchResult, b: SearchResult) => b.search_score! - a.search_score!)
       .slice(0, 8);
 
   } catch (error) {
@@ -173,16 +173,16 @@ export const searchProductsBasic = async (query: string): Promise<SearchResult[]
     if (error) throw error;
 
     const queryParse = parseSearchQuery(query);
-    
+
     // Apply basic scoring
-    const scoredResults = (data || []).map(item => {
+    const scoredResults = (data || []).map((item: any) => {
       const score = calculateEnhancedSearchScore(
-        item as SearchResult, 
-        query, 
-        queryParse.target_variant, 
+        item as SearchResult,
+        query,
+        queryParse.target_variant,
         queryParse.is_combo_search
       );
-      
+
       return {
         ...item,
         search_score: score,
@@ -191,7 +191,7 @@ export const searchProductsBasic = async (query: string): Promise<SearchResult[]
       } as SearchResult;
     });
 
-    return scoredResults.sort((a, b) => b.search_score - a.search_score);
+    return scoredResults.sort((a: SearchResult, b: SearchResult) => b.search_score! - a.search_score!);
 
   } catch (error) {
     logger.error('Basic search error:', error);
@@ -213,23 +213,23 @@ export const getSearchSuggestions = async (query: string): Promise<string[]> => 
     if (error) throw error;
 
     const suggestions = new Set<string>();
-    
-    (data || []).forEach(item => {
+
+    (data || []).forEach((item: any) => {
       // Add product name suggestions
       if (item.name.toLowerCase().includes(query.toLowerCase())) {
         suggestions.add(item.name);
       }
-      
+
       // Add brand suggestions
       if (item.brand.toLowerCase().includes(query.toLowerCase())) {
         suggestions.add(item.brand);
       }
-      
+
       // Add variant suggestions
       if (item.variant_name && item.variant_name.toLowerCase().includes(query.toLowerCase())) {
         suggestions.add(`${item.name} ${item.variant_name}`);
       }
-      
+
       // Add combo suggestions
       if (item.combo_name && item.combo_name.toLowerCase().includes(query.toLowerCase())) {
         suggestions.add(item.combo_name);

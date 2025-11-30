@@ -95,13 +95,13 @@ const Header = () => {
         .eq('is_active', true);
 
       if (error) throw error;
-      
+
       // Normalize brand from array to object
       const normalizedData = (data || []).map(p => ({
         ...p,
         brand: normalizeBrand(p.brand)
       })) as Product[];
-      
+
       setAllProducts(normalizedData);
       initializeFuse(normalizedData);
     } catch (error) {
@@ -112,10 +112,10 @@ const Header = () => {
   // Advanced search algorithm with fuzzy matching
   const calculateLevenshteinDistance = (str1: string, str2: string): number => {
     const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-    
+
     for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
     for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-    
+
     for (let j = 1; j <= str2.length; j++) {
       for (let i = 1; i <= str1.length; i++) {
         const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
@@ -126,7 +126,7 @@ const Header = () => {
         );
       }
     }
-    
+
     return matrix[str2.length][str1.length];
   };
 
@@ -135,27 +135,27 @@ const Header = () => {
     const nameLower = product.name.toLowerCase();
     const brandLower = getBrandName(product).toLowerCase();
     const descriptionLower = (product.description || '').toLowerCase();
-    
+
     let score = 0;
-    
+
     // Exact matches get highest score
     if (nameLower === queryLower) score += 1000;
     if (brandLower === queryLower) score += 800;
-    
+
     // Starts with matches
     if (nameLower.startsWith(queryLower)) score += 500;
     if (brandLower.startsWith(queryLower)) score += 400;
-    
+
     // Contains matches
     if (nameLower.includes(queryLower)) score += 300;
     if (brandLower.includes(queryLower)) score += 200;
     if (descriptionLower.includes(queryLower)) score += 100;
-    
+
     // Word boundary matches (more precise)
     const nameWords = nameLower.split(/\s+/);
     const brandWords = brandLower.split(/\s+/);
     const queryWords = queryLower.split(/\s+/);
-    
+
     queryWords.forEach((queryWord: string) => {
       nameWords.forEach((nameWord: string) => {
         if (nameWord.startsWith(queryWord)) score += 150;
@@ -166,17 +166,16 @@ const Header = () => {
         if (brandWord.includes(queryWord)) score += 60;
       });
     });
-    
+
     // Fuzzy matching with Levenshtein distance
     const nameDistance = calculateLevenshteinDistance(queryLower, nameLower);
     const brandDistance = calculateLevenshteinDistance(queryLower, brandLower);
-    
+
     if (nameDistance <= 2) score += Math.max(0, 200 - nameDistance * 50);
     if (brandDistance <= 2) score += Math.max(0, 150 - brandDistance * 40);
-    
-    // Boost score for products with higher ratings
-    if (product.rating) score += product.rating * 10;
-    
+
+    // Rating boost removed as column was dropped
+
     return score;
   };
 
@@ -188,39 +187,39 @@ const Header = () => {
     }
 
     setIsSearching(true);
-    
+
     try {
       // Use Fuse.js for fuzzy search if available (most reliable)
       if (fuseInstance) {
         const fuseResults = fuseInstance.search(query);
-          const results: SearchResult[] = fuseResults
-            .slice(0, 8)
-            .map(result => ({
-              id: result.item.id,
-              name: result.item.name,
-              slug: result.item.slug,
-              brand: getBrandName(result.item),
-              brand_id: result.item.brand_id,
-              description: result.item.description,
-              gallery_images: result.item.gallery_images,
-              is_active: result.item.is_active,
-              item_type: 'product' as const,
-              search_score: result.score || 0,
-              searchable_text: `${result.item.name} ${getBrandName(result.item)} ${result.item.description || ''}`,
-              base_price: getProductPrice(result.item),
-              created_at: result.item.created_at || new Date().toISOString(),
-              variant_id: undefined,
-              variant_name: undefined,
-              variant_price: undefined,
-              combo_id: undefined,
-              combo_name: undefined,
-              combo_price: undefined,
-              original_price: undefined,
-              matched_variant: undefined,
-              matched_combo: undefined,
-              product_variants: result.item.product_variants
-            }));
-        
+        const results: SearchResult[] = fuseResults
+          .slice(0, 8)
+          .map(result => ({
+            id: result.item.id,
+            name: result.item.name,
+            slug: result.item.slug,
+            brand: getBrandName(result.item),
+            brand_id: result.item.brand_id,
+            description: result.item.description,
+            image: result.item.product_variants?.[0]?.images?.[0] || '',
+            is_active: result.item.is_active,
+            item_type: 'product' as const,
+            search_score: result.score || 0,
+            searchable_text: `${result.item.name} ${getBrandName(result.item)} ${result.item.description || ''}`,
+            base_price: getProductPrice(result.item),
+            created_at: result.item.created_at || new Date().toISOString(),
+            variant_id: undefined,
+            variant_name: undefined,
+            variant_price: undefined,
+            combo_id: undefined,
+            combo_name: undefined,
+            combo_price: undefined,
+            original_price: undefined,
+            matched_variant: undefined,
+            matched_combo: undefined,
+            product_variants: result.item.product_variants
+          }));
+
         setSearchResults(results);
         setShowResults(true);
       } else {
@@ -228,7 +227,7 @@ const Header = () => {
         const { data, error } = await supabase
           .from('products')
           .select(`
-            id, name, slug, brand_id, brand:brands(id, name), description, is_active, gallery_images, rating, created_at,
+            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
             product_variants (
               id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
             )
@@ -250,7 +249,7 @@ const Header = () => {
             brand: brandName,
             brand_id: product.brand_id,
             description: product.description,
-            gallery_images: product.gallery_images,
+            image: product.product_variants?.[0]?.images?.[0] || '',
             is_active: product.is_active,
             item_type: 'product' as const,
             search_score: calculateSearchScore(normalizedProduct, query),
@@ -302,20 +301,20 @@ const Header = () => {
       if (autoShowTimeout) {
         clearTimeout(autoShowTimeout);
       }
-      
+
       // Show mini cart immediately
       setIsMiniCartOpen(true);
-      
+
       // Set timeout to hide after 3 seconds
       const timeout = setTimeout(() => {
         setIsMiniCartOpen(false);
       }, 3000);
-      
+
       setAutoShowTimeout(timeout);
     };
 
     window.addEventListener('cartItemAdded', handleCartItemAdded);
-    
+
     return () => {
       window.removeEventListener('cartItemAdded', handleCartItemAdded);
       if (autoShowTimeout) {
@@ -342,8 +341,8 @@ const Header = () => {
     <header className="hidden lg:block fixed top-0 left-0 right-0 z-50 px-4 py-3">
       <div className="bg-creme border border-coyote rounded-lg h-14 flex items-center justify-between px-2 relative z-10">
         {/* Left Section - Menu */}
-        <button 
-          type="button" 
+        <button
+          type="button"
           className="flex items-center gap-3 px-4 py-2 border-r border-coyote rounded-l-lg hover:bg-dark transition-colors duration-300 group"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
@@ -364,17 +363,17 @@ const Header = () => {
         {/* Right Section - Icons */}
         <div className="flex items-center gap-1">
           {/* Search */}
-          <button 
+          <button
             className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
             onClick={() => setIsSearchOpen(!isSearchOpen)}
             aria-label="Search"
           >
             <Search className="w-4 h-4 lg:w-5 lg:h-5 xl:w-5 xl:h-5 text-dark" strokeWidth={1.5} />
           </button>
-          
+
           {/* Wishlist */}
-          <Link 
-            to="/wishlist" 
+          <Link
+            to="/wishlist"
             className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300 relative"
             aria-label="Wishlist"
           >
@@ -387,7 +386,7 @@ const Header = () => {
           </Link>
 
           {/* Cart */}
-          <div 
+          <div
             className="relative"
             onMouseEnter={() => {
               if (autoShowTimeout) {
@@ -398,7 +397,7 @@ const Header = () => {
             }}
             onMouseLeave={() => setIsMiniCartOpen(false)}
           >
-            <button 
+            <button
               className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300 relative"
               onClick={() => setIsMiniCartOpen(!isMiniCartOpen)}
               aria-label="Shopping cart"
@@ -410,22 +409,22 @@ const Header = () => {
                 </span>
               )}
             </button>
-            
+
             {/* Mini Cart */}
-            <MiniCart 
-              isVisible={isMiniCartOpen} 
-              onClose={() => setIsMiniCartOpen(false)} 
+            <MiniCart
+              isVisible={isMiniCartOpen}
+              onClose={() => setIsMiniCartOpen(false)}
             />
           </div>
 
           {/* Authentication */}
           {user ? (
-            <div 
+            <div
               className="relative"
               onMouseEnter={() => setIsUserDropdownOpen(true)}
               onMouseLeave={() => setIsUserDropdownOpen(false)}
             >
-              <button 
+              <button
                 className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                 aria-label="User menu"
@@ -447,7 +446,7 @@ const Header = () => {
                   <Link to="/orders" className="block px-4 py-2.5 text-sm text-dark hover:bg-creme-light transition-colors">
                     My Orders
                   </Link>
-                  <button 
+                  <button
                     onClick={() => signOut()}
                     className="w-full text-left px-4 py-2.5 text-sm text-dark hover:bg-creme-light transition-colors flex items-center gap-2"
                   >
@@ -458,7 +457,7 @@ const Header = () => {
               </div>
             </div>
           ) : (
-            <button 
+            <button
               className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
               onClick={() => setIsAuthDialogOpen(true)}
               aria-label="Sign in"
@@ -491,7 +490,7 @@ const Header = () => {
                 Shopping Cart
               </Link>
             </div>
-            
+
             {/* Account Section */}
             <div className="p-6 border-b border-coyote lg:border-b-0 lg:border-r lg:border-coyote">
               <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
@@ -510,7 +509,7 @@ const Header = () => {
                       Admin Dashboard
                     </Link>
                   )}
-                  <button 
+                  <button
                     onClick={() => { signOut(); setIsMenuOpen(false); }}
                     className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon text-left"
                   >
@@ -518,7 +517,7 @@ const Header = () => {
                   </button>
                 </>
               ) : (
-                <button 
+                <button
                   onClick={() => { setIsAuthDialogOpen(true); setIsMenuOpen(false); }}
                   className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon text-left"
                 >
@@ -526,7 +525,7 @@ const Header = () => {
                 </button>
               )}
             </div>
-            
+
             {/* Information Section */}
             <div className="p-6 border-b border-coyote lg:border-b-0 lg:border-r lg:border-coyote">
               <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
@@ -545,7 +544,7 @@ const Header = () => {
                 Shipping Info
               </Link>
             </div>
-            
+
             {/* Legal Section */}
             <div className="p-6">
               <span className="block text-dark font-sans font-medium uppercase text-sm leading-tight tracking-tight mb-4">
@@ -586,7 +585,7 @@ const Header = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                   {isSearching && <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 text-coyote animate-spin" />}
-                  <button 
+                  <button
                     onClick={handleSearchClose}
                     className="text-coyote hover:text-dark transition-colors p-1"
                     aria-label="Close search"
@@ -617,7 +616,7 @@ const Header = () => {
                             {/* Product Image */}
                             <div className="flex-shrink-0">
                               <img
-                                src={getProductImageUrl(result.gallery_images?.[0])}
+                                src={getProductImageUrl(result.image)}
                                 alt={result.name}
                                 className="w-16 h-16 rounded-lg object-cover bg-white"
                                 onError={(e) => {
@@ -626,7 +625,7 @@ const Header = () => {
                                 }}
                               />
                             </div>
-                            
+
                             {/* Product Info */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
@@ -637,7 +636,7 @@ const Header = () => {
                                   <h4 className="text-dark font-sans font-semibold text-base leading-tight line-clamp-2">
                                     {result.name}
                                   </h4>
-                                  
+
                                   {/* Variant/Combo Info */}
                                   {result.item_type === 'variant' && result.variant_name && (
                                     <div className="flex items-center gap-2 mt-1">
@@ -647,7 +646,7 @@ const Header = () => {
                                       </Badge>
                                     </div>
                                   )}
-                                  
+
                                   {result.item_type === 'combo' && (
                                     <div className="flex items-center gap-2 mt-1">
                                       <Badge variant="default" className="text-xs bg-accent text-accent-foreground">
@@ -656,14 +655,14 @@ const Header = () => {
                                       </Badge>
                                     </div>
                                   )}
-                                  
+
                                   {/* Match indicator */}
                                   {result.matched_variant && (
                                     <div className="text-xs text-green-600 mt-1">
                                       ✓ Matched: {result.matched_variant}
                                     </div>
                                   )}
-                                  
+
                                   {result.description && (
                                     <p className="text-dark/70 text-sm leading-relaxed line-clamp-2 font-sans mt-1">
                                       {result.description}
@@ -685,7 +684,7 @@ const Header = () => {
                           </Link>
                         ))}
                       </div>
-                      
+
                       {/* View All Results */}
                       {searchResults.length >= 8 && (
                         <div className="mt-4 pt-4 border-t border-coyote">
@@ -723,9 +722,9 @@ const Header = () => {
       )}
 
       {/* Authentication Dialog */}
-      <AuthDialog 
-        open={isAuthDialogOpen} 
-        onOpenChange={setIsAuthDialogOpen} 
+      <AuthDialog
+        open={isAuthDialogOpen}
+        onOpenChange={setIsAuthDialogOpen}
       />
     </header>
   );

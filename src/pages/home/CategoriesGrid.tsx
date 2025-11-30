@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Package, Leaf, Flame } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
 import { Link } from 'react-router-dom';
 import { useCart, Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  image: string | null;
+import { Category as HomeCategory } from '../../types/home';
+
+interface Category extends HomeCategory {
   product_count?: number;
 }
 
@@ -23,98 +19,20 @@ const categoryIcons: { [key: string]: React.ComponentType<any> } = {
   accessories: Package,
 };
 
-export function CategoriesGrid() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [collectionProducts, setCollectionProducts] = useState<Product[]>([]);
-  const [isCollectionMode, setIsCollectionMode] = useState(false);
+interface CategoriesGridProps {
+  categories?: Category[];
+  collectionProducts?: Product[];
+  isCollectionMode?: boolean;
+  isLoading?: boolean;
+}
+
+export function CategoriesGrid({ 
+  categories = [], 
+  collectionProducts = [], 
+  isCollectionMode = false, 
+  isLoading = false 
+}: CategoriesGridProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      // 1. Check for attached collection
-      const { data: componentConfig } = await supabase
-        .from('homepage_component_config')
-        .select('config')
-        .eq('component_name', 'CategoriesGrid')
-        .single();
-      
-      const attachedCollectionId = componentConfig?.config?.collection_id;
-
-      if (attachedCollectionId) {
-        setIsCollectionMode(true);
-        await fetchCollectionProducts(attachedCollectionId);
-      } else {
-        setIsCollectionMode(false);
-        await fetchCategories();
-      }
-
-    } catch (error) {
-      console.error('Error loading categories grid data:', error);
-    }
-  };
-
-  const fetchCollectionProducts = async (collectionId: string) => {
-    try {
-      const { data: collectionData, error: collectionError } = await supabase
-        .from('collection_products')
-        .select(`
-          product_id,
-          products (
-            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-            product_variants (
-              id, product_id, variant_name, variant_type, price, is_default, is_active, images
-            )
-          )
-        `)
-        .eq('collection_id', collectionId)
-        .order('sort_order', { ascending: true });
-
-      if (collectionError) throw collectionError;
-
-      const products = collectionData
-        ?.map(item => item.products)
-        .filter((p): p is any => !!p && typeof p === 'object' && 'id' in p && (p as any).is_active);
-
-      setCollectionProducts(products || []);
-    } catch (error) {
-      console.error('Error fetching collection products:', error);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      // Fetch categories with product counts
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('id, name, slug, description, image')
-        .order('name');
-
-      if (categoriesError) throw categoriesError;
-
-      // Get product counts for each category
-      const categoriesWithCounts = await Promise.all(
-        (categoriesData || []).map(async (category) => {
-          const { count } = await supabase
-            .from('product_categories')
-            .select('product_id', { count: 'exact' })
-            .eq('category_id', category.id);
-
-          return {
-            ...category,
-            product_count: count || 0
-          };
-        })
-      );
-
-      setCategories(categoriesWithCounts);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
 
   const handleAddToCart = async (product: Product) => {
     try {

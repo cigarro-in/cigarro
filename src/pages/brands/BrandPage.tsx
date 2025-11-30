@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
-import { useCart } from '../../hooks/useCart';
+import { useCart, Product } from '../../hooks/useCart';
 
 interface Brand {
   id: string;
@@ -28,20 +28,6 @@ interface Brand {
   } | null;
   created_at: string;
   updated_at: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  brand: string;
-  price: number;
-  description: string;
-  is_active: boolean;
-  gallery_images: string[];
-  rating: number;
-  review_count: number;
-  created_at?: string;
 }
 
 export function BrandPage() {
@@ -79,19 +65,26 @@ export function BrandPage() {
 
       setBrand(brandData);
 
-      // Fetch brand products
+      // Fetch brand products using brand_id
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
-          id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at
+          id, name, slug, brand_id, description, is_active, created_at,
+          brand:brands(id, name),
+          product_variants(id, variant_name, price, is_default, is_active, images)
         `)
-        .eq('brand', brandData.name)
+        .eq('brand_id', brandData.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (productsError) throw productsError;
 
-      setProducts(productsData || []);
+      const normalizedProducts = (productsData || []).map((p: any) => ({
+        ...p,
+        brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
+      }));
+
+      setProducts(normalizedProducts as Product[]);
     } catch (error) {
       console.error('Error fetching brand data:', error);
       toast.error('Failed to load brand information');
@@ -163,7 +156,7 @@ export function BrandPage() {
         </div>
 
         {/* Brand Hero Section - Elegant Full Width */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
@@ -172,7 +165,7 @@ export function BrandPage() {
           <div className="main-container py-20">
             <div className="max-w-5xl mx-auto">
               {/* Brand Logo */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.6 }}
@@ -196,7 +189,7 @@ export function BrandPage() {
               </motion.div>
 
               {/* Brand Name */}
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.6 }}
@@ -207,7 +200,7 @@ export function BrandPage() {
 
               {/* Heritage Info */}
               {brand.heritage && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.6 }}
@@ -236,7 +229,7 @@ export function BrandPage() {
 
               {/* Brand Description */}
               {brand.description && (
-                <motion.p 
+                <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5, duration: 0.6 }}
@@ -248,7 +241,7 @@ export function BrandPage() {
 
               {/* Brand Story */}
               {brand.heritage?.story && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.6, duration: 0.6 }}
@@ -262,7 +255,7 @@ export function BrandPage() {
               )}
 
               {/* Website Link & Stats */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7, duration: 0.6 }}
@@ -290,7 +283,7 @@ export function BrandPage() {
 
         {/* Products Section */}
         <div className="main-container py-20">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -308,7 +301,7 @@ export function BrandPage() {
           </motion.div>
 
           {products.length === 0 ? (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-center py-20"

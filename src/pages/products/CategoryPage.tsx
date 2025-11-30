@@ -41,7 +41,7 @@ export function CategoryPage() {
 
   const isProductsPage = location.pathname === '/products';
   const productsPerPage = 12;
-  
+
   // Get search query from URL parameters
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get('search') || '';
@@ -59,18 +59,24 @@ export function CategoryPage() {
     try {
       let query = supabase
         .from('products')
-        .select('id, name, slug, brand, price, description, is_active, gallery_images, rating, review_count, created_at')
+        .select('id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, variant_name, price, is_default, is_active, images)')
         .eq('is_active', true);
 
       // If there's a search query, filter products
       if (searchQuery.trim()) {
-        query = query.or(`name.ilike.%${searchQuery}%,brand.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProducts(data || []);
+      
+      // Transform to flatten brand from array
+      const transformedProducts = (data || []).map((p: any) => ({
+        ...p,
+        brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
+      }));
+      setProducts(transformedProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');
@@ -98,17 +104,13 @@ export function CategoryPage() {
             products!inner(
               id,
               name,
-              brand,
-              price,
+              brand_id,
+              brand:brands(id, name),
               description,
               is_active,
               slug,
-              gallery_images,
-              rating,
-              review_count,
-              image,
-              limited,
-              created_at
+              created_at,
+              product_variants(id, variant_name, price, is_default, is_active, images)
             )
           )
         `)
@@ -135,9 +137,13 @@ export function CategoryPage() {
       };
 
       setCategory(categoryInfo);
-      
-      // Extract products from the nested structure
-      const categoryProducts = data.products?.map((pc: any) => pc.products).filter(Boolean) || [];
+
+      // Extract products from the nested structure and flatten brand
+      const categoryProducts = (data.products?.map((pc: any) => pc.products).filter(Boolean) || [])
+        .map((p: any) => ({
+          ...p,
+          brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
+        }));
       setProducts(categoryProducts);
     } catch (error) {
       console.error('Error fetching category:', error);
@@ -159,11 +165,12 @@ export function CategoryPage() {
   const sortedProducts = [...products].sort((a, b) => {
     switch (sortBy) {
       case 'price-low':
-        return a.price - b.price;
+        return (a.price || 0) - (b.price || 0);
       case 'price-high':
-        return b.price - a.price;
+        return (b.price || 0) - (a.price || 0);
       case 'rating':
-        return (b.rating || 0) - (a.rating || 0);
+        // Rating removed, fallback to name
+        return a.name.localeCompare(b.name);
       case 'newest':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       default: // name
@@ -178,14 +185,14 @@ export function CategoryPage() {
 
   const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
 
-  const pageTitle = isProductsPage 
+  const pageTitle = isProductsPage
     ? (searchQuery ? `Search Results for "${searchQuery}"` : 'Premium Tobacco Products')
     : category?.meta_title || category?.name || 'Products';
 
   const pageDescription = isProductsPage
-    ? (searchQuery 
-        ? `Search results for "${searchQuery}" - Find the perfect tobacco products that match your preferences.`
-        : 'Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands.')
+    ? (searchQuery
+      ? `Search results for "${searchQuery}" - Find the perfect tobacco products that match your preferences.`
+      : 'Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands.')
     : category?.meta_description || category?.description || 'Premium tobacco products';
 
   if (isLoading) {
@@ -221,7 +228,7 @@ export function CategoryPage() {
           {(category?.description || isProductsPage) && (
             <div className="text-wrapper text-center max-w-4xl mx-auto">
               <p className="text">
-                {category?.description || (searchQuery 
+                {category?.description || (searchQuery
                   ? `Found ${sortedProducts.length} products matching "${searchQuery}"`
                   : 'Explore our curated selection of premium tobacco products, carefully sourced from the finest growers worldwide.')}
               </p>
@@ -242,7 +249,7 @@ export function CategoryPage() {
                 </span>
               )}
             </div>
-            
+
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <label className="text-dark font-sans font-medium text-base">Sort by:</label>
               <select
@@ -253,7 +260,7 @@ export function CategoryPage() {
                 <option value="name">Name A-Z</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
-                <option value="rating">Highest Rated</option>
+                {/* <option value="rating">Highest Rated</option> */}
                 <option value="newest">Newest First</option>
               </select>
             </div>
@@ -298,7 +305,7 @@ export function CategoryPage() {
             >
               Previous
             </button>
-            
+
             <div className="flex gap-1">
               {[...Array(totalPages)].map((_, i) => {
                 const pageNum = i + 1;
@@ -311,11 +318,10 @@ export function CategoryPage() {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`w-10 h-10 rounded-md font-sans font-medium transition-colors duration-300 ${
-                        currentPage === pageNum
-                          ? 'bg-dark text-creme-light'
-                          : 'border border-coyote hover:bg-creme-light'
-                      }`}
+                      className={`w-10 h-10 rounded-md font-sans font-medium transition-colors duration-300 ${currentPage === pageNum
+                        ? 'bg-dark text-creme-light'
+                        : 'border border-coyote hover:bg-creme-light'
+                        }`}
                     >
                       {pageNum}
                     </button>

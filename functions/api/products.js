@@ -27,14 +27,14 @@ export async function onRequest(context) {
       env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Fetch all active products with variants
-    const { data, error } = await supabase
+    // Fetch all active products with variants and brand
+    const { data: productsData, error } = await supabase
       .from('products')
       .select(`
-        id, name, slug, brand, price, description,
-        gallery_images, rating, review_count, is_featured,
+        id, name, slug, description,
         created_at, updated_at,
-        product_variants(id, variant_name, variant_type, price, is_active)
+        brand:brands(name, slug),
+        product_variants(id, variant_name, variant_type, price, images, is_active)
       `)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -44,10 +44,29 @@ export async function onRequest(context) {
       throw new Error(error.message);
     }
 
-    console.log(`✅ Fetched ${data?.length || 0} products`);
+    // Transform data to match expected frontend structure
+    const formattedData = productsData.map(product => {
+      // Find default or first active variant
+      const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
+      const defaultVariant = activeVariants[0]; // Assuming order returned is sufficient or first is default enough
+      
+      return {
+        ...product,
+        brand: product.brand?.name || 'Unknown',
+        price: defaultVariant?.price || 0,
+        gallery_images: activeVariants.flatMap(v => v.images || []),
+        image: defaultVariant?.images?.[0] || null,
+        // Add dummy values for removed columns if needed by frontend types
+        rating: 0,
+        review_count: 0,
+        is_featured: false 
+      };
+    });
+
+    console.log(`✅ Fetched ${formattedData?.length || 0} products`);
 
     // Return response - Cloudflare CDN will cache automatically
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(formattedData), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

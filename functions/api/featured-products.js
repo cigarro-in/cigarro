@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function onRequest(context) {
   const { request, env } = context;
-  
+
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -27,18 +27,37 @@ export async function onRequest(context) {
       env.VITE_SUPABASE_ANON_KEY
     );
 
-    // Fetch featured products
-    const { data, error } = await supabase
+    // Fetch featured products (fallback to latest active products since is_featured was removed)
+    const { data: rawData, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand, price, gallery_images, rating, review_count, is_featured')
+      .select(`
+        id, name, slug, description,
+        created_at, updated_at,
+        brand:brands(name, slug),
+        product_variants(id, variant_name, variant_type, price, images, is_active)
+      `)
       .eq('is_active', true)
-      .eq('is_featured', true)
       .order('created_at', { ascending: false })
       .limit(20);
 
     if (error) {
       throw new Error(error.message);
     }
+
+    // Transform data
+    const data = rawData.map(product => {
+      const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
+      const defaultVariant = activeVariants[0];
+
+      return {
+        ...product,
+        brand: product.brand?.name || 'Unknown',
+        price: defaultVariant?.price || 0,
+        gallery_images: activeVariants.flatMap(v => v.images || []),
+        image: defaultVariant?.images?.[0] || null,
+        is_featured: true // Dummy value
+      };
+    });
 
     console.log(`✅ Fetched ${data?.length || 0} featured products`);
 

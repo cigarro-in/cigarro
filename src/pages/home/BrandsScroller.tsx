@@ -1,45 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
+import { Brand } from '../../types/home';
 
-interface Brand {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  is_active: boolean;
-  product_count?: number;
+interface BrandsScrollerProps {
+  brands?: Brand[];
+  isLoading?: boolean;
 }
 
-export function BrandsScroller() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchBrands();
-  }, []);
-
-  const fetchBrands = async () => {
-    try {
-      // Optimized single query - Fetch only active brands
-      // Removing per-brand product count check for maximum performance
-      const { data, error } = await supabase
-        .from('brands')
-        .select('id, name, slug, description, logo_url, is_active')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      
-      setBrands(data || []);
-    } catch (error) {
-      console.error('Error fetching brands:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+export function BrandsScroller({ brands = [], isLoading = false }: BrandsScrollerProps) {
   if (isLoading) {
     // Minimal height reservation without visual noise
     return <section className="py-6 bg-creme min-h-[240px]"></section>;
@@ -103,13 +71,6 @@ export function BrandsScroller() {
           ))}
         </div>
       </div>
-
-      {/* Hide scrollbar CSS */}
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </section>
   );
 }

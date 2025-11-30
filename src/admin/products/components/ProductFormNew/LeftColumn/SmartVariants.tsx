@@ -164,7 +164,7 @@ export function SmartVariants({ formData, onChange }: SmartVariantsProps) {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="sticks">Sticks</SelectItem>
-                            <SelectItem value="packs">Packs</SelectItem>
+                            <SelectItem value="packets">Packets</SelectItem>
                             <SelectItem value="cartons">Cartons</SelectItem>
                             <SelectItem value="bundles">Bundles</SelectItem>
                             <SelectItem value="pieces">Pieces</SelectItem>

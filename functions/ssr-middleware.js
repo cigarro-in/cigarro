@@ -39,7 +39,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand, price, description, short_description, gallery_images, meta_title, meta_description, og_image, rating, review_count')
+      .select('id, name, slug, brand:brands(name), price, description, short_description, meta_title, meta_description, og_image, product_variants(images, is_active)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -49,7 +49,9 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
     }
 
     const canonicalUrl = `https://cigarro.in/product/${slug}`;
-    const imageUrl = product.gallery_images?.[0] || product.og_image || faviconUrl;
+    const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
+    const variantImages = activeVariants.flatMap(v => v.images || []);
+    const imageUrl = variantImages[0] || product.og_image || faviconUrl;
     const title = product.meta_title || `${product.name} | Cigarro`;
     const description = product.meta_description || product.short_description || product.description?.substring(0, 160) || '';
 
@@ -89,28 +91,23 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <!-- Structured Data -->
   <script type="application/ld+json">
   ${JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    description: description,
-    image: imageUrl,
-    brand: {
-      '@type': 'Brand',
-      name: product.brand
-    },
-    offers: {
-      '@type': 'Offer',
-      price: product.price,
-      priceCurrency: 'INR',
-      availability: 'https://schema.org/InStock',
-      url: canonicalUrl
-    },
-    aggregateRating: product.rating ? {
-      '@type': 'AggregateRating',
-      ratingValue: product.rating,
-      reviewCount: product.review_count || 1
-    } : undefined
-  })}
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: description,
+      image: imageUrl,
+      brand: {
+        '@type': 'Brand',
+        name: product.brand?.name || 'Cigarro'
+      },
+      offers: {
+        '@type': 'Offer',
+        price: product.price,
+        priceCurrency: 'INR',
+        availability: 'https://schema.org/InStock',
+        url: canonicalUrl
+      }
+    })}
   </script>
 </head>
 <body>
@@ -118,7 +115,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <p>${escapeHtml(description)}</p>
   <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
   <p>Price: ₹${product.price}</p>
-  <p>Brand: ${escapeHtml(product.brand)}</p>
+  <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
   
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
@@ -167,12 +164,12 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
   
   <script type="application/ld+json">
   ${JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: category.name,
-    description: description,
-    url: canonicalUrl
-  })}
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: category.name,
+      description: description,
+      url: canonicalUrl
+    })}
   </script>
 </head>
 <body>
@@ -459,30 +456,30 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
   <!-- Structured Data -->
   <script type="application/ld+json">
   ${JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: post.title,
-    description: description,
-    image: imageUrl,
-    datePublished: publishedDate,
-    dateModified: publishedDate,
-    author: {
-      '@type': 'Person',
-      name: authorName
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: 'Cigarro',
-      logo: {
-        '@type': 'ImageObject',
-        url: faviconUrl
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description: description,
+      image: imageUrl,
+      datePublished: publishedDate,
+      dateModified: publishedDate,
+      author: {
+        '@type': 'Person',
+        name: authorName
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Cigarro',
+        logo: {
+          '@type': 'ImageObject',
+          url: faviconUrl
+        }
+      },
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': canonicalUrl
       }
-    },
-    mainEntityOfPage: {
-      '@type': 'WebPage',
-      '@id': canonicalUrl
-    }
-  })}
+    })}
   </script>
 </head>
 <body>
@@ -523,20 +520,20 @@ export async function onRequest(context) {
   const { request, next, env } = context;
   const url = new URL(request.url);
   const userAgent = request.headers.get('user-agent') || '';
-  
+
   // Only prerender for bots
   if (!isBot(userAgent)) {
     return next();
   }
 
   // Skip for admin, API, and user-specific pages
-  if (url.pathname.startsWith('/admin') || 
-      url.pathname.startsWith('/api') ||
-      url.pathname.startsWith('/checkout') ||
-      url.pathname.startsWith('/cart') ||
-      url.pathname.startsWith('/orders') ||
-      url.pathname.startsWith('/wishlist') ||
-      url.pathname.startsWith('/payment')) {
+  if (url.pathname.startsWith('/admin') ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/checkout') ||
+    url.pathname.startsWith('/cart') ||
+    url.pathname.startsWith('/orders') ||
+    url.pathname.startsWith('/wishlist') ||
+    url.pathname.startsWith('/payment')) {
     return next();
   }
 
@@ -555,11 +552,11 @@ export async function onRequest(context) {
     // Generate appropriate HTML based on route
     if (url.pathname === '/' || url.pathname === '') {
       html = generateHomepageHTML(faviconUrl);
-    } else if (url.pathname === '/about' || url.pathname === '/contact' || 
-               url.pathname === '/products' || url.pathname === '/categories' ||
-               url.pathname === '/brands' || url.pathname === '/blogs' ||
-               url.pathname === '/terms' || url.pathname === '/privacy' ||
-               url.pathname === '/shipping' || url.pathname === '/legal') {
+    } else if (url.pathname === '/about' || url.pathname === '/contact' ||
+      url.pathname === '/products' || url.pathname === '/categories' ||
+      url.pathname === '/brands' || url.pathname === '/blogs' ||
+      url.pathname === '/terms' || url.pathname === '/privacy' ||
+      url.pathname === '/shipping' || url.pathname === '/legal') {
       html = generateStaticPageHTML(url.pathname, faviconUrl);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = url.pathname.replace('/product/', '');

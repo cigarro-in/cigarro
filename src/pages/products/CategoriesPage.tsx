@@ -27,40 +27,51 @@ export function CategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        // Try Cloudflare cached API first (ultra-fast edge response)
-        const response = await fetch('https://cigarro.in/api/categories');
-        
-        if (response.ok) {
-          const data = await response.json();
-          setCategories(data || []);
-          
-          // Log cache status for debugging
-          const cacheStatus = response.headers.get('X-Cache-Status');
-          console.log('📦 Categories loaded from:', cacheStatus === 'HIT' ? 'Edge Cache ⚡' : 'Database 🔍');
+        // Fetch categories with their products via product_categories junction
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select(`
+            id,
+            name,
+            slug,
+            description,
+            image,
+            products:product_categories(
+              products(
+                id, name, slug, brand_id, description, is_active, created_at,
+                brand:brands(id, name),
+                product_variants(id, variant_name, price, is_default, is_active, images)
+              )
+            )
+          `)
+          .order('name');
+
+        if (categoriesError) {
+          toast.error('Failed to load categories.');
+          console.error(categoriesError);
           return;
         }
-        
-        // Fallback to direct Supabase call if API fails
-        console.log('⚠️ API failed, falling back to direct Supabase');
-        const { data, error } = await supabase.rpc('get_categories_with_products');
 
-        if (error) {
-          toast.error('Failed to load categories.');
-          console.error(error);
-        } else {
-          setCategories(data || []);
-        }
+        // Transform data to match expected structure
+        const transformedCategories = (categoriesData || []).map((cat: any) => ({
+          category_id: cat.id,
+          category_name: cat.name,
+          category_slug: cat.slug,
+          category_description: cat.description,
+          category_image: cat.image,
+          products: (cat.products || [])
+            .map((pc: any) => pc.products)
+            .filter((p: any) => p && p.is_active)
+            .map((p: any) => ({
+              ...p,
+              brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
+            }))
+        })).filter((cat: any) => cat.products.length > 0);
+
+        setCategories(transformedCategories);
       } catch (error) {
-        // Final fallback to direct Supabase
-        console.error('Fetch error, using Supabase fallback:', error);
-        const { data, error: supabaseError } = await supabase.rpc('get_categories_with_products');
-        
-        if (supabaseError) {
-          toast.error('Failed to load categories.');
-          console.error(supabaseError);
-        } else {
-          setCategories(data || []);
-        }
+        console.error('Error fetching categories:', error);
+        toast.error('Failed to load categories.');
       }
     };
 

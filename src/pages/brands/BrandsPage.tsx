@@ -39,13 +39,13 @@ export function BrandsPage() {
 
       if (brandsError) throw brandsError;
 
-      // Get product counts for each brand
+      // Get product counts for each brand using brand_id
       const brandsWithCounts = await Promise.all(
         (brandsData || []).map(async (brand) => {
           const { count } = await supabase
             .from('products')
             .select('id', { count: 'exact' })
-            .eq('brand', brand.name)
+            .eq('brand_id', brand.id)
             .eq('is_active', true);
 
           return {

@@ -1,140 +1,47 @@
-import { motion } from 'framer-motion';
-import { useCart, Product } from '../../hooks/useCart';
-import { useWishlist } from '../../hooks/useWishlist';
+import { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { useCart } from '../../hooks/useCart';
 import { toast } from 'sonner';
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase/client';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../../components/products/ProductCard';
+import { SectionConfig, HomepageProduct } from '../../types/home';
 
-// Helper function to format price in Indian numbering system
-const formatIndianPrice = (priceINR: number): string => {
-  return priceINR.toLocaleString('en-IN');
-};
+interface FeaturedProductsProps {
+  products?: HomepageProduct[];
+  config?: SectionConfig | null;
+  isLoading?: boolean;
+}
 
-export function FeaturedProducts() {
+export const FeaturedProducts = memo(function FeaturedProducts({ 
+  products = [], 
+  config = null, 
+  isLoading = false 
+}: FeaturedProductsProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // Track active index only (integer) to avoid 60fps re-renders
   const [activeIndex, setActiveIndex] = useState(0);
   
-  const [sectionConfig, setSectionConfig] = useState({
+  const sectionConfig = config || {
     title: 'Top Products',
     subtitle: 'Featured Products',
     description: 'Discover our handpicked selection of premium tobacco products',
     button_text: 'View All Products',
     button_url: '/products',
     is_enabled: true
-  });
-
-  const fetchFeaturedProducts = async (collectionId?: string) => {
-    try {
-      setIsLoadingProducts(true);
-      
-      if (collectionId) {
-        // Fetch from collection
-        const { data: collectionData, error: collectionError } = await supabase
-          .from('collection_products')
-          .select(`
-            product_id,
-            products (
-              id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-              product_variants (
-                id, product_id, variant_name, variant_type, price, is_default, is_active, images
-              )
-            )
-          `)
-          .eq('collection_id', collectionId)
-          .order('sort_order', { ascending: true });
-
-        if (collectionError) throw collectionError;
-
-        // Transform data to match Product interface
-        const products = collectionData
-          ?.map(item => item.products)
-          .filter((p): p is any => !!p && typeof p === 'object' && 'id' in p && (p as any).is_active); // strict type guard and active check
-
-        setFeaturedProducts(products || []);
-      } else {
-        // Legacy fallback: fetch active products
-        const { data: products, error: productsError } = await supabase
-          .from('products')
-          .select(`
-            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-            product_variants (
-              id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-            )
-          `)
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(6);
-
-        if (productsError) throw productsError;
-        setFeaturedProducts(products || []);
-      }
-    } catch (error) {
-      console.error('Error fetching featured products:', error);
-    } finally {
-      setIsLoadingProducts(false);
-    }
   };
 
-  const loadData = async () => {
+  const handleAddToCart = useCallback(async (product: HomepageProduct) => {
     try {
-      // 1. Get Component Config to find attached collection
-      const { data: componentConfig, error: configError } = await supabase
-        .from('homepage_component_config')
-        .select('config')
-        .eq('component_name', 'FeaturedProducts')
-        .single();
-      
-      const attachedCollectionId = componentConfig?.config?.collection_id;
-
-      // 2. Fetch Section UI Config (title, subtitle etc)
-      const { data: sectionConfigData, error: sectionError } = await supabase
-        .from('section_configurations')
-        .select('title, subtitle, description, button_text, button_url, is_enabled')
-        .eq('section_name', 'featured_products')
-        .single();
-
-      if (sectionConfigData) {
-        setSectionConfig({
-          title: sectionConfigData.title || 'Curated Selection of Premium Tobacco',
-          subtitle: sectionConfigData.subtitle || 'Featured Products',
-          description: sectionConfigData.description || 'Discover our handpicked selection of premium tobacco products',
-          button_text: sectionConfigData.button_text || 'View All Products',
-          button_url: sectionConfigData.button_url || '/products',
-          is_enabled: sectionConfigData.is_enabled !== false
-        });
-      }
-
-      // 3. Fetch Products (using collection ID if available)
-      await fetchFeaturedProducts(attachedCollectionId);
-
-    } catch (error) {
-      console.error('Error loading featured products data:', error);
-    }
-  };
-
-  const handleAddToCart = async (product: Product) => {
-    try {
-      await addToCart(product, 1);
+      await addToCart(product as any, 1);
       toast.success(`${product.name} added to cart!`);
-    } catch (error) {
+    } catch {
       toast.error('Failed to add item to cart');
     }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  }, [addToCart]);
 
   // Optimized scroll handler using IntersectionObserver for center item detection
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || featuredProducts.length === 0) return;
+    if (!container || products.length === 0) return;
 
     const handleScroll = () => {
       if (!container) return;
@@ -161,37 +68,30 @@ export function FeaturedProducts() {
 
     container.addEventListener('scroll', throttledScroll, { passive: true });
     return () => container.removeEventListener('scroll', throttledScroll);
-  }, [featuredProducts]);
+  }, [products]);
 
   if (!sectionConfig.is_enabled) return null;
 
   // Minimal height reservation while loading
-  if (isLoadingProducts) {
+  if (isLoading) {
     return <section className="py-8 md:py-16 bg-creme min-h-[400px]"></section>;
   }
 
-  if (featuredProducts.length === 0) {
+  if (products.length === 0) {
     return null;
   }
 
   // Triple the products for infinite scroll effect
-  const infiniteProducts = [...featuredProducts, ...featuredProducts, ...featuredProducts];
+  const infiniteProducts = [...products, ...products, ...products];
 
   return (
     <section className="py-8 md:py-16 bg-creme md:min-h-screen md:flex md:items-center">
       <div className="w-full">
         {/* Section Header */}
-        <div className="text-center mb-[1.5rem] md:mb-[3rem] px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-          >
-            <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
-              {sectionConfig.title}
-            </h2>
-          </motion.div>
+        <div className="text-center mb-6 md:mb-12 px-4">
+          <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
+            {sectionConfig.title}
+          </h2>
         </div>
 
         {/* Products Grid - Mobile: Infinite Carousel, Desktop: Centered Trio */}
@@ -212,7 +112,7 @@ export function FeaturedProducts() {
               }}
             >
               {infiniteProducts.map((product, index) => {
-                const len = featuredProducts.length;
+                const len = products.length;
                 const actualIndex = index % len;
                 
                 // Calculate distance from viewport center for smooth scaling
@@ -247,10 +147,10 @@ export function FeaturedProducts() {
                     }}
                   >
                     <ProductCard
-                      product={product}
+                      product={product as any}
                       variant="default"
-                      onAddToCart={handleAddToCart}
-                      isLoading={cartLoading} // Use cartLoading
+                      onAddToCart={handleAddToCart as any}
+                      isLoading={cartLoading}
                       index={actualIndex}
                     />
                   </div>
@@ -260,9 +160,9 @@ export function FeaturedProducts() {
             
             {/* Scroll Indicators */}
             <div className="flex justify-center gap-2 mt-4">
-              {featuredProducts.map((_, index) => {
+              {products.map((_, index) => {
                 // Calculate which item is currently centered
-                const isActive = index === activeIndex % featuredProducts.length; // Use activeIndex
+                const isActive = index === activeIndex % products.length; // Use activeIndex
                 
                 return (
                   <div
@@ -280,37 +180,30 @@ export function FeaturedProducts() {
 
           {/* Desktop Layout: Equal Height Cards */}
           <div className="hidden md:grid md:grid-cols-3 gap-8 w-full px-4">
-            {featuredProducts.slice(0, 3).map((product, index) => (
+            {products.slice(0, 3).map((product, index) => (
               <div key={product.id}>
                 <ProductCard
-                  product={product}
+                  product={product as any}
                   variant="default"
-                  onAddToCart={handleAddToCart}
-                  isLoading={cartLoading} // Use cartLoading
+                  onAddToCart={handleAddToCart as any}
+                  isLoading={cartLoading}
                   index={index}
                 />
               </div>
             ))}
           </div>
         </div>
-        
-        {/* Hide scrollbar CSS */}
-        <style>{`
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
 
         {/* View All Button - Centered below products */}
         <div className="text-center mt-8 md:mt-16 px-4">
           <Link
-            to={sectionConfig.button_url}
+            to={sectionConfig.button_url || '/products'}
             className="btn-primary inline-flex items-center px-8 py-3"
           >
-            {sectionConfig.button_text}
+            {sectionConfig.button_text || 'View All Products'}
           </Link>
         </div>
       </div>
     </section>
   );
-}
+});

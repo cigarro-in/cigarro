@@ -36,7 +36,6 @@ export interface Combo {
   original_price?: number;
   discount_percentage?: number;
   image?: string;
-  gallery_images?: string[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -105,8 +104,8 @@ export interface SearchResult {
   brand?: string;
   brand_id?: string;
   description?: string;
+  image?: string;
   base_price: number;
-  gallery_images?: string[];
   is_active: boolean;
   created_at: string;
   item_type: 'product' | 'combo' | 'variant';
@@ -264,7 +263,6 @@ export interface ComboFormData {
   description?: string;
   combo_price: number;
   image?: string;
-  gallery_images?: string[];
   is_active: boolean;
   items: {
     variant_id: string;

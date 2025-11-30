@@ -1,77 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
+import { HeroSlide } from '../../types/home';
 
-interface HeroSlide {
-  id: string;
-  title: string;
-  suptitle?: string;
-  description?: string;
-  image_url: string;
-  mobile_image_url?: string;
-  small_image_url?: string;
-  button_text?: string;
-  button_url?: string;
-  product_name?: string;
-  product_price?: string;
-  product_image_url?: string;
-  is_active: boolean;
-  sort_order: number;
+interface HeroProps {
+  slides?: HeroSlide[];
+  isLoading?: boolean;
+  autoPlayInterval?: number;
 }
 
-const Hero = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [slides, setSlides] = useState<HeroSlide[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const AUTO_PLAY_INTERVAL = 5000; // 5 seconds
 
-  useEffect(() => {
-    loadHeroSlides();
+const Hero = memo(function Hero({ 
+  slides = [], 
+  isLoading = false,
+  autoPlayInterval = AUTO_PLAY_INTERVAL 
+}: HeroProps) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const slideCount = slides.length;
+
+  const nextSlide = useCallback(() => {
+    if (slideCount === 0) return;
+    setCurrentSlide((prev) => (prev + 1) % slideCount);
+  }, [slideCount]);
+
+  const prevSlide = useCallback(() => {
+    if (slideCount === 0) return;
+    setCurrentSlide((prev) => (prev - 1 + slideCount) % slideCount);
+  }, [slideCount]);
+
+  const goToSlide = useCallback((index: number) => {
+    setCurrentSlide(index);
   }, []);
 
-  const loadHeroSlides = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('hero_slides')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+  // Auto-play functionality
+  useEffect(() => {
+    if (slideCount <= 1 || isPaused) return;
+    
+    const timer = setInterval(nextSlide, autoPlayInterval);
+    return () => clearInterval(timer);
+  }, [slideCount, isPaused, nextSlide, autoPlayInterval]);
 
-      if (error) throw error;
-      setSlides(data || []);
-    } catch (error) {
-      console.error('Error loading hero slides:', error);
-      // No fallback - show empty state if database fails
-      setSlides([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'ArrowRight') nextSlide();
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nextSlide, prevSlide]);
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  const currentSlideData = slides[currentSlide];
-
-  // Space reservation for LCP stability (no visible loader)
-  if (isLoading || slides.length === 0) {
+  // Loading state - reserve space for LCP stability
+  if (isLoading || slideCount === 0) {
     return (
-      <div className="py-0 md:py-[2rem]">
+      <section className="py-0 md:py-8" aria-label="Hero carousel loading">
         <div className="main-container">
-          <div className="relative w-full aspect-video rounded-[0.75rem] md:rounded-[1rem] bg-transparent"></div>
+          <div className="relative w-full aspect-video rounded-xl md:rounded-2xl bg-creme-light/50 animate-pulse" />
         </div>
-      </div>
+      </section>
     );
   }
 
+  const currentSlideData = slides[currentSlide];
+  if (!currentSlideData) return null;
+
   return (
-    <div className="py-0 md:py-[2rem]">
+    <section 
+      className="py-0 md:py-8"
+      aria-label="Hero carousel"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       <div className="main-container">
-        <div className="relative w-full aspect-video rounded-[0.75rem] md:rounded-[1rem] overflow-hidden shadow-2xl transition-all duration-300">
+        <div className="relative w-full aspect-video rounded-xl md:rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
           <div className="absolute inset-0">
             <div className="relative h-full">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 h-full" id={`header-slider__slide-${currentSlide}`}>
@@ -203,6 +207,7 @@ const Hero = () => {
               <button 
                 className="inline-block w-[2.5rem] lg:w-[3rem] aspect-square border border-dark rounded-full relative transition-colors duration-300 overflow-hidden hover:bg-dark hover:text-white group"
                 onClick={prevSlide}
+                aria-label="Previous slide"
               >
                 <span className="inline-block w-full h-full relative transition-transform duration-500 group-hover:translate-x-full">
                   <ChevronLeft className="w-[1.25rem] h-[1.25rem] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
@@ -214,6 +219,7 @@ const Hero = () => {
               <button 
                 className="inline-block w-[2.5rem] lg:w-[3rem] aspect-square border border-dark rounded-full relative transition-colors duration-300 overflow-hidden hover:bg-dark hover:text-white group"
                 onClick={nextSlide}
+                aria-label="Next slide"
               >
                 <span className="inline-block w-full h-full relative transition-transform duration-500 group-hover:translate-x-full">
                   <ChevronRight className="w-[1.25rem] h-[1.25rem] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
@@ -225,25 +231,32 @@ const Hero = () => {
               </div>
 
               {/* Slide Indicators */}
-              <div className="absolute bottom-[1rem] left-1/2 transform -translate-x-1/2 flex space-x-[0.75rem] z-10">
-              {slides.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentSlide(index)}
-                  className={`h-[0.75rem] rounded-full transition-all duration-300 ${
-                    index === currentSlide 
-                      ? 'w-[2rem] bg-dark shadow-lg' 
-                      : 'w-[0.75rem] bg-dark/40 hover:bg-dark/70 hover:scale-110'
-                  }`}
-                />
-              ))}
+              <div 
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 z-10"
+                role="tablist"
+                aria-label="Slide indicators"
+              >
+                {slides.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => goToSlide(index)}
+                    role="tab"
+                    aria-selected={index === currentSlide}
+                    aria-label={`Go to slide ${index + 1}`}
+                    className={`h-3 rounded-full transition-all duration-300 ${
+                      index === currentSlide 
+                        ? 'w-8 bg-dark shadow-lg' 
+                        : 'w-3 bg-dark/40 hover:bg-dark/70 hover:scale-110'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
-};
+});
 
 export default Hero;

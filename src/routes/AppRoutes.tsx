@@ -7,13 +7,13 @@ import { ROUTES } from '../config/routes';
 const HomePage = lazy(() => import('../pages/home/HomePage').then(m => ({ default: m.HomePage })));
 
 // Shopping & Checkout
-const CartPage = lazy(() => import('../pages/cart/CartPage'));
-const CheckoutRouter = lazy(() => import('../pages/cart/CheckoutRouter').then(m => ({ default: m.CheckoutRouter })));
-const CheckoutPage = lazy(() => import('../pages/cart/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
-const MobileCheckoutPage = lazy(() => import('../pages/cart/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
+const CartPage = lazy(() => import('../pages/checkout/CartPage'));
+const CheckoutRouter = lazy(() => import('../pages/checkout/CheckoutRouter').then(m => ({ default: m.CheckoutRouter })));
+const CheckoutPage = lazy(() => import('../pages/checkout/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+const MobileCheckoutPage = lazy(() => import('../pages/checkout/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
+const TransactionProcessingPage = lazy(() => import('../pages/checkout/TransactionProcessingPage').then(m => ({ default: m.TransactionProcessingPage })));
 
-// Payment & Orders
-const TransactionProcessingPage = lazy(() => import('../pages/transaction/TransactionProcessingPage').then(m => ({ default: m.TransactionProcessingPage })));
+// Orders
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
 
 // User
@@ -21,7 +21,7 @@ const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ 
 const ProfileSettingsPage = lazy(() => import('../pages/user/ProfileSettingsPage').then(m => ({ default: m.ProfileSettingsPage })));
 const AddressesPage = lazy(() => import('../pages/user/AddressesPage').then(m => ({ default: m.AddressesPage })));
 const ReviewsPage = lazy(() => import('../pages/user/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
-const WalletPage = lazy(() => import('../pages/wallet/WalletPage').then(m => ({ default: m.WalletPage })));
+const WalletPage = lazy(() => import('../pages/user/WalletPage').then(m => ({ default: m.WalletPage })));
 const WishlistPage = lazy(() => import('../pages/user/WishlistPage').then(m => ({ default: m.WishlistPage })));
 const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
 const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
@@ -34,9 +34,9 @@ const CategoryPage = lazy(() => import('../pages/products/CategoryPage').then(m 
 const BrandsPage = lazy(() => import('../pages/brands/BrandsPage').then(m => ({ default: m.BrandsPage })));
 const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
 
-// Content
-const BlogsPage = lazy(() => import('../pages/content/BlogsPage').then(m => ({ default: m.BlogsPage })));
-const BlogPost = lazy(() => import('../pages/content/BlogsPage').then(m => ({ default: m.BlogPost })));
+// Blog
+const BlogsPage = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogsPage })));
+const BlogPost = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogPost })));
 const AboutPage = lazy(() => import('../pages/company/AboutPage').then(m => ({ default: m.AboutPage })));
 const ContactPage = lazy(() => import('../pages/company/ContactPage').then(m => ({ default: m.ContactPage })));
 

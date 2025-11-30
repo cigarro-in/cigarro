@@ -1,15 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Leaf, Flame } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
+import { Category } from '../../types/home';
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  image: string | null;
-  product_count?: number;
+interface CategoriesScrollerProps {
+  categories?: Category[];
+  isLoading?: boolean;
 }
 
 const categoryIcons: { [key: string]: React.ComponentType<any> } = {
@@ -19,32 +15,7 @@ const categoryIcons: { [key: string]: React.ComponentType<any> } = {
   accessories: Package,
 };
 
-export function CategoriesScroller() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      // Optimized single query - Count is nice but speed is better. 
-      // fetching just categories is instant.
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name, slug, description, image')
-        .order('name');
-
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+export function CategoriesScroller({ categories = [], isLoading = false }: CategoriesScrollerProps) {
   if (isLoading) {
     // Minimal height reservation without visual noise
     return <section className="py-6 bg-creme min-h-[240px]"></section>;
@@ -96,13 +67,6 @@ export function CategoriesScroller() {
                         <IconComponent className="w-6 h-6 text-canyon" />
                       </div>
                     )}
-                    
-                    {/* Product Count Badge */}
-                    {category.product_count !== undefined && (
-                      <div className="absolute top-2 right-2 bg-dark text-creme-light text-xs font-medium px-2 py-0.5 rounded-full">
-                        {category.product_count}
-                      </div>
-                    )}
                   </div>
 
                   {/* Category Name */}
@@ -117,13 +81,6 @@ export function CategoriesScroller() {
           })}
         </div>
       </div>
-
-      {/* Hide scrollbar CSS */}
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </section>
   );
 }

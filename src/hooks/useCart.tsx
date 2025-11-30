@@ -14,10 +14,8 @@ export interface Product {
   is_active: boolean;
   // Legacy fields for backward compatibility
   price?: number;
-  rating?: number;
   created_at?: string;
   origin?: string;
-  gallery_images?: string[];
   // New variant-based fields - images are now on variants
   product_variants?: Array<{
     id: string;
@@ -82,7 +80,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setIsInitialized(true);
     }
   }, [isInitialized]);
-  
+
   // Reload cart when user changes (login/logout)
   useEffect(() => {
     if (isInitialized && user !== undefined) {
@@ -130,7 +128,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Check if there's a guest cart to merge
       const guestCart = localStorage.getItem('cart');
       const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
-      
+
       // Get cart items from Supabase
       const { data: cartItems, error } = await supabase
         .from('cart_items')
@@ -167,17 +165,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         console.error('❌ Failed to load cart from database:', error);
         throw error;
       }
-      
+
       // Transform Supabase data to CartItem format
       const userItems: CartItem[] = cartItems?.filter(item => item.products).map(item => {
         const product = item.products as any;
         const variant = item.product_variants as any;
         const combo = item.combos as any;
-        
+
         // Convert null to undefined for proper comparison
         const variantId = item.variant_id || undefined;
         const comboId = item.combo_id || undefined;
-        
+
         const cartItem = {
           id: product.id,
           name: product.name,
@@ -186,8 +184,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
           price: variant?.price || product.price || 0,
           description: product.description,
           is_active: product.is_active,
-          rating: 0,
-          review_count: 0,
           image: variant?.images?.[0] || '',
           quantity: item.quantity,
           variant_id: variantId,
@@ -197,18 +193,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           combo_name: combo?.name,
           combo_price: combo?.combo_price
         };
-        
+
         return cartItem as CartItem;
       }) || [];
-      
+
       // Merge guest cart with user cart
       if (guestItems.length > 0) {
         const mergedItems = [...userItems];
-        
+
         for (const guestItem of guestItems) {
-          const existingItemIndex = mergedItems.findIndex(item => 
-            item.id === guestItem.id && 
-            item.variant_id === guestItem.variant_id && 
+          const existingItemIndex = mergedItems.findIndex(item =>
+            item.id === guestItem.id &&
+            item.variant_id === guestItem.variant_id &&
             item.combo_id === guestItem.combo_id
           );
           if (existingItemIndex >= 0) {
@@ -220,14 +216,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
               .update({ quantity: mergedItems[existingItemIndex].quantity })
               .eq('user_id', user.id)
               .eq('product_id', guestItem.id);
-            
+
             if (guestItem.variant_id) {
               updateQuery.eq('variant_id', guestItem.variant_id);
             }
             if (guestItem.combo_id) {
               updateQuery.eq('combo_id', guestItem.combo_id);
             }
-            
+
             await updateQuery;
           } else {
             // Add new item
@@ -244,7 +240,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
               });
           }
         }
-        
+
         // Save merged cart and clear localStorage
         setItems(mergedItems);
         localStorage.removeItem('cart');
@@ -260,14 +256,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const saveCartToServer = async (newItems: CartItem[]) => {
     if (!user) return;
-    
+
     try {
       // First, clear all existing cart items for this user
       await supabase
         .from('cart_items')
         .delete()
         .eq('user_id', user.id);
-      
+
       // Insert new cart items
       if (newItems.length > 0) {
         const cartItemsToInsert = newItems.map(item => ({
@@ -277,7 +273,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variant_id: item.variant_id,
           combo_id: item.combo_id
         }));
-        
+
         await supabase
           .from('cart_items')
           .insert(cartItemsToInsert);
@@ -308,13 +304,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
     // Optimistic update - update UI immediately
-    const existingItem = items.find(item => 
-      item.id === product.id && 
-      item.variant_id === variantId && 
+    const existingItem = items.find(item =>
+      item.id === product.id &&
+      item.variant_id === variantId &&
       item.combo_id === comboId
     );
     let newItems: CartItem[];
-    
+
     if (existingItem) {
       newItems = items.map(item =>
         item.id === product.id && item.variant_id === variantId && item.combo_id === comboId
@@ -337,13 +333,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
       newItems = [...items, newItem];
     }
-    
+
     // Update UI immediately
     setItems(newItems);
-    
+
     // Dispatch event to auto-show mini cart
     window.dispatchEvent(new CustomEvent('cartItemAdded'));
-    
+
     // Save in background
     try {
       if (!user) {
@@ -366,26 +362,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     // Start with current items
     let newItems = [...items];
-    
+
     // Add each product with its quantity
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
       const quantity = quantities[i];
-      
+
       // Check for existing item considering variant_id and combo_id
-      const existingItemIndex = newItems.findIndex(item => 
-        item.id === product.id && 
-        item.variant_id === (product as any).variant_id && 
+      const existingItemIndex = newItems.findIndex(item =>
+        item.id === product.id &&
+        item.variant_id === (product as any).variant_id &&
         item.combo_id === (product as any).combo_id
       );
-      
+
       if (existingItemIndex >= 0) {
         // Add to existing quantity
         newItems[existingItemIndex].quantity += quantity;
       } else {
         // Add new item
-        newItems.push({ 
-          ...product, 
+        newItems.push({
+          ...product,
           // Get price from default variant
           price: (product as any).variant_price || product.product_variants?.find(v => v.is_default)?.price || product.product_variants?.[0]?.price || 0,
           quantity,
@@ -394,10 +390,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
       }
     }
-    
+
     // Update UI immediately
     setItems(newItems);
-    
+
     // Save in background
     try {
       if (!user) {
@@ -415,13 +411,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const removeFromCart = async (productId: string, variantId?: string, comboId?: string) => {
     const originalItems = items;
-    const newItems = items.filter(item => 
+    const newItems = items.filter(item =>
       !(item.id === productId && item.variant_id === variantId && item.combo_id === comboId)
     );
-    
+
     // Update UI immediately
     setItems(newItems);
-    
+
     // Save in background
     try {
       if (!user) {
@@ -444,30 +440,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     const originalItems = items;
-    
+
     // Find matching item
     const matchingItem = items.find(item => {
       const idMatch = item.id === productId;
       const variantMatch = item.variant_id === variantId;
       const comboMatch = item.combo_id === comboId;
-      
+
       return idMatch && variantMatch && comboMatch;
     });
-    
+
     if (!matchingItem) {
       console.error('❌ No matching item found for update!');
       return;
     }
-    
+
     const newItems = items.map(item =>
       item.id === productId && item.variant_id === variantId && item.combo_id === comboId
         ? { ...item, quantity }
         : item
     );
-    
+
     // Update UI immediately
     setItems(newItems);
-    
+
     // Save in background
     try {
       if (!user) {
@@ -497,7 +493,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Priority: variant price > combo price > product price
     return item.variant_price || item.combo_price || item.price || 0;
   };
-  
+
   // Helper to get product price (from default variant if available)
   const getProductPrice = (product: Product): number => {
     if (product.product_variants?.length) {
@@ -537,7 +533,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         images: combo.gallery_images || [combo.image]
       }]
     };
-    
+
     await addToCart(comboProduct, quantity, undefined, combo.id);
   };
 
@@ -570,14 +566,14 @@ export function useCart() {
       items: [],
       totalItems: 0,
       totalPrice: 0,
-      addToCart: async () => {},
-      addMultipleToCart: async () => {},
-      removeFromCart: async () => {},
-      updateQuantity: async () => {},
-      clearCart: async () => {},
+      addToCart: async () => { },
+      addMultipleToCart: async () => { },
+      removeFromCart: async () => { },
+      updateQuantity: async () => { },
+      clearCart: async () => { },
       isLoading: false,
-      addVariantToCart: async () => {},
-      addComboToCart: async () => {},
+      addVariantToCart: async () => { },
+      addComboToCart: async () => { },
       getCartItemPrice: () => 0,
     };
   }

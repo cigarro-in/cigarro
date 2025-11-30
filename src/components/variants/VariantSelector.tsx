@@ -21,15 +21,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   basePrice,
   productName
 }) => {
-  // Group variants by type
-  const variantsByType = variants.reduce((acc, variant) => {
-    if (!acc[variant.variant_type]) {
-      acc[variant.variant_type] = [];
-    }
-    acc[variant.variant_type].push(variant);
-    return acc;
-  }, {} as Record<string, ProductVariant[]>);
-
   // Auto-select first variant if none selected
   useEffect(() => {
     if (!selectedVariant && variants.length > 0) {
@@ -37,63 +28,27 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     }
   }, [variants, selectedVariant, onVariantSelect]);
 
-  const getVariantTypeLabel = (type: string): string => {
-    switch (type) {
-      case 'packaging':
-        return 'Type';
-      case 'color':
-        return 'Color';
-      case 'size':
-        return 'Size';
-      case 'weight':
-        return 'Weight';
-      case 'strength':
-        return 'Strength';
-      default:
-        return type.charAt(0).toUpperCase() + type.slice(1);
-    }
-  };
-
-  const isVariantAvailable = (variant: ProductVariant): boolean => {
-    // Check if variant has stock
-    return (variant.stock || 0) > 0;
-  };
-
   return (
-    <div className="space-y-8">
-      {Object.entries(variantsByType).map(([type, typeVariants]) => (
-        <div key={type} className="space-y-4">
-          <h3 className="text-sm uppercase tracking-widest text-dark/60 font-medium">
-            {getVariantTypeLabel(type)}
-          </h3>
-          
-          <div className="flex flex-wrap gap-3">
-            {typeVariants.map((variant) => {
-              const isSelected = selectedVariant?.id === variant.id;
-              const isAvailable = isVariantAvailable(variant);
-              
-              return (
-                <button
-                  key={variant.id}
-                  onClick={() => isAvailable && onVariantSelect(variant)}
-                  disabled={!isAvailable}
-                  className={`
-                    px-6 py-3 rounded-full text-sm font-medium transition-all duration-300
-                    ${isSelected
-                      ? 'bg-dark text-creme shadow-md'
-                      : isAvailable
-                        ? 'bg-creme-light border border-coyote/30 text-dark hover:border-dark/40 hover:shadow-sm'
-                        : 'bg-creme-light border border-coyote/20 text-dark/30 cursor-not-allowed line-through'
-                    }
-                  `}
-                >
-                  {variant.variant_name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+    <div className="flex flex-wrap justify-start gap-3">
+      {variants.map((variant) => {
+        const isSelected = selectedVariant?.id === variant.id;
+        
+        return (
+          <button
+            key={variant.id}
+            onClick={() => onVariantSelect(variant)}
+            className={`
+              px-6 py-3 rounded-full text-sm font-medium transition-all duration-300
+              ${isSelected
+                ? 'bg-dark text-creme shadow-md'
+                : 'bg-creme-light border border-coyote/30 text-dark hover:border-dark/40 hover:shadow-sm'
+              }
+            `}
+          >
+            {variant.variant_name}
+          </button>
+        );
+      })}
     </div>
   );
 };

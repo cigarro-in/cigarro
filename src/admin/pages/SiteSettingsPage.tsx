@@ -136,7 +136,7 @@ export function SiteSettingsPage() {
     setIsSavingUpi(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       // Get settings ID if not available in state
       let settingsId = settings.id;
       if (!settingsId) {
@@ -148,7 +148,7 @@ export function SiteSettingsPage() {
 
       const { error } = await supabase
         .from('site_settings')
-        .update({ 
+        .update({
           upi_id: upiId.trim(),
           updated_at: new Date().toISOString(),
           updated_by: user?.id
@@ -170,7 +170,7 @@ export function SiteSettingsPage() {
   const handlePurgeSitemapCache = async () => {
     setIsGeneratingSitemap(true);
     const loadingToast = toast.loading('Purging sitemap cache...');
-    
+
     try {
       // Force refresh by adding cache-busting parameter
       const response = await fetch(`https://cigarro.in/sitemap.xml?t=${Date.now()}`, {
@@ -237,8 +237,8 @@ export function SiteSettingsPage() {
             />
           </div>
           <div className="flex gap-3 pt-4">
-            <Button 
-              onClick={handleSaveSettings} 
+            <Button
+              onClick={handleSaveSettings}
               disabled={isSaving}
               className="bg-canyon hover:bg-canyon/90 text-creme"
             >
@@ -336,12 +336,12 @@ export function SiteSettingsPage() {
                   <Button
                     onClick={async () => {
                       const isProduction = window.location.hostname === 'cigarro.in';
-                      
+
                       if (!isProduction) {
                         toast.info('⚠️ Cache refresh only works in production.\n\nIn development, there is no cache - all data loads fresh from Supabase.', { duration: 5000 });
                         return;
                       }
-                      
+
                       const loading = toast.loading('Refreshing cache...');
                       try {
                         const response = await fetch('https://cigarro.in/api/invalidate-cache', {
@@ -363,7 +363,7 @@ export function SiteSettingsPage() {
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh Cache Now
                   </Button>
-                  
+
                   <Button
                     onClick={async () => {
                       console.log('🧪 Test Performance button clicked');
@@ -372,33 +372,33 @@ export function SiteSettingsPage() {
                         const isProduction = window.location.hostname === 'cigarro.in';
                         console.log('🌍 Hostname:', window.location.hostname);
                         console.log('🏭 Is Production:', isProduction);
-                        
+
                         let endpoints;
-                        
+
                         if (!isProduction) {
                           console.log('💻 Development mode - Testing Supabase directly');
                           toast.dismiss(loading);
                           const devLoading = toast.loading('Testing Supabase connection...');
-                          
+
                           // First test basic connection with timeout
                           console.log('🔌 Testing Supabase connection...');
                           console.log('📍 Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'NOT SET');
-                          
+
                           try {
-                            const connectionTimeout = new Promise((_, reject) => 
+                            const connectionTimeout = new Promise((_, reject) =>
                               setTimeout(() => reject(new Error('Connection timeout (5s)')), 5000)
                             );
-                            
+
                             const connectionTest = supabase
                               .from('categories')
                               .select('count')
                               .limit(1);
-                            
+
                             const { data: testData, error: testError } = await Promise.race([
                               connectionTest,
                               connectionTimeout
                             ]) as any;
-                            
+
                             if (testError) {
                               console.error('❌ Supabase connection failed:', testError);
                               toast.dismiss(devLoading);
@@ -409,7 +409,7 @@ export function SiteSettingsPage() {
                           } catch (err: any) {
                             console.error('❌ Supabase connection error:', err);
                             toast.dismiss(devLoading);
-                            
+
                             if (err.message.includes('timeout')) {
                               toast.error(`⏱️ Supabase connection timeout!\n\nYour database is not responding. Check:\n1. Internet connection\n2. Supabase project status\n3. .env credentials`, { duration: 10000 });
                             } else {
@@ -417,48 +417,48 @@ export function SiteSettingsPage() {
                             }
                             return;
                           }
-                          
+
                           toast.dismiss(devLoading);
                           const perfLoading = toast.loading('Testing query performance...');
-                          
+
                           // Test Supabase directly in development
                           const results = [];
-                          
+
                           const tests = [
                             { name: 'Categories', query: () => supabase.from('categories').select('id, name, slug, image').limit(20) },
-                            { name: 'Products', query: () => supabase.from('products').select('id, name, slug, brand, price, gallery_images').limit(50) },
+                            { name: 'Products', query: () => supabase.from('products').select('id, name, slug, brand, price').limit(50) },
                             { name: 'Homepage Data', query: () => supabase.from('hero_slides').select('*').limit(10) },
                             { name: 'Brands', query: () => supabase.from('brands').select('*').limit(20) },
                             { name: 'Featured Products', query: () => supabase.from('products').select('id, name, price').eq('is_featured', true).limit(12) },
                           ];
-                          
+
                           console.log(`📡 Testing ${tests.length} Supabase queries...`);
-                          
+
                           for (const test of tests) {
                             console.log(`🔍 Testing: ${test.name}`);
                             try {
                               const start = performance.now();
-                              
+
                               // Add 10 second timeout
-                              const timeoutPromise = new Promise((_, reject) => 
+                              const timeoutPromise = new Promise((_, reject) =>
                                 setTimeout(() => reject(new Error('Timeout after 10s')), 10000)
                               );
-                              
+
                               const { data, error } = await Promise.race([
                                 test.query(),
                                 timeoutPromise
                               ]) as any;
-                              
+
                               const end = performance.now();
                               const time = Math.round(end - start);
-                              
+
                               if (error) {
                                 console.error(`   ❌ Error:`, error);
                               }
-                              
+
                               const sizeBytes = data ? JSON.stringify(data).length : 0;
                               const sizeKB = sizeBytes >= 1024 ? `${Math.round(sizeBytes / 1024)}KB` : `${sizeBytes}B`;
-                              
+
                               const result = {
                                 name: test.name,
                                 time,
@@ -467,7 +467,7 @@ export function SiteSettingsPage() {
                                 status: !error ? '✅' : '❌',
                                 error: error?.message || null
                               };
-                              
+
                               console.log(`   ${result.status} ${time}ms | Direct DB | ${result.size}${error ? ` | Error: ${error.message}` : ''}`);
                               results.push(result);
                             } catch (err: any) {
@@ -482,28 +482,28 @@ export function SiteSettingsPage() {
                               });
                             }
                           }
-                          
+
                           console.log('✅ All Supabase tests completed');
                           toast.dismiss(perfLoading);
-                          
+
                           // Show results
                           let message = '📊 Supabase Performance (Development):\n\n';
                           results.forEach(r => {
                             message += `${r.status} ${r.name}:\n`;
                             message += `   ⏱️ ${r.time}ms | 💾 Direct DB | 📦 ${r.size}\n\n`;
                           });
-                          
+
                           const avgTime = Math.round(results.reduce((sum, r) => sum + r.time, 0) / results.length);
                           message += `Average: ${avgTime}ms (No cache - Direct Supabase)\n\n`;
                           message += `💡 Deploy to production to see cache performance (30-50ms expected)`;
-                          
+
                           console.table(results);
                           console.log('📊 Supabase Performance Summary:', {
                             averageTime: `${avgTime}ms`,
                             mode: 'Development - Direct Database',
                             recommendation: 'Deploy to production for 10x faster cached responses'
                           });
-                          
+
                           // Store results for display
                           setPerformanceResults({
                             mode: 'development',
@@ -511,13 +511,13 @@ export function SiteSettingsPage() {
                             avgTime,
                             timestamp: new Date().toLocaleTimeString()
                           });
-                          
+
                           toast.success(message, { duration: 10000 });
                           return;
                         }
-                        
+
                         console.log('✅ Production detected, starting cache tests...');
-                        
+
                         endpoints = [
                           { name: 'Categories', url: 'https://cigarro.in/api/categories' },
                           { name: 'Products', url: 'https://cigarro.in/api/products' },
@@ -527,13 +527,13 @@ export function SiteSettingsPage() {
                         ];
 
                         const results = [];
-                        
+
                         console.log(`📡 Testing ${endpoints.length} endpoints...`);
-                        
+
                         for (const endpoint of endpoints) {
                           console.log(`🔍 Testing: ${endpoint.name} - ${endpoint.url}`);
                           const start = performance.now();
-                          
+
                           try {
                             const response = await fetch(endpoint.url, {
                               cache: 'no-store', // Prevent browser cache interference
@@ -541,24 +541,24 @@ export function SiteSettingsPage() {
                                 'Accept': 'application/json',
                               },
                             });
-                            
+
                             const data = await response.text();
                             const end = performance.now();
                             const time = Math.round(end - start);
-                            
+
                             // Check Cloudflare's native cache status header
                             const cfCacheStatus = response.headers.get('cf-cache-status') || 'UNKNOWN';
                             const cacheControl = response.headers.get('cache-control') || 'none';
                             const age = response.headers.get('age') || '0';
                             const size = `${Math.round(data.length / 1024)}KB`;
-                            
+
                             console.log(`   Response headers:`, {
                               'cf-cache-status': cfCacheStatus,
                               'cache-control': cacheControl,
                               'age': age,
                               'content-length': response.headers.get('content-length'),
                             });
-                            
+
                             const result = {
                               name: endpoint.name,
                               time,
@@ -567,7 +567,7 @@ export function SiteSettingsPage() {
                               age: `${age}s`,
                               status: response.ok ? '✅' : '❌'
                             };
-                            
+
                             console.log(`   ${result.status} ${time}ms | ${cfCacheStatus} | ${size} | Age: ${age}s`);
                             results.push(result);
                           } catch (err: any) {
@@ -583,11 +583,11 @@ export function SiteSettingsPage() {
                             });
                           }
                         }
-                        
+
                         console.log('✅ All endpoint tests completed');
 
                         toast.dismiss(loading);
-                        
+
                         // Create detailed results message
                         let message = '📊 Cloudflare CDN Cache Performance:\n\n';
                         results.forEach(r => {
@@ -595,20 +595,20 @@ export function SiteSettingsPage() {
                           message += `${r.status} ${r.name}:\n`;
                           message += `   ${statusIcon} ${r.cacheStatus} | ⏱️ ${r.time}ms | 📦 ${r.size} | Age: ${r.age}\n\n`;
                         });
-                        
+
                         const validResults = results.filter(r => r.time > 0);
                         const avgTime = validResults.length > 0 ? Math.round(validResults.reduce((sum, r) => sum + r.time, 0) / validResults.length) : 0;
                         const hitCount = results.filter(r => r.cacheStatus === 'HIT').length;
                         const missCount = results.filter(r => r.cacheStatus === 'MISS').length;
                         const dynamicCount = results.filter(r => r.cacheStatus === 'DYNAMIC').length;
-                        
+
                         message += `📈 Summary:\n`;
                         message += `Average: ${avgTime}ms\n`;
                         message += `🟢 HIT: ${hitCount} | 🟡 MISS: ${missCount} | 🔵 DYNAMIC: ${dynamicCount}\n\n`;
-                        message += hitCount === results.length ? '🚀 Perfect! All cached!' : 
-                                   hitCount > 0 ? '✅ Partial cache - Run again for more HITs' : 
-                                   '⚠️ No cache - First request or cache purged';
-                        
+                        message += hitCount === results.length ? '🚀 Perfect! All cached!' :
+                          hitCount > 0 ? '✅ Partial cache - Run again for more HITs' :
+                            '⚠️ No cache - First request or cache purged';
+
                         // Show in console for detailed view
                         console.table(results);
                         console.log('📊 Cloudflare CDN Cache Summary:', {
@@ -620,7 +620,7 @@ export function SiteSettingsPage() {
                           performance: avgTime < 50 ? '🚀 Excellent (CDN cached)' : avgTime < 200 ? '✅ Good (Some cached)' : '⚠️ Slow (No cache)',
                           recommendation: hitCount === 0 ? 'Run test again to see cache HITs' : 'Cache working correctly'
                         });
-                        
+
                         // Store results for display
                         setPerformanceResults({
                           mode: 'production',
@@ -629,7 +629,7 @@ export function SiteSettingsPage() {
                           hitCount,
                           timestamp: new Date().toLocaleTimeString()
                         });
-                        
+
                         console.log('📊 Showing results toast...');
                         toast.success(message, { duration: 10000 });
                         console.log('✅ Cache performance test complete!');
@@ -645,7 +645,7 @@ export function SiteSettingsPage() {
                     📊 Test Performance
                   </Button>
                 </div>
-                
+
                 {/* Performance Results Display */}
                 {performanceResults && (
                   <div className="mt-6 p-4 bg-creme-light rounded-lg border border-coyote">
@@ -658,7 +658,7 @@ export function SiteSettingsPage() {
                       </h4>
                       <span className="text-xs text-dark/60">{performanceResults.timestamp}</span>
                     </div>
-                    
+
                     <div className="space-y-2">
                       {performanceResults.results.map((result: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded border border-coyote/30">
@@ -680,7 +680,7 @@ export function SiteSettingsPage() {
                         </div>
                       ))}
                     </div>
-                    
+
                     <div className="mt-4 p-3 bg-canyon/10 rounded border border-canyon/30">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-dark">Average Response Time:</span>
@@ -701,9 +701,9 @@ export function SiteSettingsPage() {
                           <p>💡 Deploy to production to see 3-5x faster cached responses (30-50ms expected)</p>
                         ) : (
                           <p>
-                            {performanceResults.avgTime < 100 ? '🚀 Excellent performance!' : 
-                             performanceResults.avgTime < 300 ? '✅ Good performance' : 
-                             '⚠️ Consider refreshing cache'}
+                            {performanceResults.avgTime < 100 ? '🚀 Excellent performance!' :
+                              performanceResults.avgTime < 300 ? '✅ Good performance' :
+                                '⚠️ Consider refreshing cache'}
                           </p>
                         )}
                       </div>
@@ -723,7 +723,7 @@ export function SiteSettingsPage() {
                   <h3 className="font-medium text-dark">Sitemap Generator</h3>
                 </div>
                 <p className="text-sm text-dark/70 mb-4">
-                  Your sitemap is generated dynamically at <code className="bg-coyote/20 px-1 py-0.5 rounded text-xs">cigarro.in/sitemap.xml</code> and cached for 1 hour. 
+                  Your sitemap is generated dynamically at <code className="bg-coyote/20 px-1 py-0.5 rounded text-xs">cigarro.in/sitemap.xml</code> and cached for 1 hour.
                   Purge the cache to force immediate regeneration with latest products, categories, and brands.
                 </p>
                 <div className="flex gap-3">
@@ -778,7 +778,7 @@ export function SiteSettingsPage() {
 
           {/* Sign Out Button */}
           <div className="pt-2">
-            <Button 
+            <Button
               variant="outline"
               onClick={handleSignOut}
               className="w-full sm:w-auto border-canyon text-canyon hover:bg-canyon hover:text-creme transition-all duration-200"

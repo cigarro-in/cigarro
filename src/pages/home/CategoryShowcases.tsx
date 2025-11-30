@@ -1,113 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
 import { Package, Leaf, Flame } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
+import { CategoryWithProducts } from '../../types/home';
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  image: string | null;
-  product_count?: number;
-}
-
-const categoryIcons: { [key: string]: React.ComponentType<any> } = {
+const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   cigarettes: Package,
   cigars: Leaf,
   tobacco: Flame,
   accessories: Package,
 };
 
-interface CategoryWithProducts extends Category {
-  products: Product[];
+interface CategoryShowcasesProps {
+  categoriesWithProducts?: CategoryWithProducts[];
+  isLoading?: boolean;
 }
 
-export function CategoryShowcases() {
-  const [categoriesWithProducts, setCategoriesWithProducts] = useState<CategoryWithProducts[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function CategoryShowcases({ categoriesWithProducts = [], isLoading = false }: CategoryShowcasesProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
 
-  useEffect(() => {
-    fetchCategoriesWithProducts();
-  }, []);
+  // Debug logging
+  console.log('🏷️ CategoryShowcases received data:', {
+    categoriesWithProducts,
+    count: categoriesWithProducts?.length,
+    isLoading,
+    firstCategory: categoriesWithProducts?.[0],
+    firstCategoryProducts: categoriesWithProducts?.[0]?.products
+  });
 
-  const fetchCategoriesWithProducts = async () => {
-    try {
-      // 1. Fetch top 5 categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('id, name, slug, description, image')
-        .order('name')
-        .limit(5);
-
-      if (categoriesError) throw categoriesError;
-      if (!categoriesData?.length) return;
-
-      const categoryIds = categoriesData.map(c => c.id);
-
-      // 2. Fetch product relationships for these categories
-      const { data: productCategories, error: pcError } = await supabase
-        .from('product_categories')
-        .select('category_id, product_id')
-        .in('category_id', categoryIds);
-
-      if (pcError) throw pcError;
-
-      const allProductIds = productCategories?.map(pc => pc.product_id) || [];
-      if (allProductIds.length === 0) {
-        setCategoriesWithProducts([]);
-        return;
-      }
-
-      // 3. Fetch the actual products (bulk)
-      const { data: allProducts, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-          product_variants (
-            id, product_id, variant_name, variant_type, price, is_default, is_active, images
-          )
-        `)
-        .in('id', allProductIds)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (productsError) throw productsError;
-
-      // 4. Map products back to categories in memory
-      const processedData = categoriesData.map(category => {
-        // Find product IDs for this category
-        const catProductIds = new Set(
-          productCategories
-            ?.filter(pc => pc.category_id === category.id)
-            .map(pc => pc.product_id)
-        );
-
-        // Filter products matching those IDs
-        const products = (allProducts || [])
-          .filter(p => catProductIds.has(p.id))
-          .slice(0, 4); // Limit to 4 per category
-
-        return {
-          ...category,
-          products,
-          product_count: products.length
-        };
-      }).filter(c => c.products.length > 0);
-
-      setCategoriesWithProducts(processedData);
-    } catch (error) {
-      console.error('Error fetching categories with products:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddToCart = async (product: Product) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAddToCart = async (product: any) => {
     try {
       await addToCart(product, 1);
       toast.success(`${product.name} added to cart!`);
@@ -137,13 +60,6 @@ export function CategoryShowcases() {
           />
         ))}
       </div>
-
-      {/* Hide scrollbar CSS */}
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </section>
   );
 }
@@ -154,9 +70,9 @@ function CategoryProductRow({
   onAddToCart, 
   isLoading 
 }: { 
-  category: CategoryWithProducts, 
-  onAddToCart: (p: Product) => void, 
-  isLoading: boolean 
+  category: CategoryWithProducts;
+  onAddToCart: (p: any) => void;
+  isLoading: boolean;
 }) {
   const IconComponent = categoryIcons[category.slug] || Package;
 
@@ -209,7 +125,7 @@ function CategoryProductRow({
               style={{ width: 'calc(40% - 6px)', minWidth: '150px', maxWidth: '180px' }}
             >
               <ProductCard
-                product={product}
+                product={product as any}
                 onAddToCart={onAddToCart}
                 isLoading={isLoading}
                 index={index}

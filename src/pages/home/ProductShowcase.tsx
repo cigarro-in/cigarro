@@ -1,123 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useCart, Product } from '../../hooks/useCart';
-import { useWishlist } from '../../hooks/useWishlist';
+import { memo, useCallback } from 'react';
+import { useCart } from '../../hooks/useCart';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
 import { Link } from 'react-router-dom';
-import { ProductCard } from './ProductCard';
+import { ProductCard } from '../../components/products/ProductCard';
+import { ShowcaseConfig, HomepageProduct } from '../../types/home';
 
-export function ProductShowcase() {
-  const { addToCart, isLoading } = useCart();
-  const { wishlistItems, isWishlisted, toggleWishlist } = useWishlist();
-  const [showcaseProducts, setShowcaseProducts] = useState<Product[]>([]);
-  const [sectionConfig, setSectionConfig] = useState({
-    title: 'Discover Our Most Celebrated Collections',
-    background_image: '',
-    button_text: 'Explore Collection',
-    button_url: '/products',
-    is_enabled: true
-  });
+interface ProductShowcaseProps {
+  products?: HomepageProduct[];
+  config?: ShowcaseConfig | null;
+  isLoading?: boolean;
+}
 
-  const fetchShowcaseProducts = async (collectionId?: string) => {
-    try {
-      if (collectionId) {
-        // Fetch from collection
-        const { data: collectionData, error: collectionError } = await supabase
-          .from('collection_products')
-          .select(`
-            product_id,
-            products (
-              id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-              product_variants (
-                id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-              )
-            )
-          `)
-          .eq('collection_id', collectionId)
-          .order('sort_order', { ascending: true })
-          .limit(6);
+export const ProductShowcase = memo(function ProductShowcase({ 
+  products = [], 
+  config, 
+  isLoading = false 
+}: ProductShowcaseProps) {
+  const { addToCart, isLoading: cartLoading } = useCart();
 
-        if (collectionError) throw collectionError;
-
-        const products = collectionData
-          ?.map(item => item.products)
-          .filter((p): p is any => !!p && typeof p === 'object' && 'id' in p && (p as any).is_active);
-
-        setShowcaseProducts(products || []);
-      } else {
-        // Legacy fallback: fetch active products
-        const { data: products, error } = await supabase
-          .from('products')
-          .select(`
-            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-            product_variants (
-              id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-            )
-          `)
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(6); // 6 products for the grid layout
-
-        if (error) throw error;
-        setShowcaseProducts(products || []);
-      }
-    } catch (error) {
-      console.error('Error fetching showcase products:', error);
-    }
+  const sectionConfig = {
+    title: config?.title || 'Discover Our Most Celebrated Collections',
+    background_image: config?.background_image || '',
+    button_text: config?.button_text || 'Explore Collection',
+    button_url: config?.button_url || '/products',
+    is_enabled: config?.is_enabled !== false
   };
 
-  const loadData = async () => {
+  const handleAddToCart = useCallback(async (product: HomepageProduct) => {
     try {
-      // 1. Get Component Config to find attached collection
-      const { data: componentConfig, error: configError } = await supabase
-        .from('homepage_component_config')
-        .select('config')
-        .eq('component_name', 'ProductShowcase')
-        .single();
-      
-      const attachedCollectionId = componentConfig?.config?.collection_id;
-
-      // 2. Fetch Section UI Config
-      const { data: config, error } = await supabase
-        .from('section_configurations')
-        .select('title, background_image, button_text, button_url, is_enabled')
-        .eq('section_name', 'product_showcase')
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (config) {
-        setSectionConfig({
-          title: config.title || 'Discover Our Most Celebrated Collections',
-          background_image: config.background_image || '',
-          button_text: config.button_text || 'Explore Collection',
-          button_url: config.button_url || '/products',
-          is_enabled: config.is_enabled !== false
-        });
-      }
-
-      // 3. Fetch Products
-      await fetchShowcaseProducts(attachedCollectionId);
-
-    } catch (error) {
-      console.error('Error loading showcase data:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleAddToCart = async (product: Product) => {
-    try {
-      await addToCart(product, 1);
+      await addToCart(product as any, 1);
       toast.success(`${product.name} added to cart!`);
-    } catch (error) {
+    } catch {
       toast.error('Failed to add item to cart');
     }
-  };
+  }, [addToCart]);
 
-  if (!sectionConfig.is_enabled || showcaseProducts.length === 0) {
+  if (!sectionConfig.is_enabled || products.length === 0) {
     return null;
   }
 
@@ -158,11 +76,11 @@ export function ProductShowcase() {
             </div>
 
             {/* Products - 6 cards in 2 columns x 3 rows */}
-            {showcaseProducts.slice(0, 6).map((product, index) => (
+            {products.slice(0, 6).map((product, index) => (
               <div key={product.id} className={index % 2 === 0 ? 'col-start-2' : 'col-start-3'}>
                 <ProductCard
-                  product={product}
-                  onAddToCart={handleAddToCart}
+                  product={product as any}
+                  onAddToCart={handleAddToCart as any}
                   isLoading={isLoading}
                   index={index}
                   variant="default"
@@ -213,11 +131,11 @@ export function ProductShowcase() {
               <div className="grid grid-rows-2 gap-6 h-full min-h-[500px]">
                 {/* First Row - 3 Products */}
                 <div className="grid grid-cols-3 gap-4">
-                  {showcaseProducts.slice(0, 3).map((product, index) => (
+                  {products.slice(0, 3).map((product, index) => (
                     <div key={product.id} className="h-full">
                       <ProductCard
-                        product={product}
-                        onAddToCart={handleAddToCart}
+                        product={product as any}
+                        onAddToCart={handleAddToCart as any}
                         isLoading={isLoading}
                         index={index}
                         variant="default"
@@ -228,11 +146,11 @@ export function ProductShowcase() {
 
                 {/* Second Row - 3 Products */}
                 <div className="grid grid-cols-3 gap-4">
-                  {showcaseProducts.slice(3, 6).map((product, index) => (
+                  {products.slice(3, 6).map((product, index) => (
                     <div key={product.id} className="h-full">
                       <ProductCard
-                        product={product}
-                        onAddToCart={handleAddToCart}
+                        product={product as any}
+                        onAddToCart={handleAddToCart as any}
                         isLoading={isLoading}
                         index={index + 3}
                         variant="default"
@@ -257,4 +175,4 @@ export function ProductShowcase() {
       </div>
     </section>
   );
-}
+});

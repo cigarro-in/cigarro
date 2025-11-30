@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tag, MapPin, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode, Gift, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -34,7 +34,7 @@ export function MobileCheckoutPage() {
 
   const normalizeString = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-  
+
   const userMetadata = ((user as unknown) as { user_metadata?: Record<string, unknown> })?.user_metadata ?? {};
 
   const metadataNameFromParts = normalizeString(
@@ -73,7 +73,7 @@ export function MobileCheckoutPage() {
   // Get flow-specific data from sessionStorage
   const buyNowItemData = sessionStorage.getItem('buyNowItem');
   const initialBuyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
-  
+
   // Local state for Buy Now item to handle quantity updates
   const [localBuyNowItem, setLocalBuyNowItem] = useState(initialBuyNowItem);
 
@@ -85,13 +85,16 @@ export function MobileCheckoutPage() {
   }, [buyNowItemData]);
 
   const retryOrderData = sessionStorage.getItem('retryOrder');
-  const retryOrder = isRetryPayment && retryOrderData ? JSON.parse(retryOrderData) : null;
+  const retryOrder = useMemo(() =>
+    isRetryPayment && retryOrderData ? JSON.parse(retryOrderData) : null,
+    [isRetryPayment, retryOrderData]
+  );
 
   // Retry order derived values
   const retrySubtotal = isRetryPayment && retryOrder
     ? (typeof retryOrder.subtotal === 'number'
-        ? retryOrder.subtotal
-        : (retryOrder.total + (retryOrder.discount || 0) - (retryOrder.shipping || 0)))
+      ? retryOrder.subtotal
+      : (retryOrder.total + (retryOrder.discount || 0) - (retryOrder.shipping || 0)))
     : null;
 
   const retryShippingCost = isRetryPayment && retryOrder
@@ -116,10 +119,10 @@ export function MobileCheckoutPage() {
   }, [urlRetryParam, retryOrderData, navigate]);
 
   // Use Retry Order, Buy Now item, or cart items
-  const items = isRetryPayment && retryOrder 
-    ? retryOrder.items 
+  const items = isRetryPayment && retryOrder
+    ? retryOrder.items
     : (isBuyNow && localBuyNowItem ? [localBuyNowItem] : cartItems);
-  
+
   // Handle quantity updates for both Cart and Buy Now flows
   const handleUpdateQuantity = async (productId: string, quantity: number, variantId?: string, comboId?: string) => {
     // Check if we should update locally
@@ -129,10 +132,10 @@ export function MobileCheckoutPage() {
     const localVariantId = localBuyNowItem?.variant_id || null;
     const localComboId = localBuyNowItem?.combo_id || null;
 
-    const isLocalUpdate = localBuyNowItem && 
-                          localBuyNowItem.id === productId && 
-                          localVariantId === targetVariantId &&
-                          localComboId === targetComboId;
+    const isLocalUpdate = localBuyNowItem &&
+      localBuyNowItem.id === productId &&
+      localVariantId === targetVariantId &&
+      localComboId === targetComboId;
 
     if (isLocalUpdate) {
       if (quantity <= 0) {
@@ -151,18 +154,18 @@ export function MobileCheckoutPage() {
       await updateQuantity(productId, quantity, variantId, comboId);
     }
   };
-  
+
   const totalPrice = isRetryPayment && retrySubtotal !== null
     ? retrySubtotal
-    : (isBuyNow && localBuyNowItem 
-      ? (localBuyNowItem.variant_price || localBuyNowItem.price) * localBuyNowItem.quantity 
+    : (isBuyNow && localBuyNowItem
+      ? (localBuyNowItem.variant_price || localBuyNowItem.price) * localBuyNowItem.quantity
       : cartTotalPrice);
 
   // State management
   const [selectedShipping, setSelectedShipping] = useState('standard');
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Wallet state
   const [walletBalance, setWalletBalance] = useState(0);
   const [isWalletLoading, setIsWalletLoading] = useState(false);
@@ -188,55 +191,59 @@ export function MobileCheckoutPage() {
   // Check referral eligibility on mount
   useEffect(() => {
     const checkEligibility = async () => {
-      if (!user) return;
+      if (!user?.id) return;
       try {
         const { data, error } = await supabase
           .from('referrals')
           .select('referred_by_user_id, first_order_completed')
           .eq('user_id', user.id)
-          .single();
-        
+          .maybeSingle();
+
         if (error && error.code !== 'PGRST116') {
-           console.error('Error checking referral status:', error);
-           return;
+          console.error('Error checking referral status:', error);
+          return;
         }
-        
-        // Eligible if record exists but no referrer and no first order
-        if (data) {
-          // If they already have a referrer, maybe we should show that?
-          // For now, only eligible if they DON'T have one.
-          setIsReferralEligible(!data.referred_by_user_id && !data.first_order_completed);
-          if (data.referred_by_user_id) {
-            // Optionally set referralApplied to true if we want to show it for existing users
-            // setReferralApplied(true); 
-          }
+
+        // Only show referral input if:
+        // 1. No referral record exists (new user) OR
+        // 2. Record exists but first_order_completed is false AND no referrer attached
+        if (!data) {
+          // New user - eligible
+          setIsReferralEligible(true);
+        } else if (data.first_order_completed === false && !data.referred_by_user_id) {
+          // Existing user who hasn't completed first order and has no referrer
+          setIsReferralEligible(true);
         } else {
-           // If no referral record found, they are eligible (will be created on attach)
-           setIsReferralEligible(true); 
+          // User has completed first order or already has a referrer
+          setIsReferralEligible(false);
+          if (data.referred_by_user_id && !data.first_order_completed) {
+            // Show that referral is already applied
+            setReferralApplied(true);
+          }
         }
       } catch (err) {
         console.error('Referral check error:', err);
       }
     };
-    
+
     checkEligibility();
-  }, [user]);
+  }, [user?.id]);
 
   const handleApplyReferral = async () => {
     if (!referralCode.trim()) {
       toast.error('Please enter a referral code');
       return;
     }
-    
+
     setIsApplyingReferral(true);
     try {
       const { data, error } = await supabase.rpc('attach_referral_code_late', {
         p_user_id: user!.id,
         p_referral_code: referralCode.trim()
       });
-      
+
       if (error) throw error;
-      
+
       if (data.success) {
         toast.success('Referral code applied successfully!');
         setReferralApplied(true);
@@ -273,7 +280,7 @@ export function MobileCheckoutPage() {
   // QR code state
   const [qrCode, setQrCode] = useState<string>('');
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
-  
+
   // Use ref for navigation state to avoid race conditions with empty cart redirect
   // on slower devices where state updates might lag behind context updates
   const isNavigatingRef = useRef(false);
@@ -302,8 +309,8 @@ export function MobileCheckoutPage() {
   };
 
   // Fetch wallet balance
-  const fetchWalletBalance = async () => {
-    if (!user) return;
+  const fetchWalletBalance = useCallback(async () => {
+    if (!user?.id) return;
 
     setIsWalletLoading(true);
     try {
@@ -319,14 +326,35 @@ export function MobileCheckoutPage() {
     } finally {
       setIsWalletLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  // Fetch saved addresses and auto-select
-  const fetchSavedAddresses = async () => {
-    if (!user) {
+  // Ref to hold latest values for fetchSavedAddresses to avoid dependency cycles
+  const fetchContextRef = useRef({
+    isRetryPayment,
+    retryOrder,
+    defaultUserName,
+    defaultUserPhone
+  });
+
+  // Keep ref updated
+  useEffect(() => {
+    fetchContextRef.current = {
+      isRetryPayment,
+      retryOrder,
+      defaultUserName,
+      defaultUserPhone
+    };
+  });
+
+  // Fetch saved addresses and auto-select (memoized to prevent re-render loops)
+  const fetchSavedAddresses = useCallback(async () => {
+    if (!user?.id) {
       console.log('📍 No user, skipping address fetch');
       return;
     }
+
+    // Use ref values to avoid dependency changes
+    const { isRetryPayment, retryOrder, defaultUserName, defaultUserPhone } = fetchContextRef.current;
 
     console.log('📍 Fetching addresses for user:', user.id);
 
@@ -338,8 +366,8 @@ export function MobileCheckoutPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      console.log('📍 Database query result:', { 
-        error, 
+      console.log('📍 Database query result:', {
+        error,
         addressCount: addresses?.length || 0,
         addresses: addresses?.map(a => ({ id: a.id, label: a.label, full_name: a.full_name }))
       });
@@ -399,9 +427,9 @@ export function MobileCheckoutPage() {
       } else if (addresses && addresses.length > 0) {
         // Auto-select first (most recent) address for normal checkout
         const addressToSelect = addresses[0];
-        
+
         console.log('📍 Auto-selecting first address:', addressToSelect.label);
-        
+
         setSelectedAddress({
           id: addressToSelect.id,
           full_name: addressToSelect.full_name,
@@ -417,7 +445,7 @@ export function MobileCheckoutPage() {
     } catch (error) {
       console.error('Error fetching addresses:', error);
     }
-  };
+  }, [user?.id]); // Only depend on stable user.id
 
   // Validate and apply coupon
   const handleApplyCoupon = async () => {
@@ -429,7 +457,7 @@ export function MobileCheckoutPage() {
     setIsValidatingCoupon(true);
     try {
       const result = await validateCouponCode(couponCode.trim());
-      
+
       if (result.isValid && result.discount) {
         setAppliedDiscount(result.discount);
         toast.success(`Coupon applied! You saved ₹${result.discount.discount_value || 0}`);
@@ -505,7 +533,7 @@ export function MobileCheckoutPage() {
   // Helper function to trigger payment webhook
   const triggerPaymentWebhook = (transactionId: string, orderId: string, amount: number) => {
     const orderCreatedAt = new Date().toISOString();
-    
+
     fetch('/payment-email-webhook', {
       method: 'POST',
       headers: {
@@ -541,9 +569,9 @@ export function MobileCheckoutPage() {
     const finalTotal = getFinalTotal();
     const walletAmountUsed = usingWallet ? walletAmountToUse : 0;
     const remainingAmount = finalTotal - walletAmountUsed;
-    
+
     const shouldClearCart = !isBuyNow && !isRetryPayment;
-    
+
     console.log('💳 Payment Handler Debug:', {
       isRetryPayment,
       retryOrderExists: !!retryOrder,
@@ -566,15 +594,15 @@ export function MobileCheckoutPage() {
 
     try {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
-      
+
       console.log('💰 Processing payment with transaction ID:', txnId);
-      
+
       let order;
-      
+
       // Check if this is a retry for an existing order
       if (isRetryPayment && retryOrder?.orderId) {
         console.log('🔄 Fetching existing order for retry:', retryOrder.orderId);
-        
+
         // Fetch existing order instead of updating (avoids RLS issues)
         // The process_order_payment RPC should handle the transaction ID update if needed
         const { data: existingOrder, error: fetchError } = await supabase
@@ -582,7 +610,7 @@ export function MobileCheckoutPage() {
           .select('*')
           .eq('id', retryOrder.orderId)
           .maybeSingle();
-          
+
         if (fetchError) {
           console.error('Error fetching retry order:', fetchError);
           console.log('⚠️ Fetch failed, creating new order');
@@ -652,7 +680,7 @@ export function MobileCheckoutPage() {
       if (remainingAmount === 0) {
         console.log('✅ Full payment from wallet - Order complete!');
         console.log('📝 Order ID:', order.id);
-        
+
         // Navigate to transaction processing page for seamless experience
         navigate('/transaction', {
           state: {
@@ -666,33 +694,33 @@ export function MobileCheckoutPage() {
             walletAmountUsed: walletAmountUsed,
             shouldClearCart,
             metadata: {
-                items_count: items.length,
-                shipping_cost: getShippingCost(),
-                discount: randomDiscount + (appliedDiscount?.discount_value || 0)
+              items_count: items.length,
+              shipping_cost: getShippingCost(),
+              discount: randomDiscount + (appliedDiscount?.discount_value || 0)
             }
           },
           replace: true
         });
-        
+
         return;
       }
 
       // Remaining amount - redirect to UPI payment
       console.log(`💳 ${usingWallet ? 'Partial wallet payment' : 'Full UPI payment'} - Remaining: ₹${remainingAmount}`);
-      
+
       // Trigger webhook
       triggerPaymentWebhook(txnId, order.id, remainingAmount);
-      
+
       // Use backend-provided UPI link (already generated with correct UPI ID from settings)
       const upiUrl = order.upi_deep_link || `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${remainingAmount}&cu=INR&tn=Order%20${order.display_order_id}%20${txnId}`;
-      
+
       // Open UPI app
       try {
         window.location.href = upiUrl;
       } catch (err) {
         console.error('Failed to open UPI app:', err);
       }
-      
+
       // Navigate to transaction processing
       navigate('/transaction', {
         state: {
@@ -750,26 +778,26 @@ export function MobileCheckoutPage() {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
       const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
       const shouldClearCart = !isBuyNow && !isRetryPayment;
-      
+
       console.log('💳 QR Payment Debug:', {
         isRetryPayment,
         retryOrderExists: !!retryOrder,
         retryOrderId: retryOrder?.orderId
       });
-      
+
       let order;
 
       // Check if this is a retry for an existing order
       if (isRetryPayment && retryOrder?.orderId) {
         console.log('🔄 Fetching existing order for QR retry:', retryOrder.orderId);
-        
+
         // Fetch existing order instead of updating (avoids RLS issues)
         const { data: existingOrder, error: fetchError } = await supabase
           .from('orders')
           .select('*')
           .eq('id', retryOrder.orderId)
           .maybeSingle();
-          
+
         if (fetchError) {
           console.error('Error fetching retry order:', fetchError);
           // Fallback to new order
@@ -840,11 +868,24 @@ export function MobileCheckoutPage() {
 
   // Load data on mount
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchWalletBalance();
-      fetchSavedAddresses();
+      // Only fetch addresses if we haven't loaded them yet to prevent re-render loops
+      // The AddressDrawer will trigger updates when addresses are added/edited
+      if (savedAddresses.length === 0) {
+        fetchSavedAddresses();
+      }
     }
-  }, [user]);
+  }, [user?.id]); // Removed fetch functions from dependency array to break infinite loop
+
+  // Memoized callbacks for AddressDrawer to prevent re-renders
+  const handleAddressDrawerOpenChange = useCallback((open: boolean) => {
+    setShowAddressDialog(open);
+  }, []);
+
+  const handleAddressSelect = useCallback((addr: Address) => {
+    setSelectedAddress(addr);
+  }, []);
 
   // Redirect if no items (but not during order completion, navigation, or retry payment)
   useEffect(() => {
@@ -890,7 +931,7 @@ export function MobileCheckoutPage() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm truncate">{item.name}{item.variant_name && ` (${item.variant_name})`}</h4>
                     <p className="text-sm font-semibold text-foreground">
@@ -933,7 +974,7 @@ export function MobileCheckoutPage() {
         <Card className="border-2 border-border/40 bg-card shadow-md">
           <CardContent className="p-4">
             <h3 className="font-serif text-lg mb-4">Price Details</h3>
-            
+
             {/* Coupon Section */}
             <div className="mb-4">
               <div className="flex gap-2 mb-2">
@@ -943,9 +984,9 @@ export function MobileCheckoutPage() {
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   className="flex-1"
                 />
-                <Button 
-                  onClick={handleApplyCoupon} 
-                  variant="outline" 
+                <Button
+                  onClick={handleApplyCoupon}
+                  variant="outline"
                   size="sm"
                   disabled={isValidatingCoupon}
                 >
@@ -968,7 +1009,7 @@ export function MobileCheckoutPage() {
                     <span>Referral code activated</span>
                   </div>
                 ) : !showReferralInput ? (
-                  <button 
+                  <button
                     onClick={() => setShowReferralInput(true)}
                     className="text-sm text-accent hover:text-accent-dark font-medium flex items-center gap-2 transition-colors w-full"
                   >
@@ -985,9 +1026,9 @@ export function MobileCheckoutPage() {
                         className="flex-1 uppercase h-9 placeholder:text-xs"
                         maxLength={10}
                       />
-                      <Button 
-                        onClick={handleApplyReferral} 
-                        variant="secondary" 
+                      <Button
+                        onClick={handleApplyReferral}
+                        variant="secondary"
                         size="sm"
                         disabled={isApplyingReferral || !referralCode.trim()}
                         className="min-w-[70px] h-9 text-xs uppercase font-semibold tracking-wider"
@@ -996,12 +1037,12 @@ export function MobileCheckoutPage() {
                       </Button>
                     </div>
                     <div className="flex justify-end">
-                       <button 
-                         onClick={() => setShowReferralInput(false)}
-                         className="text-[10px] text-muted-foreground hover:text-foreground"
-                       >
-                         Cancel
-                       </button>
+                      <button
+                        onClick={() => setShowReferralInput(false)}
+                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1064,9 +1105,9 @@ export function MobileCheckoutPage() {
             disabled={isProcessing || !selectedAddress}
             className="w-full bg-dark hover:bg-canyon text-creme-light font-semibold py-4 rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
-            {isProcessing ? 'Processing...' : 
-              (getFinalTotal() - walletAmountToUse) <= 0 
-                ? '✓ Pay with Wallet' 
+            {isProcessing ? 'Processing...' :
+              (getFinalTotal() - walletAmountToUse) <= 0
+                ? '✓ Pay with Wallet'
                 : `Pay ${formatINR(Math.max(0, getFinalTotal() - walletAmountToUse))}`
             }
           </Button>
@@ -1094,12 +1135,12 @@ export function MobileCheckoutPage() {
       {/* Address Drawer */}
       <AddressDrawer
         open={showAddressDialog}
-        onOpenChange={setShowAddressDialog}
+        onOpenChange={handleAddressDrawerOpenChange}
         user={user}
         selectedAddress={selectedAddress}
-        onAddressSelect={setSelectedAddress}
+        onAddressSelect={handleAddressSelect}
         savedAddresses={savedAddresses}
-        onAddressesUpdate={async () => { await fetchSavedAddresses(); }}
+        onAddressesUpdate={fetchSavedAddresses}
       />
     </div>
   );

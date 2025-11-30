@@ -150,6 +150,11 @@ export function SEOHead({
 
   return (
     <Helmet>
+      {/* Preload LCP image if provided */}
+      {image && image !== 'https://cigarro.in/logo.png' && (
+        <link rel="preload" as="image" href={image} fetchPriority="high" />
+      )}
+
       {/* Primary Meta Tags */}
       <title>{fullTitle}</title>
       <meta name="title" content={fullTitle} />

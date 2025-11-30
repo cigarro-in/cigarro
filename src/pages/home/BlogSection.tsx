@@ -3,25 +3,24 @@ import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getBlogImageUrl } from '../../lib/supabase/storage';
-import { supabase } from '../../lib/supabase/client';
-import { BlogPost } from '../../types/blog';
+import { BlogPost, BlogSectionConfig } from '../../types/home';
 
 
-export function BlogSection() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [sectionConfig, setSectionConfig] = useState({
-    title: 'Blogs',
-    subtitle: '',
-    description: ''
-  });
-  const [isLoading, setIsLoading] = useState(true);
+interface BlogSectionProps {
+  posts?: BlogPost[];
+  config?: BlogSectionConfig | null;
+  isLoading?: boolean;
+}
+
+export function BlogSection({ posts = [], config, isLoading = false }: BlogSectionProps) {
+  const sectionConfig = {
+    title: config?.title || 'Blogs',
+    subtitle: config?.subtitle || '',
+    description: config?.description || ''
+  };
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-
-  useEffect(() => {
-    loadBlogData();
-  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -52,53 +51,6 @@ export function BlogSection() {
       left: targetScroll,
       behavior: 'smooth'
     });
-  };
-
-  const loadBlogData = async () => {
-    try {
-      // Load section configuration
-      const { data: configData, error: configError } = await supabase
-        .from('section_configurations')
-        .select('*')
-        .eq('section_name', 'blog_section')
-        .single();
-
-      if (!configError && configData) {
-        setSectionConfig({
-          title: configData.title || 'Blogs',
-          subtitle: '',
-          description: ''
-        });
-      }
-
-      // Load blog posts
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          author:profiles(name, email),
-          category:blog_categories(name, color),
-          tags:blog_post_tags(
-            tag:blog_tags(name, color)
-          )
-        `)
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(6);
-
-      if (error) throw error;
-
-      const formattedPosts = data?.map(post => ({
-        ...post,
-        tags: post.tags?.map((t: any) => t.tag) || []
-      })) || [];
-
-      setPosts(formattedPosts);
-    } catch (error) {
-      console.error('Error loading blog data:', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const featuredPost = posts[0];

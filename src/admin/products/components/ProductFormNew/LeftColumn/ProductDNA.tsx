@@ -2,9 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../../../../compone
 import { Label } from "../../../../../components/ui/label";
 import { Input } from "../../../../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
-import { ProductFormData, Brand } from "../../../../../types/product";
+import { ProductFormData, Brand, Category } from "../../../../../types/product";
 import { useEffect, useState } from "react";
 import { supabase } from "../../../../../lib/supabase/client";
+import { X } from "lucide-react";
 
 interface ProductDNAProps {
   formData: ProductFormData;
@@ -13,14 +14,27 @@ interface ProductDNAProps {
 
 export function ProductDNA({ formData, onChange }: ProductDNAProps) {
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   useEffect(() => {
-    const loadBrands = async () => {
-      const { data } = await supabase.from('brands').select('*').order('name');
-      if (data) setBrands(data);
+    const loadData = async () => {
+      const [brandsRes, categoriesRes] = await Promise.all([
+        supabase.from('brands').select('*').order('name'),
+        supabase.from('categories').select('*').order('name')
+      ]);
+      if (brandsRes.data) setBrands(brandsRes.data);
+      if (categoriesRes.data) setCategories(categoriesRes.data);
     };
-    loadBrands();
+    loadData();
   }, []);
+
+  const handleCategoryToggle = (categoryId: string) => {
+    const currentCategories = formData.categories || [];
+    const newCategories = currentCategories.includes(categoryId)
+      ? currentCategories.filter(id => id !== categoryId)
+      : [...currentCategories, categoryId];
+    onChange({ categories: newCategories });
+  };
 
   return (
     <Card className="bg-[var(--color-creme-light)] border-[var(--color-coyote)] shadow-sm">

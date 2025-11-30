@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { 
-  Drawer, 
-  DrawerContent, 
-  DrawerHeader, 
-  DrawerTitle, 
+import { memo } from 'react';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
   DrawerDescription
 } from '../../ui/drawer';
 import { AddressList } from './AddressList';
@@ -25,7 +26,7 @@ interface AddressDrawerProps {
   onAddressesUpdate: () => Promise<void>;
 }
 
-export function AddressDrawer({
+export const AddressDrawer = memo(function AddressDrawer({
   open,
   onOpenChange,
   user,
@@ -90,13 +91,13 @@ export function AddressDrawer({
       if (error) throw error;
 
       toast.success(addressData.id ? 'Address updated' : 'Address added');
-      
+
       await onAddressesUpdate();
-      
+
       if (savedData) {
         onAddressSelect(savedData);
       }
-      
+
       setView('list');
       setEditingAddress(null);
     } catch (err) {
@@ -132,9 +133,9 @@ export function AddressDrawer({
         <DrawerHeader className="border-b border-coyote/20 pb-4">
           <div className="flex items-center gap-2">
             {view === 'form' && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-8 w-8 -ml-2"
                 onClick={handleBack}
               >
@@ -151,7 +152,7 @@ export function AddressDrawer({
             </div>
           </div>
         </DrawerHeader>
-        
+
         <div className="p-4 overflow-y-auto flex-1 bg-creme">
           {view === 'list' ? (
             <AddressList
@@ -186,4 +187,4 @@ export function AddressDrawer({
       </DrawerContent>
     </Drawer>
   );
-}
+});
