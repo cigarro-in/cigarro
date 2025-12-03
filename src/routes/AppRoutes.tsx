@@ -46,8 +46,8 @@ const TermsPage = lazy(() => import('../pages/legal/TermsPage').then(m => ({ def
 const PrivacyPage = lazy(() => import('../pages/legal/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const ShippingPage = lazy(() => import('../pages/legal/ShippingPage').then(m => ({ default: m.ShippingPage })));
 
-// Admin
-const AdminDashboard = lazy(() => import('../admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+// Admin - New modular admin system
+const AdminRouter = lazy(() => import('../adminnew/AdminRouter').then(m => ({ default: m.AdminRouter })));
 
 interface AppRoutesProps {
   isAdminRoute?: boolean;
@@ -57,11 +57,8 @@ interface AppRoutesProps {
 
 export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: AppRoutesProps) => {
   if (isAdminRoute) {
-    return (
-      <Routes location={location}>
-        <Route path={ROUTES.ADMIN} element={<AdminDashboard onStatsUpdate={onStatsUpdate || (() => {})} />} />
-      </Routes>
-    );
+    // AdminRouter has its own Routes component, so we render it directly
+    return <AdminRouter onStatsUpdate={onStatsUpdate || (() => {})} />;
   }
 
   return (

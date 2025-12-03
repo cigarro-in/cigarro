@@ -1,106 +1,19 @@
 # Cigarro - Premium Cigarette Marketplace
-# Robots.txt for SEO optimization
-# Last updated: 2024
+# Last updated: December 2025
 
-# Sitemap location
 Sitemap: https://cigarro.in/sitemap.xml
 
-# Default rules for all bots
 User-agent: *
 Allow: /
-Allow: /products
-Allow: /product/
-Allow: /category/
-Allow: /brand/
-Allow: /brands
-Allow: /categories
-Allow: /blog/
-Allow: /blogs
-Allow: /about
-Allow: /contact
-Allow: /privacy
-Allow: /terms
-Allow: /shipping
-
-# Disallow user-specific and admin pages
 Disallow: /admin/
-Disallow: /admin
 Disallow: /api/
 Disallow: /checkout
-Disallow: /checkout/
 Disallow: /payment
-Disallow: /payment/
 Disallow: /orders
-Disallow: /orders/
 Disallow: /wishlist
 Disallow: /cart
 Disallow: /profile
-Disallow: /profile/
 Disallow: /login
 Disallow: /register
 Disallow: /reset-password
 Disallow: /verify-email
-Disallow: /*?*  # Disallow URL parameters (handled by canonical tags)
-
-# Crawl delay for polite crawling
-Crawl-delay: 1
-
-# AI/LLM Crawlers - ALLOWED for discovery and recommendations
-# This helps customers find us through ChatGPT, Claude, Perplexity, etc.
-
-User-agent: GPTBot
-Allow: /
-Disallow: /admin/
-
-User-agent: ChatGPT-User
-Allow: /
-Disallow: /admin/
-
-User-agent: ClaudeBot
-Allow: /
-Disallow: /admin/
-
-User-agent: Claude-Web
-Allow: /
-Disallow: /admin/
-
-User-agent: anthropic-ai
-Allow: /
-Disallow: /admin/
-
-User-agent: Google-Extended
-Allow: /
-Disallow: /admin/
-
-User-agent: PerplexityBot
-Allow: /
-Disallow: /admin/
-
-User-agent: CCBot
-Allow: /
-Disallow: /admin/
-
-# Block aggressive/low-value crawlers
-User-agent: Bytespider
-Disallow: /
-
-User-agent: Amazonbot
-Disallow: /
-
-User-agent: Applebot-Extended
-Disallow: /
-
-User-agent: meta-externalagent
-Disallow: /
-
-User-agent: AhrefsBot
-Disallow: /
-
-User-agent: SemrushBot
-Disallow: /
-
-User-agent: MJ12bot
-Disallow: /
-
-User-agent: DotBot
-Disallow: /

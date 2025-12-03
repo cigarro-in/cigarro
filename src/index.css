@@ -191,20 +191,23 @@ body {
   overflow-x: hidden;
   overflow-y: scroll;
   background-color: var(--color-creme);
-  padding-top: 64px; /* Mobile header height */
   font-family: var(--font-family-sans);
   color: var(--color-dark);
 }
 
-/* Responsive body padding for fixed headers */
+/* Responsive body padding for fixed headers - ONLY for user pages */
+body:not(.admin-page) {
+  padding-top: 64px; /* Mobile header height */
+}
+
 @media (min-width: 640px) {
-  body {
+  body:not(.admin-page) {
     padding-top: 72px; /* Small tablet */
   }
 }
 
 @media (min-width: 1024px) {
-  body {
+  body:not(.admin-page) {
     padding-top: 80px; /* Desktop header height */
   }
 }

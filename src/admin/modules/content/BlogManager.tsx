@@ -1,97 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  Star, 
-  Pin, 
-  Calendar,
-  User,
-  Tag,
-  MoreHorizontal,
-  BookOpen
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, ArrowLeft, Trash2, BookOpen, Save, Eye, EyeOff, Star, Pin } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '../../../components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
+import { Label } from '../../../components/ui/label';
+import { Textarea } from '../../../components/ui/textarea';
+import { Switch } from '../../../components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { ImageUpload } from '../../../components/ui/ImageUpload';
 import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
-import { BlogEditorModal } from './modals/BlogEditorModal';
-import { BlogPost, BlogCategory, BlogTag } from '../../../types/blog';
 
+// Database-aligned interfaces
+interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string | null;
+  featured_image: string | null;
+  status: 'draft' | 'published' | 'archived';
+  is_featured: boolean;
+  is_pinned: boolean;
+  category_id: string | null;
+  author_id: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  published_at: string | null;
+  reading_time: number | null;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  category?: { id: string; name: string; color: string } | null;
+  author?: { name: string; email: string } | null;
+}
+
+interface BlogCategory {
+  id: string;
+  name: string;
+  color: string;
+}
 
 export function BlogManager() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [categories, setCategories] = useState<BlogCategory[]>([]);
-  const [tags, setTags] = useState<BlogTag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  
-  // Modal states
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
-  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [form, setForm] = useState({
+    title: '',
+    slug: '',
+    excerpt: '',
+    content: '',
+    featured_image: '',
+    status: 'draft' as 'draft' | 'published' | 'archived',
+    is_featured: false,
+    is_pinned: false,
+    category_id: '',
+    meta_title: '',
+    meta_description: ''
+  });
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
-      await Promise.all([
-        loadPosts(),
-        loadCategories(),
-        loadTags()
-      ]);
+      await Promise.all([loadPosts(), loadCategories()]);
     } catch (error) {
-      console.error('Error loading blog data:', error);
-      toast.error('Failed to load blog data');
+      console.error('Error loading data:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -101,27 +88,18 @@ export function BlogManager() {
       .select(`
         *,
         author:profiles(name, email),
-        category:blog_categories(id, name, color),
-        tags:blog_post_tags(
-          tag:blog_tags(name, color)
-        )
+        category:blog_categories(id, name, color)
       `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    const formattedPosts = data?.map(post => ({
-      ...post,
-      tags: post.tags?.map((t: any) => t.tag) || []
-    })) || [];
-
-    setPosts(formattedPosts);
+    setPosts(data || []);
   };
 
   const loadCategories = async () => {
     const { data, error } = await supabase
       .from('blog_categories')
-      .select('*')
+      .select('id, name, color')
       .eq('is_active', true)
       .order('sort_order');
 
@@ -129,496 +107,465 @@ export function BlogManager() {
     setCategories(data || []);
   };
 
-  const loadTags = async () => {
-    const { data, error } = await supabase
-      .from('blog_tags')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-
-    if (error) throw error;
-    setTags(data || []);
+  const generateSlug = (title: string) => {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
 
-  const handleCreatePost = () => {
-    setEditingPost(null);
-    setIsEditorOpen(true);
+  const calculateReadingTime = (content: string) => {
+    const wordsPerMinute = 200;
+    const words = content.trim().split(/\s+/).length;
+    return Math.ceil(words / wordsPerMinute);
   };
 
-  const handleEditPost = (post: BlogPost) => {
-    setEditingPost(post);
-    setIsEditorOpen(true);
+  const resetForm = () => {
+    setForm({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      featured_image: '',
+      status: 'draft',
+      is_featured: false,
+      is_pinned: false,
+      category_id: '',
+      meta_title: '',
+      meta_description: ''
+    });
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const openCreate = () => {
+    resetForm();
+    setSelectedPost(null);
+    setIsCreating(true);
+  };
+
+  const openEdit = (post: BlogPost) => {
+    setForm({
+      title: post.title || '',
+      slug: post.slug || '',
+      excerpt: post.excerpt || '',
+      content: post.content || '',
+      featured_image: post.featured_image || '',
+      status: post.status || 'draft',
+      is_featured: post.is_featured ?? false,
+      is_pinned: post.is_pinned ?? false,
+      category_id: post.category_id || '',
+      meta_title: post.meta_title || '',
+      meta_description: post.meta_description || ''
+    });
+    setSelectedPost(post);
+    setIsCreating(false);
+  };
+
+  const closeEditor = () => {
+    setSelectedPost(null);
+    setIsCreating(false);
+    resetForm();
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) {
+      toast.error('Post title is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const slug = form.slug || generateSlug(form.title);
+      const readingTime = calculateReadingTime(form.content);
+
+      const data = {
+        title: form.title.trim(),
+        slug,
+        excerpt: form.excerpt.trim() || null,
+        content: form.content || null,
+        featured_image: form.featured_image || null,
+        status: form.status,
+        is_featured: form.is_featured,
+        is_pinned: form.is_pinned,
+        category_id: form.category_id || null,
+        meta_title: form.meta_title.trim() || null,
+        meta_description: form.meta_description.trim() || null,
+        reading_time: readingTime,
+        published_at: form.status === 'published' && !selectedPost?.published_at 
+          ? new Date().toISOString() 
+          : selectedPost?.published_at || null
+      };
+
+      if (selectedPost) {
+        const { error } = await supabase
+          .from('blog_posts')
+          .update(data)
+          .eq('id', selectedPost.id);
+        if (error) throw error;
+        toast.success('Post updated');
+      } else {
+        const { error } = await supabase
+          .from('blog_posts')
+          .insert({ ...data, view_count: 0 });
+        if (error) throw error;
+        toast.success('Post created');
+      }
+
+      closeEditor();
+      loadPosts();
+    } catch (error: any) {
+      console.error('Error saving post:', error);
+      if (error?.code === '23505') {
+        toast.error('A post with this slug already exists');
+      } else {
+        toast.error(error?.message || 'Failed to save post');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedPost) return;
+    if (!confirm(`Delete "${selectedPost.title}"? This cannot be undone.`)) return;
+
     try {
       const { error } = await supabase
         .from('blog_posts')
         .delete()
-        .eq('id', postId);
-
+        .eq('id', selectedPost.id);
       if (error) throw error;
-
-      toast.success('Blog post deleted successfully');
+      toast.success('Post deleted');
+      closeEditor();
       loadPosts();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting post:', error);
-      toast.error('Failed to delete blog post');
-    } finally {
-      setDeletePostId(null);
+      toast.error(error?.message || 'Failed to delete post');
     }
   };
-
-  const handleToggleStatus = async (post: BlogPost) => {
-    const newStatus = post.status === 'published' ? 'draft' : 'published';
-    
-    try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .update({ 
-          status: newStatus,
-          published_at: newStatus === 'published' ? new Date().toISOString() : null
-        })
-        .eq('id', post.id);
-
-      if (error) throw error;
-
-      toast.success(`Post ${newStatus === 'published' ? 'published' : 'unpublished'} successfully`);
-      loadPosts();
-    } catch (error) {
-      console.error('Error updating post status:', error);
-      toast.error('Failed to update post status');
-    }
-  };
-
-  const handleToggleFeatured = async (post: BlogPost) => {
-    try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .update({ is_featured: !post.is_featured })
-        .eq('id', post.id);
-
-      if (error) throw error;
-
-      toast.success(`Post ${post.is_featured ? 'removed from' : 'added to'} featured`);
-      loadPosts();
-    } catch (error) {
-      console.error('Error updating featured status:', error);
-      toast.error('Failed to update featured status');
-    }
-  };
-
-  const handleTogglePinned = async (post: BlogPost) => {
-    try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .update({ is_pinned: !post.is_pinned })
-        .eq('id', post.id);
-
-      if (error) throw error;
-
-      toast.success(`Post ${post.is_pinned ? 'unpinned' : 'pinned'} successfully`);
-      loadPosts();
-    } catch (error) {
-      console.error('Error updating pinned status:', error);
-      toast.error('Failed to update pinned status');
-    }
-  };
-
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (post.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-                         (post.author?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    
-    const matchesStatus = statusFilter === 'all' || post.status === statusFilter;
-    const matchesCategory = categoryFilter === 'all' || post.category?.id === categoryFilter;
-
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
-
-  const sortedPosts = [...filteredPosts].sort((a, b) => {
-    let aValue = a[sortBy as keyof BlogPost];
-    let bValue = b[sortBy as keyof BlogPost];
-
-    if (sortBy === 'published_at' || sortBy === 'created_at' || sortBy === 'updated_at') {
-      aValue = aValue ? new Date(aValue as string).getTime() : 0;
-      bValue = bValue ? new Date(bValue as string).getTime() : 0;
-    }
-
-    // Handle null values
-    if (aValue === null || aValue === undefined) aValue = '';
-    if (bValue === null || bValue === undefined) bValue = '';
-
-    if (sortOrder === 'asc') {
-      return aValue > bValue ? 1 : -1;
-    } else {
-      return aValue < bValue ? 1 : -1;
-    }
-  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'published': return 'bg-green-100 text-green-800';
-      case 'draft': return 'bg-yellow-100 text-yellow-800';
-      case 'archived': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'published': return 'default';
+      case 'draft': return 'secondary';
+      case 'archived': return 'outline';
+      default: return 'secondary';
     }
   };
 
-  if (isLoading) {
+  const filteredPosts = posts.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.excerpt?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Show editor view
+  if (selectedPost || isCreating) {
     return (
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Blog Management</h2>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={closeEditor}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">
+              {isCreating ? 'New Post' : `Edit: ${selectedPost?.title}`}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectedPost && (
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save Post'}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading blog posts...</p>
+
+        {/* Form */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">Post Content</h2>
+              
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={form.title}
+                  onChange={e => {
+                    setForm(f => ({ 
+                      ...f, 
+                      title: e.target.value,
+                      slug: f.slug || generateSlug(e.target.value)
+                    }));
+                  }}
+                  placeholder="Enter post title"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  value={form.slug}
+                  onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                  placeholder="post-url-slug"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="excerpt">Excerpt</Label>
+                <Textarea
+                  id="excerpt"
+                  value={form.excerpt}
+                  onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
+                  placeholder="Brief summary of the post"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="content">Content</Label>
+                <Textarea
+                  id="content"
+                  value={form.content}
+                  onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                  placeholder="Write your post content here..."
+                  rows={15}
+                  className="font-mono text-sm"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  ~{calculateReadingTime(form.content)} min read
+                </p>
+              </div>
+            </div>
+
+            {/* SEO */}
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">SEO Settings</h2>
+              
+              <div>
+                <Label htmlFor="meta_title">Meta Title</Label>
+                <Input
+                  id="meta_title"
+                  value={form.meta_title}
+                  onChange={e => setForm(f => ({ ...f, meta_title: e.target.value }))}
+                  placeholder="SEO title"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="meta_desc">Meta Description</Label>
+                <Textarea
+                  id="meta_desc"
+                  value={form.meta_description}
+                  onChange={e => setForm(f => ({ ...f, meta_description: e.target.value }))}
+                  placeholder="SEO description"
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Featured Image */}
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">Featured Image</h2>
+              <ImageUpload
+                imageUrl={form.featured_image || null}
+                onImageUrlChange={(url) => setForm(f => ({ ...f, featured_image: url || '' }))}
+                showSelector={true}
+              />
+            </div>
+
+            {/* Status & Settings */}
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">Settings</h2>
+              
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={form.status}
+                  onValueChange={(value: 'draft' | 'published' | 'archived') => 
+                    setForm(f => ({ ...f, status: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={form.category_id || 'none'}
+                  onValueChange={(value) => 
+                    setForm(f => ({ ...f, category_id: value === 'none' ? '' : value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Category</SelectItem>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Featured</Label>
+                  <p className="text-sm text-gray-500">Show in featured section</p>
+                </div>
+                <Switch
+                  checked={form.is_featured}
+                  onCheckedChange={checked => setForm(f => ({ ...f, is_featured: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Pinned</Label>
+                  <p className="text-sm text-gray-500">Pin to top of list</p>
+                </div>
+                <Switch
+                  checked={form.is_pinned}
+                  onCheckedChange={checked => setForm(f => ({ ...f, is_pinned: checked }))}
+                />
+              </div>
+            </div>
+
+            {/* Info */}
+            {selectedPost && (
+              <div className="bg-white rounded-lg border p-6 space-y-2 text-sm text-gray-500">
+                <p>Created: {format(new Date(selectedPost.created_at), 'MMM dd, yyyy')}</p>
+                <p>Updated: {format(new Date(selectedPost.updated_at), 'MMM dd, yyyy')}</p>
+                {selectedPost.published_at && (
+                  <p>Published: {format(new Date(selectedPost.published_at), 'MMM dd, yyyy')}</p>
+                )}
+                <p>Views: {selectedPost.view_count}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
+  // List view
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6" />
-            Blog Management
-          </h2>
-          <p className="text-muted-foreground">Manage your blog posts, categories, and content</p>
+          <h1 className="text-2xl font-bold">Blog Posts</h1>
+          <p className="text-gray-500">{posts.length} posts total</p>
         </div>
-        <Button type="button" onClick={handleCreatePost} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
           New Post
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Posts</p>
-                <p className="text-2xl font-bold">{posts.length}</p>
-              </div>
-              <BookOpen className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Published</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {posts.filter(p => p.status === 'published').length}
-                </p>
-              </div>
-              <Eye className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Drafts</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {posts.filter(p => p.status === 'draft').length}
-                </p>
-              </div>
-              <EyeOff className="h-8 w-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Featured</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {posts.filter(p => p.is_featured).length}
-                </p>
-              </div>
-              <Star className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Filters */}
+      <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search posts..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search posts..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+      {/* List */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        </div>
+      ) : filteredPosts.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          {searchTerm || statusFilter !== 'all' 
+            ? 'No posts match your filters' 
+            : 'No posts yet. Create your first post!'}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border divide-y">
+          {filteredPosts.map(post => (
+            <div
+              key={post.id}
+              onClick={() => openEdit(post)}
+              className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              {/* Image */}
+              <div className="w-16 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {post.featured_image ? (
+                  <img src={post.featured_image} alt={post.title} className="w-full h-full object-cover" />
+                ) : (
+                  <BookOpen className="h-6 w-6 text-gray-400" />
+                )}
               </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium truncate">{post.title}</span>
+                  {post.is_featured && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                  {post.is_pinned && <Pin className="h-4 w-4 text-blue-500" />}
+                </div>
+                <p className="text-sm text-gray-500 truncate">{post.excerpt || 'No excerpt'}</p>
+              </div>
+
+              {/* Category */}
+              {post.category && (
+                <Badge variant="outline" style={{ borderColor: post.category.color, color: post.category.color }}>
+                  {post.category.name}
+                </Badge>
+              )}
+
+              {/* Date */}
+              <div className="text-sm text-gray-500">
+                {post.published_at 
+                  ? format(new Date(post.published_at), 'MMM dd')
+                  : 'Not published'}
+              </div>
+
+              {/* Status */}
+              <Badge variant={getStatusColor(post.status) as any}>
+                {post.status}
+              </Badge>
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_at">Created Date</SelectItem>
-                <SelectItem value="published_at">Published Date</SelectItem>
-                <SelectItem value="updated_at">Updated Date</SelectItem>
-                <SelectItem value="title">Title</SelectItem>
-                <SelectItem value="view_count">Views</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Posts Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Post</TableHead>
-                <TableHead>Author</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Published</TableHead>
-                <TableHead>Views</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedPosts.map((post) => (
-                <TableRow key={post.id}>
-                  <TableCell>
-                    <div className="flex items-start gap-3">
-                      {post.featured_image && (
-                        <div className="w-16 h-12 rounded-md overflow-hidden flex-shrink-0">
-                          <ImageWithFallback
-                            src={post.featured_image}
-                            alt={post.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium truncate">{post.title}</h3>
-                          {post.is_featured && (
-                            <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                          )}
-                          {post.is_pinned && (
-                            <Pin className="h-4 w-4 text-blue-500" />
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {post.excerpt || 'No excerpt available'}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {post.tags?.slice(0, 2).map((tag: { id: string; name: string; slug: string; color: string }, index: number) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {tag.name}
-                            </Badge>
-                          ))}
-                          {post.tags && post.tags.length > 2 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{post.tags.length - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{post.author?.name || 'Unknown'}</span>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {post.category ? (
-                      <Badge 
-                        variant="outline" 
-                        style={{ borderColor: post.category.color, color: post.category.color }}
-                      >
-                        {post.category.name}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">No category</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Badge className={getStatusColor(post.status)}>
-                      {post.status}
-                    </Badge>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {post.published_at ? format(new Date(post.published_at), 'MMM dd, yyyy') : 'Not published'}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium">{post.view_count}</div>
-                      {post.reading_time && (
-                        <div className="text-muted-foreground">{post.reading_time} min read</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditPost(post)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleStatus(post)}>
-                          {post.status === 'published' ? (
-                            <>
-                              <EyeOff className="h-4 w-4 mr-2" />
-                              Unpublish
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Publish
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleFeatured(post)}>
-                          <Star className="h-4 w-4 mr-2" />
-                          {post.is_featured ? 'Remove from Featured' : 'Add to Featured'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTogglePinned(post)}>
-                          <Pin className="h-4 w-4 mr-2" />
-                          {post.is_pinned ? 'Unpin' : 'Pin'}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => setDeletePostId(post.id)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {sortedPosts.length === 0 && (
-            <div className="text-center py-8">
-              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No blog posts found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
-                  ? 'Try adjusting your filters to see more posts.'
-                  : 'Get started by creating your first blog post.'
-                }
-              </p>
-              <Button onClick={handleCreatePost}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Post
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Blog Editor Modal */}
-      <BlogEditorModal
-        open={isEditorOpen}
-        onOpenChange={setIsEditorOpen}
-        post={editingPost}
-        categories={categories}
-        tags={tags}
-        onSave={loadPosts}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deletePostId} onOpenChange={() => setDeletePostId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Blog Post</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this blog post? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletePostId && handleDeletePost(deletePostId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
-// Admin Modules Exports - Export what actually exists in modules folder
-export * from './content';
+// Admin Modules - Streamlined exports
 export * from './assets';
-export * from './customers';
-export * from './orders';
-export * from './combos';
-export * from './discounts';
-export * from './variants';
 export * from './brands';
+export * from './collections';
+export * from './combos';
+export * from './content';
+export * from './customers';
+export * from './discounts';
+export * from './orders';
+export * from './variants';

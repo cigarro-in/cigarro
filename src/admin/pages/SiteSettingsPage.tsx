@@ -346,16 +346,25 @@ export function SiteSettingsPage() {
                       try {
                         const response = await fetch('https://cigarro.in/api/invalidate-cache', {
                           method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
                         });
-                        if (response.ok) {
-                          toast.dismiss(loading);
-                          toast.success('Cache refreshed! Changes will appear immediately.');
+                        const data = await response.json();
+                        toast.dismiss(loading);
+                        
+                        if (response.ok && data.success) {
+                          const successCount = data.results?.filter((r: any) => r.success).length || 0;
+                          const totalCount = data.results?.length || 0;
+                          toast.success(`Cache refreshed! ${successCount}/${totalCount} endpoints purged.`, { duration: 4000 });
                         } else {
-                          throw new Error('Failed');
+                          console.error('Cache purge failed:', data);
+                          toast.error(data.error || 'Failed to refresh cache');
                         }
                       } catch (error) {
+                        console.error('Cache purge error:', error);
                         toast.dismiss(loading);
-                        toast.error('Failed to refresh cache');
+                        toast.error('Failed to refresh cache. Check console for details.');
                       }
                     }}
                     className="bg-canyon hover:bg-canyon/90 text-creme"

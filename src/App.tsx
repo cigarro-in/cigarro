@@ -54,15 +54,26 @@ function AppContent() {
     fetchSiteSettings();
   }, []);
 
+  const isAdminPath = location.pathname.startsWith('/admin');
+
   useEffect(() => {
-    if (user?.isAdmin) {
+    // Only redirect admins to /admin when they are not already inside the admin area
+    if (user?.isAdmin && !isAdminPath) {
       navigate('/admin');
     }
-  }, [user, navigate]);
+  }, [user, navigate, isAdminPath]);
 
   // Manual scroll restoration is now handled by SmoothScrollToTop inside PageTransition
+  const isUserPage = !isAdminPath;
 
-  const isUserPage = !location.pathname.startsWith('/admin');
+  // Add/remove admin-page class to body for conditional styling
+  useEffect(() => {
+    if (isAdminPath) {
+      document.body.classList.add('admin-page');
+    } else {
+      document.body.classList.remove('admin-page');
+    }
+  }, [isAdminPath]);
 
   if (!isAgeVerified) {
     return <AgeVerification onVerify={() => setIsAgeVerified(true)} />;
@@ -80,24 +91,24 @@ function AppContent() {
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Helmet>
-      <div className="min-h-screen bg-creme font-sans">
-        {/* Desktop Layout */}
-        <div className="hidden md:block">
-          {isUserPage && <Header />}
-          {isUserPage && <BreadcrumbNav />}
-          <main>
-            <PageTransition>
-              <Suspense fallback={<LoadingSpinner />}>
-                <AppRoutes isAdminRoute={!isUserPage} location={location} />
-              </Suspense>
-            </PageTransition>
-          </main>
-          {isUserPage && <Footer />}
-        </div>
+{isUserPage ? (
+        <div className="min-h-screen bg-creme font-sans">
+          {/* Desktop Layout - User Pages */}
+          <div className="hidden md:block">
+            <Header />
+            <BreadcrumbNav />
+            <main>
+              <PageTransition>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AppRoutes isAdminRoute={false} location={location} />
+                </Suspense>
+              </PageTransition>
+            </main>
+            <Footer />
+          </div>
 
-        {/* Mobile Layout */}
-        <div className="md:hidden">
-          {isUserPage ? (
+          {/* Mobile Layout - User Pages */}
+          <div className="md:hidden">
             <MobileLayout>
               <PageTransition>
                 <Suspense fallback={<LoadingSpinner />}>
@@ -105,17 +116,14 @@ function AppContent() {
                 </Suspense>
               </PageTransition>
             </MobileLayout>
-          ) : (
-            <main>
-              <PageTransition>
-                <Suspense fallback={<LoadingSpinner />}>
-                   <AppRoutes isAdminRoute={true} location={location} />
-                </Suspense>
-              </PageTransition>
-            </main>
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Admin Layout - No wrapper div, no padding/margin */
+        <Suspense fallback={<LoadingSpinner />}>
+          <AppRoutes isAdminRoute={true} />
+        </Suspense>
+      )}
     </HelmetProvider>
   );
 }

@@ -47,11 +47,10 @@ export async function onRequest(context) {
 
     // List of all API endpoints to purge from CDN cache
     const urlsToPurge = [
+      'https://cigarro.in/api/homepage-data',
       'https://cigarro.in/api/categories',
       'https://cigarro.in/api/products',
-      'https://cigarro.in/api/featured-products',
       'https://cigarro.in/api/brands',
-      'https://cigarro.in/api/homepage-data',
     ];
 
     // Purge each URL by making a request with Cache-Control: no-cache

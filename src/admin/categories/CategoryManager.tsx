@@ -1,269 +1,79 @@
 import { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Search, 
-  Filter, 
-  Eye, 
-  EyeOff,
-  Settings,
-  MoreHorizontal,
-  Copy,
-  Archive,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  Star,
-  Grid,
-  List,
-  ArrowUp,
-  ArrowDown,
-  Image as ImageIcon,
-  Tag
-} from 'lucide-react';
+import { Plus, Search, ArrowLeft, Trash2, FolderTree, Save } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../../components/ui/dropdown-menu';
-import { Checkbox } from '../../components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { Switch } from '../../components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Separator } from '../../components/ui/separator';
 import { ImageUpload } from '../../components/ui/ImageUpload';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
-import { sanitizer } from '../../utils/validation';
-import { auditLogger } from '../../utils/audit-logger';
 
+// Database-aligned Category interface
 interface Category {
   id: string;
   name: string;
   slug: string;
-  description?: string;
-  image?: string;
-  image_alt_text?: string;
-  meta_title?: string;
-  meta_description?: string;
+  description: string | null;
+  image: string | null;
+  image_alt_text: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
   created_at: string;
   updated_at: string;
   product_count?: number;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  price?: number; // legacy fallback
-  image_url?: string;
-  gallery_images?: string[];
-  brand?: string;
-  product_variants?: Array<{
-    id: string;
-    price: number;
-    is_default?: boolean;
-  }>;
-}
-
-interface CategoryFormData {
-  name: string;
-  description: string;
-  image: string | null;
-  image_alt_text: string;
-  meta_title: string;
-  meta_description: string;
-}
-
-interface EnhancedCategoryManagerProps {
+interface CategoryManagerProps {
   onStatsUpdate: () => void;
 }
 
-export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCategoryManagerProps) {
+export default function CategoryManager({ onStatsUpdate }: CategoryManagerProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  
-  // Products for category assignment
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
-  const [productSearchTerm, setProductSearchTerm] = useState('');
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  
-  // Filters and search
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   // Form state
-  const [formData, setFormData] = useState<CategoryFormData>({
+  const [form, setForm] = useState({
     name: '',
     description: '',
-    image: null,
+    image: '',
     image_alt_text: '',
     meta_title: '',
     meta_description: ''
   });
-  
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Analytics
-  const [analytics, setAnalytics] = useState({
-    totalCategories: 0
-  });
 
   useEffect(() => {
     loadCategories();
-    loadAllProducts();
   }, []);
 
-  // Helper: get product price from default variant (or first variant), fallback to legacy price
-  const getProductPrice = (product: Product): number => {
-    if (product.product_variants && product.product_variants.length > 0) {
-      const def = product.product_variants.find(v => v.is_default);
-      if (def) return def.price;
-      return product.product_variants[0].price;
-    }
-    return product.price || 0;
-  };
-
-  useEffect(() => {
-    filterCategories();
-    calculateAnalytics();
-  }, [categories, searchTerm]);
-
   const loadCategories = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('categories')
-        .select(`
-          *,
-          product_count:product_categories(count)
-        `)
-        .order('created_at', { ascending: true });
+        .select('*')
+        .order('name', { ascending: true });
 
-      if (error) {
-        // If the relationship doesn't exist, try without it
-        console.warn('Product count relationship not found, loading categories without counts');
-        const { data: simpleData, error: simpleError } = await supabase
-          .from('categories')
-          .select('*')
-          .order('created_at', { ascending: true });
-        
-        if (simpleError) throw simpleError;
-        
-        const processedCategories = (simpleData || []).map(category => ({
-          ...category,
-          product_count: 0
-        }));
-        
-        setCategories(processedCategories);
-        return;
-      }
-
-      // Process the data to include product counts
-      const processedCategories = (data || []).map(category => ({
-        ...category,
-        product_count: category.product_count?.[0]?.count || 0
-      }));
-
-      setCategories(processedCategories);
+      if (error) throw error;
+      setCategories(data || []);
     } catch (error) {
       console.error('Error loading categories:', error);
       toast.error('Failed to load categories');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const loadAllProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, slug, is_active, product_variants(id, price, is_default, images)')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setAllProducts(data || []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
+  const generateSlug = (name: string) => {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
 
-  const loadCategoryProducts = async (categoryId: string) => {
-    setIsLoadingProducts(true);
-    try {
-      const { data, error } = await supabase
-        .from('product_categories')
-        .select(`
-          product_id,
-          products (
-            id, name, slug, is_active, product_variants(id, price, is_default, images)
-          )
-        `)
-        .eq('category_id', categoryId);
-
-      if (error) throw error;
-
-      // Type the response properly
-      type ProductCategoryResponse = {
-        product_id: string;
-        products: Product | Product[] | null;
-      };
-
-      const products = (data as ProductCategoryResponse[] || [])
-        .map(pc => {
-          // Handle both single object and array responses
-          if (Array.isArray(pc.products)) {
-            return pc.products[0];
-          }
-          return pc.products;
-        })
-        .filter((p): p is Product => p !== null && p !== undefined);
-      
-      setCategoryProducts(products);
-    } catch (error) {
-      console.error('Error loading category products:', error);
-      toast.error('Failed to load category products');
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
-
-  const filterCategories = () => {
-    let filtered = [...categories];
-
-    if (searchTerm) {
-      filtered = filtered.filter(category =>
-        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        category.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    setFilteredCategories(filtered);
-  };
-
-  const calculateAnalytics = () => {
-    const totalCategories = categories.length;
-
-    setAnalytics({
-      totalCategories
-    });
-  };
-
-  const handleCreateCategory = () => {
-    setEditingCategory(null);
-    setFormData({
+  const resetForm = () => {
+    setForm({
       name: '',
       description: '',
       image: '',
@@ -271,578 +81,294 @@ export default function EnhancedCategoryManager({ onStatsUpdate }: EnhancedCateg
       meta_title: '',
       meta_description: ''
     });
-    setFormErrors({});
-    setShowCategoryModal(true);
   };
 
-  const handleEditCategory = (category: Category) => {
-    setEditingCategory(category);
-    setFormData({
-      name: category.name,
+  const openCreate = () => {
+    resetForm();
+    setSelectedCategory(null);
+    setIsCreating(true);
+  };
+
+  const openEdit = (category: Category) => {
+    setForm({
+      name: category.name || '',
       description: category.description || '',
       image: category.image || '',
       image_alt_text: category.image_alt_text || '',
       meta_title: category.meta_title || '',
       meta_description: category.meta_description || ''
     });
-    setFormErrors({});
-    loadCategoryProducts(category.id);
-    setShowCategoryModal(true);
+    setSelectedCategory(category);
+    setIsCreating(false);
   };
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      errors.name = 'Category name is required';
-    }
-
-    if (!formData.description.trim()) {
-      errors.description = 'Description is required';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  const closeEditor = () => {
+    setSelectedCategory(null);
+    setIsCreating(false);
+    resetForm();
   };
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim();
-  };
-
-  const handleSaveCategory = async () => {
-    if (!validateForm()) {
-      toast.error('Please fix the validation errors');
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      toast.error('Category name is required');
       return;
     }
 
-    setIsSaving(true);
+    setSaving(true);
     try {
-      // Only send fields that exist in the database schema
-      const sanitizedData = {
-        name: sanitizer.sanitizeText(formData.name),
-        slug: generateSlug(formData.name),
-        description: sanitizer.sanitizeText(formData.description),
-        image: formData.image || null,
-        image_alt_text: sanitizer.sanitizeText(formData.image_alt_text),
-        meta_title: sanitizer.sanitizeText(formData.meta_title),
-        meta_description: sanitizer.sanitizeText(formData.meta_description)
+      const data = {
+        name: form.name.trim(),
+        slug: generateSlug(form.name),
+        description: form.description.trim() || null,
+        image: form.image || null,
+        image_alt_text: form.image_alt_text.trim() || null,
+        meta_title: form.meta_title.trim() || null,
+        meta_description: form.meta_description.trim() || null
       };
 
-      if (editingCategory) {
-        // Update existing category
+      if (selectedCategory) {
         const { error } = await supabase
           .from('categories')
-          .update(sanitizedData)
-          .eq('id', editingCategory.id);
-
+          .update(data)
+          .eq('id', selectedCategory.id);
         if (error) throw error;
-
-        await auditLogger.logAction('categories', 'UPDATE', editingCategory.id, editingCategory, sanitizedData);
-        toast.success('Category updated successfully');
+        toast.success('Category updated');
       } else {
-        // Create new category
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('categories')
-          .insert(sanitizedData)
-          .select()
-          .single();
-
+          .insert(data);
         if (error) throw error;
-
-        await auditLogger.logAction('categories', 'INSERT', data.id, null, sanitizedData);
-        toast.success('Category created successfully');
+        toast.success('Category created');
       }
 
-      setShowCategoryModal(false);
-      await loadCategories();
+      closeEditor();
+      loadCategories();
       onStatsUpdate();
-    } catch (error) {
-      console.error('Error saving category:', error);
-      toast.error('Failed to save category');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteCategory = async (category: Category) => {
-    if (!confirm(`Are you sure you want to delete "${category.name}"?`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', category.id);
-
-      if (error) throw error;
-
-      await auditLogger.logAction('categories', 'DELETE', category.id, category, null);
-      toast.success('Category deleted successfully');
-      await loadCategories();
-      onStatsUpdate();
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error('Failed to delete category');
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedCategories.length === 0) {
-      toast.error('Please select categories first');
-      return;
-    }
-
-    if (!confirm(`Delete ${selectedCategories.length} selected categories?`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .in('id', selectedCategories);
-      
-      if (error) throw error;
-      
-      toast.success(`Deleted ${selectedCategories.length} categories`);
-      setSelectedCategories([]);
-      await loadCategories();
-      onStatsUpdate();
-    } catch (error) {
-      console.error('Error deleting categories:', error);
-      toast.error('Failed to delete categories');
-    }
-  };
-
-  const handleAddProductToCategory = async (productId: string) => {
-    if (!editingCategory) return;
-
-    try {
-      const { error } = await supabase
-        .from('product_categories')
-        .insert({
-          product_id: productId,
-          category_id: editingCategory.id
-        });
-
-      if (error) throw error;
-
-      toast.success('Product added to category');
-      await loadCategoryProducts(editingCategory.id);
-      await loadCategories();
     } catch (error: any) {
-      if (error.code === '23505') {
-        toast.error('Product already in this category');
+      console.error('Error saving category:', error);
+      if (error?.code === '23505') {
+        toast.error('A category with this name already exists');
       } else {
-        console.error('Error adding product:', error);
-        toast.error('Failed to add product');
+        toast.error(error?.message || 'Failed to save category');
       }
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleRemoveProductFromCategory = async (productId: string) => {
-    if (!editingCategory) return;
+  const handleDelete = async () => {
+    if (!selectedCategory) return;
+    if (!confirm(`Delete "${selectedCategory.name}"? This cannot be undone.`)) return;
 
     try {
       const { error } = await supabase
-        .from('product_categories')
+        .from('categories')
         .delete()
-        .eq('product_id', productId)
-        .eq('category_id', editingCategory.id);
-
+        .eq('id', selectedCategory.id);
       if (error) throw error;
-
-      toast.success('Product removed from category');
-      await loadCategoryProducts(editingCategory.id);
-      await loadCategories();
-    } catch (error) {
-      console.error('Error removing product:', error);
-      toast.error('Failed to remove product');
+      toast.success('Category deleted');
+      closeEditor();
+      loadCategories();
+      onStatsUpdate();
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      toast.error(error?.message || 'Failed to delete category');
     }
   };
 
-  const filteredProducts = allProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-                         product.brand?.toLowerCase().includes(productSearchTerm.toLowerCase());
-    const notInCategory = !categoryProducts.some(cp => cp.id === product.id);
-    return matchesSearch && notInCategory;
-  });
+  const filteredCategories = categories.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  if (isLoading) {
+  // Show editor view
+  if (selectedCategory || isCreating) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Analytics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">{analytics.totalCategories}</p>
-                <p className="text-sm text-muted-foreground">Total Categories</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">{categories.filter(c => c.image).length}</p>
-                <p className="text-sm text-muted-foreground">With Images</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{categories.filter(c => c.product_count && c.product_count > 0).length}</p>
-                <p className="text-sm text-muted-foreground">With Products</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Header and Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Category Management</span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              >
-                {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
-              </Button>
-              <Button onClick={handleCreateCategory} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Category
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full">
-            <Input
-              placeholder="Search categories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
-            />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={closeEditor}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">
+              {isCreating ? 'New Category' : `Edit: ${selectedCategory?.name}`}
+            </h1>
           </div>
-
-          {/* Bulk Actions */}
-          {selectedCategories.length > 0 && (
-            <div className="flex items-center gap-2 p-4 bg-muted rounded-lg mt-4">
-              <span className="text-sm font-medium">
-                {selectedCategories.length} categories selected
-              </span>
-              <Separator orientation="vertical" className="h-4" />
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+          <div className="flex items-center gap-2">
+            {selectedCategory && (
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete Selected
+                Delete
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save Category'}
+            </Button>
+          </div>
+        </div>
 
-      {/* Categories Display */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedCategories.length === filteredCategories.length}
-                    onCheckedChange={(checked: boolean) => {
-                      if (checked) {
-                        setSelectedCategories(filteredCategories.map(c => c.id));
-                      } else {
-                        setSelectedCategories([]);
-                      }
-                    }}
-                  />
-                </TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCategories.map((category, index) => (
-                <TableRow 
-                  key={category.id}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => handleEditCategory(category)}
-                >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedCategories.includes(category.id)}
-                      onCheckedChange={(checked: boolean) => {
-                        if (checked) {
-                          setSelectedCategories(prev => [...prev, category.id]);
-                        } else {
-                          setSelectedCategories(prev => prev.filter(id => id !== category.id));
-                        }
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
-                        {category.image ? (
-                          <img
-                            src={category.image}
-                            alt={category.image_alt_text || category.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Tag className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{category.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {category.description && category.description.length > 50 
-                            ? `${category.description.substring(0, 50)}...` 
-                            : category.description}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{category.product_count || 0}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(category.created_at).toLocaleDateString()}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Category Form Modal */}
-      <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingCategory ? 'Edit Category' : 'Create Category'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingCategory ? 'Update category information and settings' : 'Create a new product category with details and settings'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Tabs defaultValue="basic" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="media">Media</TabsTrigger>
-              <TabsTrigger value="seo">SEO</TabsTrigger>
-              {editingCategory && <TabsTrigger value="products">Products ({categoryProducts.length})</TabsTrigger>}
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-4">
+        {/* Form */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Info */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">Basic Information</h2>
+              
               <div>
                 <Label htmlFor="name">Category Name *</Label>
                 <Input
                   id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className={formErrors.name ? 'border-red-500' : ''}
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Enter category name"
                 />
-                {formErrors.name && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>
-                )}
               </div>
 
               <div>
-                <Label htmlFor="description">Description *</Label>
+                <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief description of the category"
                   rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className={formErrors.description ? 'border-red-500' : ''}
-                />
-                {formErrors.description && (
-                  <p className="text-sm text-red-500 mt-1">{formErrors.description}</p>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="media" className="space-y-4">
-              <div>
-                <Label>Category Image</Label>
-                <p className="text-sm text-muted-foreground mb-2">Upload or select an image for this category</p>
-                <ImageUpload
-                  imageUrl={formData.image || null}
-                  onImageUrlChange={(url: string | null) => setFormData(prev => ({ ...prev, image: url || '' }))}
-                  showSelector={true}
                 />
               </div>
+            </div>
 
-              <div>
-                <Label htmlFor="image_alt_text">Image Alt Text</Label>
-                <Input
-                  id="image_alt_text"
-                  value={formData.image_alt_text}
-                  onChange={(e) => setFormData(prev => ({ ...prev, image_alt_text: e.target.value }))}
-                  placeholder="Descriptive text for accessibility"
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="seo" className="space-y-4">
+            {/* SEO */}
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">SEO Settings</h2>
+              
               <div>
                 <Label htmlFor="meta_title">Meta Title</Label>
                 <Input
                   id="meta_title"
-                  value={formData.meta_title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, meta_title: e.target.value }))}
+                  value={form.meta_title}
+                  onChange={e => setForm(f => ({ ...f, meta_title: e.target.value }))}
                   placeholder="SEO title for search engines"
                 />
               </div>
 
               <div>
-                <Label htmlFor="meta_description">Meta Description</Label>
+                <Label htmlFor="meta_desc">Meta Description</Label>
                 <Textarea
-                  id="meta_description"
-                  rows={3}
-                  value={formData.meta_description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, meta_description: e.target.value }))}
+                  id="meta_desc"
+                  value={form.meta_description}
+                  onChange={e => setForm(f => ({ ...f, meta_description: e.target.value }))}
                   placeholder="SEO description for search engines"
+                  rows={2}
                 />
               </div>
-            </TabsContent>
-
-            {editingCategory && (
-              <TabsContent value="products" className="space-y-4">
-                {/* Current Products */}
-                <div>
-                  <Label>Current Products ({categoryProducts.length})</Label>
-                  {isLoadingProducts ? (
-                    <div className="flex items-center justify-center p-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    </div>
-                  ) : categoryProducts.length > 0 ? (
-                    <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                      {categoryProducts.map(product => (
-                        <div key={product.id} className="flex items-center gap-3 p-2 bg-muted rounded-lg">
-                          <div className="w-12 h-12 rounded overflow-hidden bg-background flex-shrink-0">
-                            <img
-                              src={product.gallery_images?.[0] || product.image_url || '/placeholder.png'}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{getProductPrice(product)}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveProductFromCategory(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-2">No products in this category yet</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Add Products */}
-                <div>
-                  <Label>Add Products</Label>
-                  <Input
-                    placeholder="Search products to add..."
-                    value={productSearchTerm}
-                    onChange={(e) => setProductSearchTerm(e.target.value)}
-                    className="mt-2"
-                  />
-                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                    {filteredProducts.length > 0 ? (
-                      filteredProducts.slice(0, 20).map(product => (
-                        <div key={product.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          <div className="w-12 h-12 rounded overflow-hidden bg-background flex-shrink-0">
-                            <img
-                              src={product.gallery_images?.[0] || product.image_url || '/placeholder.png'}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{product.brand} • ₹{getProductPrice(product)}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAddProductToCategory(product.id)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        {productSearchTerm ? 'No products found' : 'All products are already in this category'}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-            )}
-          </Tabs>
-
-          <div className="flex justify-end gap-2 mt-6">
-            <Button type="button" variant="outline" onClick={() => setShowCategoryModal(false)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleSaveCategory} disabled={isSaving}>
-              {isSaving ? 'Saving...' : editingCategory ? 'Update Category' : 'Create Category'}
-            </Button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Image */}
+            <div className="bg-white rounded-lg border p-6 space-y-4">
+              <h2 className="font-semibold text-lg">Category Image</h2>
+              <ImageUpload
+                imageUrl={form.image || null}
+                onImageUrlChange={(url) => setForm(f => ({ ...f, image: url || '' }))}
+                showSelector={true}
+              />
+              <div>
+                <Label htmlFor="alt">Image Alt Text</Label>
+                <Input
+                  id="alt"
+                  value={form.image_alt_text}
+                  onChange={e => setForm(f => ({ ...f, image_alt_text: e.target.value }))}
+                  placeholder="Describe the image"
+                />
+              </div>
+            </div>
+
+            {/* Info */}
+            {selectedCategory && (
+              <div className="bg-white rounded-lg border p-6 space-y-2 text-sm text-gray-500">
+                <p>Created: {new Date(selectedCategory.created_at).toLocaleDateString()}</p>
+                <p>Updated: {new Date(selectedCategory.updated_at).toLocaleDateString()}</p>
+                <p>Slug: {selectedCategory.slug}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // List view
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Categories</h1>
+          <p className="text-gray-500">{categories.length} categories total</p>
+        </div>
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Category
+        </Button>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search categories..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        </div>
+      ) : filteredCategories.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          {searchTerm ? 'No categories match your search' : 'No categories yet. Create your first category!'}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border divide-y">
+          {filteredCategories.map(category => (
+            <div
+              key={category.id}
+              onClick={() => openEdit(category)}
+              className="flex items-center gap-4 p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              {/* Image */}
+              <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {category.image ? (
+                  <img src={category.image} alt={category.name} className="w-full h-full object-cover" />
+                ) : (
+                  <FolderTree className="h-6 w-6 text-gray-400" />
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <span className="font-medium truncate block">{category.name}</span>
+                {category.description && (
+                  <p className="text-sm text-gray-500 truncate">{category.description}</p>
+                )}
+              </div>
+
+              {/* Product count */}
+              <Badge variant="secondary">
+                {category.product_count || 0} products
+              </Badge>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

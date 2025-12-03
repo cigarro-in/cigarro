@@ -5,7 +5,19 @@
 import { createClient } from '@supabase/supabase-js';
 
 export async function onRequest(context) {
-  const { env } = context;
+  const { request, env } = context;
+  
+  // CORS headers for cross-origin requests
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
+  // Handle OPTIONS preflight request
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
   
   try {
     // Initialize Supabase
@@ -21,6 +33,7 @@ export async function onRequest(context) {
       headers: {
         'Content-Type': 'application/xml',
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        ...corsHeaders,
       }
     });
     
@@ -46,9 +59,20 @@ export async function onRequest(context) {
 </urlset>`;
     
     return new Response(fallback, {
-      headers: { 'Content-Type': 'application/xml' }
+      headers: { 'Content-Type': 'application/xml', ...corsHeaders }
     });
   }
+}
+
+// Escape special XML characters
+function escapeXml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 async function generateSitemap(supabase) {
@@ -136,8 +160,8 @@ async function generateSitemap(supabase) {
         if (imageUrl) {
           xml += `
     <image:image>
-      <image:loc>${imageUrl}</image:loc>
-      <image:title>${product.name || 'Product Image'}</image:title>
+      <image:loc>${escapeXml(imageUrl)}</image:loc>
+      <image:title>${escapeXml(product.name) || 'Product Image'}</image:title>
     </image:image>`;
         }
       });
