@@ -53,11 +53,6 @@ interface Order {
   shipping_state: string;
   shipping_zip_code: string;
   shipping_phone: string;
-  // User info from profiles join
-  profiles?: {
-    name: string;
-    email: string;
-  };
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
@@ -81,7 +76,6 @@ export function OrdersPage() {
         .from('orders')
         .select(`
           *,
-          profiles:user_id(name, email),
           order_items(id, product_id, quantity, product_price, product_name, variant_name)
         `)
         .order('created_at', { ascending: false });
@@ -154,8 +148,7 @@ export function OrdersPage() {
       sortable: true,
       render: (name: string, order: Order) => (
         <div>
-          <div className="font-medium text-gray-900">{name || order.profiles?.name || 'Unknown'}</div>
-          <div className="text-sm text-gray-500">{order.profiles?.email || ''}</div>
+          <div className="font-medium text-gray-900">{name || 'Unknown'}</div>
           <div className="text-xs text-gray-400 flex items-center">
             <Phone className="w-3 h-3 mr-1" />
             {order.shipping_phone || 'N/A'}

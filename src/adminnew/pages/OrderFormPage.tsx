@@ -39,11 +39,6 @@ interface Order {
   shipping_zip_code: string;
   shipping_country?: string;
   shipping_phone?: string;
-  // User info from profiles join
-  profiles?: {
-    name: string;
-    email: string;
-  };
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
@@ -71,7 +66,6 @@ export function OrderFormPage() {
         .from('orders')
         .select(`
           *,
-          profiles:user_id(name, email),
           order_items(id, product_id, quantity, product_price, product_name, variant_name, product_image)
         `)
         .eq('id', id)
@@ -186,11 +180,7 @@ export function OrderFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div>
-                <div className="font-medium text-gray-900">{order.shipping_name || order.profiles?.name || 'Unknown'}</div>
-                <div className="text-sm text-gray-500 flex items-center">
-                  <Mail className="w-4 h-4 mr-2" />
-                  {order.profiles?.email || 'N/A'}
-                </div>
+                <div className="font-medium text-gray-900">{order.shipping_name || 'Unknown'}</div>
                 <div className="text-sm text-gray-500 flex items-center">
                   <Phone className="w-4 h-4 mr-2" />
                   {order.shipping_phone || 'N/A'}
