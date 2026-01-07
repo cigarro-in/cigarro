@@ -14,7 +14,7 @@ interface OrderItem {
   id: string;
   product_id: string;
   quantity: number;
-  price: number;
+  product_price: number;
   product_name: string;
   variant_name?: string;
   product_image?: string;
@@ -22,20 +22,28 @@ interface OrderItem {
 
 interface Order {
   id: string;
-  display_id: string;
+  display_order_id: string;
   user_id: string;
-  user_email: string;
-  user_name: string;
-  user_phone: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_verified: string;
   payment_method: string;
   subtotal: number;
-  shipping_cost: number;
-  discount_amount: number;
+  shipping: number;
+  discount: number;
   total: number;
-  shipping_address: any;
-  billing_address?: any;
+  // Shipping info
+  shipping_name: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_zip_code: string;
+  shipping_country?: string;
+  shipping_phone?: string;
+  // User info from profiles join
+  profiles?: {
+    name: string;
+    email: string;
+  };
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
@@ -63,7 +71,8 @@ export function OrderFormPage() {
         .from('orders')
         .select(`
           *,
-          order_items(*)
+          profiles:user_id(name, email),
+          order_items(id, product_id, quantity, product_price, product_name, variant_name, product_image)
         `)
         .eq('id', id)
         .single();
@@ -80,7 +89,7 @@ export function OrderFormPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!order) return;
-    
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -156,7 +165,7 @@ export function OrderFormPage() {
     <div className="w-full min-h-screen bg-[var(--color-creme)] pb-20">
       {/* Header */}
       <PageHeader
-        title={`Order #${order.display_id}`}
+        title={`Order #${order.display_order_id}`}
         description={`${new Date(order.created_at).toLocaleDateString()} at ${new Date(order.created_at).toLocaleTimeString()}`}
         backUrl="/admin/orders"
       >
@@ -167,7 +176,7 @@ export function OrderFormPage() {
       </PageHeader>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
-        
+
         {/* LEFT COLUMN */}
         <div className="space-y-6">
           {/* Customer Information */}
@@ -177,14 +186,14 @@ export function OrderFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div>
-                <div className="font-medium text-gray-900">{order.user_name}</div>
+                <div className="font-medium text-gray-900">{order.shipping_name || order.profiles?.name || 'Unknown'}</div>
                 <div className="text-sm text-gray-500 flex items-center">
                   <Mail className="w-4 h-4 mr-2" />
-                  {order.user_email}
+                  {order.profiles?.email || 'N/A'}
                 </div>
                 <div className="text-sm text-gray-500 flex items-center">
                   <Phone className="w-4 h-4 mr-2" />
-                  {order.user_phone}
+                  {order.shipping_phone || 'N/A'}
                 </div>
               </div>
             </AdminCardContent>
@@ -201,19 +210,16 @@ export function OrderFormPage() {
                   <MapPin className="w-4 h-4 mr-2 mt-1 text-gray-400" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      {order.shipping_address?.name}
+                      {order.shipping_name}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {order.shipping_address?.address_line_1}
-                      {order.shipping_address?.address_line_2 && (
-                        <>, {order.shipping_address.address_line_2}</>
-                      )}
+                      {order.shipping_address}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {order.shipping_address?.city}, {order.shipping_address?.state} {order.shipping_address?.postal_code}
+                      {order.shipping_city}, {order.shipping_state} {order.shipping_zip_code}
                     </div>
                     <div className="text-sm text-gray-600">
-                      {order.shipping_address?.country}
+                      {order.shipping_country}
                     </div>
                   </div>
                 </div>
@@ -252,10 +258,10 @@ export function OrderFormPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-gray-900">
-                        {formatINR(item.price * item.quantity)}
+                        {formatINR(item.product_price * item.quantity)}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {formatINR(item.price)} each
+                        {formatINR(item.product_price)} each
                       </div>
                     </div>
                   </div>
@@ -329,12 +335,12 @@ export function OrderFormPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Shipping</span>
-                <span className="font-medium">{formatINR(order.shipping_cost)}</span>
+                <span className="font-medium">{formatINR(order.shipping)}</span>
               </div>
-              {order.discount_amount > 0 && (
+              {order.discount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Discount</span>
-                  <span className="font-medium text-green-600">-{formatINR(order.discount_amount)}</span>
+                  <span className="font-medium text-green-600">-{formatINR(order.discount)}</span>
                 </div>
               )}
               <Separator />
@@ -357,8 +363,8 @@ export function OrderFormPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Status</span>
-                <Badge className={getPaymentStatusColor(order.payment_status)}>
-                  {order.payment_status ? order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1) : 'Unknown'}
+                <Badge className={order.payment_verified === 'YES' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                  {order.payment_verified === 'YES' ? 'Verified' : 'Pending'}
                 </Badge>
               </div>
             </AdminCardContent>

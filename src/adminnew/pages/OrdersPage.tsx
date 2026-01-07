@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Eye, 
-  Truck, 
-  Ban, 
-  CheckCircle2, 
-  Clock, 
+import {
+  Eye,
+  Truck,
+  Ban,
+  CheckCircle2,
+  Clock,
   Package,
   MapPin,
   Phone,
@@ -37,20 +37,27 @@ interface OrderItem {
 
 interface Order {
   id: string;
-  display_id: string;
+  display_order_id: string;
   user_id: string;
-  user_email: string;
-  user_name: string;
-  user_phone: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_verified: string;
   payment_method: string;
   subtotal: number;
-  shipping_cost: number;
-  discount_amount: number;
+  shipping: number;
+  discount: number;
   total: number;
-  shipping_address: any;
-  billing_address?: any;
+  // Shipping info from orders table
+  shipping_name: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_zip_code: string;
+  shipping_phone: string;
+  // User info from profiles join
+  profiles?: {
+    name: string;
+    email: string;
+  };
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
@@ -74,7 +81,8 @@ export function OrdersPage() {
         .from('orders')
         .select(`
           *,
-          order_items(*)
+          profiles:user_id(name, email),
+          order_items(id, product_id, quantity, product_price, product_name, variant_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -131,7 +139,7 @@ export function OrdersPage() {
 
   const columns = [
     {
-      key: 'display_id',
+      key: 'display_order_id',
       label: 'Order ID',
       sortable: true,
       render: (displayId: string) => (
@@ -141,16 +149,16 @@ export function OrdersPage() {
       )
     },
     {
-      key: 'user_name',
+      key: 'shipping_name',
       label: 'Customer',
       sortable: true,
       render: (name: string, order: Order) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{order.user_email}</div>
+          <div className="font-medium text-gray-900">{name || order.profiles?.name || 'Unknown'}</div>
+          <div className="text-sm text-gray-500">{order.profiles?.email || ''}</div>
           <div className="text-xs text-gray-400 flex items-center">
             <Phone className="w-3 h-3 mr-1" />
-            {order.user_phone}
+            {order.shipping_phone || 'N/A'}
           </div>
         </div>
       )
@@ -196,11 +204,11 @@ export function OrdersPage() {
       )
     },
     {
-      key: 'payment_status',
+      key: 'payment_verified',
       label: 'Payment',
       render: (status: string) => (
-        <Badge className={getPaymentStatusColor(status)}>
-          {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
+        <Badge className={status === 'YES' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+          {status === 'YES' ? 'Verified' : 'Pending'}
         </Badge>
       )
     },
@@ -245,8 +253,8 @@ export function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
-      <PageHeader 
-        title="Orders" 
+      <PageHeader
+        title="Orders"
         description="Manage customer orders"
         search={{
           value: searchTerm,
