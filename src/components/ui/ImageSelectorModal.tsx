@@ -63,7 +63,6 @@ export function ImageSelectorModal({
   };
 
   const handleImageSelect = (imageUrl: string) => {
-    console.log('ImageSelectorModal: Image selected:', imageUrl);
     onImageSelect(imageUrl);
     onOpenChange(false);
     setMode(null);

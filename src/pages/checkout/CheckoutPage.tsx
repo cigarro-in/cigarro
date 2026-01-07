@@ -408,7 +408,6 @@ export function CheckoutPage() {
           .single();
         
         if (error) {
-          console.log('PIN code not found in database:', error.message);
           // Show warning that PIN code is not servicable
           setValidationErrors(prev => ({
             ...prev,
@@ -450,7 +449,6 @@ export function CheckoutPage() {
           toast.success(`Location found: ${data.city}, ${data.state}`);
           
         } else {
-          console.log('PIN code not found or not servicable');
           setValidationErrors(prev => ({
             ...prev,
             pincode: 'This PIN code is not servicable'
@@ -720,14 +718,12 @@ export function CheckoutPage() {
     
     // Only save if it's a new address and form is complete
     if (!isNewAddress || !isAddressComplete) {
-      console.log('Skipping address save - not new or incomplete');
       return;
     }
     
     // Check for duplicates first
     const isDuplicate = await checkForDuplicateAddress(editingAddressId || undefined);
     if (isDuplicate) {
-      console.log('Address already exists, skipping save');
       return;
     }
     
@@ -743,15 +739,9 @@ export function CheckoutPage() {
         .from('addresses')
         .select('id, is_primary')
         .eq('user_id', user.id);
-      
-      console.log('Existing addresses:', existingAddresses);
-      
       // Determine if this should be primary based on existing addresses
       const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
       const shouldBePrimary = !hasPrimary;
-      
-      console.log('Should be primary:', shouldBePrimary, 'Has primary:', hasPrimary);
-      
       // With the fixed constraint, we can now properly set is_primary
       const addressData = {
         user_id: user.id,
@@ -773,14 +763,12 @@ export function CheckoutPage() {
         .insert(addressData);
       
       if (!error) {
-        console.log('Address saved successfully on order completion');
         toast.success(`Address saved as "${addressLabel}" for future orders`);
         // Reload addresses to update the UI
         await loadSavedAddresses(true);
       } else {
         console.error('Failed to save address:', error);
         // The constraint is fundamentally broken - let's skip auto-save for now
-        console.log('Skipping auto-save due to constraint issues');
       }
     } catch (error) {
       console.error('Error saving address on order success:', error);
@@ -863,15 +851,9 @@ export function CheckoutPage() {
       .from('addresses')
       .select('id, is_primary')
       .eq('user_id', user.id);
-    
-    console.log('Existing addresses for manual save:', existingAddresses);
-    
     // Determine if this should be primary based on existing addresses
     const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
     const shouldBePrimary = !hasPrimary;
-    
-    console.log('Manual save - Should be primary:', shouldBePrimary, 'Has primary:', hasPrimary);
-    
     // With the fixed constraint, we can now properly set is_primary
     const addressData = {
       user_id: user.id,
@@ -965,8 +947,6 @@ export function CheckoutPage() {
       toast.error('Please log in to complete your order');
       return;
     }
-    
-    console.log('Starting payment confirmation...');
     setIsProcessingPayment(true);
     
     try {

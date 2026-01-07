@@ -14,7 +14,6 @@ declare module 'virtual:pwa-register/react' {
   export function useRegisterSW(options?: RegisterSWOptions & { registrationOptions?: any }): RegisterSWHook
 }
 
-
 // Augment React definitions to include fetchpriority
 import 'react';
 

@@ -116,11 +116,11 @@ export function ProductsPage() {
             return;
           }
         } catch (apiError) {
-          console.log('API not available, using Supabase fallback');
+
         }
 
         // Fallback: Test database connection first
-        console.log('Testing database connection...');
+
         const { data: testData, error: testError } = await supabase
           .from('products')
           .select('id')
@@ -133,8 +133,7 @@ export function ProductsPage() {
           setIsInitialLoad(false);
           return;
         }
-        
-        console.log('Database connection successful');
+
         await Promise.all([fetchProducts(), fetchFilterData()]);
         setIsInitialLoad(false);
       } catch (error) {
@@ -214,11 +213,9 @@ export function ProductsPage() {
     setFilterSections(sections);
   }, [categories, brands, origins, strengths, packSizes]);
 
-
   const fetchFilterData = async () => {
     try {
-      console.log('Fetching filter data...');
-      
+
       // Fetch all filter data in parallel
       const [categoriesResult, brandsResult] = await Promise.all([
         supabase.from('categories').select('id, name, slug').order('name'),
@@ -331,7 +328,6 @@ export function ProductsPage() {
         }
       }
 
-
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
@@ -371,7 +367,6 @@ export function ProductsPage() {
       setIsLoading(false); // Add this line to fix the loading issue
     }
   };
-
 
   const handleAddToCart = async (product: Product) => {
     try {

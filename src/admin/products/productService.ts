@@ -90,7 +90,7 @@ export async function saveProduct(data: ProductFormData, existingId?: string) {
       };
 
       // Debug: Log the exact payload being sent
-      console.log('Variant payload being sent:', JSON.stringify(variantPayload, null, 2));
+      );
       
       let error;
       if (variant.id) {

@@ -109,9 +109,6 @@ export function WalletPage() {
       if (!orderResult || !orderResult.success) {
         throw new Error(orderResult?.message || 'Failed to create wallet load order');
       }
-
-      console.log('✅ Wallet load order created:', orderResult);
-
       setShowLoadDialog(false);
       setLoadAmount('');
 

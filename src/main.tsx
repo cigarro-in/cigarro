@@ -20,11 +20,9 @@ const UpdateSW = () => {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: any) {
-      // console.log('SW Registered: ' + r)
-    },
+      // },
     onRegisterError(error: any) {
-      // console.log('SW registration error', error)
-    },
+      // },
     // Add auto-update configuration
     registrationOptions: {
       updateViaCache: 'always',
@@ -32,8 +30,7 @@ const UpdateSW = () => {
     // Check for updates periodically
     immediate: true,
     onNeedRefresh: () => {
-      // console.log('SW needs refresh')
-    },
+      // },
   })
 
   const close = () => {

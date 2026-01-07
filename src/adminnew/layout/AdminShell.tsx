@@ -12,7 +12,6 @@ interface AdminShellProps {
  * Shell stays mounted during navigation to prevent flickering
  */
 export function AdminShell({ children }: AdminShellProps) {
-  console.log('[AdminShell] render');
   return (
     <SidebarProvider>
       <AdminSidebar />

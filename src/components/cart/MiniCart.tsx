@@ -22,7 +22,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
   // Debug: Log cart items to identify any issues
   /* React.useEffect(() => {
     if (items.length > 0) {
-      console.log('MiniCart items:', items.map((item, index) => ({
+      => ({
         index,
         id: item.id,
         name: item.name,

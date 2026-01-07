@@ -253,7 +253,6 @@ export function ProductsManager() {
     }
   ];
 
-
   const bulkActions = [
     {
       label: 'Activate Selected',

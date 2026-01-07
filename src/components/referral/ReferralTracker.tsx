@@ -19,8 +19,6 @@ export function ReferralTracker() {
         const { was_referred } = await checkIfUserWasReferred(user.id);
         
         if (!was_referred) {
-          console.log('🔗 Found pending referral code:', referralCode);
-          
           // Record the referral
           const result = await recordReferral({
             referred_user_id: user.id,
@@ -41,7 +39,6 @@ export function ReferralTracker() {
              if (result.error?.includes('already referred') || result.error?.includes('Cannot refer yourself')) {
                 sessionStorage.removeItem('referral_code');
              }
-             console.log('Referral record result:', result);
           }
         } else {
           // Already referred, clear the code

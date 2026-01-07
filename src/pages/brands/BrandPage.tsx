@@ -68,7 +68,7 @@ export function BrandPage() {
           }
         }
       } catch (apiError) {
-        console.log('API not available, using Supabase fallback');
+
       }
 
       // Fallback: Fetch brand from database

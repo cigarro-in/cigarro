@@ -12,10 +12,7 @@ interface AddressListProps {
 }
 
 export function AddressList({ addresses, selectedId, onSelect, onEdit, onAddNew }: AddressListProps) {
-  console.log('🏠 AddressList render:', { 
-    addressCount: addresses.length, 
-    selectedId,
-    addresses: addresses.map(a => ({ id: a.id, label: a.label }))
+  )
   });
 
   if (addresses.length === 0) {

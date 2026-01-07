@@ -375,24 +375,16 @@ export function SiteSettingsPage() {
 
                   <Button
                     onClick={async () => {
-                      console.log('🧪 Test Performance button clicked');
                       const loading = toast.loading('Testing performance...');
                       try {
                         const isProduction = window.location.hostname === 'cigarro.in';
-                        console.log('🌍 Hostname:', window.location.hostname);
-                        console.log('🏭 Is Production:', isProduction);
-
                         let endpoints;
 
                         if (!isProduction) {
-                          console.log('💻 Development mode - Testing Supabase directly');
                           toast.dismiss(loading);
                           const devLoading = toast.loading('Testing Supabase connection...');
 
                           // First test basic connection with timeout
-                          console.log('🔌 Testing Supabase connection...');
-                          console.log('📍 Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'NOT SET');
-
                           try {
                             const connectionTimeout = new Promise((_, reject) =>
                               setTimeout(() => reject(new Error('Connection timeout (5s)')), 5000)
@@ -414,7 +406,6 @@ export function SiteSettingsPage() {
                               toast.error(`Supabase Error: ${testError.message}\n\nCheck your database and RLS policies.`, { duration: 8000 });
                               return;
                             }
-                            console.log('✅ Supabase connected successfully');
                           } catch (err: any) {
                             console.error('❌ Supabase connection error:', err);
                             toast.dismiss(devLoading);
@@ -440,11 +431,7 @@ export function SiteSettingsPage() {
                             { name: 'Brands', query: () => supabase.from('brands').select('*').limit(20) },
                             { name: 'Featured Products', query: () => supabase.from('products').select('id, name, price').eq('is_featured', true).limit(12) },
                           ];
-
-                          console.log(`📡 Testing ${tests.length} Supabase queries...`);
-
                           for (const test of tests) {
-                            console.log(`🔍 Testing: ${test.name}`);
                             try {
                               const start = performance.now();
 
@@ -476,8 +463,6 @@ export function SiteSettingsPage() {
                                 status: !error ? '✅' : '❌',
                                 error: error?.message || null
                               };
-
-                              console.log(`   ${result.status} ${time}ms | Direct DB | ${result.size}${error ? ` | Error: ${error.message}` : ''}`);
                               results.push(result);
                             } catch (err: any) {
                               console.error(`   ❌ Exception:`, err);
@@ -491,8 +476,6 @@ export function SiteSettingsPage() {
                               });
                             }
                           }
-
-                          console.log('✅ All Supabase tests completed');
                           toast.dismiss(perfLoading);
 
                           // Show results
@@ -507,12 +490,6 @@ export function SiteSettingsPage() {
                           message += `💡 Deploy to production to see cache performance (30-50ms expected)`;
 
                           console.table(results);
-                          console.log('📊 Supabase Performance Summary:', {
-                            averageTime: `${avgTime}ms`,
-                            mode: 'Development - Direct Database',
-                            recommendation: 'Deploy to production for 10x faster cached responses'
-                          });
-
                           // Store results for display
                           setPerformanceResults({
                             mode: 'development',
@@ -524,9 +501,6 @@ export function SiteSettingsPage() {
                           toast.success(message, { duration: 10000 });
                           return;
                         }
-
-                        console.log('✅ Production detected, starting cache tests...');
-
                         endpoints = [
                           { name: 'Categories', url: 'https://cigarro.in/api/categories' },
                           { name: 'Products', url: 'https://cigarro.in/api/products' },
@@ -536,11 +510,7 @@ export function SiteSettingsPage() {
                         ];
 
                         const results = [];
-
-                        console.log(`📡 Testing ${endpoints.length} endpoints...`);
-
                         for (const endpoint of endpoints) {
-                          console.log(`🔍 Testing: ${endpoint.name} - ${endpoint.url}`);
                           const start = performance.now();
 
                           try {
@@ -561,11 +531,7 @@ export function SiteSettingsPage() {
                             const age = response.headers.get('age') || '0';
                             const size = `${Math.round(data.length / 1024)}KB`;
 
-                            console.log(`   Response headers:`, {
-                              'cf-cache-status': cfCacheStatus,
-                              'cache-control': cacheControl,
-                              'age': age,
-                              'content-length': response.headers.get('content-length'),
+                            ,
                             });
 
                             const result = {
@@ -576,8 +542,6 @@ export function SiteSettingsPage() {
                               age: `${age}s`,
                               status: response.ok ? '✅' : '❌'
                             };
-
-                            console.log(`   ${result.status} ${time}ms | ${cfCacheStatus} | ${size} | Age: ${age}s`);
                             results.push(result);
                           } catch (err: any) {
                             console.error(`   ❌ Error testing ${endpoint.name}:`, err);
@@ -592,9 +556,6 @@ export function SiteSettingsPage() {
                             });
                           }
                         }
-
-                        console.log('✅ All endpoint tests completed');
-
                         toast.dismiss(loading);
 
                         // Create detailed results message
@@ -620,13 +581,7 @@ export function SiteSettingsPage() {
 
                         // Show in console for detailed view
                         console.table(results);
-                        console.log('📊 Cloudflare CDN Cache Summary:', {
-                          averageTime: `${avgTime}ms`,
-                          cacheHitRate: `${hitCount}/${results.length}`,
-                          hits: hitCount,
-                          misses: missCount,
-                          dynamic: dynamicCount,
-                          performance: avgTime < 50 ? '🚀 Excellent (CDN cached)' : avgTime < 200 ? '✅ Good (Some cached)' : '⚠️ Slow (No cache)',
+                        ' : avgTime < 200 ? '✅ Good (Some cached)' : '⚠️ Slow (No cache)',
                           recommendation: hitCount === 0 ? 'Run test again to see cache HITs' : 'Cache working correctly'
                         });
 
@@ -638,10 +593,7 @@ export function SiteSettingsPage() {
                           hitCount,
                           timestamp: new Date().toLocaleTimeString()
                         });
-
-                        console.log('📊 Showing results toast...');
                         toast.success(message, { duration: 10000 });
-                        console.log('✅ Cache performance test complete!');
                       } catch (error) {
                         console.error('❌ Cache test error:', error);
                         toast.dismiss(loading);

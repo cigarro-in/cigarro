@@ -99,8 +99,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       // Create circle with product image fill
       const circle = document.createElement('div');
-      // Get image from first variant or fallback
-      const variantImages = product.product_variants?.[0]?.images;
+      // Get image from default variant or fall back to first variant
+      const primaryVariant = product.product_variants?.find((v: any) => v.is_default) || product.product_variants?.[0];
+      const variantImages = primaryVariant?.images;
       const imgUrl = !imageError ? getProductImageUrl(variantImages?.[0]) : getProductImageUrl();
       circle.style.position = 'fixed';
       circle.style.left = `${startLeft}px`;
@@ -125,10 +126,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           { left: `${endLeft}px`, top: `${endTop + 8}px`, transform: 'scale(1.08, 0.92)', opacity: 1 },
           { left: `${endLeft}px`, top: `${endTop}px`, transform: 'scale(1)', opacity: 0 }
         ],
-        { 
+        {
           duration: 3000, // Slower, more dramatic fall
-          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', 
-          fill: 'forwards' 
+          easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+          fill: 'forwards'
         });
 
       drop.onfinish = () => {
@@ -196,11 +197,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         aria-label={isWishlisted(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
       >
         <Heart
-          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-all duration-300 ${
-            isWishlisted(product.id)
+          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-all duration-300 ${isWishlisted(product.id)
               ? 'fill-canyon text-canyon'
               : 'text-dark hover:text-canyon'
-          }`}
+            }`}
           strokeWidth={1.5}
         />
       </button>
@@ -210,7 +210,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="relative aspect-square overflow-hidden bg-white">
           <img
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            src={!imageError ? getProductImageUrl(product.product_variants?.[0]?.images?.[0]) : getProductImageUrl()}
+            src={!imageError ? getProductImageUrl(defaultVariant?.images?.[0] || product.product_variants?.[0]?.images?.[0]) : getProductImageUrl()}
             alt={product.name}
             onError={() => setImageError(true)}
             ref={imgRef}
@@ -228,12 +228,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               {product.name}
             </h3>
           </div>
-          
+
           <div className="flex items-center justify-between gap-1.5">
             <p className="text-dark font-bold text-sm sm:text-base md:text-lg">
               ₹{formatIndianPrice(defaultVariant?.price || product.product_variants?.[0]?.price || 0)}
             </p>
-            
+
             {/* Add to Cart Button - Compact */}
             {onAddToCart && (
               <button

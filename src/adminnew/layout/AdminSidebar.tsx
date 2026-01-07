@@ -98,7 +98,7 @@ export function AdminSidebar() {
     }
   };
 
-  console.log('[AdminSidebar] render', location.pathname);
+
 
   // Group items by section
   const sections = NAVIGATION_CONFIG.reduce((acc, item) => {
@@ -128,10 +128,9 @@ export function AdminSidebar() {
               <SidebarMenu>
                 {items.map((item) => (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton 
+                    <SidebarMenuButton
                       isActive={isActive(item.path)}
                       onClick={() => {
-                        console.log('[AdminSidebar] navigate ->', item.path);
                         navigate(item.path);
                       }}
                       tooltip={item.label}

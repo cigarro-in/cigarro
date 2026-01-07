@@ -34,7 +34,6 @@ export function subscribeToPaymentVerification(
   orderId: string,
   onStatusChange: (status: OrderPaymentStatus) => void
 ): RealtimeChannel {
-  console.log('📡 Subscribing to payment updates for order:', orderId);
 
   const channel = supabase
     .channel(`order-payment-${orderId}`)
@@ -47,8 +46,7 @@ export function subscribeToPaymentVerification(
         filter: `id=eq.${orderId}`,
       },
       (payload) => {
-        console.log('💰 Order payment status updated:', payload);
-        
+
         const order = payload.new as any;
         
         onStatusChange({
@@ -61,7 +59,7 @@ export function subscribeToPaymentVerification(
       }
     )
     .subscribe((status) => {
-      console.log('📡 Subscription status:', status);
+
     });
 
   return channel;
@@ -74,7 +72,7 @@ export async function unsubscribeFromPaymentVerification(
   channel: RealtimeChannel
 ): Promise<void> {
   await supabase.removeChannel(channel);
-  console.log('📡 Unsubscribed from payment updates');
+
 }
 
 /**
@@ -91,7 +89,7 @@ export async function pollPaymentStatus(
 
   const poll = async () => {
     if (stopped || attempts >= maxAttempts) {
-      console.log('⏹️ Stopped polling payment status');
+
       return;
     }
 
@@ -117,7 +115,7 @@ export async function pollPaymentStatus(
 
         // Stop polling if payment is confirmed
         if (data.payment_confirmed) {
-          console.log('✅ Payment confirmed, stopping poll');
+
           stopped = true;
           return;
         }

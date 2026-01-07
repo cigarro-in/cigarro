@@ -195,7 +195,6 @@ export function CustomersManager() {
     }
   ];
 
-
   const filters = [
     {
       key: 'status',

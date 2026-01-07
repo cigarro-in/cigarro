@@ -44,7 +44,7 @@ export async function getUserReferralStats(userId: string): Promise<ReferralStat
       console.error('RPC Error - get_user_referral_stats:', error);
       throw error;
     }
-    console.log('Referral Stats Data (with .single()):', data);
+    ):', data);
     
     // The RPC returns JSONB data directly
     return data as ReferralStats;

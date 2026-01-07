@@ -37,15 +37,6 @@ export const AddressDrawer = memo(function AddressDrawer({
 }: AddressDrawerProps) {
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-
-  console.log('🚪 AddressDrawer render:', {
-    open,
-    view,
-    savedAddressesCount: savedAddresses.length,
-    selectedAddressId: selectedAddress?.id,
-    userId: user?.id
-  });
-
   const handleSaveAddress = async (addressData: Address) => {
     if (!user) return;
 

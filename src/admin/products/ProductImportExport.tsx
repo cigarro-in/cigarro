@@ -57,19 +57,12 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
   const [brands, setBrands] = useState<any[]>([]);
 
   const loadMetadata = async () => {
-    console.log('Loading metadata (categories/brands)...');
+    ...');
     try {
       const [categoriesResult, brandsResult] = await Promise.all([
         supabase.from('categories').select('id, name'),
         supabase.from('brands').select('id, name').eq('is_active', true)
       ]);
-
-      console.log('Metadata loaded:', {
-        categories: categoriesResult.data?.length,
-        brands: brandsResult.data?.length,
-        catError: categoriesResult.error,
-        brandError: brandsResult.error
-      });
 
       if (categoriesResult.data) setCategories(categoriesResult.data);
       if (brandsResult.data) setBrands(brandsResult.data);
@@ -398,8 +391,7 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
         }
         
           const totalRows = rows.length;
-        console.log(`File parsed. Total rows: ${totalRows}`);
-        
+
         let successfulImports = 0;
         const allErrors: ImportError[] = [];
         const warnings: string[] = [];
@@ -422,12 +414,10 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
 
         const productsToProcess = Object.entries(productGroups);
         const totalProducts = productsToProcess.length;
-        console.log(`Found ${totalProducts} unique products to process.`);
 
         for (let pIndex = 0; pIndex < totalProducts; pIndex++) {
           const [productName, productRows] = productsToProcess[pIndex];
-          console.log(`Processing product: "${productName}" with ${productRows.length} rows`);
-          
+
           const mainRow = productRows[0]; // Use first row for main product data
 
           try {
@@ -494,7 +484,7 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
             };
 
             // Insert Product
-            console.log('Attempting to insert product:', productData);
+
             const { data: insertedProduct, error: insertError } = await supabase
               .from('products')
               .insert(productData)
@@ -522,8 +512,6 @@ export function ProductImportExport({ isOpen, onClose, onImportComplete }: Produ
               }
               continue;
             }
-            
-            console.log('Successfully inserted product:', insertedProduct);
 
             // Process Category Relationship
             if (categoryId && insertedProduct) {

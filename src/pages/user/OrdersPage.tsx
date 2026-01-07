@@ -88,7 +88,6 @@ export function OrdersPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && user) {
-        console.log('📱 Page visible - Refreshing orders...');
         setPage(0);
         fetchOrders(true);
       }
@@ -108,9 +107,6 @@ export function OrdersPage() {
     const currentPage = reset ? 0 : page;
     const from = currentPage * ORDERS_PER_PAGE;
     const to = from + ORDERS_PER_PAGE - 1;
-
-    console.log(`📦 Fetching orders: page ${currentPage}, range ${from}-${to}`);
-
     const { data, error, count } = await supabase
       .from('orders')
       .select('*, order_items(*)', { count: 'exact' })
@@ -181,7 +177,6 @@ export function OrdersPage() {
       }
 
       setHasMore(formattedOrders.length === ORDERS_PER_PAGE);
-      console.log(`✅ Loaded ${formattedOrders.length} orders, hasMore: ${formattedOrders.length === ORDERS_PER_PAGE}`);
     }
     setIsInitialLoading(false);
     setIsFetchingMore(false);
@@ -194,7 +189,6 @@ export function OrdersPage() {
     
     observerRef.current = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore) {
-        console.log('📜 Reached bottom - Loading more orders...');
         setPage(prev => prev + 1);
       }
     });
@@ -205,7 +199,6 @@ export function OrdersPage() {
   // Fetch more when page changes
   useEffect(() => {
     if (page > 0 && user) {
-      console.log('📄 Page changed to:', page);
       fetchOrders(false);
     }
   }, [page, user]);
@@ -369,9 +362,6 @@ export function OrdersPage() {
       
       sessionStorage.setItem('retryOrder', JSON.stringify(retryOrderData));
       sessionStorage.setItem('isRetryPayment', 'true');
-      
-      console.log('🔄 Retry payment initiated for order:', order.displayOrderId);
-      
       // Navigate to checkout page with retry param
       navigate(buildRoute.checkoutWithParams({ retry: true }));
       

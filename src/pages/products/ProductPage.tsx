@@ -108,7 +108,7 @@ function ProductPage() {
             }
           }
         } catch (apiError) {
-          console.log('API not available, using Supabase fallback');
+
         }
 
         // Fallback: Fetch product details with brand relation
@@ -349,22 +349,21 @@ function ProductPage() {
 
   const handleAddToCart = async () => {
     if (!product) {
-      console.log('No product found');
+
       return;
     }
-    
-    console.log('Adding to cart:', { product: product.name, quantity, selectedVariant });
+
     setIsAddingToCart(true);
     
     try {
       if (selectedVariant) {
         // Add variant to cart
-        console.log('Adding variant to cart');
+
         await addVariantToCart(product, selectedVariant, quantity);
         toast.success(`Added ${quantity}x ${product.name} (${selectedVariant.variant_name}) to cart`);
       } else {
         // Add default variant to cart
-        console.log('Adding default variant to cart');
+
         const defaultVariant = variants.find(v => v.is_default);
         if (defaultVariant) {
           await addVariantToCart(product, defaultVariant, quantity);
@@ -398,8 +397,7 @@ function ProductPage() {
       // Show success feedback and reset quantity
       setShowAddedFeedback(true);
       setQuantity(1);
-      console.log('Product added successfully');
-      
+
       // Hide feedback after 2 seconds
       setTimeout(() => {
         setShowAddedFeedback(false);
@@ -1312,7 +1310,7 @@ function ProductPage() {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log('Add to cart button clicked');
+
                   if (!isAddingToCart) {
                     handleAddToCart();
                   }
@@ -1364,8 +1362,7 @@ function ProductPage() {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log('Buy now clicked');
-                  
+
                   // Clear any stale retry payment data
                   sessionStorage.removeItem('isRetryPayment');
                   sessionStorage.removeItem('retryOrder');

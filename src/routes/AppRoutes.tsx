@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Lazy load components - organized by feature
 // Home
@@ -58,34 +59,34 @@ interface AppRoutesProps {
 export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: AppRoutesProps) => {
   if (isAdminRoute) {
     // AdminRouter has its own Routes component, so we render it directly
-    return <AdminRouter onStatsUpdate={onStatsUpdate || (() => {})} />;
+    return <AdminRouter onStatsUpdate={onStatsUpdate || (() => { })} />;
   }
 
   return (
     <Routes location={location}>
       {/* Home */}
       <Route path={ROUTES.HOME} element={<HomePage />} />
-      
+
       {/* Shopping & Checkout */}
       <Route path={ROUTES.CART} element={<CartPage />} />
       <Route path={ROUTES.CHECKOUT} element={<CheckoutRouter />} />
       <Route path={ROUTES.DESKTOP_CHECKOUT} element={<CheckoutPage />} />
       <Route path={ROUTES.MOBILE_CHECKOUT} element={<MobileCheckoutPage />} />
-      
+
       {/* Payment & Orders */}
-      <Route path={ROUTES.TRANSACTION} element={<TransactionProcessingPage />} />
-      <Route path={ROUTES.ORDERS} element={<OrdersPage />} />
-      
-      {/* User */}
-      <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
-      <Route path={ROUTES.PROFILE_SETTINGS} element={<ProfileSettingsPage />} />
-      <Route path={ROUTES.ADDRESSES} element={<AddressesPage />} />
-      <Route path={ROUTES.REVIEWS} element={<ReviewsPage />} />
-      <Route path={ROUTES.WALLET} element={<WalletPage />} />
+      <Route path={ROUTES.TRANSACTION} element={<ProtectedRoute><TransactionProcessingPage /></ProtectedRoute>} />
+      <Route path={ROUTES.ORDERS} element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+
+      {/* User - Protected Routes */}
+      <Route path={ROUTES.PROFILE} element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+      <Route path={ROUTES.PROFILE_SETTINGS} element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
+      <Route path={ROUTES.ADDRESSES} element={<ProtectedRoute><AddressesPage /></ProtectedRoute>} />
+      <Route path={ROUTES.REVIEWS} element={<ProtectedRoute><ReviewsPage /></ProtectedRoute>} />
+      <Route path={ROUTES.WALLET} element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
       <Route path={ROUTES.WISHLIST} element={<WishlistPage />} />
-      <Route path={ROUTES.REFERRALS} element={<ReferralPage />} />
+      <Route path={ROUTES.REFERRALS} element={<ProtectedRoute><ReferralPage /></ProtectedRoute>} />
       <Route path={ROUTES.REFERRAL_LANDING} element={<ReferralLandingPage />} />
-      
+
       {/* Products & Categories */}
       <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductPage />} />
       <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
@@ -94,19 +95,19 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryPage />} />
       <Route path={ROUTES.BRANDS} element={<BrandsPage />} />
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandPage />} />
-      
+
       {/* Content */}
       <Route path={ROUTES.BLOGS} element={<BlogsPage />} />
       <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
       <Route path={ROUTES.ABOUT} element={<AboutPage />} />
       <Route path={ROUTES.CONTACT} element={<ContactPage />} />
-      
+
       {/* Legal */}
       <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
       <Route path={ROUTES.TERMS} element={<TermsPage />} />
       <Route path={ROUTES.SHIPPING} element={<ShippingPage />} />
       <Route path={ROUTES.LEGAL} element={<LegalPage />} />
-      
+
       {/* Catch-all route for broken links */}
       <Route path="*" element={<HomePage />} />
     </Routes>

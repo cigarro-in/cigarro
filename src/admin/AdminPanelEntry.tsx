@@ -190,7 +190,7 @@ export default function AdminPanelEntry() {
 
   const handleStatsUpdate = () => {
     // This will be passed to admin components that need to update stats
-    console.log('Stats updated');
+
   };
 
   if (isLoading) {

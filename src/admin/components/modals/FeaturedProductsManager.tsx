@@ -114,7 +114,6 @@ export function FeaturedProductsManager({ open, onOpenChange, onUpdate }: Featur
     // Legacy logic removed as column is dropped
   };
 
-
   const featuredProducts = []; // specific featured column is removed
 
   const getProductPrice = (product: Product): number => {

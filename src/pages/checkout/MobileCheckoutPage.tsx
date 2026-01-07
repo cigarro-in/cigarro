@@ -361,15 +361,11 @@ export function MobileCheckoutPage() {
   // Fetch saved addresses and auto-select (memoized to prevent re-render loops)
   const fetchSavedAddresses = useCallback(async () => {
     if (!user?.id) {
-      console.log('📍 No user, skipping address fetch');
       return;
     }
 
     // Use ref values to avoid dependency changes
     const { isRetryPayment, retryOrder, defaultUserName, defaultUserPhone } = fetchContextRef.current;
-
-    console.log('📍 Fetching addresses for user:', user.id);
-
     try {
       // Always fetch saved addresses from database
       const { data: addresses, error } = await supabase
@@ -378,29 +374,19 @@ export function MobileCheckoutPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      console.log('📍 Database query result:', {
-        error,
-        addressCount: addresses?.length || 0,
-        addresses: addresses?.map(a => ({ id: a.id, label: a.label, full_name: a.full_name }))
-      });
-
       if (error) {
         console.error('Error fetching addresses:', error);
         return;
       }
 
       if (addresses && addresses.length > 0) {
-        console.log('📍 Setting saved addresses:', addresses.length);
         setSavedAddresses(addresses);
       } else {
-        console.log('📍 No saved addresses found');
         setSavedAddresses([]);
       }
 
       // If retry payment, use the original shipping address for selection
       if (isRetryPayment && retryOrder?.shippingAddress) {
-        console.log('📍 Auto-selecting retry order shipping address');
-
         const shippingAddress = retryOrder.shippingAddress as Record<string, unknown>;
 
         setSelectedAddress({
@@ -439,9 +425,6 @@ export function MobileCheckoutPage() {
       } else if (addresses && addresses.length > 0) {
         // Auto-select first (most recent) address for normal checkout
         const addressToSelect = addresses[0];
-
-        console.log('📍 Auto-selecting first address:', addressToSelect.label);
-
         setSelectedAddress({
           id: addressToSelect.id,
           full_name: addressToSelect.full_name,
@@ -560,7 +543,7 @@ export function MobileCheckoutPage() {
         timestamp: new Date().toISOString()
       }),
       keepalive: true
-    }).catch(err => console.log('Verification started on server:', err));
+    }).catch(() => { /* Webhook error ignored */ });
   };
 
   // Unified payment handler
@@ -583,38 +566,15 @@ export function MobileCheckoutPage() {
     const remainingAmount = finalTotal - walletAmountUsed;
 
     const shouldClearCart = !isBuyNow && !isRetryPayment;
-
-    console.log('💳 Payment Handler Debug:', {
-      isRetryPayment,
-      retryOrderExists: !!retryOrder,
-      retryOrderId: retryOrder?.orderId,
-      retryOrderData: retryOrder
-    });
-
-    console.log('💳 Payment Handler:', {
-      finalTotal,
-      walletAmountToUse,
-      walletAmountUsed,
-      remainingAmount,
-      usingWallet,
-      isFullWalletPayment: remainingAmount === 0,
-      shouldClearCart
-    });
-
     setIsProcessing(true);
     setIsCompletingOrder(true);
 
     try {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
-
-      console.log('💰 Processing payment with transaction ID:', txnId);
-
       let order;
 
       // Check if this is a retry for an existing order
       if (isRetryPayment && retryOrder?.orderId) {
-        console.log('🔄 Fetching existing order for retry:', retryOrder.orderId);
-
         // Fetch existing order instead of updating (avoids RLS issues)
         // The process_order_payment RPC should handle the transaction ID update if needed
         const { data: existingOrder, error: fetchError } = await supabase
@@ -625,27 +585,20 @@ export function MobileCheckoutPage() {
 
         if (fetchError) {
           console.error('Error fetching retry order:', fetchError);
-          console.log('⚠️ Fetch failed, creating new order');
           order = await saveOrderToDatabase(txnId, 'pending');
         } else if (!existingOrder) {
-          console.log('⚠️ Order not found, creating new order');
           order = await saveOrderToDatabase(txnId, 'pending');
         } else {
-          console.log('✅ Found existing order to retry:', existingOrder.id);
           order = existingOrder;
         }
       } else {
         // Create new order
-        console.log('✨ Creating new order');
         order = await saveOrderToDatabase(txnId, 'pending');
       }
 
       if (!order) {
         throw new Error('Failed to process order record');
       }
-
-      console.log('✅ Order record ready:', order.id);
-
       // Set navigating state FIRST to lock UI and prevent redirect effects
       isNavigatingRef.current = true;
 
@@ -678,21 +631,8 @@ export function MobileCheckoutPage() {
         console.error('❌ process_order_payment error:', error);
         throw error;
       }
-
-      console.log('✅ process_order_payment result:', result);
-      console.log('📊 Result details:', {
-        success: result?.success,
-        wallet_transaction_id: result?.wallet_transaction_id,
-        gateway_transaction_id: result?.gateway_transaction_id,
-        wallet_amount_used: result?.wallet_amount_used,
-        gateway_amount: result?.gateway_amount
-      });
-
       // Check if wallet covered full amount (no additional payment needed)
       if (remainingAmount === 0) {
-        console.log('✅ Full payment from wallet - Order complete!');
-        console.log('📝 Order ID:', order.id);
-
         // Navigate to transaction processing page for seamless experience
         navigate('/transaction', {
           state: {
@@ -718,8 +658,6 @@ export function MobileCheckoutPage() {
       }
 
       // Remaining amount - redirect to UPI payment
-      console.log(`💳 ${usingWallet ? 'Partial wallet payment' : 'Full UPI payment'} - Remaining: ₹${remainingAmount}`);
-
       // Trigger webhook
       triggerPaymentWebhook(txnId, order.id, remainingAmount);
 
@@ -790,19 +728,10 @@ export function MobileCheckoutPage() {
       const txnId = `TXN${Date.now().toString().slice(-8)}`;
       const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
       const shouldClearCart = !isBuyNow && !isRetryPayment;
-
-      console.log('💳 QR Payment Debug:', {
-        isRetryPayment,
-        retryOrderExists: !!retryOrder,
-        retryOrderId: retryOrder?.orderId
-      });
-
       let order;
 
       // Check if this is a retry for an existing order
       if (isRetryPayment && retryOrder?.orderId) {
-        console.log('🔄 Fetching existing order for QR retry:', retryOrder.orderId);
-
         // Fetch existing order instead of updating (avoids RLS issues)
         const { data: existingOrder, error: fetchError } = await supabase
           .from('orders')
@@ -815,10 +744,8 @@ export function MobileCheckoutPage() {
           // Fallback to new order
           order = await saveOrderToDatabase(txnId, 'pending');
         } else if (!existingOrder) {
-          console.log('⚠️ Order not found, creating new order');
           order = await saveOrderToDatabase(txnId, 'pending');
         } else {
-          console.log('✅ Found existing order to retry:', existingOrder.id);
           order = existingOrder;
         }
       } else {

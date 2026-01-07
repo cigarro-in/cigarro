@@ -105,7 +105,6 @@ export function CategoryPage() {
           }
         }
       } catch (apiError) {
-        console.log('API not available, using Supabase fallback');
       }
 
       const { data, error } = await supabase

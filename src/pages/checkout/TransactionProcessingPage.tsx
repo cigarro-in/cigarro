@@ -84,7 +84,6 @@ export function TransactionProcessingPage() {
     // "empty cart redirect" effect from firing during the transition.
     if (transactionData.shouldClearCart) {
       setTimeout(() => {
-        console.log('🛒 Clearing cart in transaction page...');
         clearCart().catch(err => console.error('Error clearing cart:', err));
       }, 500);
     }
@@ -156,9 +155,7 @@ export function TransactionProcessingPage() {
         let isSuccess = false;
         let data = null;
 
-        // console.log('Polling status for:', transactionData);
-
-        // For all orders (including wallet loads), we MUST use the Order UUID (orderId) as the single source of truth.
+        // // For all orders (including wallet loads), we MUST use the Order UUID (orderId) as the single source of truth.
         // The transactionId might be an external string (TXN...) which doesn't match the DB UUID.
         const targetId = transactionData.orderId;
         

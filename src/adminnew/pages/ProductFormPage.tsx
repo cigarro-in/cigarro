@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, Plus, Trash2, X, Package, Box, Info } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus, Trash2, X, Package, Box, Info, Search } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,6 +9,7 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Switch } from '../../components/ui/switch';
 import { MultipleImagePicker } from '../components/shared/ImagePicker';
+import { ProductImageSearchModal } from '../components/shared/ProductImageSearchModal';
 import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -17,9 +18,9 @@ import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { ProductFormData, VariantFormData, Brand, Category, generateSlug, calculateProfitMargin } from '../../types/product';
 
-interface ProductFormPageProps {}
+interface ProductFormPageProps { }
 
-export function ProductFormPage({}: ProductFormPageProps) {
+export function ProductFormPage({ }: ProductFormPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditMode = !!id;
@@ -32,6 +33,8 @@ export function ProductFormPage({}: ProductFormPageProps) {
   const [collections, setCollections] = useState<{ id: string; title: string }[]>([]);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
+  const [imageSearchVariantIndex, setImageSearchVariantIndex] = useState<number | null>(null);
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
@@ -95,7 +98,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
       .from('categories')
       .select('*')
       .order('name');
-    
+
     if (error) {
       console.error('Error loading categories:', error);
       return;
@@ -149,7 +152,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
         collections: collectionIds,
         categories: categoryIds,
         origin: data.origin || '',
-        specifications: data.specifications 
+        specifications: data.specifications
           ? Object.entries(data.specifications).map(([key, value]) => ({ key, value: String(value) }))
           : [],
         variants: data.product_variants?.map((v: any) => ({
@@ -215,7 +218,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
   const addVariant = (type: 'carton' | 'custom') => {
     const basePrice = formData.variants.find(v => v.is_default)?.price || 0;
     const isFirstVariant = formData.variants.length === 0;
-    
+
     let newVariant: VariantFormData = {
       variant_name: '',
       variant_type: 'pack',
@@ -255,7 +258,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
 
   const updateVariant = (index: number, updates: Partial<VariantFormData>) => {
     const newVariants = [...formData.variants];
-    
+
     if (updates.is_default === true) {
       newVariants.forEach((v, i) => {
         if (i !== index && v.is_default) {
@@ -263,7 +266,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
         }
       });
     }
-    
+
     newVariants[index] = { ...newVariants[index], ...updates };
     handleChange({ variants: newVariants });
   };
@@ -271,16 +274,16 @@ export function ProductFormPage({}: ProductFormPageProps) {
   const removeVariant = (index: number) => {
     const variantToRemove = formData.variants[index];
     const newVariants = formData.variants.filter((_, i) => i !== index);
-    
+
     // Track deleted variants for database cleanup
     if (variantToRemove.id) {
       setDeletedVariantIds(prev => [...prev, variantToRemove.id!]);
     }
-    
+
     if (variantToRemove.is_default && newVariants.length > 0) {
       newVariants[0] = { ...newVariants[0], is_default: true };
     }
-    
+
     handleChange({ variants: newVariants });
   };
 
@@ -536,15 +539,15 @@ export function ProductFormPage({}: ProductFormPageProps) {
         description={isEditMode ? 'Edit product' : 'Create new product'}
         backUrl="/admin/products"
       >
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => navigate('/admin/products')}
         >
           Cancel
         </Button>
         {isEditMode && (
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             onClick={handleDelete}
             disabled={saving}
             className="bg-red-600 hover:bg-red-700 text-white"
@@ -553,8 +556,8 @@ export function ProductFormPage({}: ProductFormPageProps) {
             Delete
           </Button>
         )}
-        <Button 
-          onClick={handleSubmit} 
+        <Button
+          onClick={handleSubmit}
           disabled={saving || !isDirty}
           className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
         >
@@ -573,7 +576,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
       </PageHeader>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
-        
+
         {/* LEFT COLUMN */}
         <div className="space-y-6">
           {/* Basic Information */}
@@ -582,7 +585,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
               <AdminCardTitle>Product Identity</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              
+
               {/* Title */}
               <div className="space-y-2">
                 <Label className="text-[var(--color-dark)] font-medium">
@@ -647,7 +650,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
               <AdminCardTitle>Product DNA</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              
+
               <div className="grid grid-cols-2 gap-6">
                 {/* Brand */}
                 <div className="space-y-2">
@@ -727,10 +730,10 @@ export function ProductFormPage({}: ProductFormPageProps) {
             <AdminCardHeader>
               <div className="flex items-center justify-between">
                 <AdminCardTitle>Specifications</AdminCardTitle>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={addSpecification}
                   className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
                 >
@@ -776,20 +779,20 @@ export function ProductFormPage({}: ProductFormPageProps) {
             <AdminCardHeader className="flex flex-row items-center justify-between">
               <AdminCardTitle>Selling Options</AdminCardTitle>
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => addVariant('carton')}
                   className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
                 >
                   <Box className="w-4 h-4 mr-2" />
                   Add Carton
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => addVariant('custom')}
                   className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
                 >
@@ -803,156 +806,172 @@ export function ProductFormPage({}: ProductFormPageProps) {
                 .map((variant, originalIndex) => ({ variant, originalIndex }))
                 .sort((a, b) => (b.variant.is_default ? 1 : 0) - (a.variant.is_default ? 1 : 0))
                 .map(({ variant, originalIndex: index }) => (
-                <AdminCard key={index} className="border-2 border-[var(--color-coyote)]/30">
-                  <AdminCardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={variant.is_default}
-                          onCheckedChange={(checked) => updateVariant(index, { is_default: checked })}
-                        />
-                        <Label>Default</Label>
+                  <AdminCard key={index} className="border-2 border-[var(--color-coyote)]/30">
+                    <AdminCardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={variant.is_default}
+                            onCheckedChange={(checked) => updateVariant(index, { is_default: checked })}
+                          />
+                          <Label>Default</Label>
+                        </div>
+                        {formData.variants.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeVariant(index)}
+                            className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
-                      {formData.variants.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeVariant(index)}
-                          className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Variant Name</Label>
-                        <Input
-                          value={variant.variant_name}
-                          onChange={(e) => updateVariant(index, { variant_name: e.target.value })}
-                          placeholder="e.g., Packet, Carton"
-                          className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Variant Type</Label>
-                        <Select value={variant.variant_type} onValueChange={(value) => updateVariant(index, { variant_type: value })}>
-                          <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pack">Pack</SelectItem>
-                            <SelectItem value="carton">Carton</SelectItem>
-                            <SelectItem value="box">Box</SelectItem>
-                            <SelectItem value="bundle">Bundle</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Units Contained</Label>
-                        <Input
-                          type="number"
-                          value={variant.units_contained}
-                          onChange={(e) => updateVariant(index, { units_contained: parseInt(e.target.value) || 0 })}
-                          className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Unit</Label>
-                        <Select value={variant.unit} onValueChange={(value) => updateVariant(index, { unit: value })}>
-                          <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="sticks">Sticks</SelectItem>
-                            <SelectItem value="packs">Packs</SelectItem>
-                            <SelectItem value="pieces">Pieces</SelectItem>
-                            <SelectItem value="grams">Grams</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Selling Price *</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Variant Name</Label>
                           <Input
-                            type="number"
-                            step="0.01"
-                            value={variant.price}
-                            onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) || 0 })}
-                            placeholder="0.00"
-                            className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            value={variant.variant_name}
+                            onChange={(e) => updateVariant(index, { variant_name: e.target.value })}
+                            placeholder="e.g., Packet, Carton"
+                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
                           />
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Compare at Price</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={variant.compare_at_price || ''}
-                            onChange={(e) => updateVariant(index, { compare_at_price: parseFloat(e.target.value) || 0 })}
-                            placeholder="0.00"
-                            className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
-                          />
+                        <div className="space-y-2">
+                          <Label>Variant Type</Label>
+                          <Select value={variant.variant_type} onValueChange={(value) => updateVariant(index, { variant_type: value })}>
+                            <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pack">Pack</SelectItem>
+                              <SelectItem value="carton">Carton</SelectItem>
+                              <SelectItem value="box">Box</SelectItem>
+                              <SelectItem value="bundle">Bundle</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Cost Price</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Units Contained</Label>
                           <Input
                             type="number"
-                            step="0.01"
-                            value={variant.cost_price || ''}
-                            onChange={(e) => updateVariant(index, { cost_price: parseFloat(e.target.value) || 0 })}
-                            placeholder="0.00"
-                            className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            value={variant.units_contained}
+                            onChange={(e) => updateVariant(index, { units_contained: parseInt(e.target.value) || 0 })}
+                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label>Unit</Label>
+                          <Select value={variant.unit} onValueChange={(value) => updateVariant(index, { unit: value })}>
+                            <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sticks">Sticks</SelectItem>
+                              <SelectItem value="packs">Packs</SelectItem>
+                              <SelectItem value="pieces">Pieces</SelectItem>
+                              <SelectItem value="grams">Grams</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>Selling Price *</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={variant.price}
+                              onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) || 0 })}
+                              placeholder="0.00"
+                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Compare at Price</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={variant.compare_at_price || ''}
+                              onChange={(e) => updateVariant(index, { compare_at_price: parseFloat(e.target.value) || 0 })}
+                              placeholder="0.00"
+                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cost Price</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={variant.cost_price || ''}
+                              onChange={(e) => updateVariant(index, { cost_price: parseFloat(e.target.value) || 0 })}
+                              placeholder="0.00"
+                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Stock</Label>
+                          <Input
+                            type="number"
+                            value={variant.stock}
+                            onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) || 0 })}
+                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={variant.track_inventory}
+                            onCheckedChange={(checked) => updateVariant(index, { track_inventory: checked })}
+                          />
+                          <Label>Track Inventory</Label>
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
-                        <Label>Stock</Label>
-                        <Input
-                          type="number"
-                          value={variant.stock}
-                          onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) || 0 })}
-                          className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                        <div className="flex items-center justify-between">
+                          <Label>Images</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setImageSearchVariantIndex(index);
+                              setImageSearchOpen(true);
+                            }}
+                            className="h-7 text-xs border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                          >
+                            <Search className="w-3 h-3 mr-1" />
+                            Search Images
+                          </Button>
+                        </div>
+                        <MultipleImagePicker
+                          value={variant.images}
+                          onChange={(imageUrls: string[]) => updateVariant(index, { images: imageUrls })}
+                          maxImages={10}
+                          searchHint={`${formData.name} cigarette pack`}
                         />
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={variant.track_inventory}
-                          onCheckedChange={(checked) => updateVariant(index, { track_inventory: checked })}
-                        />
-                        <Label>Track Inventory</Label>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Images</Label>
-                      <MultipleImagePicker
-                        value={variant.images}
-                        onChange={(imageUrls: string[]) => updateVariant(index, { images: imageUrls })}
-                        maxImages={10}
-                      />
-                    </div>
-                  </AdminCardContent>
-                </AdminCard>
-              ))}
+                    </AdminCardContent>
+                  </AdminCard>
+                ))}
             </AdminCardContent>
           </AdminCard>
 
@@ -1007,8 +1026,8 @@ export function ProductFormPage({}: ProductFormPageProps) {
               <AdminCardTitle>Status</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              <Select 
-                value={formData.is_active ? 'active' : 'draft'} 
+              <Select
+                value={formData.is_active ? 'active' : 'draft'}
                 onValueChange={(value: string) => handleChange({ is_active: value === 'active' })}
               >
                 <SelectTrigger className="w-full bg-[var(--color-creme)] border-[var(--color-coyote)]">
@@ -1044,7 +1063,7 @@ export function ProductFormPage({}: ProductFormPageProps) {
               <AdminCardTitle>Pricing</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              
+
               {!defaultVariant ? (
                 <Alert className="bg-amber-50 border-amber-200 text-amber-800">
                   <Info className="h-4 w-4" />
@@ -1156,6 +1175,31 @@ export function ProductFormPage({}: ProductFormPageProps) {
           </AdminCard>
         </div>
       </div>
+
+      {/* Image Search Modal */}
+      <ProductImageSearchModal
+        open={imageSearchOpen}
+        onClose={() => {
+          setImageSearchOpen(false);
+          setImageSearchVariantIndex(null);
+        }}
+        product={formData.name ? {
+          id: id || 'new',
+          name: formData.name,
+          slug: formData.slug,
+          brand: brands.find(b => b.id === formData.brand_id)?.name,
+          gallery_images: imageSearchVariantIndex !== null
+            ? formData.variants[imageSearchVariantIndex]?.images
+            : [],
+        } : undefined}
+        onImagesAdded={(_, urls) => {
+          if (imageSearchVariantIndex !== null) {
+            const currentImages = formData.variants[imageSearchVariantIndex]?.images || [];
+            updateVariant(imageSearchVariantIndex, { images: [...currentImages, ...urls] });
+          }
+        }}
+        mode="single"
+      />
     </div>
   );
 }

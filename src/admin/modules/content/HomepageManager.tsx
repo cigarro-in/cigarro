@@ -498,7 +498,6 @@ export default function HomepageManager() {
         </DialogContent>
       </Dialog>
 
-
       <Dialog open={showProductShowcaseManager} onOpenChange={setShowProductShowcaseManager}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

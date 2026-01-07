@@ -47,23 +47,20 @@ export class EmailParser {
    * Parse an email and extract payment details
    */
   async parse(email: EmailData): Promise<ParsedPayment | null> {
-    console.log('🔍 Parsing email from:', email.from);
-    console.log('📧 Subject:', email.subject);
 
     // Try each template in priority order
     for (const template of this.templates) {
       try {
         const parsed = this.tryParseWithTemplate(email, template);
         if (parsed) {
-          console.log('✅ Successfully parsed with template:', template.bank_name);
+
           return parsed;
         }
       } catch (error) {
-        console.log(`❌ Failed to parse with template ${template.bank_name}:`, error);
+
       }
     }
 
-    console.log('⚠️ Could not parse email with any template');
     return null;
   }
 
@@ -112,7 +109,7 @@ export class EmailParser {
 
     // Validate receiver VPA if found (should be hrejuh@upi)
     if (receiverVPA && !receiverVPA.includes('hrejuh')) {
-      console.log('⚠️ Receiver VPA does not match expected:', receiverVPA);
+
       // Don't reject, but log warning
     }
 
@@ -309,11 +306,10 @@ export async function testEmailParser() {
   };
 
   const result = await parser.parse(phonepeEmail);
-  console.log('Test result:', result);
 
   if (result) {
     const validation = validateParsedPayment(result);
-    console.log('Validation:', validation);
+
   }
 
   return result;

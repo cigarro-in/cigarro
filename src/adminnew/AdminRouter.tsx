@@ -50,8 +50,6 @@ interface AdminRouterProps {
 
 export function AdminRouter(_props: AdminRouterProps) {
   const location = useLocation();
-  console.log('[AdminRouter] render', location.pathname);
-
   return (
     <AdminShell>
       <Routes>
