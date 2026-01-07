@@ -12,8 +12,6 @@ interface AddressListProps {
 }
 
 export function AddressList({ addresses, selectedId, onSelect, onEdit, onAddNew }: AddressListProps) {
-  )
-  });
 
   if (addresses.length === 0) {
     return (
@@ -52,7 +50,7 @@ export function AddressList({ addresses, selectedId, onSelect, onEdit, onAddNew 
           />
         ))}
       </div>
-      
+
       {/* Sticky Add Button Container */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-creme border-t border-coyote/20 safe-area-bottom">
         <Button

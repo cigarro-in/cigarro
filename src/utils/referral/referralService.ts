@@ -44,8 +44,7 @@ export async function getUserReferralStats(userId: string): Promise<ReferralStat
       console.error('RPC Error - get_user_referral_stats:', error);
       throw error;
     }
-    ):', data);
-    
+
     // The RPC returns JSONB data directly
     return data as ReferralStats;
   } catch (error) {
@@ -182,8 +181,8 @@ export async function checkIfUserWasReferred(userId: string): Promise<{
     return {
       was_referred: true,
       referrer_name: referrerData?.name || 'A friend',
-      reward_pending: data.first_order_completed && !data.own_reward_paid 
-        ? data.referral_reward_amount 
+      reward_pending: data.first_order_completed && !data.own_reward_paid
+        ? data.referral_reward_amount
         : 0
     };
   } catch (error) {
@@ -220,7 +219,7 @@ export async function copyReferralLink(referralCode: string): Promise<boolean> {
 export async function shareReferralLink(referralCode: string): Promise<boolean> {
   try {
     const link = generateReferralLink(referralCode);
-    
+
     if (navigator.share) {
       await navigator.share({
         title: 'Join Cigarro',
