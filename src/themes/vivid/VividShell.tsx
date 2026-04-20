@@ -1,7 +1,9 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, User, Grid3X3, Home, Package } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 
 interface Props {
   children: ReactNode;
@@ -9,8 +11,10 @@ interface Props {
 
 export function VividShell({ children }: Props) {
   const { totalItems } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [authOpen, setAuthOpen] = useState(false);
 
   const hideBottomNav =
     location.pathname.startsWith('/checkout') ||
@@ -55,7 +59,17 @@ export function VividShell({ children }: Props) {
               label="Cart"
               badge={totalItems}
             />
-            <HeaderLink to="/profile" icon={<User className="w-4 h-4" />} label="Account" />
+            {user ? (
+              <HeaderLink to="/profile" icon={<User className="w-4 h-4" />} label="Account" />
+            ) : (
+              <button
+                onClick={() => setAuthOpen(true)}
+                className="relative px-3 py-2 rounded-lg text-sm text-[var(--color-foreground)] hover:bg-[var(--color-surface-2)] flex items-center gap-2"
+              >
+                <User className="w-4 h-4" />
+                <span className="hidden md:inline">Sign in</span>
+              </button>
+            )}
           </nav>
         </div>
       </header>
@@ -106,12 +120,34 @@ export function VividShell({ children }: Props) {
           <div className="grid grid-cols-4 h-14">
             <BottomLink to="/" icon={<Home className="w-5 h-5" />} label="Home" active={location.pathname === '/'} />
             <BottomLink to="/categories" icon={<Grid3X3 className="w-5 h-5" />} label="Categories" active={location.pathname.startsWith('/categor')} />
-            <BottomLink to="/orders" icon={<Package className="w-5 h-5" />} label="Orders" active={location.pathname.startsWith('/orders')} />
-            <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Me" active={location.pathname.startsWith('/profile')} />
+            {user ? (
+              <BottomLink to="/orders" icon={<Package className="w-5 h-5" />} label="Orders" active={location.pathname.startsWith('/orders')} />
+            ) : (
+              <BottomButton onClick={() => setAuthOpen(true)} icon={<Package className="w-5 h-5" />} label="Orders" />
+            )}
+            {user ? (
+              <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Me" active={location.pathname.startsWith('/profile')} />
+            ) : (
+              <BottomButton onClick={() => setAuthOpen(true)} icon={<User className="w-5 h-5" />} label="Sign in" />
+            )}
           </div>
         </nav>
       )}
+
+      <PhoneAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
     </div>
+  );
+}
+
+function BottomButton({ onClick, icon, label }: { onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)]"
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
