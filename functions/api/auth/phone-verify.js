@@ -68,10 +68,15 @@ async function verifyMsg91Token(token, authKey) {
     body: JSON.stringify({ authkey: authKey, 'access-token': token }),
   });
   const data = await res.json();
-  if (data.type !== 'success') {
-    throw new Error(data.message || 'Phone verification failed');
-  }
-  return data;
+  if (data.type === 'success') return data;
+
+  // Newer MSG91 widgets verify the OTP client-side. A second verifyAccessToken
+  // call returns "access-token already verified" — that still proves the token
+  // came from MSG91, so we treat it as a valid verification.
+  const msg = String(data.message || '').toLowerCase();
+  if (msg.includes('already verified')) return data;
+
+  throw new Error(data.message || 'Phone verification failed');
 }
 
 export async function onRequest(context) {
@@ -183,7 +188,8 @@ export async function onRequest(context) {
 
     await admin.from('profiles').upsert(profilePayload, { onConflict: 'id' });
 
-    // 4. Mint Supabase-compatible JWT
+    // 4. Mint Supabase-compatible JWT. session_id is intentionally omitted —
+    // Supabase validates it against auth.sessions and we don't create that row.
     const now = Math.floor(Date.now() / 1000);
     const accessToken = await signJWT(
       {
@@ -196,7 +202,6 @@ export async function onRequest(context) {
         iat: now,
         exp: now + JWT_TTL_SECONDS,
         amr: [{ method: 'otp', timestamp: now }],
-        session_id: crypto.randomUUID(),
         app_metadata: { provider: 'phone', providers: ['phone'] },
         user_metadata: { name: name || null },
       },
