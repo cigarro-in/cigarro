@@ -1,13 +1,26 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { getProductImageUrl } from '../../lib/supabase/storage';
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export default function VividCart() {
   const { items, totalPrice, totalItems, updateQuantity, removeFromCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [authOpen, setAuthOpen] = useState(false);
+
+  const handleCheckout = () => {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    navigate('/checkout');
+  };
 
   if (items.length === 0) {
     return (
@@ -108,12 +121,18 @@ export default function VividCart() {
           </span>
         </div>
         <button
-          onClick={() => navigate('/checkout')}
+          onClick={handleCheckout}
           className="vv-btn-primary w-full h-11 text-sm"
         >
-          Proceed to Checkout
+          {user ? 'Proceed to Checkout' : 'Sign in to checkout'}
         </button>
       </div>
+
+      <PhoneAuthDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        onAuthSuccess={() => navigate('/checkout')}
+      />
     </div>
   );
 }
