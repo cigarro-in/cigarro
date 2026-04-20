@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, Package, User, Grid3x3 } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { AuthDialog } from '../auth/AuthDialog';
+import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
 import { MiniCart } from '../cart/MiniCart';
 
 export const MobileBottomNav = () => {
@@ -133,7 +133,7 @@ export const MobileBottomNav = () => {
       </nav>
 
       {/* Authentication Dialog */}
-      <AuthDialog 
+      <PhoneAuthDialog 
         open={isAuthDialogOpen} 
         onOpenChange={setIsAuthDialogOpen} 
       />

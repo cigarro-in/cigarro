@@ -5,7 +5,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatINR } from '../../utils/currency';
-import { AuthDialog } from '../auth/AuthDialog';
+import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
 import { getProductImageUrl } from '../../lib/supabase/storage';
 
 interface MiniCartProps {
@@ -329,7 +329,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
       
       {/* Auth Dialog */}
       {showAuthDialog && (
-        <AuthDialog 
+        <PhoneAuthDialog 
           key="mini-cart-auth-dialog"
           open={showAuthDialog} 
           onOpenChange={setShowAuthDialog}
@@ -337,7 +337,6 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
             setShowAuthDialog(false);
             navigate('/checkout');
           }}
-          context="checkout"
         />
       )}
     </>

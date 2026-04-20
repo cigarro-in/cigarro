@@ -15,7 +15,7 @@ import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
-import { AuthDialog } from '../../components/auth/AuthDialog';
+import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
 import { getProductImageUrl } from '../../lib/supabase/storage';
@@ -224,11 +224,10 @@ export function CheckoutPage() {
             You can continue shopping and sign in when you're ready to checkout
           </p>
         </div>
-        <AuthDialog 
+        <PhoneAuthDialog 
           open={showAuthDialog} 
           onOpenChange={setShowAuthDialog}
           onAuthSuccess={handleAuthSuccess}
-          context="checkout"
         />
       </div>
     );

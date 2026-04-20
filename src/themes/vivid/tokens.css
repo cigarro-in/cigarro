@@ -1,0 +1,196 @@
+[data-theme="vivid"] {
+  --color-background: #f6f6f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f4f6;
+  --color-foreground: #18181b;
+  --color-muted: #a1a1aa;
+  --color-muted-foreground: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d4d4d8;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #eff6ff;
+  --color-accent: #ff4b34;
+  --color-accent-foreground: #ffffff;
+  --color-success: #16a34a;
+  --radius-vivid: 10px;
+}
+
+[data-theme="vivid"] body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: 'DM-Sans', system-ui, sans-serif;
+}
+
+[data-theme="vivid"] body:not(.admin-page) {
+  padding-top: 0 !important;
+}
+
+[data-theme="vivid"] .vv-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-vivid);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="vivid"] .vv-card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="vivid"] .vv-btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+[data-theme="vivid"] .vv-btn-primary:hover { background: var(--color-primary-hover); }
+[data-theme="vivid"] .vv-btn-primary:active { transform: scale(0.98); }
+[data-theme="vivid"] .vv-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+[data-theme="vivid"] .vv-btn-add {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+[data-theme="vivid"] .vv-btn-add:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+[data-theme="vivid"] .vv-chip {
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+[data-theme="vivid"] .vv-chip:hover,
+[data-theme="vivid"] .vv-chip--active {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-color: var(--color-primary);
+}
+
+[data-theme="vivid"] .vv-side-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  color: var(--color-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+[data-theme="vivid"] .vv-side-link:hover {
+  background: var(--color-surface-2);
+}
+
+[data-theme="vivid"] .vv-side-link--active {
+  color: var(--color-primary);
+  font-weight: 700;
+  border-left-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+[data-theme="vivid"] .vv-side-count {
+  color: var(--color-muted-foreground);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+[data-theme="vivid"] .vv-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM-Sans', system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="vivid"] .vv-section-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-theme="vivid"] .vv-badge-discount {
+  position: absolute;
+  left: 0;
+  bottom: 8px;
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 7px 3px 8px;
+  border-radius: 0 3px 3px 0;
+}
+
+[data-theme="vivid"] .vv-banner {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  display: block;
+  aspect-ratio: 16 / 7;
+  background: var(--color-surface-2);
+}
+
+[data-theme="vivid"] .vv-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-theme="vivid"] .vv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+[data-theme="vivid"] .vv-dot--active {
+  width: 20px;
+  background: var(--color-primary);
+}

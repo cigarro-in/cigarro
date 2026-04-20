@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
 import { HomepageData } from '../types/home';
 import { supabase } from '../lib/supabase/client';
+import { useCached } from '../lib/cache/swrCache';
 
 const API_URL = '/api/homepage-data';
+const CACHE_KEY = 'homepage:v1';
+const TTL = 5 * 60_000;
 
-// Transform products to include gallery_images from variants
 function transformProducts(products: any[]) {
-  return (products || []).map(product => {
+  return (products || []).map((product) => {
     const activeVariants = product.product_variants?.filter((v: any) => v.is_active !== false) || [];
     const images = activeVariants.flatMap((v: any) => v.images || []);
     return {
@@ -17,7 +18,6 @@ function transformProducts(products: any[]) {
   });
 }
 
-// Fallback: fetch directly from Supabase (for local development)
 async function fetchFromSupabase(): Promise<HomepageData> {
   const [featuredProducts, categories, brands, heroSlides, sectionConfig, showcaseConfig, blogPosts, showcaseProducts, blogSectionConfig, categoriesWithProductsResult] = await Promise.all([
     supabase.from('products').select(`id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, price, images, is_active, is_default, variant_name)`).eq('is_active', true).order('created_at', { ascending: false }).limit(12),
@@ -32,14 +32,12 @@ async function fetchFromSupabase(): Promise<HomepageData> {
     supabase.from('categories').select(`id, name, slug, description, image, products:product_categories(products(id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, price, images, is_active, is_default, variant_name)))`).order('name').limit(6)
   ]);
 
-  // Transform blog posts to flatten author/category from arrays
   const transformedBlogPosts = (blogPosts.data || []).map((post: any) => ({
     ...post,
     author: Array.isArray(post.author) ? post.author[0] : post.author,
     category: Array.isArray(post.category) ? post.category[0] : post.category
   }));
 
-  // Transform categories with products
   const categoriesWithProducts = (categoriesWithProductsResult.data || []).map((cat: any) => {
     const products = (cat.products || [])
       .map((pc: any) => pc.products)
@@ -71,48 +69,25 @@ async function fetchFromSupabase(): Promise<HomepageData> {
   };
 }
 
-export function useHomepageData() {
-  const [data, setData] = useState<HomepageData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Try the edge-cached API first (works in production on Cloudflare Pages)
-        const response = await fetch(API_URL);
-        
-        // Check if response is JSON (API available) or HTML (404/dev mode)
-        const contentType = response.headers.get('content-type');
-        if (response.ok && contentType?.includes('application/json')) {
-          const result = await response.json();
-          setData(result);
-          return;
-        }
-        
-        // Fallback: fetch directly from Supabase (local development)
-        const fallbackData = await fetchFromSupabase();
-        setData(fallbackData);
-      } catch (err) {
-        console.error('Error fetching homepage data:', err);
-        // Try Supabase fallback on any error
-        try {
-          const fallbackData = await fetchFromSupabase();
-          setData(fallbackData);
-        } catch (fallbackErr) {
-          setError(fallbackErr instanceof Error ? fallbackErr : new Error('Unknown error'));
-        }
-      } finally {
-        setIsLoading(false);
-      }
+async function fetchHomepageData(): Promise<HomepageData> {
+  try {
+    const response = await fetch(API_URL);
+    const contentType = response.headers.get('content-type');
+    if (response.ok && contentType?.includes('application/json')) {
+      return (await response.json()) as HomepageData;
     }
+  } catch {
+    /* fall through to Supabase */
+  }
+  return fetchFromSupabase();
+}
 
-    fetchData();
-  }, []);
+export function useHomepageData() {
+  const { data, isLoading, error } = useCached<HomepageData>(
+    CACHE_KEY,
+    fetchHomepageData,
+    { ttl: TTL }
+  );
 
-  return {
-    data,
-    isLoading,
-    error
-  };
+  return { data, isLoading, error };
 }

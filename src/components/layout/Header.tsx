@@ -3,7 +3,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
 import { Search, ShoppingBag, Menu, X, Heart, User, LogOut, Loader2, Package, ExternalLink } from 'lucide-react';
-import { AuthDialog } from '../auth/AuthDialog';
+import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
 import { MiniCart } from '../cart/MiniCart';
 import { Badge } from '../ui/badge';
 import { supabase } from '../../lib/supabase/client';
@@ -722,7 +722,7 @@ const Header = () => {
       )}
 
       {/* Authentication Dialog */}
-      <AuthDialog
+      <PhoneAuthDialog
         open={isAuthDialogOpen}
         onOpenChange={setIsAuthDialogOpen}
       />

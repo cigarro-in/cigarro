@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import { Sparkles, ArrowRight, Gift, Leaf, Heart } from 'lucide-react';
 import { validateReferralCode } from '../../utils/referral/referralService';
-import { AuthDialog } from '../../components/auth/AuthDialog';
+import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { motion } from 'framer-motion';
 
 export default function ReferralLandingPage() {
@@ -231,7 +231,7 @@ export default function ReferralLandingPage() {
       </div>
 
       {/* Auth Dialog */}
-      <AuthDialog 
+      <PhoneAuthDialog 
         open={showAuthDialog} 
         onOpenChange={setShowAuthDialog}
       />

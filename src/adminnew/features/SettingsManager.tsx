@@ -5,7 +5,8 @@ import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase/client';
-import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud } from 'lucide-react';
+import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check } from 'lucide-react';
+import { useTheme } from '../../themes';
 import { PageHeader } from '../components/shared/PageHeader';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { 
@@ -23,6 +24,7 @@ interface SiteSettings {
   meta_title: string | null;
   meta_description: string | null;
   upi_id: string | null;
+  active_theme: string | null;
   updated_at: string | null;
   updated_by: string | null;
 }
@@ -45,9 +47,12 @@ export function SettingsManager() {
     meta_title: '',
     meta_description: '',
     upi_id: '',
+    active_theme: 'classic',
     updated_at: null,
     updated_by: null
   });
+  const { themeId, availableThemes, setTheme } = useTheme();
+  const [isSavingTheme, setIsSavingTheme] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -341,6 +346,25 @@ export function SettingsManager() {
     }
   };
 
+  const handleSelectTheme = async (newThemeId: string) => {
+    if (newThemeId === themeId) return;
+    setIsSavingTheme(newThemeId);
+    try {
+      const { error } = await supabase
+        .from('site_settings')
+        .update({ active_theme: newThemeId, updated_at: new Date().toISOString() })
+        .eq('id', settings.id);
+      if (error) throw error;
+      setTheme(newThemeId);
+      setSettings(prev => ({ ...prev, active_theme: newThemeId }));
+      toast.success(`Switched to ${availableThemes.find(t => t.id === newThemeId)?.name}`);
+    } catch (error: any) {
+      toast.error(`Failed to switch theme: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSavingTheme(null);
+    }
+  };
+
   const handleChange = (field: keyof SiteSettings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }));
     setIsDirty(true);
@@ -375,6 +399,43 @@ export function SettingsManager() {
       </PageHeader>
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+        {/* Storefront Theme */}
+        <AdminCard>
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Palette className="mr-2 h-5 w-5" />
+              Storefront Theme
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Choose which template is shown to customers. Switching applies immediately.
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableThemes.map((t) => {
+                const active = t.id === themeId;
+                const saving = isSavingTheme === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleSelectTheme(t.id)}
+                    disabled={saving}
+                    className={`text-left p-4 rounded-lg border-2 transition-all ${active ? 'border-[var(--color-canyon)] bg-[var(--color-canyon)]/5' : 'border-[var(--color-coyote)]/30 hover:border-[var(--color-coyote)]'}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-medium text-sm">{t.name}</h4>
+                      {active && <Check className="h-4 w-4 text-[var(--color-canyon)]" />}
+                      {saving && <RefreshCw className="h-4 w-4 animate-spin text-[var(--color-canyon)]" />}
+                    </div>
+                    <p className="text-xs text-[var(--color-dark)]/60">{t.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
         {/* General Settings */}
         <AdminCard>
           <AdminCardHeader>

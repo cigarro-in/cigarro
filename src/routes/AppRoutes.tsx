@@ -3,12 +3,17 @@ import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
-// Lazy load components - organized by feature
-// Home
-const HomePage = lazy(() => import('../pages/home/HomePage').then(m => ({ default: m.HomePage })));
+import { Slot } from '../themes';
+
+// Themed via Slot so each theme can provide its own variant
+const HomePage = () => <Slot name="Home" />;
+const CartPage = () => <Slot name="Cart" />;
+const ProductPage = () => <Slot name="Product" />;
+const ProductsPage = () => <Slot name="Products" />;
+const CategoryPage = () => <Slot name="Category" />;
 
 // Shopping & Checkout
-const CartPage = lazy(() => import('../pages/checkout/CartPage'));
+// Note: checkout pages remain on classic for payment flow stability
 const CheckoutRouter = lazy(() => import('../pages/checkout/CheckoutRouter').then(m => ({ default: m.CheckoutRouter })));
 const CheckoutPage = lazy(() => import('../pages/checkout/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
 const MobileCheckoutPage = lazy(() => import('../pages/checkout/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
@@ -27,11 +32,8 @@ const WishlistPage = lazy(() => import('../pages/user/WishlistPage').then(m => (
 const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
 const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
 
-// Products & Categories
-const ProductPage = lazy(() => import('../pages/products/ProductPage'));
-const ProductsPage = lazy(() => import('../pages/products/ProductsPage').then(m => ({ default: m.ProductsPage })));
+// Products & Categories - CategoriesPage (index) stays direct; detail pages go through Slot
 const CategoriesPage = lazy(() => import('../pages/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
-const CategoryPage = lazy(() => import('../pages/products/CategoryPage').then(m => ({ default: m.CategoryPage })));
 const BrandsPage = lazy(() => import('../pages/brands/BrandsPage').then(m => ({ default: m.BrandsPage })));
 const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
 

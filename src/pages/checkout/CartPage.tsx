@@ -7,7 +7,7 @@ import { ShoppingBag, Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Package, Shi
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { AuthDialog } from '../../components/auth/AuthDialog';
+import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { getProductImageUrl } from '../../lib/supabase/storage';
 import { Card, CardContent } from '../../components/ui/card';
 
@@ -368,14 +368,13 @@ export default function CartPage() {
         )}
       </div>
 
-      <AuthDialog
+      <PhoneAuthDialog
         open={showAuthDialog}
         onOpenChange={setShowAuthDialog}
         onAuthSuccess={() => {
           setShowAuthDialog(false);
           navigate('/checkout');
         }}
-        context="checkout"
       />
     </>
   );

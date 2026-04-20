@@ -14,6 +14,7 @@ import { WishlistProvider } from './hooks/useWishlist';
 import { supabase } from './lib/supabase/client';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
+import { ThemeProvider, useTheme } from './themes';
 
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
@@ -23,8 +24,10 @@ function LoadingSpinner() {
 
 function AppContent() {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const ThemeLayout = theme.slots.Layout;
   
   // Check localStorage immediately to prevent flash of age verification
   const [isAgeVerified, setIsAgeVerified] = useState(() => {
@@ -92,32 +95,44 @@ function AppContent() {
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Helmet>
 {isUserPage ? (
-        <div className="min-h-screen bg-creme font-sans">
-          {/* Desktop Layout - User Pages */}
-          <div className="hidden md:block">
-            <Header />
-            <BreadcrumbNav />
-            <main>
+        ThemeLayout ? (
+          <Suspense fallback={<LoadingSpinner />}>
+            <ThemeLayout>
               <PageTransition>
                 <Suspense fallback={<LoadingSpinner />}>
                   <AppRoutes isAdminRoute={false} location={location} />
                 </Suspense>
               </PageTransition>
-            </main>
-            <Footer />
-          </div>
+            </ThemeLayout>
+          </Suspense>
+        ) : (
+          <div className="min-h-screen bg-creme font-sans">
+            {/* Desktop Layout - User Pages */}
+            <div className="hidden md:block">
+              <Header />
+              <BreadcrumbNav />
+              <main>
+                <PageTransition>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <AppRoutes isAdminRoute={false} location={location} />
+                  </Suspense>
+                </PageTransition>
+              </main>
+              <Footer />
+            </div>
 
-          {/* Mobile Layout - User Pages */}
-          <div className="md:hidden">
-            <MobileLayout>
-              <PageTransition>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <AppRoutes isAdminRoute={false} location={location} />
-                </Suspense>
-              </PageTransition>
-            </MobileLayout>
+            {/* Mobile Layout - User Pages */}
+            <div className="md:hidden">
+              <MobileLayout>
+                <PageTransition>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <AppRoutes isAdminRoute={false} location={location} />
+                  </Suspense>
+                </PageTransition>
+              </MobileLayout>
+            </div>
           </div>
-        </div>
+        )
       ) : (
         /* Admin Layout - No wrapper div, no padding/margin */
         <Suspense fallback={<LoadingSpinner />}>
@@ -135,7 +150,9 @@ export default function App() {
         <AuthProvider>
           <WishlistProvider>
             <CartProvider>
-              <AppContent />
+              <ThemeProvider>
+                <AppContent />
+              </ThemeProvider>
             </CartProvider>
           </WishlistProvider>
         </AuthProvider>
