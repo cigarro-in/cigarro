@@ -107,7 +107,13 @@ export async function onRequest(context) {
     const jwtSecret = env.SUPABASE_JWT_SECRET;
 
     if (!msg91AuthKey || !supabaseUrl || !serviceKey || !jwtSecret) {
-      return new Response(JSON.stringify({ error: 'Server auth not configured' }), {
+      const missing = [
+        !msg91AuthKey && 'MSG91_AUTH_KEY',
+        !supabaseUrl && 'SUPABASE_URL',
+        !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY',
+        !jwtSecret && 'SUPABASE_JWT_SECRET',
+      ].filter(Boolean).join(', ');
+      return new Response(JSON.stringify({ error: `Server auth not configured. Missing: ${missing}` }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
@@ -213,9 +219,15 @@ export async function onRequest(context) {
     );
   } catch (err) {
     console.error('[phone-verify]', err);
-    return new Response(JSON.stringify({ error: err?.message || 'Verification failed' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return new Response(
+      JSON.stringify({
+        error: err?.message || 'Verification failed',
+        detail: err?.stack?.split('\n')?.[0] || null,
+      }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      }
+    );
   }
 }
