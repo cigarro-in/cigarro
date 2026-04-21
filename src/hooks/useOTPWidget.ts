@@ -62,10 +62,38 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
       },
     };
 
+    const pollAndInit = () => {
+      let attempts = 0;
+      const max = 50; // 10 s @ 200 ms
+      const iv = setInterval(() => {
+        attempts += 1;
+        if (window.initSendOTP) {
+          clearInterval(iv);
+          try {
+            window.initSendOTP(config);
+          } catch (e) {
+            setError('OTP widget failed to initialize');
+            return;
+          }
+          setIsLoaded(true);
+        } else if (attempts >= max) {
+          clearInterval(iv);
+          setError('OTP service took too long to load');
+        }
+      }, 200);
+    };
+
+    // Script already on the page (e.g. user reopened the dialog) — poll until ready
     if (document.getElementById('msg91-otp-script')) {
       if (window.initSendOTP) {
-        window.initSendOTP(config);
-        setIsLoaded(true);
+        try {
+          window.initSendOTP(config);
+          setIsLoaded(true);
+        } catch {
+          pollAndInit();
+        }
+      } else {
+        pollAndInit();
       }
       return;
     }
@@ -75,14 +103,7 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
     script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
     script.async = true;
     script.onload = () => {
-      setTimeout(() => {
-        if (window.initSendOTP) {
-          window.initSendOTP(config);
-          setIsLoaded(true);
-        } else {
-          setError('OTP widget failed to initialize');
-        }
-      }, 500);
+      pollAndInit();
     };
     script.onerror = () => {
       setError('Failed to load OTP service');

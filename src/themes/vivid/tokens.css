@@ -142,6 +142,16 @@
 
   /* Swap the serif display font for DM-Sans in Vivid (more modern look). */
   --font-family-serif:       var(--vv-font-sans);
+
+  /* Admin sidebar — keep it subtle in Vivid too */
+  --color-sidebar:                     var(--vv-bg-elevated);
+  --color-sidebar-foreground:          var(--vv-fg);
+  --color-sidebar-primary:             var(--vv-brand);
+  --color-sidebar-primary-foreground:  var(--vv-brand-on);
+  --color-sidebar-accent:              var(--vv-bg-inset);
+  --color-sidebar-accent-foreground:   var(--vv-fg);
+  --color-sidebar-border:              var(--vv-border);
+  --color-sidebar-ring:                var(--vv-brand);
 }
 
 [data-theme="vivid"] body {

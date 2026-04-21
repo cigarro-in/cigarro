@@ -256,14 +256,14 @@ export function ProductImportExport({ onAfterImport }: Props) {
   const onExport = async () => {
     setWorking(true);
     try {
+      // Fetch products core + brand + variants. Keep this query minimal so
+      // it doesn't fail if optional tables/columns are missing.
       const { data: products, error } = await supabase
         .from('products')
         .select(
           `id, name, slug, description, short_description, origin, specifications,
            is_active, is_featured, meta_title, meta_description, canonical_url,
            brand:brands(name),
-           categories:product_categories(category:categories(name)),
-           collections:collection_products(collection:collections(name)),
            variants:product_variants(id, variant_name, variant_type, price, compare_at_price,
              cost_price, stock, is_default, is_active, units_contained, unit, track_inventory,
              weight)`
@@ -271,19 +271,49 @@ export function ProductImportExport({ onAfterImport }: Props) {
         .order('name');
       if (error) throw error;
 
+      const productIds = (products || []).map((p: any) => p.id);
+
+      // Categories — separate fetch, tolerant of schema differences
+      const categoryMap = new Map<string, string[]>();
+      if (productIds.length > 0) {
+        const { data: pc } = await supabase
+          .from('product_categories')
+          .select('product_id, category:categories(name)')
+          .in('product_id', productIds);
+        (pc || []).forEach((row: any) => {
+          const catName = Array.isArray(row.category) ? row.category[0]?.name : row.category?.name;
+          if (!catName) return;
+          const list = categoryMap.get(row.product_id) || [];
+          list.push(catName);
+          categoryMap.set(row.product_id, list);
+        });
+      }
+
+      // Collections — optional table, don't fail the whole export if absent
+      const collectionMap = new Map<string, string[]>();
+      if (productIds.length > 0) {
+        try {
+          const { data: cp } = await supabase
+            .from('collection_products')
+            .select('product_id, collection:collections(name)')
+            .in('product_id', productIds);
+          (cp || []).forEach((row: any) => {
+            const colName = Array.isArray(row.collection) ? row.collection[0]?.name : row.collection?.name;
+            if (!colName) return;
+            const list = collectionMap.get(row.product_id) || [];
+            list.push(colName);
+            collectionMap.set(row.product_id, list);
+          });
+        } catch {
+          /* collections table may not exist — skip silently */
+        }
+      }
+
       const rows: SheetRow[] = [];
       for (const p of (products as any[]) || []) {
         const brand = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
-        const categoryNames = (p.categories || [])
-          .map((pc: any) =>
-            Array.isArray(pc.category) ? pc.category[0]?.name : pc.category?.name
-          )
-          .filter(Boolean);
-        const collectionNames = (p.collections || [])
-          .map((pc: any) =>
-            Array.isArray(pc.collection) ? pc.collection[0]?.name : pc.collection?.name
-          )
-          .filter(Boolean);
+        const categoryNames = categoryMap.get(p.id) || [];
+        const collectionNames = collectionMap.get(p.id) || [];
         const variants = p.variants || [];
 
         const productCols = {

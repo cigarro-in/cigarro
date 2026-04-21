@@ -61,6 +61,16 @@
   --color-border: var(--color-coyote);
   --color-input: var(--color-creme-light);
   --color-ring: var(--color-canyon);
+
+  /* Sidebar (used by admin Sidebar component from shadcn) */
+  --color-sidebar: var(--color-creme-light);
+  --color-sidebar-foreground: var(--color-dark);
+  --color-sidebar-primary: var(--color-canyon);
+  --color-sidebar-primary-foreground: var(--color-creme-light);
+  --color-sidebar-accent: var(--color-creme);
+  --color-sidebar-accent-foreground: var(--color-dark);
+  --color-sidebar-border: var(--color-coyote);
+  --color-sidebar-ring: var(--color-canyon);
 }
 
 /* Utility Classes */
