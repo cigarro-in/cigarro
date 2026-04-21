@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Trash2, Package, Plus } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Package, Plus, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { supabase } from '../../lib/supabase/client';
 import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
+import { ProductImportExport } from '../features/ProductImportExport';
 
 interface Product {
   id: string;
@@ -33,6 +35,7 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -235,11 +238,24 @@ export function ProductsPage() {
           placeholder: "Search products..."
         }}
       >
+        <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <FileSpreadsheet className="mr-2 h-4 w-4" />
+          Import / Export
+        </Button>
         <Button onClick={handleAddProduct} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
       </PageHeader>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Products · Import / Export</DialogTitle>
+          </DialogHeader>
+          <ProductImportExport onAfterImport={fetchProducts} />
+        </DialogContent>
+      </Dialog>
       
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         <DataTable
