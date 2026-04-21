@@ -199,7 +199,7 @@ export const SYSTEM_TEMPLATES: Omit<BankEmailTemplate, "_id">[] = [
   {
     bankKey: "hdfc",
     label: "HDFC Bank UPI credit alert",
-    senderRegex: "@hdfcbank\\.bank\\.in|@hdfcbank\\.net|alerts@hdfcbank",
+    senderRegex: "@hdfcbank\\.bank\\.in|@hdfcbank\\.net",
     // HDFC subject observed: "Account update for your HDFC Bank A/c"
     // Client may prefix with "View:" so make subject optional / lenient.
     subjectRegex: "account\\s+update|upi|credited",

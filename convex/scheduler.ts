@@ -42,7 +42,12 @@ export const getGasConfig = internalQuery({
   },
 });
 
-const DEFAULT_SENDERS = ["@hdfcbank.bank.in", "@hdfcbank.net", "alerts@hdfcbank"];
+const DEFAULT_SENDERS = [
+  "hdfcbank.bank.in",
+  "hdfcbank.net",
+];
+
+/** Always merge custom + defaults (dedup, case-insensitive). */
 export const getSendersForPoke = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -50,9 +55,16 @@ export const getSendersForPoke = internalQuery({
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", "singleton"))
       .unique();
-    return row?.bankSenders && row.bankSenders.length > 0
-      ? row.bankSenders
-      : DEFAULT_SENDERS;
+    const custom = row?.bankSenders ?? [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of [...custom, ...DEFAULT_SENDERS]) {
+      const n = s.trim().toLowerCase();
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      out.push(s.trim());
+    }
+    return out;
   },
 });
 
@@ -76,10 +88,11 @@ function addStep(
   startedAt: number,
   extra: Record<string, any> = {},
 ) {
-  const entry: TraceStep = { step, ok, ms: Date.now() - startedAt, ...extra };
+  // Put step, ok, ms LAST so any name-collision in `extra` can't override
+  // the step's own ok flag (previous bug: a `ok: false` inside GAS payload
+  // was being spread and overrode the step's own success marker).
+  const entry: TraceStep = { ...extra, step, ok, ms: Date.now() - startedAt };
   trace.push(entry);
-  // Also console.log so it shows up in Convex dashboard logs.
-  // eslint-disable-next-line no-console
   console.log(`[pokeGas] ${step} ok=${ok} ms=${entry.ms}`, extra);
   return entry;
 }
@@ -95,8 +108,10 @@ export const pokeGas = internalAction({
       v.literal("admin_scan"),
     ),
     triggerOrderId: v.optional(v.id("orders")),
+    includeLabeled: v.optional(v.boolean()),
+    peek: v.optional(v.boolean()),
   },
-  handler: async (ctx, { orgId, reason, triggerOrderId }) => {
+  handler: async (ctx, { orgId, reason, triggerOrderId, includeLabeled, peek }) => {
     const trace: TraceStep[] = [];
     const runStartedAt = Date.now();
 
@@ -166,11 +181,13 @@ export const pokeGas = internalAction({
         body: JSON.stringify({
           auth: cfg.secret,
           orgId,
-          since: Date.now() - 60 * 60 * 1000,
-          limit: MAX_FETCH_BATCH,
+          since: Date.now() - 7 * 24 * 60 * 60 * 1000, // last 7 days
+          limit: peek ? 3 : MAX_FETCH_BATCH,
           reason,
           triggerOrderId,
           senders: bankSenders,
+          includeLabeled: !!includeLabeled,
+          peek: !!peek,
         }),
         signal: controller.signal,
       });
@@ -205,8 +222,29 @@ export const pokeGas = internalAction({
         addStep(trace, "parse_response", true, parseStart, {
           emailsCount: emails.length,
           topLevelKeys: Object.keys(gasPayload || {}),
-          ok: !!gasPayload?.ok,
+          gasReportedOk: !!gasPayload?.ok,
+          gasError: gasPayload?.error,
+          // Pass through GAS's debug object so admin sees the Gmail query,
+          // threads matched, messages inspected, etc.
+          gasDebug: gasPayload?.debug,
         });
+
+        // Even though HTTP was 200, GAS may have signalled failure at the
+        // app level (e.g. wrong secret). Surface that as a proper error.
+        if (gasPayload && gasPayload.ok === false) {
+          return {
+            error: `gas_${gasPayload.error || "reported_failure"}`,
+            message:
+              gasPayload.error === "unauthorized"
+                ? "GAS rejected the CONVEX_SECRET. Re-run the Connect Gmail wizard to re-sync the secret between Convex and Apps Script, or verify the CONVEX_SECRET script property in your Apps Script matches what's saved in Payment Settings."
+                : gasPayload.message || gasPayload.error,
+            gasError: gasPayload.error,
+            body: responseBody.slice(0, 200),
+            reason,
+            trace,
+            totalMs: Date.now() - runStartedAt,
+          };
+        }
       } catch (parseErr: any) {
         addStep(trace, "parse_response", false, parseStart, {
           error: String(parseErr?.message || parseErr),
@@ -234,6 +272,20 @@ export const pokeGas = internalAction({
         message: String(e?.message || e),
         timeoutMs: POKE_TIMEOUT_MS,
         reason,
+        trace,
+        totalMs: Date.now() - runStartedAt,
+      };
+    }
+
+    // Peek mode returns here without ingesting — it's a read-only diagnostic.
+    if (peek) {
+      addStep(trace, "peek_done", true, runStartedAt, { count: emails.length });
+      return {
+        ok: true,
+        peek: true,
+        reason,
+        fetched: emails.length,
+        emails,
         trace,
         totalMs: Date.now() - runStartedAt,
       };
@@ -441,12 +493,18 @@ export const assertOrgAdmin = internalQuery({
 });
 
 export const adminScan = action({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }): Promise<any> => {
+  args: {
+    orgId: v.id("organizations"),
+    includeLabeled: v.optional(v.boolean()),
+    peek: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { orgId, includeLabeled, peek }): Promise<any> => {
     await ctx.runQuery(internal.scheduler.assertOrgAdmin, { orgId });
     return await ctx.runAction(internal.scheduler.pokeGas, {
       orgId,
       reason: "admin_scan",
+      includeLabeled,
+      peek,
     });
   },
 });
@@ -474,12 +532,16 @@ export const dailySweepAll = internalMutation({
 // ---------- Admin: test connection (synchronous, returns result) ----------
 
 export const testGasConnection = action({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }): Promise<any> => {
+  args: {
+    orgId: v.id("organizations"),
+    includeLabeled: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { orgId, includeLabeled }): Promise<any> => {
     await ctx.runQuery(internal.scheduler.assertOrgAdmin, { orgId });
     return await ctx.runAction(internal.scheduler.pokeGas, {
       orgId,
       reason: "admin_scan",
+      includeLabeled,
     });
   },
 });

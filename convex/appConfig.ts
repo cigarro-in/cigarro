@@ -9,7 +9,31 @@ const KEY = "singleton";
  * Safe to expose: the template URL is intentionally shared with tenants
  * (it's the "copy this master project" link).
  */
-const DEFAULT_SENDERS = ["@hdfcbank.bank.in", "@hdfcbank.net", "alerts@hdfcbank"];
+// Sender patterns used for the Gmail `from:` search. Domain-level is safer
+// than exact address — HDFC can rotate sender addresses without breaking us.
+// The template parser's senderRegex does the final check to decide which
+// matched emails are genuine transaction alerts.
+export const DEFAULT_SENDERS = [
+  "hdfcbank.bank.in",
+  "hdfcbank.net",
+];
+
+/**
+ * Merge custom senders with built-in defaults (deduplicated, case-insensitive).
+ * Custom senders are always added — never replace — so enabling one bank
+ * doesn't disable HDFC.
+ */
+function mergeSenders(custom: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of [...(custom ?? []), ...DEFAULT_SENDERS]) {
+    const normalized = s.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(s.trim());
+  }
+  return out;
+}
 
 export const get = query({
   args: {},
@@ -20,16 +44,16 @@ export const get = query({
       .unique();
     return {
       gasTemplateUrl: row?.gasTemplateUrl ?? null,
-      bankSenders: row?.bankSenders && row.bankSenders.length > 0
-        ? row.bankSenders
-        : DEFAULT_SENDERS,
+      bankSenders: mergeSenders(row?.bankSenders),
+      customBankSenders: row?.bankSenders ?? [],
+      defaultBankSenders: DEFAULT_SENDERS,
     };
   },
 });
 
 /**
- * Internal-ish read for the pokeGas action — returns the sender list we want
- * GAS to use for Gmail search. Uses the configured list or the built-in default.
+ * Internal-ish read for the pokeGas action — returns the merged sender list
+ * (custom + defaults, deduped) the GAS should search Gmail for.
  */
 export const getBankSenders = query({
   args: {},
@@ -38,9 +62,7 @@ export const getBankSenders = query({
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", KEY))
       .unique();
-    return row?.bankSenders && row.bankSenders.length > 0
-      ? row.bankSenders
-      : DEFAULT_SENDERS;
+    return mergeSenders(row?.bankSenders);
   },
 });
 

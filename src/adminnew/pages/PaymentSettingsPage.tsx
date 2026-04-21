@@ -254,7 +254,9 @@ export function PaymentSettingsPage() {
         {/* Platform-level config — only shown to users with owner role somewhere */}
         <PlatformConfigCard
           currentTemplateUrl={appConfig?.gasTemplateUrl ?? ''}
-          currentSenders={appConfig?.bankSenders ?? []}
+          customSenders={(appConfig as any)?.customBankSenders ?? []}
+          defaultSenders={(appConfig as any)?.defaultBankSenders ?? []}
+          mergedSenders={appConfig?.bankSenders ?? []}
           onSave={async (templateUrl, sendersCsv) => {
             try {
               await setAppConfig({
@@ -336,18 +338,20 @@ function GmailConnectionCard(props: {
 
 function PlatformConfigCard(props: {
   currentTemplateUrl: string;
-  currentSenders: string[];
+  customSenders: string[];
+  defaultSenders: string[];
+  mergedSenders: string[];
   onSave: (templateUrl: string, sendersCsv: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(props.currentTemplateUrl);
-  const [sendersCsv, setSendersCsv] = useState(props.currentSenders.join('\n'));
+  const [sendersCsv, setSendersCsv] = useState(props.customSenders.join('\n'));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setUrl(props.currentTemplateUrl);
-    setSendersCsv(props.currentSenders.join('\n'));
-  }, [props.currentTemplateUrl, props.currentSenders]);
+    setSendersCsv(props.customSenders.join('\n'));
+  }, [props.currentTemplateUrl, props.customSenders]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -389,18 +393,34 @@ function PlatformConfigCard(props: {
             </p>
           </div>
           <div>
-            <Label>Allowed bank-alert senders</Label>
+            <Label>Additional bank-alert senders</Label>
             <textarea
               className="w-full rounded-md border border-gray-300 p-2 text-sm font-mono"
-              rows={5}
+              rows={4}
               value={sendersCsv}
               onChange={(e) => setSendersCsv(e.target.value)}
-              placeholder={'@hdfcbank.bank.in\n@icicibank.com\nalerts@sbi.co.in'}
+              placeholder={'@icicibank.com\nalerts@sbi.co.in'}
             />
             <p className="text-xs text-gray-500 mt-1">
-              One per line. Gmail <code>from:</code> patterns. GAS searches these senders'
-              mail. Max 20 entries.
+              One per line. Gmail <code>from:</code> patterns. These are <b>added</b>
+              to the built-in defaults (HDFC) — they don't replace them. Max 20 entries.
             </p>
+            <div className="mt-3 rounded-lg bg-gray-50 border p-3 text-xs">
+              <p className="font-semibold mb-1">Currently searched ({props.mergedSenders.length})</p>
+              <ul className="space-y-0.5">
+                {props.mergedSenders.map((s) => (
+                  <li key={s} className="font-mono text-gray-700">
+                    {s}
+                    {props.defaultSenders.includes(s) && (
+                      <span className="text-gray-400 ml-2">(default)</span>
+                    )}
+                    {props.customSenders.includes(s) && !props.defaultSenders.includes(s) && (
+                      <span className="text-blue-600 ml-2">(custom)</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save platform config'}

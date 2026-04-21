@@ -63,8 +63,39 @@ function doPost(e) {
         .filter(function (s) { return s.length > 0; });
     }
 
-    var bundle = collectEmails_(limit, sinceMs, senders);
-    return json_({ ok: true, emails: bundle.emails, count: bundle.emails.length });
+    var includeLabeled = body.includeLabeled === true;
+    var peek = body.peek === true;
+
+    // Peek mode: return the most recent N inbox messages regardless of
+    // sender / label / time. Purely for diagnostics — proves GAS can read
+    // your Gmail at all.
+    if (peek) {
+      var peekBundle = peekInbox_(Math.min(Number(body.limit || 3), 10));
+      return json_({
+        ok: true,
+        emails: peekBundle.emails,
+        count: peekBundle.emails.length,
+        peek: true,
+        debug: { query: peekBundle.query, totalInspected: peekBundle.emails.length },
+      });
+    }
+
+    var bundle = collectEmails_(limit, sinceMs, senders, includeLabeled);
+    return json_({
+      ok: true,
+      emails: bundle.emails,
+      count: bundle.emails.length,
+      debug: {
+        query: bundle.query,
+        threadsMatched: bundle.threadsMatched,
+        messagesInspected: bundle.messagesInspected,
+        messagesReturned: bundle.emails.length,
+        filteredBecauseLabeled: bundle.filteredLabeled,
+        filteredBecauseOutsideWindow: bundle.filteredOutsideWindow,
+        sendersUsed: bundle.sendersUsed,
+        includeLabeled: includeLabeled,
+      },
+    });
   } catch (err) {
     return json_({ ok: false, error: 'exception', message: String(err) }, 500);
   }
@@ -81,29 +112,66 @@ function doGet() {
  * Search Gmail for allowed-sender messages that aren't yet labeled
  * as processed, extract the parts Convex needs, label them, return bundle.
  */
-function collectEmails_(limit, sinceMs, overrideSenders) {
-  var label = getOrCreateLabel_(LABEL_NAME);
-  var newerThan = '';
-  if (sinceMs <= 24 * 60 * 60 * 1000) newerThan = ' newer_than:1d';
-  else if (sinceMs <= 7 * 24 * 60 * 60 * 1000) newerThan = ' newer_than:7d';
+function peekInbox_(limit) {
+  var query = 'in:inbox';
+  var threads = GmailApp.search(query, 0, limit);
+  var emails = [];
+  for (var i = 0; i < threads.length && emails.length < limit; i++) {
+    var msgs = threads[i].getMessages();
+    // Show only the most recent message of each thread
+    var m = msgs[msgs.length - 1];
+    emails.push({
+      messageId: m.getId(),
+      from: extractAddress_(m.getFrom()),
+      fromRaw: m.getFrom(),
+      to: extractAddress_(m.getTo()),
+      subject: m.getSubject() || '',
+      snippet: (m.getPlainBody() || '').slice(0, 200),
+      receivedAt: m.getDate().getTime(),
+    });
+  }
+  return { emails: emails, query: query };
+}
 
-  var senders = (overrideSenders && overrideSenders.length > 0)
+function collectEmails_(limit, sinceMs, overrideSenders, includeLabeled) {
+  var label = getOrCreateLabel_(LABEL_NAME);
+  // Gmail's newer_than is relative to now (not to sinceMs). Use a 7-day window
+  // as a broad safety net; we still filter per-message by sinceMs below.
+  var newerThan = ' newer_than:7d';
+
+  var rawSenders = (overrideSenders && overrideSenders.length > 0)
     ? overrideSenders
     : getSenderList_();
+  // Strip leading '@' — Gmail's `from:` operator does domain matching on
+  // the bare domain; a leading '@' can cause the query to not match.
+  var senders = rawSenders.map(function (s) {
+    return s.replace(/^@/, '');
+  });
   var fromClause = senders
     .map(function (s) {
       return 'from:' + s;
     })
     .join(' OR ');
-  var query = '(' + fromClause + ') -label:' + LABEL_NAME + newerThan;
+  var labelExclusion = includeLabeled ? '' : ' -label:' + LABEL_NAME;
+  var query = '(' + fromClause + ')' + labelExclusion + newerThan;
 
-  var threads = GmailApp.search(query, 0, limit);
+  var threads = GmailApp.search(query, 0, Math.max(limit, 50));
   var emails = [];
+  var filteredLabeled = 0;
+  var filteredOutsideWindow = 0;
+  var messagesInspected = 0;
+
   for (var i = 0; i < threads.length && emails.length < limit; i++) {
     var msgs = threads[i].getMessages();
     for (var j = 0; j < msgs.length && emails.length < limit; j++) {
+      messagesInspected++;
       var m = msgs[j];
-      if (m.getDate().getTime() < sinceMs) continue;
+
+      // Per-message window check
+      if (m.getDate().getTime() < sinceMs) {
+        filteredOutsideWindow++;
+        continue;
+      }
 
       emails.push({
         messageId: m.getId(),
@@ -118,7 +186,16 @@ function collectEmails_(limit, sinceMs, overrideSenders) {
     // Mark the whole thread processed (labels apply thread-level in Gmail).
     threads[i].addLabel(label);
   }
-  return { emails: emails };
+
+  return {
+    emails: emails,
+    query: query,
+    threadsMatched: threads.length,
+    messagesInspected: messagesInspected,
+    filteredLabeled: filteredLabeled,
+    filteredOutsideWindow: filteredOutsideWindow,
+    sendersUsed: senders,
+  };
 }
 
 /**

@@ -30,6 +30,7 @@ type TraceStep = {
 };
 type ScanResult = {
   ok?: boolean;
+  peek?: boolean;
   skipped?: string;
   error?: string;
   message?: string;
@@ -40,6 +41,15 @@ type ScanResult = {
   duplicates?: number;
   parseFailures?: number;
   skippedMissingFields?: number;
+  emails?: Array<{
+    messageId: string;
+    from: string;
+    fromRaw?: string;
+    to?: string;
+    subject: string;
+    snippet?: string;
+    receivedAt: number;
+  }>;
   ingestResults?: Array<{
     messageId: string;
     from?: string;
@@ -78,22 +88,30 @@ export function PaymentsPage() {
   const pendingCount = recentOrders?.filter((o: any) => o.status === 'pending').length ?? 0;
   const unmatchedCount = unmatched?.length ?? 0;
 
-  const handleScan = async () => {
+  const handleScan = async (opts: { includeLabeled?: boolean; peek?: boolean } = {}) => {
     if (!org) return;
     setScanning(true);
     setLastScan(null);
     try {
-      const result = (await adminScan({ orgId: org._id })) as ScanResult;
+      const result = (await adminScan({
+        orgId: org._id,
+        includeLabeled: opts.includeLabeled,
+        peek: opts.peek,
+      })) as ScanResult;
       setLastScan({ at: new Date(), result });
       if (result?.error) {
         toast.error(`Scan failed: ${result.error}`);
       } else if (result?.skipped) {
         toast.message(`Scan skipped: ${result.skipped}`);
       } else {
-        const { ingested = 0, matched = 0, duplicates = 0 } = result;
-        toast.success(
-          `Scanned — ${ingested} email${ingested === 1 ? '' : 's'}${matched ? `, ${matched} matched` : ''}${duplicates ? `, ${duplicates} duplicate` : ''}`,
-        );
+        const { fetched = 0, ingested = 0, matched = 0, duplicates = 0 } = result;
+        if (fetched === 0) {
+          toast.message('Scan complete — 0 new emails found in Gmail.');
+        } else {
+          toast.success(
+            `Scanned — ${ingested} email${ingested === 1 ? '' : 's'}${matched ? `, ${matched} matched` : ''}${duplicates ? `, ${duplicates} duplicate` : ''}`,
+          );
+        }
       }
     } catch (e: any) {
       toast.error(e?.data?.code || e?.message || 'Scan failed');
@@ -131,15 +149,35 @@ export function PaymentsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
       <PageHeader title="Payments" description="UPI payment operations">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleScan}
-          disabled={scanning}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
-          {scanning ? 'Scanning...' : 'Scan inbox now'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleScan()}
+            disabled={scanning}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
+            {scanning ? 'Scanning...' : 'Scan inbox'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleScan({ includeLabeled: true })}
+            disabled={scanning}
+            title="Rescan including emails already labelled convex-sent."
+          >
+            Rescan all
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleScan({ peek: true })}
+            disabled={scanning}
+            title="Diagnostic: show the last 3 emails in your inbox regardless of sender/label/date."
+          >
+            Peek last 3
+          </Button>
+        </div>
       </PageHeader>
       <div className="p-6 max-w-[1200px] mx-auto space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -277,6 +315,13 @@ function ScanResultCard({ at, result }: { at: Date; result: ScanResult }) {
               {result.error === 'gas_response_not_json' && (
                 <>GAS returned a non-JSON response. Usually means the script errored during Gmail access. Check Executions log.</>
               )}
+              {result.error === 'gas_unauthorized' && (
+                <>
+                  Apps Script rejected the secret. The <code>CONVEX_SECRET</code>
+                  property in your script doesn't match the secret stored here.
+                  Go to <b>Payment Settings → Reconnect</b> to regenerate both sides.
+                </>
+              )}
             </div>
           </div>
         )}
@@ -297,13 +342,43 @@ function ScanResultCard({ at, result }: { at: Date; result: ScanResult }) {
           </div>
         )}
 
-        {!failed && !skipped && (
+        {!failed && !skipped && !result.peek && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Stat label="Fetched" value={fetched} />
             <Stat label="Ingested" value={ingested} />
             <Stat label="Matched" value={matched} tone={matched > 0 ? 'good' : 'neutral'} />
             <Stat label="Duplicates" value={duplicates} />
             <Stat label="Parse failed" value={parseFailures} tone={parseFailures > 0 ? 'bad' : 'neutral'} />
+          </div>
+        )}
+
+        {result.peek && result.emails && (
+          <div>
+            <h4 className="text-sm font-semibold mb-2">
+              Peek — last {result.emails.length} email{result.emails.length === 1 ? '' : 's'} in your Gmail inbox
+            </h4>
+            {result.emails.length === 0 ? (
+              <p className="text-sm text-gray-600">Inbox is empty. GAS can see Gmail but there's nothing there.</p>
+            ) : (
+              <div className="divide-y rounded-lg border">
+                {result.emails.map((em, i) => (
+                  <div key={i} className="p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="font-mono text-xs truncate">{em.fromRaw || em.from}</div>
+                      <div className="text-xs text-gray-500 shrink-0">
+                        {new Date(em.receivedAt).toLocaleString('en-IN', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                    <div className="font-semibold truncate mb-1">{em.subject || '(no subject)'}</div>
+                    {em.snippet && (
+                      <div className="text-xs text-gray-600 line-clamp-2">{em.snippet}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
