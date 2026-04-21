@@ -5,15 +5,11 @@
  * - localStorage persistence with TTL so a reload is still warm.
  * - Single in-flight promise per key to prevent thundering-herd fetches.
  *
- * Usage:
- *   const { data, isLoading, refresh } = useCached(
- *     'homepage:v1',
- *     fetchHomepageData,
- *     { ttl: 5 * 60_000 }
- *   );
+ * Key change is handled correctly: when the `key` argument changes between
+ * renders, the hook re-syncs its state from the new key's cache entry.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface CacheEntry<T> {
   data: T;
@@ -43,15 +39,19 @@ function writeStorage<T>(key: string, entry: CacheEntry<T>): void {
   }
 }
 
-export function readCache<T>(key: string): T | null {
+function getEntry<T>(key: string): CacheEntry<T> | null {
   const m = mem.get(key) as CacheEntry<T> | undefined;
-  if (m) return m.data;
+  if (m) return m;
   const s = readStorage<T>(key);
   if (s) {
     mem.set(key, s);
-    return s.data;
+    return s;
   }
   return null;
+}
+
+export function readCache<T>(key: string): T | null {
+  return getEntry<T>(key)?.data ?? null;
 }
 
 export function writeCache<T>(key: string, data: T): void {
@@ -90,18 +90,34 @@ interface UseCachedOptions {
   enabled?: boolean;
 }
 
+interface State<T> {
+  data: T | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
 export function useCached<T>(
   key: string,
   fetcher: () => Promise<T>,
   options: UseCachedOptions = {}
 ) {
   const { ttl = 5 * 60_000, enabled = true } = options;
-  const cached = readCache<T>(key);
-  const [data, setData] = useState<T | null>(cached);
-  const [isLoading, setIsLoading] = useState<boolean>(cached === null && enabled);
-  const [error, setError] = useState<Error | null>(null);
-  const mounted = useRef(true);
 
+  const [state, setState] = useState<State<T>>(() => {
+    const entry = getEntry<T>(key);
+    const isFresh = entry && Date.now() - entry.ts < ttl;
+    return {
+      data: entry?.data ?? null,
+      isLoading: enabled && (!entry || !isFresh),
+      error: null,
+    };
+  });
+
+  // Keep fetcher fresh without retriggering the effect
+  const fetcherRef = useRef(fetcher);
+  fetcherRef.current = fetcher;
+
+  const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -109,53 +125,71 @@ export function useCached<T>(
     };
   }, []);
 
-  const run = async () => {
-    if (!enabled) return;
-    setError(null);
-    const existing = inflight.get(key) as Promise<T> | undefined;
-    const promise =
-      existing ??
-      (async () => {
-        try {
-          const fresh = await fetcher();
-          writeCache(key, fresh);
-          return fresh;
-        } finally {
-          inflight.delete(key);
+  const run = useCallback(
+    async (k: string) => {
+      const existing = inflight.get(k) as Promise<T> | undefined;
+      const promise =
+        existing ??
+        (async () => {
+          try {
+            const fresh = await fetcherRef.current();
+            writeCache(k, fresh);
+            return fresh;
+          } finally {
+            inflight.delete(k);
+          }
+        })();
+      if (!existing) inflight.set(k, promise);
+
+      try {
+        const result = await promise;
+        // Only commit if still mounted and the key still matches what the caller cares about
+        if (mounted.current) {
+          setState((prev) =>
+            prev.data === result ? prev : { data: result, isLoading: false, error: null }
+          );
         }
-      })();
-    if (!existing) inflight.set(key, promise);
-
-    try {
-      const result = await promise;
-      if (mounted.current) {
-        setData(result);
-        setIsLoading(false);
+      } catch (e) {
+        if (mounted.current) {
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: e instanceof Error ? e : new Error(String(e)),
+          }));
+        }
       }
-    } catch (e) {
-      if (mounted.current) {
-        setError(e instanceof Error ? e : new Error(String(e)));
-        setIsLoading(false);
-      }
-    }
-  };
+    },
+    []
+  );
 
+  // Re-sync when key, enabled, or ttl changes
   useEffect(() => {
-    if (!enabled) return;
-    const entry = mem.get(key) ?? readStorage<T>(key);
-    const isFresh = entry && Date.now() - entry.ts < ttl;
-    if (!isFresh) {
-      run();
-    } else {
-      setIsLoading(false);
+    if (!enabled) {
+      setState({ data: null, isLoading: false, error: null });
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled]);
+
+    const entry = getEntry<T>(key);
+    const isFresh = entry && Date.now() - entry.ts < ttl;
+
+    // Immediately reflect the new key's cache state in local state
+    setState({
+      data: entry?.data ?? null,
+      isLoading: !entry || !isFresh,
+      error: null,
+    });
+
+    if (!isFresh) {
+      run(key);
+    }
+  }, [key, enabled, ttl, run]);
+
+  const refresh = useCallback(() => run(key), [key, run]);
 
   return {
-    data,
-    isLoading,
-    error,
-    refresh: run,
+    data: state.data,
+    isLoading: state.isLoading,
+    error: state.error,
+    refresh,
   };
 }
