@@ -22,6 +22,28 @@ interface OTPWidgetProps {
 const WIDGET_ID = import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined;
 const TOKEN_AUTH = import.meta.env.VITE_MSG91_TOKEN_AUTH as string | undefined;
 
+// MSG91 defines a custom element (`h-captcha`) on init. Calling initSendOTP a
+// second time re-runs customElements.define → DOMException → half-init state
+// where `hcaptchaService` never gets assigned → later sendOtp crashes.
+// Guard globally so we only init once per page lifetime. Callbacks are stored
+// in a dispatcher that the singleton widget forwards to whichever component
+// is currently "active".
+type WidgetCallbacks = {
+  success: (data: { mobile?: string; countryCode?: string; message?: string }) => void;
+  failure: (err: { message?: string }) => void;
+};
+const widgetState: {
+  loadStarted: boolean;
+  initialized: boolean;
+  activeCallbacks: WidgetCallbacks | null;
+  scriptLoadListeners: Array<() => void>;
+} = {
+  loadStarted: false,
+  initialized: false,
+  activeCallbacks: null,
+  scriptLoadListeners: [],
+};
+
 export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,22 +59,18 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
   phoneRef.current = phone;
 
   const isConfigured = !!WIDGET_ID && !!TOKEN_AUTH;
-  const initializedRef = useRef(false);
 
+  // Register this component's callbacks with the singleton dispatcher so the
+  // already-initialized widget's success/failure routes to the current caller.
   useEffect(() => {
-    if (!isConfigured || initializedRef.current) return;
-    initializedRef.current = true;
-
-    const config: MSG91Config = {
-      widgetId: WIDGET_ID!,
-      tokenAuth: TOKEN_AUTH!,
-      exposeMethods: true,
+    if (!isConfigured) return;
+    const callbacks: WidgetCallbacks = {
       success: (data) => {
         setStep('success');
         onSuccessRef.current(
           data.mobile || phoneRef.current,
           data.countryCode || '91',
-          data.message || ''
+          data.message || '',
         );
       },
       failure: (err) => {
@@ -61,21 +79,69 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
         onErrorRef.current?.(message);
       },
     };
+    widgetState.activeCallbacks = callbacks;
+    return () => {
+      if (widgetState.activeCallbacks === callbacks) {
+        widgetState.activeCallbacks = null;
+      }
+    };
+  }, [isConfigured]);
 
-    const pollAndInit = () => {
+  // Ensure the MSG91 script is loaded and initSendOTP is called exactly once
+  // per page lifetime. Subsequent mounts just mark themselves as loaded.
+  useEffect(() => {
+    if (!isConfigured) return;
+
+    const markLoadedWhenInitialized = () => {
+      if (widgetState.initialized) {
+        setIsLoaded(true);
+      } else {
+        widgetState.scriptLoadListeners.push(() => setIsLoaded(true));
+      }
+    };
+
+    if (widgetState.initialized) {
+      setIsLoaded(true);
+      return;
+    }
+
+    if (widgetState.loadStarted) {
+      markLoadedWhenInitialized();
+      return;
+    }
+
+    widgetState.loadStarted = true;
+
+    const config: MSG91Config = {
+      widgetId: WIDGET_ID!,
+      tokenAuth: TOKEN_AUTH!,
+      exposeMethods: true,
+      success: (data) => widgetState.activeCallbacks?.success(data),
+      failure: (err) => widgetState.activeCallbacks?.failure(err),
+    };
+
+    const initOnce = () => {
+      if (widgetState.initialized) return;
+      if (!window.initSendOTP) return;
+      try {
+        window.initSendOTP(config);
+        widgetState.initialized = true;
+        setIsLoaded(true);
+        for (const fn of widgetState.scriptLoadListeners) fn();
+        widgetState.scriptLoadListeners = [];
+      } catch (e) {
+        setError('OTP widget failed to initialize');
+      }
+    };
+
+    const pollForInit = () => {
       let attempts = 0;
       const max = 50; // 10 s @ 200 ms
       const iv = setInterval(() => {
         attempts += 1;
         if (window.initSendOTP) {
           clearInterval(iv);
-          try {
-            window.initSendOTP(config);
-          } catch (e) {
-            setError('OTP widget failed to initialize');
-            return;
-          }
-          setIsLoaded(true);
+          initOnce();
         } else if (attempts >= max) {
           clearInterval(iv);
           setError('OTP service took too long to load');
@@ -83,18 +149,11 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
       }, 200);
     };
 
-    // Script already on the page (e.g. user reopened the dialog) — poll until ready
-    if (document.getElementById('msg91-otp-script')) {
-      if (window.initSendOTP) {
-        try {
-          window.initSendOTP(config);
-          setIsLoaded(true);
-        } catch {
-          pollAndInit();
-        }
-      } else {
-        pollAndInit();
-      }
+    const existing = document.getElementById('msg91-otp-script');
+    if (existing) {
+      // Script is already on the page from a previous mount — don't add another.
+      if (window.initSendOTP) initOnce();
+      else pollForInit();
       return;
     }
 
@@ -102,12 +161,8 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
     script.id = 'msg91-otp-script';
     script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
     script.async = true;
-    script.onload = () => {
-      pollAndInit();
-    };
-    script.onerror = () => {
-      setError('Failed to load OTP service');
-    };
+    script.onload = pollForInit;
+    script.onerror = () => setError('Failed to load OTP service');
     document.body.appendChild(script);
   }, [isConfigured]);
 
