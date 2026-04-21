@@ -13,6 +13,11 @@ const ProductsPage = () => <Slot name="Products" />;
 const CategoryPage = () => <Slot name="Category" />;
 const CategoriesPage = () => <Slot name="Categories" />;
 const ProfilePage = () => <Slot name="Profile" />;
+const ProfileSettingsPage = () => <Slot name="ProfileSettings" />;
+const OrdersPage = () => <Slot name="Orders" />;
+const WishlistPage = () => <Slot name="Wishlist" />;
+const AddressesPage = () => <Slot name="Addresses" />;
+const BrandsPage = () => <Slot name="Brands" />;
 
 // Shopping & Checkout
 // Note: checkout pages remain on classic for payment flow stability
@@ -21,20 +26,13 @@ const CheckoutPage = lazy(() => import('../pages/checkout/CheckoutPage').then(m 
 const MobileCheckoutPage = lazy(() => import('../pages/checkout/MobileCheckoutPage').then(m => ({ default: m.MobileCheckoutPage })));
 const TransactionProcessingPage = lazy(() => import('../pages/checkout/TransactionProcessingPage').then(m => ({ default: m.TransactionProcessingPage })));
 
-// Orders
-const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
-
-// User
-const ProfileSettingsPage = lazy(() => import('../pages/user/ProfileSettingsPage').then(m => ({ default: m.ProfileSettingsPage })));
-const AddressesPage = lazy(() => import('../pages/user/AddressesPage').then(m => ({ default: m.AddressesPage })));
+// User — non-themed pages (palette-aliased classic via Vivid tokens)
 const ReviewsPage = lazy(() => import('../pages/user/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
 const WalletPage = lazy(() => import('../pages/user/WalletPage').then(m => ({ default: m.WalletPage })));
-const WishlistPage = lazy(() => import('../pages/user/WishlistPage').then(m => ({ default: m.WishlistPage })));
 const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
 const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
 
 // Products & Categories
-const BrandsPage = lazy(() => import('../pages/brands/BrandsPage').then(m => ({ default: m.BrandsPage })));
 const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
 
 // Blog

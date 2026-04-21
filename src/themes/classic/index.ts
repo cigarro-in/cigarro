@@ -8,6 +8,11 @@ const Categories = lazy(() => import('../../pages/products/CategoriesPage').then
 const Product = lazy(() => import('../../pages/products/ProductPage'));
 const Cart = lazy(() => import('../../pages/checkout/CartPage'));
 const Profile = lazy(() => import('../../pages/user/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const ProfileSettings = lazy(() => import('../../pages/user/ProfileSettingsPage').then((m) => ({ default: m.ProfileSettingsPage })));
+const Orders = lazy(() => import('../../pages/user/OrdersPage').then((m) => ({ default: m.OrdersPage })));
+const Wishlist = lazy(() => import('../../pages/user/WishlistPage').then((m) => ({ default: m.WishlistPage })));
+const Addresses = lazy(() => import('../../pages/user/AddressesPage').then((m) => ({ default: m.AddressesPage })));
+const Brands = lazy(() => import('../../pages/brands/BrandsPage').then((m) => ({ default: m.BrandsPage })));
 
 export const classicTheme: ThemeManifest = {
   id: 'classic',
@@ -21,5 +26,10 @@ export const classicTheme: ThemeManifest = {
     Product,
     Cart,
     Profile,
+    ProfileSettings,
+    Orders,
+    Wishlist,
+    Addresses,
+    Brands,
   },
 };

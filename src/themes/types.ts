@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 export type ThemeSlotName =
   | 'Layout'
+  | 'AgeVerification'
   | 'Home'
   | 'Products'
   | 'Category'
@@ -10,6 +11,11 @@ export type ThemeSlotName =
   | 'Cart'
   | 'Checkout'
   | 'Profile'
+  | 'ProfileSettings'
+  | 'Orders'
+  | 'Wishlist'
+  | 'Addresses'
+  | 'Brands'
   | 'Header'
   | 'Footer'
   | 'ProductCard';

@@ -79,6 +79,14 @@ function AppContent() {
   }, [isAdminPath]);
 
   if (!isAgeVerified) {
+    const ThemedAgeGate = theme.slots.AgeVerification;
+    if (ThemedAgeGate) {
+      return (
+        <Suspense fallback={null}>
+          <ThemedAgeGate onVerify={() => setIsAgeVerified(true)} />
+        </Suspense>
+      );
+    }
     return <AgeVerification onVerify={() => setIsAgeVerified(true)} />;
   }
 
