@@ -158,14 +158,23 @@ export function ProductImportExport({ onAfterImport }: Props) {
 
   useEffect(() => {
     (async () => {
-      const [{ data: b }, { data: c }, { data: col }] = await Promise.all([
+      const [{ data: b }, { data: c }, colRes] = await Promise.all([
         supabase.from('brands').select('id, name'),
         supabase.from('categories').select('id, name'),
-        supabase.from('collections').select('id, name').then((res) => res).catch(() => ({ data: [] })),
+        supabase
+          .from('collections')
+          .select('id, title')
+          .then((r) => r)
+          .catch(() => ({ data: [] as Array<{ id: string; title: string }> })),
       ]);
       setBrands(b || []);
       setCategories(c || []);
-      setCollections((col as any) || []);
+      setCollections(
+        ((colRes.data || []) as Array<{ id: string; title: string }>).map((c) => ({
+          id: c.id,
+          name: c.title,
+        }))
+      );
     })();
   }, []);
 
@@ -284,23 +293,23 @@ export function ProductImportExport({ onAfterImport }: Props) {
         });
       }
 
-      // Collections — optional table, don't fail the whole export if absent
+      // Collections — table uses "title", not "name"
       const collectionMap = new Map<string, string[]>();
       if (productIds.length > 0) {
         try {
           const { data: cp } = await supabase
             .from('collection_products')
-            .select('product_id, collection:collections(name)')
+            .select('product_id, collection:collections(title)')
             .in('product_id', productIds);
           (cp || []).forEach((row: any) => {
-            const colName = Array.isArray(row.collection) ? row.collection[0]?.name : row.collection?.name;
-            if (!colName) return;
+            const colTitle = Array.isArray(row.collection) ? row.collection[0]?.title : row.collection?.title;
+            if (!colTitle) return;
             const list = collectionMap.get(row.product_id) || [];
-            list.push(colName);
+            list.push(colTitle);
             collectionMap.set(row.product_id, list);
           });
         } catch {
-          /* collections table may not exist — skip silently */
+          /* collections linkage may not exist — skip silently */
         }
       }
 
