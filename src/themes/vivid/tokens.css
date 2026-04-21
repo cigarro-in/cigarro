@@ -505,6 +505,119 @@
   margin: var(--vv-space-4) 0;
 }
 
+/* ---------------------------------------------------------------
+   Checkout / cart / form-page polish for classic components
+   that still render inside the Vivid theme. These overrides apply
+   only when data-theme="vivid" is active and target the shadcn
+   card / input / typography primitives to feel Vivid without
+   rewriting the checkout logic.
+   --------------------------------------------------------------- */
+
+/* Classic "main-container" used by checkout / blog / legal pages */
+[data-theme="vivid"] .main-container {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--vv-space-4);
+}
+
+/* Shadcn card primitives — tighten borders, lighter shadow */
+[data-theme="vivid"] [data-slot="card"],
+[data-theme="vivid"] .bg-card {
+  background: var(--vv-bg-elevated) !important;
+  border: 1px solid var(--vv-border) !important;
+  border-radius: var(--vv-radius-lg) !important;
+  box-shadow: none !important;
+}
+
+[data-theme="vivid"] [data-slot="card-header"] {
+  padding: var(--vv-space-5) var(--vv-space-5) var(--vv-space-3) !important;
+  border-bottom: 1px solid var(--vv-border);
+}
+
+[data-theme="vivid"] [data-slot="card-title"] {
+  font-family: var(--vv-font-sans);
+  font-weight: 700;
+  font-size: var(--vv-text-lg);
+  letter-spacing: var(--vv-tracking-tight);
+}
+
+[data-theme="vivid"] [data-slot="card-content"] {
+  padding: var(--vv-space-5) !important;
+}
+
+/* Classic display-heading classes — modernize via sans-serif weight */
+[data-theme="vivid"] .main-title,
+[data-theme="vivid"] .big-title,
+[data-theme="vivid"] .medium-title {
+  font-family: var(--vv-font-sans) !important;
+  font-weight: 800 !important;
+  letter-spacing: var(--vv-tracking-tight) !important;
+  line-height: var(--vv-leading-tight) !important;
+}
+[data-theme="vivid"] .main-title { font-size: var(--vv-text-3xl) !important; }
+[data-theme="vivid"] .big-title  { font-size: var(--vv-text-4xl) !important; }
+[data-theme="vivid"] .medium-title { font-size: var(--vv-text-2xl) !important; }
+
+[data-theme="vivid"] .suptitle {
+  font-family: var(--vv-font-sans) !important;
+  font-size: var(--vv-text-xs) !important;
+  letter-spacing: var(--vv-tracking-wide) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  color: var(--vv-fg-muted);
+}
+
+/* Primary buttons styled with `bg-dark text-creme-light hover:bg-canyon`
+   should read as the Vivid brand button. */
+[data-theme="vivid"] .bg-dark.text-creme-light,
+[data-theme="vivid"] button.bg-dark,
+[data-theme="vivid"] a.bg-dark {
+  background: var(--vv-brand) !important;
+  color: var(--vv-brand-on) !important;
+  border: none !important;
+  border-radius: var(--vv-radius-md) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--vv-tracking-flat);
+}
+
+[data-theme="vivid"] .bg-dark.text-creme-light:hover,
+[data-theme="vivid"] button.bg-dark:hover,
+[data-theme="vivid"] a.bg-dark:hover {
+  background: var(--vv-brand-hover) !important;
+  color: var(--vv-brand-on) !important;
+}
+
+/* Shadcn inputs / textareas */
+[data-theme="vivid"] input[data-slot="input"],
+[data-theme="vivid"] textarea[data-slot="textarea"] {
+  background: var(--vv-bg-elevated) !important;
+  border: 1px solid var(--vv-border) !important;
+  border-radius: var(--vv-radius-md) !important;
+  color: var(--vv-fg) !important;
+  font-size: var(--vv-text-base);
+  transition: border-color var(--vv-duration-1) var(--vv-ease),
+              box-shadow var(--vv-duration-1) var(--vv-ease);
+}
+[data-theme="vivid"] input[data-slot="input"]:focus,
+[data-theme="vivid"] textarea[data-slot="textarea"]:focus {
+  border-color: var(--vv-brand) !important;
+  box-shadow: var(--vv-shadow-focus) !important;
+  outline: none !important;
+}
+
+/* Shadcn badge primitive — less classic-serif, more flat */
+[data-theme="vivid"] [data-slot="badge"] {
+  font-family: var(--vv-font-sans) !important;
+  font-weight: 600;
+  letter-spacing: var(--vv-tracking-flat);
+  border-radius: var(--vv-radius-sm);
+}
+
+/* Separators lighter */
+[data-theme="vivid"] [data-slot="separator-root"] {
+  background: var(--vv-border) !important;
+}
+
 /* Subtle page header */
 [data-theme="vivid"] .vv-page-header {
   padding-top: var(--vv-space-6);
