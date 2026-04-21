@@ -3,6 +3,7 @@ import { AdminShell } from './layout/AdminShell';
 import {
   DashboardPage,
   ProductsPage,
+  ProductImportPage,
   CategoriesPage,
   BrandsPage,
   CollectionsPage,
@@ -32,6 +33,7 @@ import {
 export const ADMIN_ROUTES = [
   { path: '/admin', element: DashboardPage, label: 'Overview', section: 'platform' },
   { path: '/admin/products', element: ProductsPage, label: 'Products', section: 'platform' },
+  { path: '/admin/products/import', element: ProductImportPage, label: 'Import / Export', section: 'platform' },
   { path: '/admin/categories', element: CategoriesPage, label: 'Categories', section: 'platform' },
   { path: '/admin/brands', element: BrandsPage, label: 'Brands', section: 'platform' },
   { path: '/admin/collections', element: CollectionsPage, label: 'Collections', section: 'platform' },

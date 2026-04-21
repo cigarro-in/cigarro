@@ -15,6 +15,7 @@ export { BlogsPage } from './BlogsPage';
 export { HomepagePage } from './HomepagePage';
 export { AssetsPage } from './AssetsPage';
 export { SettingsPage } from './SettingsPage';
+export { ProductImportPage } from './ProductImportPage';
 
 // Form pages
 export { ProductFormPage } from './ProductFormPage';
