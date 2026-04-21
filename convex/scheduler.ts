@@ -15,7 +15,8 @@ import { requireMember } from "./lib/auth";
 
 const WAKE_THROTTLE_MS = 3 * 60 * 1000;
 const MAX_FETCH_BATCH = 20;
-const POKE_TIMEOUT_MS = 10_000;
+// GAS cold-starts can take 15-20s; allow 45s before aborting.
+const POKE_TIMEOUT_MS = 45_000;
 
 // ---------- Internal queries (read-only probes used by the poke action) ----------
 
@@ -56,6 +57,32 @@ export const getSendersForPoke = internalQuery({
 });
 
 // ---------- The poke action ----------
+//
+// Returns a detailed trace with timing and status for every step so the
+// admin UI can show exactly where failure happened. Each trace entry is
+// { step, ok, ms, ... details }.
+
+type TraceStep = {
+  step: string;
+  ok: boolean;
+  ms: number;
+  [k: string]: any;
+};
+
+function addStep(
+  trace: TraceStep[],
+  step: string,
+  ok: boolean,
+  startedAt: number,
+  extra: Record<string, any> = {},
+) {
+  const entry: TraceStep = { step, ok, ms: Date.now() - startedAt, ...extra };
+  trace.push(entry);
+  // Also console.log so it shows up in Convex dashboard logs.
+  // eslint-disable-next-line no-console
+  console.log(`[pokeGas] ${step} ok=${ok} ms=${entry.ms}`, extra);
+  return entry;
+}
 
 export const pokeGas = internalAction({
   args: {
@@ -70,33 +97,72 @@ export const pokeGas = internalAction({
     triggerOrderId: v.optional(v.id("orders")),
   },
   handler: async (ctx, { orgId, reason, triggerOrderId }) => {
-    // Idle-skip: scheduled pokes that find no pending orders return immediately.
+    const trace: TraceStep[] = [];
+    const runStartedAt = Date.now();
+
+    // ---- 1. Idle-skip check for scheduled pokes ----
     if (reason === "scheduled") {
+      const t = Date.now();
       const anyPending = await ctx.runQuery(
         internal.scheduler.hasPendingOrders,
         { orgId },
       );
-      if (!anyPending) return { skipped: "no_pending_orders" };
+      addStep(trace, "check_pending_orders", true, t, { anyPending });
+      if (!anyPending) {
+        return {
+          skipped: "no_pending_orders",
+          reason,
+          trace,
+          totalMs: Date.now() - runStartedAt,
+        };
+      }
     }
 
-    const cfg = await ctx.runQuery(internal.scheduler.getGasConfig, { orgId });
-    if (!cfg) return { skipped: "no_gas_config" };
+    // ---- 2. Load GAS config ----
+    let cfg: { url: string; secret: string } | null = null;
+    {
+      const t = Date.now();
+      cfg = await ctx.runQuery(internal.scheduler.getGasConfig, { orgId });
+      addStep(trace, "load_gas_config", !!cfg, t, {
+        found: !!cfg,
+        url: cfg?.url ? cfg.url.slice(0, 60) + "…" : null,
+        hasSecret: !!cfg?.secret,
+      });
+    }
+    if (!cfg) {
+      return {
+        skipped: "no_gas_config",
+        reason,
+        trace,
+        totalMs: Date.now() - runStartedAt,
+      };
+    }
 
-    const bankSenders = await ctx.runQuery(
-      internal.scheduler.getSendersForPoke,
-      {},
-    );
+    // ---- 3. Load sender list ----
+    let bankSenders: string[] = [];
+    {
+      const t = Date.now();
+      bankSenders = await ctx.runQuery(
+        internal.scheduler.getSendersForPoke,
+        {},
+      );
+      addStep(trace, "load_senders", true, t, { count: bankSenders.length, senders: bankSenders });
+    }
 
+    // ---- 4. POST to GAS webhook with timeout ----
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), POKE_TIMEOUT_MS);
-
+    let httpStatus = 0;
+    let responseBody = "";
+    let parseOk = false;
     let emails: Array<any> = [];
+    let gasPayload: any = null;
+
+    const fetchStart = Date.now();
     try {
       const res = await fetch(cfg.url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // Apps Script web apps can't read request headers, so the auth
-        // token travels in the JSON body. GAS side uses constant-time compare.
         body: JSON.stringify({
           auth: cfg.secret,
           orgId,
@@ -109,24 +175,91 @@ export const pokeGas = internalAction({
         signal: controller.signal,
       });
       clearTimeout(timer);
+      httpStatus = res.status;
+
+      const text = await res.text().catch(() => "");
+      responseBody = text.slice(0, 1000);
+
+      addStep(trace, "gas_fetch", res.ok, fetchStart, {
+        httpStatus,
+        bodyBytes: text.length,
+        bodyPreview: text.slice(0, 200),
+        timeoutMs: POKE_TIMEOUT_MS,
+      });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        return { error: `gas_http_${res.status}`, body: text.slice(0, 200) };
+        return {
+          error: `gas_http_${httpStatus}`,
+          body: responseBody.slice(0, 200),
+          reason,
+          trace,
+          totalMs: Date.now() - runStartedAt,
+        };
       }
 
-      const payload = await res.json().catch(() => ({}));
-      emails = Array.isArray(payload?.emails) ? payload.emails : [];
+      const parseStart = Date.now();
+      try {
+        gasPayload = JSON.parse(text);
+        parseOk = true;
+        emails = Array.isArray(gasPayload?.emails) ? gasPayload.emails : [];
+        addStep(trace, "parse_response", true, parseStart, {
+          emailsCount: emails.length,
+          topLevelKeys: Object.keys(gasPayload || {}),
+          ok: !!gasPayload?.ok,
+        });
+      } catch (parseErr: any) {
+        addStep(trace, "parse_response", false, parseStart, {
+          error: String(parseErr?.message || parseErr),
+          preview: text.slice(0, 200),
+        });
+        return {
+          error: "gas_response_not_json",
+          body: responseBody.slice(0, 200),
+          reason,
+          trace,
+          totalMs: Date.now() - runStartedAt,
+        };
+      }
     } catch (e: any) {
       clearTimeout(timer);
-      return { error: "gas_fetch_failed", message: String(e?.message || e) };
+      const isAbort = e?.name === "AbortError";
+      addStep(trace, "gas_fetch", false, fetchStart, {
+        errorName: e?.name,
+        errorMessage: String(e?.message || e),
+        isAbort,
+        timeoutMs: POKE_TIMEOUT_MS,
+      });
+      return {
+        error: isAbort ? "gas_fetch_timeout" : "gas_fetch_failed",
+        message: String(e?.message || e),
+        timeoutMs: POKE_TIMEOUT_MS,
+        reason,
+        trace,
+        totalMs: Date.now() - runStartedAt,
+      };
     }
 
-    let ingested = 0;
+    // ---- 5. Ingest each email ----
+    const ingestResults: Array<{
+      messageId: string;
+      amount?: number;
+      matched?: boolean;
+      duplicate?: boolean;
+      parsed?: boolean;
+      orgNotFound?: boolean;
+      reusedEmailId?: string;
+    }> = [];
     let matched = 0;
     let duplicates = 0;
+    let parseFailures = 0;
+    let skippedMissingFields = 0;
+
     for (const em of emails) {
-      if (!em?.messageId || !em?.from) continue;
+      if (!em?.messageId || !em?.from) {
+        skippedMissingFields++;
+        continue;
+      }
+      const t = Date.now();
       const r: any = await ctx.runMutation(
         internal.payments.ingestBankEmail,
         {
@@ -138,12 +271,44 @@ export const pokeGas = internalAction({
           messageId: String(em.messageId),
         },
       );
-      ingested++;
+      const entry = {
+        messageId: String(em.messageId).slice(0, 30),
+        from: String(em.from),
+        matched: !!r?.matched,
+        duplicate: !!r?.duplicate,
+        parsed: r?.parsed !== false,
+        orgNotFound: !!r?.orgNotFound,
+        via: r?.via,
+      };
+      ingestResults.push(entry as any);
       if (r?.matched) matched++;
       if (r?.duplicate) duplicates++;
+      if (r?.parsed === false) parseFailures++;
+      addStep(trace, "ingest_email", !r?.orgNotFound, t, entry);
     }
 
-    return { ingested, matched, duplicates, reason };
+    addStep(trace, "summary", true, runStartedAt, {
+      fetched: emails.length,
+      ingested: ingestResults.length,
+      matched,
+      duplicates,
+      parseFailures,
+      skippedMissingFields,
+    });
+
+    return {
+      ok: true,
+      reason,
+      fetched: emails.length,
+      ingested: ingestResults.length,
+      matched,
+      duplicates,
+      parseFailures,
+      skippedMissingFields,
+      ingestResults,
+      trace,
+      totalMs: Date.now() - runStartedAt,
+    };
   },
 });
 

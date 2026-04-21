@@ -22,14 +22,37 @@ import { useOrg } from '../../lib/convex/useOrg';
 import { paiseToRupees } from '../../lib/convex/money';
 import { formatINR } from '../../utils/currency';
 
+type TraceStep = {
+  step: string;
+  ok: boolean;
+  ms: number;
+  [k: string]: any;
+};
 type ScanResult = {
+  ok?: boolean;
   skipped?: string;
   error?: string;
   message?: string;
+  body?: string;
+  fetched?: number;
   ingested?: number;
   matched?: number;
   duplicates?: number;
-  body?: string;
+  parseFailures?: number;
+  skippedMissingFields?: number;
+  ingestResults?: Array<{
+    messageId: string;
+    from?: string;
+    matched?: boolean;
+    duplicate?: boolean;
+    parsed?: boolean;
+    orgNotFound?: boolean;
+    via?: string;
+  }>;
+  trace?: TraceStep[];
+  totalMs?: number;
+  timeoutMs?: number;
+  reason?: string;
 };
 
 export function PaymentsPage() {
@@ -199,11 +222,13 @@ export function PaymentsPage() {
 function ScanResultCard({ at, result }: { at: Date; result: ScanResult }) {
   const failed = !!result.error;
   const skipped = !!result.skipped;
-  const { ingested = 0, matched = 0, duplicates = 0 } = result;
+  const { fetched = 0, ingested = 0, matched = 0, duplicates = 0, parseFailures = 0 } = result;
+  const [traceOpen, setTraceOpen] = useState(true);
+
   return (
-    <Card className={failed ? 'border-red-200' : skipped ? 'border-yellow-200' : 'border-green-200'}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-2">
+    <Card className={failed ? 'border-red-300' : skipped ? 'border-yellow-300' : 'border-green-300'}>
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             {failed ? (
               <XCircle className="w-5 h-5 text-red-600" />
@@ -213,30 +238,137 @@ function ScanResultCard({ at, result }: { at: Date; result: ScanResult }) {
               <CheckCircle2 className="w-5 h-5 text-green-600" />
             )}
             <h3 className="font-semibold">Last scan</h3>
+            <Badge variant="outline" className="text-xs">
+              {result.reason || 'admin_scan'}
+            </Badge>
+            {typeof result.totalMs === 'number' && (
+              <Badge variant="outline" className="text-xs">
+                {result.totalMs}ms total
+              </Badge>
+            )}
           </div>
           <span className="text-xs text-gray-500">{at.toLocaleTimeString()}</span>
         </div>
-        {failed ? (
-          <p className="text-sm text-red-700">
-            <b>{result.error}</b>
-            {result.message && <span className="text-gray-600"> — {result.message}</span>}
-            {result.body && <span className="text-gray-600"> · {result.body.slice(0, 120)}</span>}
-          </p>
-        ) : skipped ? (
-          <p className="text-sm text-yellow-800">
+
+        {failed && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm">
+            <div className="font-semibold text-red-800">{result.error}</div>
+            {result.message && (
+              <div className="text-red-700 mt-1">{result.message}</div>
+            )}
+            {result.timeoutMs && (
+              <div className="text-red-600 text-xs mt-1">timeout was {result.timeoutMs}ms</div>
+            )}
+            {result.body && (
+              <pre className="mt-2 text-xs text-red-900 bg-red-100 p-2 rounded overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                {result.body}
+              </pre>
+            )}
+            <div className="text-xs text-gray-600 mt-2">
+              {result.error === 'gas_fetch_timeout' && (
+                <>GAS took longer than the timeout. Cold starts can be slow on first run of the day — retry once. If persistent, check your Apps Script Executions log.</>
+              )}
+              {result.error === 'gas_fetch_failed' && (
+                <>Network or GAS error before a response came back. Verify the webhook URL in Payment Settings ends with <code>/exec</code>.</>
+              )}
+              {result.error?.startsWith('gas_http_') && (
+                <>GAS returned a non-2xx status. 401/403 means secret mismatch; 500 means Apps Script threw — check Executions log.</>
+              )}
+              {result.error === 'gas_response_not_json' && (
+                <>GAS returned a non-JSON response. Usually means the script errored during Gmail access. Check Executions log.</>
+              )}
+            </div>
+          </div>
+        )}
+
+        {skipped && (
+          <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-900">
             Skipped: <b>{result.skipped}</b>
             {result.skipped === 'no_pending_orders' && (
-              <span className="text-gray-600"> — this was a scheduled poke with no active orders to match. Manual scans bypass this.</span>
+              <div className="text-yellow-800 text-xs mt-1">
+                A scheduled poke found no active orders. Manual scans bypass this.
+              </div>
             )}
             {result.skipped === 'no_gas_config' && (
-              <span className="text-gray-600"> — Apps Script webhook URL / secret not saved. Go to Payment Settings.</span>
+              <div className="text-yellow-800 text-xs mt-1">
+                No Apps Script webhook URL/secret saved. Go to Payment Settings → Connect Gmail.
+              </div>
             )}
-          </p>
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <Stat label="Fetched" value={ingested} />
-            <Stat label="Matched to order" value={matched} tone={matched > 0 ? 'good' : 'neutral'} />
+          </div>
+        )}
+
+        {!failed && !skipped && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Stat label="Fetched" value={fetched} />
+            <Stat label="Ingested" value={ingested} />
+            <Stat label="Matched" value={matched} tone={matched > 0 ? 'good' : 'neutral'} />
             <Stat label="Duplicates" value={duplicates} />
+            <Stat label="Parse failed" value={parseFailures} tone={parseFailures > 0 ? 'bad' : 'neutral'} />
+          </div>
+        )}
+
+        {/* Per-email breakdown */}
+        {result.ingestResults && result.ingestResults.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold mb-1">Emails processed</h4>
+            <div className="divide-y rounded-lg border text-sm">
+              {result.ingestResults.map((r, i) => (
+                <div key={i} className="p-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs truncate">{r.from || 'unknown sender'}</div>
+                    <div className="text-xs text-gray-500 truncate">msg: {r.messageId}</div>
+                  </div>
+                  <div className="flex gap-1">
+                    {r.matched && <Badge className="bg-green-100 text-green-800">matched</Badge>}
+                    {r.duplicate && <Badge className="bg-yellow-100 text-yellow-800">duplicate</Badge>}
+                    {r.parsed === false && <Badge className="bg-red-100 text-red-800">parse failed</Badge>}
+                    {r.orgNotFound && <Badge className="bg-red-100 text-red-800">org not found</Badge>}
+                    {r.via && <Badge variant="outline" className="text-xs">{r.via}</Badge>}
+                    {!r.matched && !r.duplicate && r.parsed !== false && !r.orgNotFound && (
+                      <Badge variant="outline" className="text-xs">no match</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full step trace (collapsible) */}
+        {result.trace && result.trace.length > 0 && (
+          <div>
+            <button
+              onClick={() => setTraceOpen((v) => !v)}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              {traceOpen ? 'Hide' : 'Show'} step-by-step trace ({result.trace.length} steps)
+            </button>
+            {traceOpen && (
+              <div className="mt-2 rounded-lg border bg-gray-50 font-mono text-[11px] divide-y">
+                {result.trace.map((step, i) => (
+                  <div key={i} className={`p-2 ${step.ok ? 'text-gray-800' : 'text-red-700 bg-red-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={step.ok ? 'text-green-700' : 'text-red-600'}>
+                        {step.ok ? '✓' : '✗'}
+                      </span>
+                      <b className="text-[12px]">{step.step}</b>
+                      <span className="text-gray-500">{step.ms}ms</span>
+                    </div>
+                    <pre className="mt-1 whitespace-pre-wrap break-all text-[10px] text-gray-600">
+                      {JSON.stringify(
+                        Object.fromEntries(
+                          Object.entries(step).filter(
+                            ([k]) => !['step', 'ok', 'ms'].includes(k),
+                          ),
+                        ),
+                        null,
+                        1,
+                      )}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -244,14 +376,14 @@ function ScanResultCard({ at, result }: { at: Date; result: ScanResult }) {
   );
 }
 
-function Stat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'good' | 'neutral' }) {
+function Stat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'good' | 'neutral' | 'bad' }) {
+  const color =
+    tone === 'good' ? 'text-green-700' :
+    tone === 'bad' ? 'text-red-700' :
+    'text-gray-900';
   return (
     <div className="rounded-lg border p-3">
-      <div
-        className={`text-2xl font-bold ${tone === 'good' ? 'text-green-700' : 'text-gray-900'}`}
-      >
-        {value}
-      </div>
+      <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="text-xs text-gray-500">{label}</div>
     </div>
   );
