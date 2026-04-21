@@ -37,7 +37,6 @@ const PRODUCT_COLUMNS = [
   'Description',
   'Origin',
   'Is Active',
-  'Is Featured',
   'Meta Title',
   'Meta Description',
   'Canonical URL',
@@ -56,7 +55,6 @@ const VARIANT_COLUMNS = [
   'Units Contained',
   'Unit',
   'Track Inventory',
-  'Weight',
 ] as const;
 
 interface SheetRow extends Record<string, unknown> {
@@ -213,7 +211,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
         Description: 'Iconic full-flavour American blend.',
         Origin: 'USA',
         'Is Active': 'yes',
-        'Is Featured': 'no',
         'Meta Title': 'Marlboro Red — Premium Cigarettes',
         'Meta Description': '',
         'Canonical URL': '',
@@ -229,7 +226,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
         'Units Contained': 20,
         Unit: 'sticks',
         'Track Inventory': 'yes',
-        Weight: 25,
       },
       {
         Name: 'Marlboro Red',
@@ -256,17 +252,16 @@ export function ProductImportExport({ onAfterImport }: Props) {
   const onExport = async () => {
     setWorking(true);
     try {
-      // Fetch products core + brand + variants. Keep this query minimal so
-      // it doesn't fail if optional tables/columns are missing.
+      // Fetch products core + brand + variants. Matches the current schema
+      // after migration 076 (no is_featured on products, no weight on variants).
       const { data: products, error } = await supabase
         .from('products')
         .select(
           `id, name, slug, description, short_description, origin, specifications,
-           is_active, is_featured, meta_title, meta_description, canonical_url,
+           is_active, meta_title, meta_description, canonical_url,
            brand:brands(name),
            variants:product_variants(id, variant_name, variant_type, price, compare_at_price,
-             cost_price, stock, is_default, is_active, units_contained, unit, track_inventory,
-             weight)`
+             cost_price, stock, is_default, is_active, units_contained, unit, track_inventory)`
         )
         .order('name');
       if (error) throw error;
@@ -326,7 +321,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
           Description: p.description || '',
           Origin: p.origin || '',
           'Is Active': p.is_active ? 'yes' : 'no',
-          'Is Featured': p.is_featured ? 'yes' : 'no',
           'Meta Title': p.meta_title || '',
           'Meta Description': p.meta_description || '',
           'Canonical URL': p.canonical_url || '',
@@ -363,7 +357,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
             'Units Contained': v.units_contained ?? '',
             Unit: v.unit ?? '',
             'Track Inventory': v.track_inventory ? 'yes' : 'no',
-            Weight: v.weight ?? '',
           });
         });
       }
@@ -472,7 +465,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
             head['Is Active'] === undefined || head['Is Active'] === ''
               ? true
               : yes(head['Is Active']),
-          is_featured: yes(head['Is Featured']),
           meta_title: str(head['Meta Title']),
           meta_description: str(head['Meta Description']),
           canonical_url: str(head['Canonical URL']),
@@ -573,7 +565,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
             units_contained: toInt(r['Units Contained']) || null,
             unit: str(r.Unit) || null,
             track_inventory: yes(r['Track Inventory']),
-            weight: toNumber(r.Weight),
           };
 
           const existingVariantId = variantByName.get(variantName);
