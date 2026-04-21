@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Drawer } from 'vaul';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Pencil, X } from 'lucide-react';
+import { Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '../ui/dialog';
 import { supabase } from '../../lib/supabase/client';
@@ -115,30 +115,30 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
     setResendIn(30);
   };
 
-  const setDigit = (idx: number, value: string) => {
-    const clean = value.replace(/\D/g, '').slice(0, 1);
-    setOtpError(false);
-    setOtpDigits((prev) => {
-      const next = [...prev];
-      next[idx] = clean;
-      return next;
-    });
-    if (clean && idx < OTP_LENGTH - 1) {
-      otpRefs.current[idx + 1]?.focus();
-    }
-    const joined = [
-      ...otpDigits.slice(0, idx),
-      clean,
-      ...otpDigits.slice(idx + 1),
-    ].join('');
-    if (joined.length === OTP_LENGTH && !joined.includes('')) {
+  const submitOtpIfComplete = (digits: string[]) => {
+    if (digits.every((d) => d.length === 1)) {
       setStep('verifying');
-      otp.verifyOTP(joined);
+      otp.verifyOTP(digits.join(''));
     }
   };
 
+  const setDigit = (idx: number, value: string) => {
+    const clean = value.replace(/\D/g, '').slice(0, 1);
+    setOtpError(false);
+    const nextDigits = [...otpDigits];
+    nextDigits[idx] = clean;
+    setOtpDigits(nextDigits);
+    if (clean && idx < OTP_LENGTH - 1) {
+      otpRefs.current[idx + 1]?.focus();
+    }
+    if (clean) submitOtpIfComplete(nextDigits);
+  };
+
   const handleOtpKey = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[idx] && idx > 0) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitOtpIfComplete(otpDigits);
+    } else if (e.key === 'Backspace' && !otpDigits[idx] && idx > 0) {
       otpRefs.current[idx - 1]?.focus();
     } else if (e.key === 'ArrowLeft' && idx > 0) {
       otpRefs.current[idx - 1]?.focus();
@@ -334,14 +334,7 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
             <Drawer.Title className="sr-only">Sign in</Drawer.Title>
             <Drawer.Description className="sr-only">Phone verification</Drawer.Description>
             <div className="mx-auto w-10 h-1 rounded-full bg-[var(--vv-border-strong,#d2d4dc)] mt-3" />
-            <div className="relative px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-              <button
-                onClick={() => onOpenChange(false)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-full grid place-items-center text-[var(--vv-fg-muted,#585966)] hover:bg-[var(--vv-bg-inset,#f1f2f4)]"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
               {body}
             </div>
           </Drawer.Content>
