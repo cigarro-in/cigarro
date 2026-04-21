@@ -5,6 +5,7 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
+  action,
   internalAction,
   internalMutation,
   internalQuery,
@@ -261,16 +262,27 @@ export const wake = mutation({
 });
 
 // ---------- Admin: manual "Scan inbox now" ----------
+//
+// Runs pokeGas synchronously and returns the full bundle (count, matches,
+// duplicates, errors) so the admin UI can display results inline instead
+// of the user having to hunt through reactive queries.
 
-export const adminScan = mutation({
+export const assertOrgAdmin = internalQuery({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await requireMember(ctx, orgId, ["admin", "owner"]);
-    await ctx.scheduler.runAfter(0, internal.scheduler.pokeGas, {
+    return true;
+  },
+});
+
+export const adminScan = action({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }): Promise<any> => {
+    await ctx.runQuery(internal.scheduler.assertOrgAdmin, { orgId });
+    return await ctx.runAction(internal.scheduler.pokeGas, {
       orgId,
       reason: "admin_scan",
     });
-    return { triggered: true };
   },
 });
 
@@ -294,16 +306,15 @@ export const dailySweepAll = internalMutation({
   },
 });
 
-// ---------- Admin: test connection (just runs a poke and returns result) ----------
+// ---------- Admin: test connection (synchronous, returns result) ----------
 
-export const testGasConnection = mutation({
+export const testGasConnection = action({
   args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    await requireMember(ctx, orgId, ["admin", "owner"]);
-    await ctx.scheduler.runAfter(0, internal.scheduler.pokeGas, {
+  handler: async (ctx, { orgId }): Promise<any> => {
+    await ctx.runQuery(internal.scheduler.assertOrgAdmin, { orgId });
+    return await ctx.runAction(internal.scheduler.pokeGas, {
       orgId,
       reason: "admin_scan",
     });
-    return { triggered: true };
   },
 });

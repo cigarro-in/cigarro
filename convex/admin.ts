@@ -147,6 +147,28 @@ export const voidOrder = mutation({
 
 // ---------- Admin queries ----------
 
+export const listRecentBankEmails = query({
+  args: {
+    orgId: v.id("organizations"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { orgId, limit }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const n = limit ?? 20;
+    // Pull a wider window and sort in memory by receivedAt desc — bankEmails
+    // doesn't have a by_org_receivedAt index but volume is small (shops
+    // process hundreds/day max and we only show the tail).
+    const rows = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_org_status", (q) => q.eq("orgId", orgId))
+      .take(200);
+    return rows
+      .slice()
+      .sort((a, b) => b.receivedAt - a.receivedAt)
+      .slice(0, n);
+  },
+});
+
 export const listUnmatchedEmails = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {

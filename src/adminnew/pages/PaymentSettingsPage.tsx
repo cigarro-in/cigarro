@@ -15,7 +15,7 @@ import {
 } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 
@@ -34,7 +34,7 @@ export function PaymentSettingsPage() {
   const appConfig = useQuery(api.appConfig.get, {});
   const update = useMutation(api.organizations.updateSettings);
   const setAppConfig = useMutation(api.appConfig.set);
-  const testConnection = useMutation(api.scheduler.testGasConnection);
+  const testConnection = useAction(api.scheduler.testGasConnection);
 
   const [upiVpa, setUpiVpa] = useState('');
   const [walletEnabled, setWalletEnabled] = useState(true);
@@ -103,10 +103,18 @@ export function PaymentSettingsPage() {
   const handleTest = async () => {
     if (!org) return;
     try {
-      await testConnection({ orgId: org._id });
-      toast.success('Test poke dispatched. Check Unmatched Emails in a few seconds.');
+      const r: any = await testConnection({ orgId: org._id });
+      if (r?.error) {
+        toast.error(`${r.error}${r.message ? ': ' + r.message : ''}`);
+      } else if (r?.skipped) {
+        toast.message(`Skipped: ${r.skipped}`);
+      } else {
+        toast.success(
+          `OK — fetched ${r?.ingested ?? 0}, matched ${r?.matched ?? 0}, duplicates ${r?.duplicates ?? 0}`,
+        );
+      }
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Test failed');
+      toast.error(e?.data?.code || e?.message || 'Test failed');
     }
   };
 
