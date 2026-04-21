@@ -20,6 +20,7 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
 import { supabase } from '../../lib/supabase/client';
+import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 
@@ -103,6 +104,7 @@ export function HomepageManager() {
       );
 
       toast.success(`Component ${enabled ? 'enabled' : 'disabled'}`);
+      await invalidateStorefront();
     } catch (error) {
       console.error('Error toggling component:', error);
       toast.error('Failed to toggle component');
@@ -125,6 +127,7 @@ export function HomepageManager() {
       );
 
       toast.success(`Slide ${isActive ? 'activated' : 'deactivated'}`);
+      await invalidateStorefront();
     } catch (error) {
       console.error('Error toggling slide:', error);
       toast.error('Failed to toggle slide');
@@ -144,6 +147,7 @@ export function HomepageManager() {
 
       setHeroSlides(prev => prev.filter(s => s.id !== slideId));
       toast.success('Slide deleted');
+      await invalidateStorefront();
     } catch (error) {
       console.error('Error deleting slide:', error);
       toast.error('Failed to delete slide');
@@ -171,6 +175,7 @@ export function HomepageManager() {
 
       setHeroSlides(newSlides);
       toast.success('Slide order updated');
+      await invalidateStorefront();
     } catch (error) {
       console.error('Error reordering slides:', error);
       toast.error('Failed to reorder slides');

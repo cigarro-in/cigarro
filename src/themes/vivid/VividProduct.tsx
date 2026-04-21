@@ -114,31 +114,33 @@ export default function VividProduct() {
         </Link>
       </div>
 
-      <div className="max-w-screen-xl mx-auto px-4 pt-4 grid gap-6 md:grid-cols-[1fr,1fr]">
-        {/* Gallery */}
-        <div>
-          <div className="aspect-square rounded-xl overflow-hidden bg-[var(--color-surface)]">
-            <img
-              src={getProductImageUrl(images[activeImage])}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          {images.length > 1 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-hide">
-              {images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveImage(i)}
-                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 ${
-                    i === activeImage ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+      <div className="max-w-[1080px] mx-auto px-4 pt-4 grid gap-8 md:grid-cols-2">
+        {/* Gallery — capped so it doesn't dominate on wide screens */}
+        <div className="md:sticky md:top-20 md:self-start">
+          <div className="max-w-[460px] mx-auto">
+            <div className="aspect-square rounded-xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)]">
+              <img
+                src={getProductImageUrl(images[activeImage])}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {images.length > 1 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-hide">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImage(i)}
+                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 ${
+                      i === activeImage ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
                   }`}
                 >
                   <img src={getProductImageUrl(img)} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Info */}

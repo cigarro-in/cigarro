@@ -12,6 +12,7 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
 import { supabase } from '../../lib/supabase/client';
+import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { toast } from 'sonner';
 
 interface HeroSlideFormData {
@@ -161,6 +162,7 @@ export function HeroSlideFormPage() {
         toast.success('Slide created');
       }
 
+      await invalidateStorefront();
       navigate('/admin/homepage');
     } catch (error) {
       console.error('Error saving slide:', error);
@@ -183,6 +185,7 @@ export function HeroSlideFormPage() {
 
       if (error) throw error;
       toast.success('Slide deleted');
+      await invalidateStorefront();
       navigate('/admin/homepage');
     } catch (error) {
       console.error('Error deleting slide:', error);
