@@ -109,11 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.error || 'Phone verification failed');
     }
 
-    const { error: setErr } = await supabase.auth.setSession({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-    });
-    if (setErr) throw setErr;
+    // Exchange the server-generated token_hash for a real Supabase session.
+    // This causes Supabase to issue a native ES256-signed JWT that Convex
+    // can verify via the published JWKS.
+    if (!data.token_hash || !data.email) {
+      throw new Error('Invalid server response — missing token_hash/email');
+    }
+    const { error: verifyErr } = await supabase.auth.verifyOtp({
+      email: data.email,
+      token_hash: data.token_hash,
+      type: 'email',
+    } as any);
+    if (verifyErr) throw verifyErr;
 
     // Force a profile refresh so consumers see the fresh user state
     const {

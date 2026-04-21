@@ -5,57 +5,32 @@
  *   1. Client verifies OTP via MSG91 widget, gets `access-token` JWT
  *   2. Client POSTs { phone, token, name? } to this endpoint
  *   3. Server verifies the token with MSG91's verifyAccessToken API
- *   4. Server finds/creates Supabase auth user keyed by phone
- *   5. Server upserts the profiles row (name, phone, phone_verified_at)
- *   6. Server mints a Supabase-compatible HS256 JWT signed with SUPABASE_JWT_SECRET
- *   7. Client calls supabase.auth.setSession({ access_token, refresh_token })
+ *   4. Server finds/creates Supabase auth user keyed by phone, ensures a
+ *      synthetic email is attached (<phone>@phone.cigarro.in)
+ *   5. Server calls admin.generateLink({ type: 'magiclink', email }) to
+ *      produce a verification token signed by Supabase's own asymmetric keys
+ *   6. Response includes { email, token_hash, user_id }
+ *   7. Client calls supabase.auth.verifyOtp({ email, token_hash, type: 'email' })
+ *      — Supabase then issues a real ES256 session recognised by Convex.
  *
  * Env vars required:
  *   - MSG91_AUTH_KEY            (server-only, MSG91 dashboard → Auth key)
  *   - SUPABASE_URL              (same value as VITE_SUPABASE_URL)
  *   - SUPABASE_SERVICE_ROLE_KEY (server-only)
- *   - SUPABASE_JWT_SECRET       (Supabase dashboard → Settings → API → JWT Secret)
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-const JWT_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
-
-function b64url(input) {
-  let s;
-  if (typeof input === 'string') {
-    s = btoa(input);
-  } else {
-    let str = '';
-    for (const byte of input) str += String.fromCharCode(byte);
-    s = btoa(str);
-  }
-  return s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-async function signJWT(payload, secret) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const headerPart = b64url(JSON.stringify(header));
-  const payloadPart = b64url(JSON.stringify(payload));
-  const signingInput = `${headerPart}.${payloadPart}`;
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = new Uint8Array(
-    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput))
-  );
-  return `${signingInput}.${b64url(sig)}`;
-}
+const SYNTHETIC_EMAIL_DOMAIN = 'phone.cigarro.in';
 
 function normalizePhone(phone, countryCode) {
   let p = String(phone || '').replace(/[^\d]/g, '');
   if (p.length === 10) p = `${countryCode || '91'}${p}`;
   return `+${p}`;
+}
+
+function syntheticEmail(normalizedPhone) {
+  return `${normalizedPhone.replace('+', '')}@${SYNTHETIC_EMAIL_DOMAIN}`;
 }
 
 async function verifyMsg91Token(token, authKey) {
@@ -69,13 +44,8 @@ async function verifyMsg91Token(token, authKey) {
   });
   const data = await res.json();
   if (data.type === 'success') return data;
-
-  // Newer MSG91 widgets verify the OTP client-side. A second verifyAccessToken
-  // call returns "access-token already verified" — that still proves the token
-  // came from MSG91, so we treat it as a valid verification.
   const msg = String(data.message || '').toLowerCase();
   if (msg.includes('already verified')) return data;
-
   throw new Error(data.message || 'Phone verification failed');
 }
 
@@ -100,42 +70,33 @@ export async function onRequest(context) {
     const { phone, token, name, countryCode } = body || {};
 
     if (!phone || !token) {
-      return new Response(JSON.stringify({ error: 'phone and token are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return jsonResponse({ error: 'phone and token are required' }, 400, corsHeaders);
     }
 
     const msg91AuthKey = env.MSG91_AUTH_KEY;
     const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
-    const jwtSecret = env.SUPABASE_JWT_SECRET;
 
-    if (!msg91AuthKey || !supabaseUrl || !serviceKey || !jwtSecret) {
+    if (!msg91AuthKey || !supabaseUrl || !serviceKey) {
       const missing = [
         !msg91AuthKey && 'MSG91_AUTH_KEY',
         !supabaseUrl && 'SUPABASE_URL',
         !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY',
-        !jwtSecret && 'SUPABASE_JWT_SECRET',
       ].filter(Boolean).join(', ');
-      return new Response(JSON.stringify({ error: `Server auth not configured. Missing: ${missing}` }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return jsonResponse({ error: `Server auth not configured. Missing: ${missing}` }, 500, corsHeaders);
     }
 
     // 1. Verify OTP token with MSG91
     await verifyMsg91Token(token, msg91AuthKey);
 
     const normalizedPhone = normalizePhone(phone, countryCode);
+    const userEmail = syntheticEmail(normalizedPhone);
 
     const admin = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // 2. Find or create the auth user for this phone.
-    // Fast path: look up our own profiles table (has a unique index on phone).
-    // Falls back to admin.createUser if no profile exists.
     let userId = null;
     let isNewUser = false;
 
@@ -147,20 +108,18 @@ export async function onRequest(context) {
 
     if (existingProfile?.id) {
       userId = existingProfile.id;
-      if (name) {
-        await admin.auth.admin.updateUserById(userId, {
-          user_metadata: { name },
-        });
-      }
     } else {
+      // Create with phone + synthetic email so generateLink works.
       const phoneDigits = normalizedPhone.replace('+', '');
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         phone: phoneDigits,
+        email: userEmail,
         phone_confirm: true,
+        email_confirm: true,
         user_metadata: { name: name || null, provider: 'phone-otp' },
       });
       if (createErr) {
-        // Race: user may have been created by a concurrent request. Look them up.
+        // Race: concurrent request may have created the user. Re-lookup.
         const { data: retry } = await admin
           .from('profiles')
           .select('id')
@@ -177,7 +136,22 @@ export async function onRequest(context) {
       }
     }
 
-    // 3. Upsert the profiles row
+    // 3. Ensure the user has our synthetic email set (existing users may not).
+    //    generateLink(type: magiclink) requires the target user to have an email.
+    const { data: userData } = await admin.auth.admin.getUserById(userId);
+    if (userData?.user && userData.user.email !== userEmail) {
+      await admin.auth.admin.updateUserById(userId, {
+        email: userEmail,
+        email_confirm: true,
+        ...(name ? { user_metadata: { ...userData.user.user_metadata, name } } : {}),
+      });
+    } else if (name) {
+      await admin.auth.admin.updateUserById(userId, {
+        user_metadata: { ...(userData?.user?.user_metadata ?? {}), name },
+      });
+    }
+
+    // 4. Upsert the profiles row
     const profilePayload = {
       id: userId,
       phone: normalizedPhone,
@@ -185,54 +159,47 @@ export async function onRequest(context) {
     };
     if (name) profilePayload.name = name;
     if (isNewUser && !name) profilePayload.name = 'Customer';
-
     await admin.from('profiles').upsert(profilePayload, { onConflict: 'id' });
 
-    // 4. Mint Supabase-compatible JWT. session_id is intentionally omitted —
-    // Supabase validates it against auth.sessions and we don't create that row.
-    const now = Math.floor(Date.now() / 1000);
-    const accessToken = await signJWT(
-      {
-        aud: 'authenticated',
-        iss: `${supabaseUrl}/auth/v1`,
-        sub: userId,
-        phone: normalizedPhone.replace('+', ''),
-        role: 'authenticated',
-        aal: 'aal1',
-        iat: now,
-        exp: now + JWT_TTL_SECONDS,
-        amr: [{ method: 'otp', timestamp: now }],
-        app_metadata: { provider: 'phone', providers: ['phone'] },
-        user_metadata: { name: name || null },
-      },
-      jwtSecret
-    );
+    // 5. Generate a magiclink. Supabase signs with its own asymmetric key
+    //    and returns a token_hash the client can exchange for a real session.
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userEmail,
+    });
+    if (linkErr) throw linkErr;
 
-    return new Response(
-      JSON.stringify({
-        access_token: accessToken,
-        refresh_token: accessToken, // no refresh flow; re-auth on expiry
-        expires_in: JWT_TTL_SECONDS,
-        token_type: 'bearer',
+    const tokenHash = linkData?.properties?.hashed_token;
+    if (!tokenHash) {
+      throw new Error('Supabase did not return a token_hash');
+    }
+
+    return jsonResponse(
+      {
+        email: userEmail,
+        token_hash: tokenHash,
         user_id: userId,
         is_new_user: isNewUser,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
+      },
+      200,
+      corsHeaders,
     );
   } catch (err) {
     console.error('[phone-verify]', err);
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         error: err?.message || 'Verification failed',
         detail: err?.stack?.split('\n')?.[0] || null,
-      }),
-      {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
+      },
+      400,
+      corsHeaders,
     );
   }
+}
+
+function jsonResponse(payload, status, cors) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...cors },
+  });
 }

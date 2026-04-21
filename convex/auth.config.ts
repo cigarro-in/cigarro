@@ -1,9 +1,8 @@
 // Supabase → Convex JWT bridge.
 //
-// Fill VITE_SUPABASE_URL (same value your React app uses).
-// Supabase must be on asymmetric JWT signing (RS256) — enable under
-// Project Settings → Auth → JWT Signing Keys. Legacy HS256 projects need
-// to migrate before Convex can verify their tokens.
+// Supabase's newer JWT Signing Keys feature uses ES256 (elliptic curve).
+// Older projects may still use RS256 — check /auth/v1/.well-known/jwks.json
+// to confirm which algorithm your project's JWKS advertises.
 //
 // The Supabase JWT has:
 //   iss = "<project-url>/auth/v1"
@@ -16,10 +15,9 @@ export default {
   providers: [
     {
       type: "customJwt",
-      applicationID: "authenticated",
       issuer: `${supabaseUrl}/auth/v1`,
       jwks: `${supabaseUrl}/auth/v1/.well-known/jwks.json`,
-      algorithm: "RS256",
+      algorithm: "ES256",
     },
   ],
 };
