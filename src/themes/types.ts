@@ -5,9 +5,11 @@ export type ThemeSlotName =
   | 'Home'
   | 'Products'
   | 'Category'
+  | 'Categories'
   | 'Product'
   | 'Cart'
   | 'Checkout'
+  | 'Profile'
   | 'Header'
   | 'Footer'
   | 'ProductCard';

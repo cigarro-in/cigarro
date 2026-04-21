@@ -1,196 +1,524 @@
+/* =========================================================================
+   Vivid Design System
+   ------------------------------------------------------------------------
+   Semantic tokens (`--vv-*`) drive everything.
+   Legacy `--color-*` aliases are maintained for Tailwind utility parity.
+   ========================================================================= */
+
 [data-theme="vivid"] {
-  --color-background: #f6f6f7;
-  --color-surface: #ffffff;
-  --color-surface-2: #f4f4f6;
-  --color-foreground: #18181b;
-  --color-muted: #a1a1aa;
-  --color-muted-foreground: #6b7280;
-  --color-border: #e5e7eb;
-  --color-border-strong: #d4d4d8;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-foreground: #ffffff;
-  --color-primary-soft: #eff6ff;
-  --color-accent: #ff4b34;
-  --color-accent-foreground: #ffffff;
-  --color-success: #16a34a;
-  --radius-vivid: 10px;
+  /* -------- Color · Brand -------- */
+  --vv-brand:         #2563eb;
+  --vv-brand-hover:   #1d4ed8;
+  --vv-brand-active:  #1e40af;
+  --vv-brand-soft:    #eff6ff;
+  --vv-brand-on:      #ffffff;
+
+  /* -------- Color · Accent (promos, discounts) -------- */
+  --vv-accent:        #ff4b34;
+  --vv-accent-hover:  #e63d27;
+  --vv-accent-soft:   #fff1ee;
+  --vv-accent-on:     #ffffff;
+
+  /* -------- Color · Surfaces -------- */
+  --vv-bg:            #f7f7f8;
+  --vv-bg-elevated:   #ffffff;
+  --vv-bg-inset:      #f1f2f4;
+  --vv-bg-overlay:    rgba(15, 15, 18, 0.48);
+
+  /* -------- Color · Foreground -------- */
+  --vv-fg:            #0f0f12;
+  --vv-fg-muted:      #585966;
+  --vv-fg-subtle:     #8a8b95;
+  --vv-fg-on-brand:   #ffffff;
+
+  /* -------- Color · Borders -------- */
+  --vv-border:        #e7e8ec;
+  --vv-border-strong: #d2d4dc;
+  --vv-border-focus:  var(--vv-brand);
+
+  /* -------- Color · Feedback -------- */
+  --vv-success:       #16a34a;
+  --vv-success-soft:  #ecfdf5;
+  --vv-warning:       #d97706;
+  --vv-warning-soft:  #fffbeb;
+  --vv-danger:        #dc2626;
+  --vv-danger-soft:   #fef2f2;
+  --vv-info:          #0891b2;
+  --vv-info-soft:     #ecfeff;
+
+  /* -------- Typography -------- */
+  --vv-font-sans:     'DM-Sans', system-ui, -apple-system, sans-serif;
+  --vv-font-display:  'DM-Sans', system-ui, sans-serif;
+  --vv-font-mono:     ui-monospace, 'SF Mono', monospace;
+
+  --vv-text-xs:       0.75rem;      /* 12 */
+  --vv-text-sm:       0.8125rem;    /* 13 */
+  --vv-text-base:     0.9375rem;    /* 15 */
+  --vv-text-lg:       1rem;         /* 16 */
+  --vv-text-xl:       1.125rem;     /* 18 */
+  --vv-text-2xl:      1.375rem;     /* 22 */
+  --vv-text-3xl:      1.75rem;      /* 28 */
+  --vv-text-4xl:      2.25rem;      /* 36 */
+  --vv-text-5xl:      3rem;         /* 48 */
+
+  --vv-leading-tight:   1.15;
+  --vv-leading-snug:    1.35;
+  --vv-leading-normal:  1.5;
+  --vv-leading-relaxed: 1.65;
+
+  --vv-tracking-tight: -0.015em;
+  --vv-tracking-flat:  -0.008em;
+  --vv-tracking-wide:   0.04em;
+
+  /* -------- Spacing (4 px grid) -------- */
+  --vv-space-0:  0;
+  --vv-space-1:  0.25rem;
+  --vv-space-2:  0.5rem;
+  --vv-space-3:  0.75rem;
+  --vv-space-4:  1rem;
+  --vv-space-5:  1.25rem;
+  --vv-space-6:  1.5rem;
+  --vv-space-8:  2rem;
+  --vv-space-10: 2.5rem;
+  --vv-space-12: 3rem;
+  --vv-space-16: 4rem;
+
+  /* -------- Radii -------- */
+  --vv-radius-xs:   4px;
+  --vv-radius-sm:   6px;
+  --vv-radius-md:   10px;
+  --vv-radius-lg:   14px;
+  --vv-radius-xl:   20px;
+  --vv-radius-full: 999px;
+
+  /* -------- Shadows -------- */
+  --vv-shadow-xs:   0 1px 1px rgba(15, 15, 18, 0.04);
+  --vv-shadow-sm:   0 1px 2px rgba(15, 15, 18, 0.05), 0 1px 3px rgba(15, 15, 18, 0.04);
+  --vv-shadow-md:   0 4px 14px rgba(15, 15, 18, 0.07);
+  --vv-shadow-lg:   0 18px 44px rgba(15, 15, 18, 0.12);
+  --vv-shadow-focus: 0 0 0 3px color-mix(in oklab, var(--vv-brand) 20%, transparent);
+
+  /* -------- Motion -------- */
+  --vv-ease:        cubic-bezier(0.4, 0, 0.2, 1);
+  --vv-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --vv-duration-1:  120ms;
+  --vv-duration-2:  180ms;
+  --vv-duration-3:  280ms;
+
+  /* -------- Z-index -------- */
+  --vv-z-raised:   10;
+  --vv-z-sticky:   40;
+  --vv-z-dropdown: 60;
+  --vv-z-dialog:   80;
+  --vv-z-toast:    100;
+
+  /* -------- Legacy aliases (Tailwind + existing classes) -------- */
+  --color-background:        var(--vv-bg);
+  --color-surface:           var(--vv-bg-elevated);
+  --color-surface-2:         var(--vv-bg-inset);
+  --color-foreground:        var(--vv-fg);
+  --color-muted:             var(--vv-fg-subtle);
+  --color-muted-foreground:  var(--vv-fg-muted);
+  --color-border:            var(--vv-border);
+  --color-border-strong:     var(--vv-border-strong);
+  --color-primary:           var(--vv-brand);
+  --color-primary-hover:     var(--vv-brand-hover);
+  --color-primary-foreground:var(--vv-brand-on);
+  --color-primary-soft:      var(--vv-brand-soft);
+  --color-accent:            var(--vv-accent);
+  --color-accent-foreground: var(--vv-accent-on);
+  --color-success:           var(--vv-success);
+  --radius-vivid:            var(--vv-radius-md);
+
+  /* -------- Classic-theme color aliases (maps existing cream/canyon palette)
+     so any page that still uses bg-creme / text-dark / border-coyote etc.
+     automatically adopts the Vivid palette when this theme is active. */
+  --color-creme:             var(--vv-bg);
+  --color-creme-light:       var(--vv-bg-elevated);
+  --color-dark:              var(--vv-fg);
+  --color-canyon:            var(--vv-brand);
+  --color-coyote:            var(--vv-border-strong);
+  --color-sunflower:         var(--vv-accent);
+
+  /* Swap the serif display font for DM-Sans in Vivid (more modern look). */
+  --font-family-serif:       var(--vv-font-sans);
 }
 
 [data-theme="vivid"] body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: 'DM-Sans', system-ui, sans-serif;
+  background-color: var(--vv-bg);
+  color: var(--vv-fg);
+  font-family: var(--vv-font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
 }
 
 [data-theme="vivid"] body:not(.admin-page) {
   padding-top: 0 !important;
 }
 
+[data-theme="vivid"] ::selection {
+  background: color-mix(in oklab, var(--vv-brand) 30%, transparent);
+  color: var(--vv-fg);
+}
+
+[data-theme="vivid"] *:focus-visible {
+  outline: none;
+  box-shadow: var(--vv-shadow-focus);
+  border-radius: var(--vv-radius-sm);
+}
+
+/* ============================================================
+   Components
+   ============================================================ */
+
+/* Card surface */
 [data-theme="vivid"] .vv-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-vivid);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: var(--vv-bg-elevated);
+  border: 1px solid var(--vv-border);
+  border-radius: var(--vv-radius-md);
+  transition: border-color var(--vv-duration-2) var(--vv-ease),
+              box-shadow var(--vv-duration-2) var(--vv-ease),
+              transform var(--vv-duration-2) var(--vv-ease);
 }
 
 [data-theme="vivid"] .vv-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-color: var(--vv-border-strong);
+  box-shadow: var(--vv-shadow-sm);
 }
+
+[data-theme="vivid"] .vv-card--lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--vv-shadow-md);
+}
+
+[data-theme="vivid"] .vv-surface {
+  background: var(--vv-bg-elevated);
+  border: 1px solid var(--vv-border);
+  border-radius: var(--vv-radius-lg);
+}
+
+/* Buttons */
+[data-theme="vivid"] .vv-btn {
+  --h: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vv-space-2);
+  height: var(--h);
+  padding: 0 var(--vv-space-4);
+  border-radius: var(--vv-radius-md);
+  font-weight: var(--vv-weight-semibold, 600);
+  font-size: var(--vv-text-sm);
+  letter-spacing: var(--vv-tracking-flat);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--vv-duration-1) var(--vv-ease),
+              color var(--vv-duration-1) var(--vv-ease),
+              border-color var(--vv-duration-1) var(--vv-ease),
+              transform var(--vv-duration-1) var(--vv-ease);
+}
+
+[data-theme="vivid"] .vv-btn:active { transform: scale(0.98); }
+[data-theme="vivid"] .vv-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+[data-theme="vivid"] .vv-btn--sm { --h: 32px; padding: 0 var(--vv-space-3); font-size: var(--vv-text-xs); }
+[data-theme="vivid"] .vv-btn--lg { --h: 48px; padding: 0 var(--vv-space-6); font-size: var(--vv-text-base); }
 
 [data-theme="vivid"] .vv-btn-primary {
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 18px;
+  background: var(--vv-brand);
+  color: var(--vv-brand-on);
+  border-color: var(--vv-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vv-space-2);
+  height: 40px;
+  padding: 0 var(--vv-space-4);
+  border-radius: var(--vv-radius-md);
   font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  font-size: var(--vv-text-sm);
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+  transition: background-color var(--vv-duration-1) var(--vv-ease),
+              transform var(--vv-duration-1) var(--vv-ease);
+}
+[data-theme="vivid"] .vv-btn-primary:hover { background: var(--vv-brand-hover); }
+[data-theme="vivid"] .vv-btn-primary:active { transform: scale(0.98); }
+[data-theme="vivid"] .vv-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+[data-theme="vivid"] .vv-btn-ghost {
+  background: transparent;
+  color: var(--vv-fg);
+  border-color: transparent;
+}
+[data-theme="vivid"] .vv-btn-ghost:hover { background: var(--vv-bg-inset); }
+
+[data-theme="vivid"] .vv-btn-outline {
+  background: var(--vv-bg-elevated);
+  color: var(--vv-fg);
+  border-color: var(--vv-border-strong);
+}
+[data-theme="vivid"] .vv-btn-outline:hover { border-color: var(--vv-fg); }
+
+[data-theme="vivid"] .vv-btn-danger {
+  background: var(--vv-danger);
+  color: #fff;
+  border-color: var(--vv-danger);
 }
 
-[data-theme="vivid"] .vv-btn-primary:hover { background: var(--color-primary-hover); }
-[data-theme="vivid"] .vv-btn-primary:active { transform: scale(0.98); }
-[data-theme="vivid"] .vv-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-
 [data-theme="vivid"] .vv-btn-add {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 6px;
+  background: var(--vv-bg-elevated);
+  color: var(--vv-brand);
+  border: 1px solid var(--vv-brand);
+  border-radius: var(--vv-radius-sm);
   padding: 5px 14px;
   font-weight: 600;
   font-size: 11px;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--vv-tracking-wide);
   text-transform: uppercase;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--vv-duration-1) var(--vv-ease), color var(--vv-duration-1) var(--vv-ease);
 }
-
 [data-theme="vivid"] .vv-btn-add:hover {
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
+  background: var(--vv-brand);
+  color: var(--vv-brand-on);
 }
 
+/* Inputs */
+[data-theme="vivid"] .vv-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--vv-space-4);
+  border: 1px solid var(--vv-border);
+  background: var(--vv-bg-elevated);
+  color: var(--vv-fg);
+  border-radius: var(--vv-radius-md);
+  font-family: inherit;
+  font-size: var(--vv-text-base);
+  letter-spacing: var(--vv-tracking-flat);
+  transition: border-color var(--vv-duration-1) var(--vv-ease), box-shadow var(--vv-duration-1) var(--vv-ease);
+}
+[data-theme="vivid"] .vv-input:focus {
+  outline: none;
+  border-color: var(--vv-brand);
+  box-shadow: var(--vv-shadow-focus);
+}
+[data-theme="vivid"] .vv-input::placeholder { color: var(--vv-fg-subtle); }
+
+[data-theme="vivid"] .vv-label {
+  display: block;
+  font-size: var(--vv-text-xs);
+  font-weight: 600;
+  color: var(--vv-fg-muted);
+  letter-spacing: var(--vv-tracking-wide);
+  text-transform: uppercase;
+  margin-bottom: var(--vv-space-2);
+}
+
+/* Chips / badges */
 [data-theme="vivid"] .vv-chip {
-  background: var(--color-surface);
-  color: var(--color-foreground);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  background: var(--vv-bg-elevated);
+  color: var(--vv-fg);
+  border: 1px solid var(--vv-border);
+  border-radius: var(--vv-radius-full);
   padding: 7px 14px;
-  font-size: 13px;
+  font-size: var(--vv-text-sm);
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--vv-duration-1) var(--vv-ease);
 }
-
 [data-theme="vivid"] .vv-chip:hover,
 [data-theme="vivid"] .vv-chip--active {
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
-  border-color: var(--color-primary);
+  background: var(--vv-brand);
+  color: var(--vv-brand-on);
+  border-color: var(--vv-brand);
 }
 
+[data-theme="vivid"] .vv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--vv-radius-sm);
+  font-size: var(--vv-text-xs);
+  font-weight: 600;
+  line-height: 1.3;
+}
+[data-theme="vivid"] .vv-badge--success { background: var(--vv-success-soft); color: var(--vv-success); }
+[data-theme="vivid"] .vv-badge--warning { background: var(--vv-warning-soft); color: var(--vv-warning); }
+[data-theme="vivid"] .vv-badge--danger  { background: var(--vv-danger-soft);  color: var(--vv-danger); }
+[data-theme="vivid"] .vv-badge--info    { background: var(--vv-info-soft);    color: var(--vv-info); }
+[data-theme="vivid"] .vv-badge--neutral { background: var(--vv-bg-inset);     color: var(--vv-fg-muted); }
+
+/* Sidebar nav link */
 [data-theme="vivid"] .vv-side-link {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--vv-space-2);
   padding: 10px 14px;
-  color: var(--color-foreground);
-  font-size: 14px;
+  color: var(--vv-fg);
+  font-size: var(--vv-text-base);
   font-weight: 500;
   border-left: 3px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--vv-duration-1) var(--vv-ease),
+              color var(--vv-duration-1) var(--vv-ease);
 }
-
-[data-theme="vivid"] .vv-side-link:hover {
-  background: var(--color-surface-2);
-}
-
+[data-theme="vivid"] .vv-side-link:hover { background: var(--vv-bg-inset); }
 [data-theme="vivid"] .vv-side-link--active {
-  color: var(--color-primary);
+  color: var(--vv-brand);
   font-weight: 700;
-  border-left-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  border-left-color: var(--vv-brand);
+  background: var(--vv-brand-soft);
 }
-
 [data-theme="vivid"] .vv-side-count {
-  color: var(--color-muted-foreground);
+  color: var(--vv-fg-subtle);
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--vv-text-sm);
 }
 
+/* Section title */
 [data-theme="vivid"] .vv-section-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-family: 'DM-Sans', system-ui, sans-serif;
-  font-size: 17px;
+  gap: var(--vv-space-2);
+  font-family: var(--vv-font-display);
+  font-size: var(--vv-text-xl);
   font-weight: 700;
-  color: var(--color-foreground);
+  color: var(--vv-fg);
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--vv-tracking-tight);
 }
-
 [data-theme="vivid"] .vv-section-count {
   display: inline-grid;
   place-items: center;
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
-  font-size: 11px;
+  border-radius: var(--vv-radius-sm);
+  background: var(--vv-brand);
+  color: var(--vv-brand-on);
+  font-size: var(--vv-text-xs);
   font-weight: 700;
 }
 
+/* Discount badge on image */
 [data-theme="vivid"] .vv-badge-discount {
   position: absolute;
   left: 0;
   bottom: 8px;
-  background: var(--color-accent);
-  color: var(--color-accent-foreground);
-  font-size: 10px;
+  background: var(--vv-accent);
+  color: var(--vv-accent-on);
+  font-size: var(--vv-text-xs);
   font-weight: 700;
   letter-spacing: 0.03em;
-  padding: 3px 7px 3px 8px;
-  border-radius: 0 3px 3px 0;
+  padding: 3px 8px;
+  border-radius: 0 var(--vv-radius-xs) var(--vv-radius-xs) 0;
 }
 
+/* Banner card */
 [data-theme="vivid"] .vv-banner {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--vv-radius-lg);
   overflow: hidden;
   display: block;
   aspect-ratio: 16 / 7;
-  background: var(--color-surface-2);
+  background: var(--vv-bg-inset);
+  transition: transform var(--vv-duration-2) var(--vv-ease);
 }
+[data-theme="vivid"] .vv-banner:hover { transform: translateY(-2px); }
+[data-theme="vivid"] .vv-banner img { width: 100%; height: 100%; object-fit: cover; }
 
-[data-theme="vivid"] .vv-banner img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
+/* Hero dots */
 [data-theme="vivid"] .vv-dot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.25);
-  transition: all 0.2s ease;
+  transition: all var(--vv-duration-2) var(--vv-ease);
 }
-
 [data-theme="vivid"] .vv-dot--active {
   width: 20px;
-  background: var(--color-primary);
+  background: var(--vv-brand);
+}
+
+/* Empty state */
+[data-theme="vivid"] .vv-empty {
+  text-align: center;
+  padding: var(--vv-space-10) var(--vv-space-4);
+  color: var(--vv-fg-muted);
+}
+[data-theme="vivid"] .vv-empty-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--vv-space-4);
+  display: grid;
+  place-items: center;
+  border-radius: var(--vv-radius-full);
+  background: var(--vv-bg-inset);
+  color: var(--vv-fg-subtle);
+}
+[data-theme="vivid"] .vv-empty-title {
+  font-size: var(--vv-text-lg);
+  font-weight: 700;
+  color: var(--vv-fg);
+  margin: 0 0 var(--vv-space-1);
+}
+
+/* Dialog polish — theme scope only */
+[data-theme="vivid"] [data-slot="dialog-overlay"] {
+  background: var(--vv-bg-overlay) !important;
+  backdrop-filter: blur(4px);
+}
+[data-theme="vivid"] [data-slot="dialog-content"],
+[data-theme="vivid"] [role="dialog"][data-state] {
+  background: var(--vv-bg-elevated) !important;
+  border: 1px solid var(--vv-border) !important;
+  border-radius: var(--vv-radius-lg) !important;
+  box-shadow: var(--vv-shadow-lg) !important;
+  color: var(--vv-fg);
+}
+
+/* Skeleton */
+[data-theme="vivid"] .vv-skeleton {
+  background: linear-gradient(90deg, var(--vv-bg-inset) 0%, color-mix(in oklab, var(--vv-bg-inset) 60%, #fff) 50%, var(--vv-bg-inset) 100%);
+  background-size: 200% 100%;
+  animation: vv-shimmer 1.4s ease infinite;
+  border-radius: var(--vv-radius-sm);
+}
+@keyframes vv-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Divider */
+[data-theme="vivid"] .vv-divider {
+  height: 1px;
+  background: var(--vv-border);
+  width: 100%;
+  margin: var(--vv-space-4) 0;
+}
+
+/* Subtle page header */
+[data-theme="vivid"] .vv-page-header {
+  padding-top: var(--vv-space-6);
+  padding-bottom: var(--vv-space-4);
+}
+[data-theme="vivid"] .vv-page-title {
+  font-size: var(--vv-text-3xl);
+  font-weight: 800;
+  letter-spacing: var(--vv-tracking-tight);
+  line-height: var(--vv-leading-tight);
+  margin: 0;
+}
+[data-theme="vivid"] .vv-page-subtitle {
+  font-size: var(--vv-text-sm);
+  color: var(--vv-fg-muted);
+  margin-top: var(--vv-space-1);
 }

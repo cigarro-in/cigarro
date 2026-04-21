@@ -11,6 +11,8 @@ const CartPage = () => <Slot name="Cart" />;
 const ProductPage = () => <Slot name="Product" />;
 const ProductsPage = () => <Slot name="Products" />;
 const CategoryPage = () => <Slot name="Category" />;
+const CategoriesPage = () => <Slot name="Categories" />;
+const ProfilePage = () => <Slot name="Profile" />;
 
 // Shopping & Checkout
 // Note: checkout pages remain on classic for payment flow stability
@@ -23,7 +25,6 @@ const TransactionProcessingPage = lazy(() => import('../pages/checkout/Transacti
 const OrdersPage = lazy(() => import('../pages/user/OrdersPage').then(m => ({ default: m.OrdersPage })));
 
 // User
-const ProfilePage = lazy(() => import('../pages/user/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const ProfileSettingsPage = lazy(() => import('../pages/user/ProfileSettingsPage').then(m => ({ default: m.ProfileSettingsPage })));
 const AddressesPage = lazy(() => import('../pages/user/AddressesPage').then(m => ({ default: m.AddressesPage })));
 const ReviewsPage = lazy(() => import('../pages/user/ReviewsPage').then(m => ({ default: m.ReviewsPage })));
@@ -32,8 +33,7 @@ const WishlistPage = lazy(() => import('../pages/user/WishlistPage').then(m => (
 const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
 const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
 
-// Products & Categories - CategoriesPage (index) stays direct; detail pages go through Slot
-const CategoriesPage = lazy(() => import('../pages/products/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+// Products & Categories
 const BrandsPage = lazy(() => import('../pages/brands/BrandsPage').then(m => ({ default: m.BrandsPage })));
 const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
 
