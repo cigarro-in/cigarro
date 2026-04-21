@@ -1,17 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Eye,
-  Truck,
-  Ban,
-  CheckCircle2,
-  Clock,
-  Package,
-  MapPin,
-  Phone,
-  Mail,
-  ChevronDown
-} from 'lucide-react';
+import { Phone, ChevronDown } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import {
@@ -21,10 +10,13 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { formatINR } from '../../utils/currency';
-import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
 import { PageHeader } from '../components/shared/PageHeader';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
+import { paiseToRupees } from '../../lib/convex/money';
 
 interface OrderItem {
   id: string;
@@ -34,6 +26,12 @@ interface OrderItem {
   product_name: string;
   variant_name?: string;
 }
+
+const mapStatusToDisplay = (s: string): Order['status'] => {
+  if (s === 'paid' || s === 'late_paid') return 'processing';
+  if (s === 'pending') return 'pending';
+  return 'cancelled';
+};
 
 interface Order {
   id: string;
@@ -60,53 +58,83 @@ interface Order {
 
 export function OrdersPage() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const org = useOrg();
+  const convexOrders = useQuery(
+    api.admin.listRecentOrders,
+    org ? { orgId: org._id, limit: 100 } : 'skip',
+  );
+  const markPaid = useMutation(api.admin.markPaid);
+  const voidOrder = useMutation(api.admin.voidOrder);
+
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  const loading = convexOrders === undefined;
 
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items(id, product_id, quantity, product_price, product_name, variant_name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders(data || []);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      toast.error('Failed to load orders');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const orders: Order[] = useMemo(() => {
+    if (!convexOrders) return [];
+    return convexOrders.map((o: any): Order => ({
+      id: o._id,
+      display_order_id: o.displayOrderId,
+      user_id: o.userId,
+      status: mapStatusToDisplay(o.status),
+      payment_verified: o.status === 'paid' || o.status === 'late_paid' ? 'YES' : 'NO',
+      payment_method: 'upi',
+      subtotal: paiseToRupees(o.cartTotalPaise),
+      shipping: 0,
+      discount: paiseToRupees(o.walletDebitPaise),
+      total: paiseToRupees(o.finalAmountPaise),
+      shipping_name: o.address?.name || '',
+      shipping_address: o.address?.line1 || '',
+      shipping_city: o.address?.city || '',
+      shipping_state: o.address?.state || '',
+      shipping_zip_code: o.address?.pincode || '',
+      shipping_phone: o.address?.phone || '',
+      created_at: new Date(o._creationTime).toISOString(),
+      updated_at: new Date(o._creationTime).toISOString(),
+      order_items: (o.items || []).map((it: any, idx: number) => ({
+        id: `${o._id}-${idx}`,
+        product_id: it.productId,
+        quantity: it.qty,
+        price: paiseToRupees(it.unitPricePaise),
+        product_name: it.name,
+        variant_name: it.variantId,
+      })),
+    }));
+  }, [convexOrders]);
 
   const handleEditOrder = (order: Order) => {
     navigate(`/admin/orders/${order.id}`);
   };
 
-  const handleBulkStatusChange = async (orderIds: string[], status: string) => {
+  const handleBulkMarkPaid = async (orderIds: string[]) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status })
-        .in('id', orderIds);
-
-      if (error) throw error;
-      toast.success(`${orderIds.length} orders updated to ${status}`);
+      await Promise.all(
+        orderIds.map((id) =>
+          markPaid({
+            orderId: id as any,
+            reference: `admin:bulk:${new Date().toISOString()}`,
+          }),
+        ),
+      );
+      toast.success(`${orderIds.length} orders marked paid`);
       setSelectedOrders([]);
-      fetchOrders();
-    } catch (error) {
-      toast.error('Failed to update order status');
+    } catch (error: any) {
+      toast.error(error?.data?.code || 'Failed to mark paid');
+    }
+  };
+
+  const handleBulkVoid = async (orderIds: string[]) => {
+    try {
+      await Promise.all(
+        orderIds.map((id) =>
+          voidOrder({ orderId: id as any, reason: 'bulk void by admin' }),
+        ),
+      );
+      toast.success(`${orderIds.length} orders voided`);
+      setSelectedOrders([]);
+    } catch (error: any) {
+      toast.error(error?.data?.code || 'Failed to void orders');
     }
   };
 
@@ -222,26 +250,14 @@ export function OrdersPage() {
 
   const bulkActions = [
     {
-      label: 'Mark as Processing',
-      icon: Clock,
-      onClick: (orderIds: string[]) => handleBulkStatusChange(orderIds, 'processing')
+      label: 'Mark Paid',
+      onClick: (orderIds: string[]) => handleBulkMarkPaid(orderIds),
     },
     {
-      label: 'Mark as Shipped',
-      icon: Truck,
-      onClick: (orderIds: string[]) => handleBulkStatusChange(orderIds, 'shipped')
+      label: 'Void Orders',
+      onClick: (orderIds: string[]) => handleBulkVoid(orderIds),
+      variant: 'destructive' as const,
     },
-    {
-      label: 'Mark as Delivered',
-      icon: CheckCircle2,
-      onClick: (orderIds: string[]) => handleBulkStatusChange(orderIds, 'delivered')
-    },
-    {
-      label: 'Cancel Orders',
-      icon: Ban,
-      onClick: (orderIds: string[]) => handleBulkStatusChange(orderIds, 'cancelled'),
-      variant: 'destructive' as const
-    }
   ];
 
   return (
@@ -270,7 +286,6 @@ export function OrdersPage() {
                   onClick={() => action.onClick(selectedOrders)}
                   className={action.variant === 'destructive' ? 'text-red-600' : ''}
                 >
-                  {action.icon && <action.icon className="mr-2 h-4 w-4" />}
                   {action.label}
                 </DropdownMenuItem>
               ))}

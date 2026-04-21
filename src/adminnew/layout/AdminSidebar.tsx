@@ -12,7 +12,11 @@ import {
   Settings,
   Image as ImageIcon,
   FileText,
-  LogOut
+  LogOut,
+  CreditCard,
+  Clock,
+  MailQuestion,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -53,6 +57,9 @@ const NAVIGATION_CONFIG: NavItem[] = [
   { id: 'brands', label: 'Brands', path: '/admin/brands', icon: Building2, section: 'platform' },
   { id: 'collections', label: 'Collections', path: '/admin/collections', icon: FolderOpen, section: 'platform' },
   { id: 'orders', label: 'Orders', path: '/admin/orders', icon: ShoppingCart, section: 'platform' },
+  { id: 'payments', label: 'Payments', path: '/admin/payments', icon: CreditCard, section: 'payments' },
+  { id: 'unmatched-emails', label: 'Unmatched Emails', path: '/admin/payments/unmatched', icon: MailQuestion, section: 'payments' },
+  { id: 'payment-settings', label: 'Payment Settings', path: '/admin/payments/settings', icon: SlidersHorizontal, section: 'payments' },
   { id: 'customers', label: 'Customers', path: '/admin/customers', icon: Users, section: 'platform' },
   { id: 'discounts', label: 'Discounts', path: '/admin/discounts', icon: Percent, section: 'platform' },
   { id: 'homepage', label: 'Homepage', path: '/admin/homepage', icon: Home, section: 'platform' },
@@ -66,6 +73,7 @@ const NAVIGATION_CONFIG: NavItem[] = [
  */
 const SECTION_LABELS: Record<string, string> = {
   platform: 'Platform',
+  payments: 'Payments',
 };
 
 /**

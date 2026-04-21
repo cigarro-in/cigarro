@@ -13,6 +13,10 @@ import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
+import { paiseToRupees } from '../../lib/convex/money';
 
 interface OrderItem {
   id: string;
@@ -64,144 +68,88 @@ interface Order {
   orderType?: 'standard' | 'wallet_load';
 }
 
+// Map Convex order status → legacy UI status
+function mapConvexStatus(s: string): Order['status'] {
+  switch (s) {
+    case 'paid':
+    case 'late_paid':
+      return 'placed';
+    case 'pending':
+      return 'pending';
+    case 'expired':
+    case 'cancelled':
+    case 'refunded':
+    case 'voided':
+      return 'cancelled';
+    default:
+      return 'pending';
+  }
+}
+
 export function OrdersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addMultipleToCart } = useCart();
-  const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const ORDERS_PER_PAGE = 10;
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const lastOrderRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchOrders(true);
-    }
-  }, [user]);
+  const org = useOrg();
+  const convexOrders = useQuery(
+    api.orders.listMyOrders,
+    org ? { orgId: org._id, limit: 50 } : 'skip',
+  );
+  const retryConvexOrder = useMutation(api.orders.retryOrder);
 
-  // Refresh orders when page becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && user) {
-        setPage(0);
-        fetchOrders(true);
-      }
+  const isInitialLoading = convexOrders === undefined;
+  const isFetchingMore = false;
+
+  const orders: Order[] = (convexOrders ?? []).map((o: any): Order => {
+    const isWalletLoad = o.kind === 'wallet_load';
+    return {
+      id: o._id,
+      displayOrderId: o.displayOrderId ?? 'N/A',
+      transactionId: o.displayOrderId,
+      items: (o.items ?? []).map((it: any) => ({
+        id: it.productId,
+        name: it.name,
+        variant_name: undefined,
+        brand: '',
+        price: paiseToRupees(it.unitPricePaise),
+        image: '',
+        quantity: it.qty,
+      })),
+      subtotal: paiseToRupees(o.cartTotalPaise ?? 0),
+      tax: 0,
+      shipping: 0,
+      discount: paiseToRupees(o.walletDebitPaise ?? 0),
+      total: paiseToRupees(o.finalAmountPaise > 0 ? o.finalAmountPaise : o.cartTotalPaise),
+      status: mapConvexStatus(o.status),
+      paymentConfirmed: o.status === 'paid' || o.status === 'late_paid',
+      paymentConfirmedAt: o.paidAt ? new Date(o.paidAt).toISOString() : undefined,
+      paymentVerified:
+        o.status === 'paid' || o.status === 'late_paid'
+          ? 'YES'
+          : o.status === 'pending'
+          ? 'NO'
+          : 'REJECTED',
+      paymentVerifiedAt: o.paidAt ? new Date(o.paidAt).toISOString() : undefined,
+      createdAt: new Date(o.createdAt).toISOString(),
+      estimatedDelivery: '',
+      shippingAddress: {
+        name: o.address?.name ?? '',
+        address: o.address?.line1 ?? '',
+        city: o.address?.city ?? '',
+        state: o.address?.state ?? '',
+        zipCode: o.address?.pincode ?? '',
+      },
+      paymentMethod: isWalletLoad ? 'Wallet Load' : 'UPI',
+      upiId: undefined,
+      orderType: isWalletLoad ? 'wallet_load' : 'standard',
     };
+  });
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user]);
-
-  const fetchOrders = async (reset = false) => {
-    if (reset) {
-      setIsInitialLoading(true);
-      setIsFetchingMore(false);
-    } else {
-      setIsFetchingMore(true);
-    }
-    const currentPage = reset ? 0 : page;
-    const from = currentPage * ORDERS_PER_PAGE;
-    const to = from + ORDERS_PER_PAGE - 1;
-    const { data, error, count } = await supabase
-      .from('orders')
-      .select('*, order_items(*)', { count: 'exact' })
-      .eq('user_id', user!.id)
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      toast.error('Failed to fetch orders');
-    } else {
-      const formattedOrders = data?.map((order: any) => ({
-        id: order.id,
-        displayOrderId: order.display_order_id || 'N/A',
-        transactionId: order.transaction_id,
-        items: order.order_items.map((item: any) => ({
-          id: item.product_id,
-          name: item.product_name,
-          variant_name: item.variant_name,
-          brand: item.product_brand,
-          price: item.product_price,
-          image: item.product_image,
-          quantity: item.quantity,
-        })),
-        subtotal: order.subtotal,
-        tax: order.tax,
-        shipping: order.shipping,
-        discount: order.discount || 0,
-        total: order.total,
-        status: order.status,
-        paymentConfirmed: order.payment_confirmed,
-        paymentConfirmedAt: order.payment_confirmed_at,
-        paymentVerified: order.payment_verified,
-        paymentVerifiedAt: order.payment_verified_at,
-        paymentRejectionReason: order.payment_rejection_reason,
-        createdAt: order.created_at,
-        estimatedDelivery: order.estimated_delivery,
-        shippingCompany: order.shipping_company,
-        trackingId: order.tracking_id,
-        trackingLink: order.tracking_link,
-        shippingMethod: order.shipping_method,
-        shippingNotes: order.shipping_notes,
-        shippedAt: order.shipped_at,
-        deliveredAt: order.delivered_at,
-        deliveryNotes: order.delivery_notes,
-        deliveryProofUrl: order.delivery_proof_url,
-        shippingAddress: {
-          name: order.shipping_name || 'N/A',
-          full_name: order.shipping_name || 'N/A',
-          phone: order.shipping_phone || '',
-          address: order.shipping_address || '',
-          city: order.shipping_city || '',
-          state: order.shipping_state || '',
-          zipCode: order.shipping_zip_code || '',
-          pincode: order.shipping_zip_code || '',
-          country: order.shipping_country || 'India',
-          label: order.shipping_method || 'Saved address',
-        },
-        paymentMethod: order.payment_method,
-        upiId: order.upi_id,
-        orderType: order.order_type || (order.order_items.length === 1 && order.order_items[0].product_name === 'Wallet Credit' ? 'wallet_load' : 'standard')
-      })) || [];
-
-      if (reset) {
-        setOrders(formattedOrders);
-        setPage(0);
-      } else {
-        setOrders(prev => currentPage === 0 ? formattedOrders : [...prev, ...formattedOrders]);
-      }
-
-      setHasMore(formattedOrders.length === ORDERS_PER_PAGE);
-    }
-    setIsInitialLoading(false);
-    setIsFetchingMore(false);
-  };
-
-  // Infinite scroll with IntersectionObserver
-  const lastOrderElementRef = useCallback((node: HTMLDivElement | null) => {
-    if (isInitialLoading || isFetchingMore) return;
-    if (observerRef.current) observerRef.current.disconnect();
-    
-    observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage(prev => prev + 1);
-      }
-    });
-    
-    if (node) observerRef.current.observe(node);
-  }, [isInitialLoading, isFetchingMore, hasMore]);
-
-  // Fetch more when page changes
-  useEffect(() => {
-    if (page > 0 && user) {
-      fetchOrders(false);
-    }
-  }, [page, user]);
+  // Convex query is reactive; pagination not wired (first 50 orders)
+  const lastOrderElementRef = useCallback((_node: HTMLDivElement | null) => {}, []);
 
   const getStatusIcon = (status: Order['status']) => {
     switch (status) {
@@ -302,72 +250,29 @@ export function OrdersPage() {
       toast.error('Please sign in to retry payment');
       return;
     }
-
-    // Special handling for Wallet Loads - Go directly to transaction page
-    if (order.orderType === 'wallet_load') {
-      // Need to fetch the UPI link again? Actually we can just reuse the order details
-      // But the transaction page expects 'transactionId' and 'upiUrl' in state.
-      // The order object has 'transactionId' and 'upiId' (which is just the VPA, not the full link).
-      // Wait, create_order returns 'upi_deep_link'. Does the order record store the full deep link?
-      // The DB schema for 'orders' doesn't seem to store the full 'upi_deep_link', only 'upi_id' (the VPA).
-      // However, we can reconstruct the link or fetch it.
-      // Actually, the 'TransactionProcessingPage' generates the QR from 'upiUrl'.
-      // If we don't have the full link, we might need to regenerate it.
-      // Let's see... create_order generates it.
-      // But we can just construct it: upi://pay?pa=...
-      
-      const upiLink = `upi://pay?pa=${order.upiId || 'hrejuh@upi'}&pn=Cigarro&am=${order.total}&cu=INR&tn=Order-${order.transactionId}`;
-      
-      // Try to open UPI app immediately
-      try {
-        window.location.href = upiLink;
-      } catch (e) {
-        console.error('Failed to open UPI link:', e);
-      }
-
-      navigate('/transaction', {
-        state: {
-          type: 'order',
-          transactionId: order.transactionId,
-          amount: order.total,
-          orderId: order.id,
-          displayOrderId: order.displayOrderId,
-          paymentMethod: 'upi',
-          upiUrl: upiLink,
-          metadata: {
-            is_wallet_load: true
-          }
-        }
-      });
-      return;
-    }
-
     try {
-      // Store retry order info in sessionStorage (similar to Buy Now flow)
-      const retryOrderData = {
-        orderId: order.id,
-        displayOrderId: order.displayOrderId,
-        items: order.items,
-        total: order.total,
-        subtotal: order.subtotal,
-        shipping: order.shipping,
-        discount: order.discount,
-        tax: order.tax,
-        shippingAddress: order.shippingAddress
-      };
-      
-      // Clear any stale Buy Now data
-      sessionStorage.removeItem('isBuyNow');
-      sessionStorage.removeItem('buyNowItem');
-      
-      sessionStorage.setItem('retryOrder', JSON.stringify(retryOrderData));
-      sessionStorage.setItem('isRetryPayment', 'true');
-      // Navigate to checkout page with retry param
-      navigate(buildRoute.checkoutWithParams({ retry: true }));
-      
-    } catch (error) {
+      const result = await retryConvexOrder({ oldOrderId: order.id as any });
+      if (result.upiUrl) {
+        try {
+          window.location.href = result.upiUrl;
+        } catch (e) {
+          console.error('Failed to open UPI link:', e);
+        }
+      }
+      navigate('/transaction', {
+        state: { orderId: result.orderId, shouldClearCart: false },
+        replace: result.status === 'paid',
+      });
+    } catch (error: any) {
       console.error('Retry payment error:', error);
-      toast.error('Failed to initiate retry payment. Please try again.');
+      const code = error?.data?.code;
+      if (code === 'NOT_RETRYABLE') {
+        toast.error('This order can no longer be retried.');
+      } else if (code === 'SLOT_POOL_EXHAUSTED') {
+        toast.error('Too many pending orders at this price — try again in a few minutes.');
+      } else {
+        toast.error('Failed to initiate retry. Please try again.');
+      }
     }
   };
 
@@ -777,9 +682,21 @@ export function OrdersPage() {
 
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-2">
-                          {/* Retry Payment Button - Show for unpaid orders */}
-                          {(!order.paymentConfirmed || order.paymentVerified === 'NO' || order.paymentVerified === 'REJECTED') && order.status === 'pending' && (
-                            <Button 
+                          {/* Continue payment on pending orders, Retry on cancelled/expired */}
+                          {order.status === 'pending' && (
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/transaction', { state: { orderId: order.id } });
+                              }}
+                              className="flex-1 bg-canyon text-creme-light px-4 py-2.5 rounded-full font-medium text-sm uppercase tracking-wide transition-all duration-300 hover:bg-canyon/90 flex items-center justify-center gap-2"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Continue Payment
+                            </Button>
+                          )}
+                          {order.status === 'cancelled' && (
+                            <Button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRetryPayment(order);
@@ -831,9 +748,9 @@ export function OrdersPage() {
             )}
             
             {/* End of list indicator */}
-            {!hasMore && orders.length > 0 && (
+            {orders.length > 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                No more orders to load
+                Showing your latest {orders.length} orders
               </div>
             )}
           </div>

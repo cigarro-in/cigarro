@@ -37,6 +37,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
+import { paiseToRupees } from '../../lib/convex/money';
 
 interface MembershipTier {
   name: string;
@@ -118,64 +122,41 @@ const membershipTiers: MembershipTier[] = [
 export function ProfilePage() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const [totalSpent, setTotalSpent] = useState(0);
-  const [ordersCount, setOrdersCount] = useState(0);
+  const org = useOrg();
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTierIndex, setActiveTierIndex] = useState(0);
 
+  const convexOrders = useQuery(
+    api.orders.listMyOrders,
+    org && user ? { orgId: org._id, limit: 200 } : 'skip',
+  );
+  const walletData = useQuery(
+    api.wallet.getMyBalance,
+    org && user ? { orgId: org._id } : 'skip',
+  );
+
+  const purchaseOrders = (convexOrders || []).filter((o: any) => o.kind === 'purchase');
+  const validOrders = purchaseOrders.filter(
+    (o: any) => !['cancelled', 'voided', 'expired', 'refunded'].includes(o.status),
+  );
+  const ordersCount = validOrders.length;
+  const totalSpent = purchaseOrders
+    .filter((o: any) => o.status === 'paid' || o.status === 'late_paid')
+    .reduce((sum: number, o: any) => sum + paiseToRupees(o.finalAmountPaise), 0);
+  const walletBalance = walletData ? paiseToRupees(walletData.balancePaise) : 0;
+
+  const isLoading = convexOrders === undefined || walletData === undefined;
+
   useEffect(() => {
-    if (user) {
-      fetchUserStats();
-    }
-  }, [user]);
-
-  const fetchUserStats = async () => {
-    try {
-      // Fetch total spent and orders count
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('total, status')
-        .eq('user_id', user!.id);
-
-      if (!ordersError && orders) {
-        // Count valid orders (not cancelled)
-        const validOrders = orders.filter(o => o.status !== 'cancelled');
-        setOrdersCount(validOrders.length);
-
-        // Calculate total spent from confirmed orders
-        // Includes: processing, shipped, delivered, completed
-        const confirmedStatuses = ['processing', 'shipped', 'delivered', 'completed'];
-        const spentOrders = orders.filter(o => confirmedStatuses.includes(o.status));
-        setTotalSpent(spentOrders.reduce((sum, order) => sum + order.total, 0));
-      }
-
-      // Fetch wishlist count
-      const { data: wishlist, error: wishlistError } = await supabase
+    if (!user) return;
+    (async () => {
+      const { data: wishlist } = await supabase
         .from('wishlist')
         .select('id')
-        .eq('user_id', user!.id);
-
-      if (!wishlistError && wishlist) {
-        setWishlistCount(wishlist.length);
-      }
-
-      // Fetch wallet balance
-      const { data: balance, error: walletError } = await supabase.rpc('get_wallet_balance', {
-        p_user_id: user!.id
-      });
-
-      if (!walletError) {
-        setWalletBalance(balance || 0);
-      }
-
-    } catch (error) {
-      console.error('Error fetching user stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        .eq('user_id', user.id);
+      if (wishlist) setWishlistCount(wishlist.length);
+    })();
+  }, [user]);
 
   const getCurrentTier = (): MembershipTier => {
     return [...membershipTiers]

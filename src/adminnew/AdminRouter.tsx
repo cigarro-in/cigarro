@@ -22,6 +22,9 @@ import {
   DiscountFormPage,
   BlogFormPage,
   HeroSlideFormPage,
+  PaymentsPage,
+  UnmatchedEmailsPage,
+  PaymentSettingsPage,
 } from './pages';
 
 /**
@@ -42,6 +45,9 @@ export const ADMIN_ROUTES = [
   { path: '/admin/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
   { path: '/admin/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
   { path: '/admin/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
+  { path: '/admin/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/admin/payments/unmatched', element: UnmatchedEmailsPage, label: 'Unmatched Emails', section: 'payments' },
+  { path: '/admin/payments/settings', element: PaymentSettingsPage, label: 'Payment Settings', section: 'payments' },
 ] as const;
 
 interface AdminRouterProps {

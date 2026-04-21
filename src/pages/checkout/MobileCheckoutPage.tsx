@@ -15,6 +15,10 @@ import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
+import { rupeesToPaise } from '../../lib/convex/money';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -32,6 +36,10 @@ export function MobileCheckoutPage() {
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
+
+  const org = useOrg();
+  const convexWallet = useQuery(api.wallet.getMyBalance, org ? { orgId: org._id } : 'skip');
+  const createConvexOrder = useMutation(api.orders.createOrder);
 
   // Determine checkout flow type using URL params as source of truth, initialized once
   const [isBuyNow] = useState(() => {
@@ -320,25 +328,19 @@ export function MobileCheckoutPage() {
     return Math.max(0, totalPrice + shipping - discount);
   };
 
-  // Fetch wallet balance
+  // Sync Convex wallet balance (paise) into local state (rupees)
   const fetchWalletBalance = useCallback(async () => {
-    if (!user?.id) return;
+    // No-op: balance is fed reactively from the useQuery below.
+  }, []);
 
-    setIsWalletLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('get_wallet_balance', {
-        p_user_id: user.id
-      });
-
-      if (error) throw error;
-      setWalletBalance(data || 0);
-    } catch (error) {
-      console.error('Error fetching wallet balance:', error);
-      setWalletBalance(0);
-    } finally {
-      setIsWalletLoading(false);
+  useEffect(() => {
+    if (convexWallet === undefined) {
+      setIsWalletLoading(true);
+      return;
     }
-  }, [user?.id]);
+    setWalletBalance(convexWallet.balancePaise / 100);
+    setIsWalletLoading(false);
+  }, [convexWallet]);
 
   // Ref to hold latest values for fetchSavedAddresses to avoid dependency cycles
   const fetchContextRef = useRef({
@@ -467,233 +469,90 @@ export function MobileCheckoutPage() {
     }
   };
 
-  // Save order to database securely using RPC
-  const saveOrderToDatabase = async (txnId: string, status: string) => {
-    if (!user || !selectedAddress) return null;
-
-    try {
-      // Prepare items for RPC
-      const rpcItems = items.map((item: any) => ({
-        product_id: item.id,
-        quantity: item.quantity,
-        variant_id: item.variant_id || null,
-        combo_id: item.combo_id || null
-      }));
-
-      // Prepare shipping address for RPC
-      const rpcAddress = {
-        full_name: selectedAddress.full_name || defaultUserName,
-        address: selectedAddress.address,
-        city: selectedAddress.city,
-        state: selectedAddress.state,
-        pincode: selectedAddress.pincode,
-        country: selectedAddress.country || 'India',
-        phone: selectedAddress.phone || defaultUserPhone
-      };
-
-      // Call secure create_order RPC
-      const { data, error } = await supabase.rpc('create_order', {
-        p_items: rpcItems,
-        p_shipping_address: rpcAddress,
-        p_shipping_method: selectedShipping,
-        p_coupon_code: appliedDiscount?.discount_code || null,
-        p_lucky_discount: randomDiscount,
-        p_user_id: user.id
-      });
-
-      if (error) {
-        console.error('Error creating order:', error);
-        throw new Error(error.message || 'Failed to create order');
-      }
-
-      if (!data || !data.success) {
-        throw new Error(data?.message || 'Failed to create order');
-      }
-
-      // Return order object compatible with existing code
+  // Build Convex orderItemV[] from the current items list
+  const buildConvexItems = () =>
+    items.map((item: any) => {
+      const unitRupees = Number(item.variant_price ?? item.combo_price ?? item.price ?? 0);
       return {
-        id: data.order_id,
-        display_order_id: data.display_order_id,
-        total: data.total,
-        transaction_id: data.transaction_id || txnId, // Use backend-generated transaction ID
-        upi_deep_link: data.upi_deep_link // Backend-generated UPI deep link
+        productId: String(item.id),
+        variantId: item.variant_id ? String(item.variant_id) : undefined,
+        name: String(item.name ?? 'Item'),
+        qty: Number(item.quantity ?? 1),
+        unitPricePaise: rupeesToPaise(unitRupees),
       };
+    });
 
-    } catch (error) {
-      console.error('Error in saveOrderToDatabase:', error);
-      throw error;
-    }
-  };
-
-  // Helper function to trigger payment webhook
-  const triggerPaymentWebhook = (transactionId: string, orderId: string, amount: number) => {
-    const orderCreatedAt = new Date().toISOString();
-
-    fetch('/payment-email-webhook', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_WEBHOOK_SECRET || 'wjfx2qo61pi97ckareu0'}`
-      },
-      body: JSON.stringify({
-        orderId: transactionId,
-        transactionId: transactionId,
-        amount: amount,
-        orderCreatedAt: orderCreatedAt,
-        timestamp: new Date().toISOString()
-      }),
-      keepalive: true
-    }).catch(() => { /* Webhook error ignored */ });
-  };
-
-  // Unified payment handler
+  // Unified payment handler — creates a Convex order, navigates to /transaction.
+  // Convex handles wallet split, UPI URL generation, slot allocation, and verification.
   const handlePayment = async () => {
     if (!selectedAddress) {
       toast.error('Please select a delivery address');
       setShowAddressDialog(true);
       return;
     }
-
     if (!user) {
       toast.error('Please sign in to continue');
       return;
     }
-
-    // Determine if using wallet
-    const usingWallet = walletAmountToUse > 0;
-    const finalTotal = getFinalTotal();
-    const walletAmountUsed = usingWallet ? walletAmountToUse : 0;
-    const remainingAmount = finalTotal - walletAmountUsed;
+    if (!org) {
+      toast.error('Store is loading. Please try again in a moment.');
+      return;
+    }
 
     const shouldClearCart = !isBuyNow && !isRetryPayment;
     setIsProcessing(true);
     setIsCompletingOrder(true);
 
     try {
-      const txnId = `TXN${Date.now().toString().slice(-8)}`;
-      let order;
+      const address = {
+        line1: selectedAddress.address,
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        pincode: selectedAddress.pincode,
+        name: selectedAddress.full_name || defaultUserName || 'Customer',
+        phone: selectedAddress.phone || defaultUserPhone || '',
+      };
 
-      // Check if this is a retry for an existing order
-      if (isRetryPayment && retryOrder?.orderId) {
-        // Fetch existing order instead of updating (avoids RLS issues)
-        // The process_order_payment RPC should handle the transaction ID update if needed
-        const { data: existingOrder, error: fetchError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('id', retryOrder.orderId)
-          .maybeSingle();
+      const walletAmountPaise = walletAmountToUse > 0 ? rupeesToPaise(walletAmountToUse) : 0;
 
-        if (fetchError) {
-          console.error('Error fetching retry order:', fetchError);
-          order = await saveOrderToDatabase(txnId, 'pending');
-        } else if (!existingOrder) {
-          order = await saveOrderToDatabase(txnId, 'pending');
-        } else {
-          order = existingOrder;
-        }
-      } else {
-        // Create new order
-        order = await saveOrderToDatabase(txnId, 'pending');
-      }
+      const result = await createConvexOrder({
+        orgId: org._id,
+        kind: 'purchase',
+        items: buildConvexItems(),
+        address,
+        walletAmountPaise,
+      });
 
-      if (!order) {
-        throw new Error('Failed to process order record');
-      }
-      // Set navigating state FIRST to lock UI and prevent redirect effects
       isNavigatingRef.current = true;
 
-      // NOTE: Cart clearing moved to TransactionProcessingPage to prevent empty cart flicker
-      // if (shouldClearCart) {
-      //   try {
-      //     await clearCart();
-      //   } catch (err) {
-      //     console.error('Failed to clear cart (proceeding with navigation):', err);
-      //   }
-      // }
-
-      // Process payment with wallet if applicable
-      const { data: result, error } = await supabase.rpc('process_order_payment', {
-        p_user_id: user.id,
-        p_order_id: order.id,
-        p_transaction_id: txnId,
-        p_amount: finalTotal,
-        p_payment_method: usingWallet ? 'wallet' : 'upi',
-        p_use_wallet: usingWallet,
-        p_wallet_amount: walletAmountUsed,
-        p_metadata: {
-          wallet_balance_before: walletBalance,
-          wallet_amount_used: walletAmountUsed,
-          remaining_amount: remainingAmount
+      // Open UPI app if we have a URL (skip for wallet-only orders)
+      if (result.upiUrl) {
+        try {
+          window.location.href = result.upiUrl;
+        } catch (err) {
+          console.error('Failed to open UPI app:', err);
         }
-      });
-
-      if (error) {
-        console.error('❌ process_order_payment error:', error);
-        throw error;
-      }
-      // Check if wallet covered full amount (no additional payment needed)
-      if (remainingAmount === 0) {
-        // Navigate to transaction processing page for seamless experience
-        navigate('/transaction', {
-          state: {
-            type: 'wallet_payment',
-            transactionId: txnId,
-            amount: finalTotal,
-            orderId: order.id,
-            displayOrderId: order.display_order_id,
-            paymentMethod: 'wallet',
-            autoComplete: true, // Signals that payment is already verified
-            walletAmountUsed: walletAmountUsed,
-            shouldClearCart,
-            metadata: {
-              items_count: items.length,
-              shipping_cost: getShippingCost(),
-              discount: randomDiscount + (appliedDiscount?.discount_value || 0)
-            }
-          },
-          replace: true
-        });
-
-        return;
       }
 
-      // Remaining amount - redirect to UPI payment
-      // Trigger webhook
-      triggerPaymentWebhook(txnId, order.id, remainingAmount);
-
-      // Use backend-provided UPI link (already generated with correct UPI ID from settings)
-      const upiUrl = order.upi_deep_link || `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${remainingAmount}&cu=INR&tn=Order%20${order.display_order_id}%20${txnId}`;
-
-      // Open UPI app
-      try {
-        window.location.href = upiUrl;
-      } catch (err) {
-        console.error('Failed to open UPI app:', err);
-      }
-
-      // Navigate to transaction processing
       navigate('/transaction', {
         state: {
-          type: 'order',
-          transactionId: txnId,
-          amount: remainingAmount,
-          orderId: order.id,
-          paymentMethod: 'upi',
-          upiUrl,
+          orderId: result.orderId,
           shouldClearCart,
-          metadata: {
-            wallet_amount_used: walletAmountUsed,
-            is_partial_payment: usingWallet,
-            original_amount: finalTotal,
-            items_count: items.length,
-            shipping_cost: getShippingCost(),
-            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
-          }
-        }
+        },
+        replace: result.status === 'paid',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Payment error:', error);
-      toast.error('Payment failed. Please try again.');
+      const code = error?.data?.code ?? error?.message;
+      const msg =
+        code === 'SLOT_POOL_EXHAUSTED'
+          ? 'Too many pending orders at this price — please retry in a few minutes.'
+          : code === 'WALLET_INSUFFICIENT'
+          ? 'Wallet balance is insufficient.'
+          : code === 'ORG_INACTIVE'
+          ? 'Store is currently unavailable.'
+          : 'Payment failed. Please try again.';
+      toast.error(msg);
       setIsCompletingOrder(false);
       isNavigatingRef.current = false;
     } finally {
@@ -701,109 +560,15 @@ export function MobileCheckoutPage() {
     }
   };
 
-  // Handle Wallet payment (full payment)
+  // Wallet-only payment — set slider to full total then submit
   const handleWalletPayment = async () => {
-    // Ensure wallet amount is set to full total
     const finalTotal = getFinalTotal();
     setWalletAmountToUse(finalTotal);
-    // Proceed with payment
     await handlePayment();
   };
 
-  // Handle QR payment
-  const handleQRPayment = async () => {
-    if (!user) {
-      toast.error('Please sign in to continue');
-      return;
-    }
-
-    if (!selectedAddress) {
-      toast.error('Please select a delivery address');
-      setShowAddressDialog(true);
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const txnId = `TXN${Date.now().toString().slice(-8)}`;
-      const paymentAmount = Math.max(0, getFinalTotal() - walletAmountToUse);
-      const shouldClearCart = !isBuyNow && !isRetryPayment;
-      let order;
-
-      // Check if this is a retry for an existing order
-      if (isRetryPayment && retryOrder?.orderId) {
-        // Fetch existing order instead of updating (avoids RLS issues)
-        const { data: existingOrder, error: fetchError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('id', retryOrder.orderId)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Error fetching retry order:', fetchError);
-          // Fallback to new order
-          order = await saveOrderToDatabase(txnId, 'pending');
-        } else if (!existingOrder) {
-          order = await saveOrderToDatabase(txnId, 'pending');
-        } else {
-          order = existingOrder;
-        }
-      } else {
-        // Save order first
-        order = await saveOrderToDatabase(txnId, 'pending');
-      }
-
-      if (!order) {
-        throw new Error('Failed to process order record');
-      }
-
-      // Process QR payment
-      const { data: result, error } = await supabase.rpc('process_order_payment', {
-        p_user_id: user.id,
-        p_order_id: order.id,
-        p_transaction_id: txnId,
-        p_amount: paymentAmount,
-        p_payment_method: 'qr',
-        p_use_wallet: false,
-        p_wallet_amount: 0,
-        p_metadata: {
-          order_id: order.id,
-          items_count: items.length,
-          shipping_cost: getShippingCost(),
-          discount: randomDiscount + (appliedDiscount?.discount_value || 0),
-          coupon_code: appliedDiscount?.discount_code || null
-        }
-      });
-
-      if (error) throw error;
-
-      // Trigger webhook
-      triggerPaymentWebhook(txnId, order.id, paymentAmount);
-
-      // Navigate to unified transaction page
-      navigate('/transaction', {
-        state: {
-          type: 'order',
-          transactionId: txnId,
-          amount: paymentAmount,
-          orderId: order.id,
-          displayOrderId: order.display_order_id,
-          paymentMethod: 'qr',
-          shouldClearCart,
-          metadata: {
-            items_count: items.length,
-            shipping_cost: getShippingCost(),
-            discount: randomDiscount + (appliedDiscount?.discount_value || 0)
-          }
-        }
-      });
-    } catch (error) {
-      console.error('QR payment error:', error);
-      toast.error('Failed to initiate payment');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // QR is just a different rendering of the UPI URL — same backend path
+  const handleQRPayment = handlePayment;
 
   // Load data on mount
   useEffect(() => {

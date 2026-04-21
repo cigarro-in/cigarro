@@ -14,6 +14,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
+import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
@@ -36,6 +40,8 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
+  const org = useOrg();
+  const createConvexOrder = useMutation(api.orders.createOrder);
   
   // Check URL params to determine checkout type
   const searchParams = new URLSearchParams(window.location.search);
@@ -946,85 +952,64 @@ export function CheckoutPage() {
       toast.error('Please log in to complete your order');
       return;
     }
+    if (!org) {
+      toast.error('Store is loading. Please try again in a moment.');
+      return;
+    }
     setIsProcessingPayment(true);
-    
-    try {
-      // Prepare items for RPC
-      const rpcItems = items.map((item: any) => ({
-        product_id: item.id,
-        quantity: item.quantity,
-        variant_id: item.variant_id || null,
-        combo_id: item.combo_id || null
-      }));
 
-      // Prepare shipping address for RPC
-      const rpcAddress = {
-        full_name: formData.fullName,
-        address: formData.address,
+    try {
+      const address = {
+        line1: formData.address,
         city: formData.city,
         state: formData.state,
         pincode: formData.pincode,
-        country: formData.country || 'India',
-        phone: `${countryCode} ${formData.phone}`
+        name: formData.fullName,
+        phone: `${countryCode} ${formData.phone}`.trim(),
       };
 
-      // Call secure create_order RPC
-      const { data, error } = await supabase.rpc('create_order', {
-        p_items: rpcItems,
-        p_shipping_address: rpcAddress,
-        p_shipping_method: formData.shippingMethod,
-        p_coupon_code: appliedDiscount?.discount_code || null,
-        p_lucky_discount: randomDiscount,
-        p_user_id: user.id
+      const convexItems = items.map((item: any) => {
+        const unitRupees = Number(item.variant_price ?? item.combo_price ?? item.price ?? 0);
+        return {
+          productId: String(item.id),
+          variantId: item.variant_id ? String(item.variant_id) : undefined,
+          name: String(item.name ?? 'Item'),
+          qty: Number(item.quantity ?? 1),
+          unitPricePaise: rupeesToPaise(unitRupees),
+        };
       });
 
-      if (error) {
-        console.error('Error creating order:', error);
-        throw new Error(error.message || 'Failed to create order');
-      }
-
-      if (!data || !data.success) {
-        throw new Error(data?.message || 'Failed to create order');
-      }
-
-      // Construct order object from response
-      const order = {
-        id: data.order_id,
-        display_order_id: data.display_order_id,
-        total: data.total,
-        subtotal: data.subtotal,
-        discount: data.discount,
-        transaction_id: `TXN${Date.now().toString().slice(-8)}` // Temporary, updated later if needed
-      };
-
-      // Always try to save address on successful order (with duplicate prevention)
-      if (user) {
-        await saveAddressOnOrderSuccess();
-      }
-
-      // Set order as complete first to prevent navigation issues
-      setCompletedOrder(order);
-      setOrderComplete(true);
-      
-      // Clear cart after setting order complete
-      await clearCart();
-      
-      toast.success(`Order #${order.display_order_id} confirmed! Your order is now being processed.`);
-      
-      // Preload important pages in background for better UX
-      const preloadPages = ['/cart', '/orders', '/products'];
-      preloadPages.forEach(page => {
-        const preloadLink = document.createElement('link');
-        preloadLink.rel = 'prefetch';
-        preloadLink.href = page;
-        document.head.appendChild(preloadLink);
+      const result = await createConvexOrder({
+        orgId: org._id,
+        kind: 'purchase',
+        items: convexItems,
+        address,
       });
-      
-      // No automatic redirect - let user choose where to go
 
-    } catch (error) {
+      if (user) await saveAddressOnOrderSuccess();
+
+      if (result.upiUrl) {
+        try {
+          window.location.href = result.upiUrl;
+        } catch (err) {
+          console.error('Failed to open UPI app:', err);
+        }
+      }
+
+      navigate('/transaction', {
+        state: { orderId: result.orderId, shouldClearCart: true },
+        replace: result.status === 'paid',
+      });
+    } catch (error: any) {
       console.error('Failed to process order:', error);
-      toast.error('Failed to process order. Please contact support.');
+      const code = error?.data?.code;
+      const msg =
+        code === 'SLOT_POOL_EXHAUSTED'
+          ? 'Too many pending orders at this price — please retry shortly.'
+          : code === 'ORG_INACTIVE'
+          ? 'Store is currently unavailable.'
+          : 'Failed to process order. Please try again.';
+      toast.error(msg);
       setIsOrderProcessing(false);
     } finally {
       setIsProcessingPayment(false);

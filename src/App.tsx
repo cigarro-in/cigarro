@@ -9,6 +9,7 @@ import { BreadcrumbNav } from './components/layout/BreadcrumbNav';
 import { PageTransition } from './components/layout/PageTransition';
 import Footer from './components/layout/Footer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { ConvexSupabaseProvider } from './lib/convex/ConvexSupabaseProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
 import { supabase } from './lib/supabase/client';
@@ -156,13 +157,15 @@ export default function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <WishlistProvider>
-            <CartProvider>
-              <ThemeProvider>
-                <AppContent />
-              </ThemeProvider>
-            </CartProvider>
-          </WishlistProvider>
+          <ConvexSupabaseProvider>
+            <WishlistProvider>
+              <CartProvider>
+                <ThemeProvider>
+                  <AppContent />
+                </ThemeProvider>
+              </CartProvider>
+            </WishlistProvider>
+          </ConvexSupabaseProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>

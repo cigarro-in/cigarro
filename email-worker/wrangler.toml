@@ -1,0 +1,15 @@
+name = "cigarro-bank-email"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Deploy with: cd email-worker && npx wrangler deploy
+# Set secrets:
+#   npx wrangler secret put CONVEX_URL              # e.g. https://happy-otter-123.convex.site
+#   npx wrangler secret put EMAIL_WEBHOOK_SECRET    # same value as Convex env EMAIL_WEBHOOK_SECRET
+#
+# Wire up Email Routing:
+#   1. Cloudflare dashboard → your domain → Email → Email Routing
+#   2. Enable Email Routing, verify MX records
+#   3. Add a custom address like `bank-cigarro@yourdomain.com` → action: Send to Worker → pick this worker
+#   4. Repeat for every org alias (`bank-<org-slug>@yourdomain.com`)
+#   5. In Gmail, filter bank alert emails to auto-forward to that address
