@@ -115,12 +115,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.token_hash || !data.email) {
       throw new Error('Invalid server response — missing token_hash/email');
     }
+    // `admin.generateLink(type: 'magiclink')` returns a token_hash verifiable
+    // via the `magiclink` type. The `email` type is for 6-digit email OTPs.
     const { error: verifyErr } = await supabase.auth.verifyOtp({
-      email: data.email,
       token_hash: data.token_hash,
-      type: 'email',
+      type: 'magiclink',
     } as any);
-    if (verifyErr) throw verifyErr;
+    if (verifyErr) {
+      // eslint-disable-next-line no-console
+      console.error('[signInWithPhone] verifyOtp error:', verifyErr);
+      throw verifyErr;
+    }
 
     // Force a profile refresh so consumers see the fresh user state
     const {
