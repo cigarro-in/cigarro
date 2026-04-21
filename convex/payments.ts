@@ -65,13 +65,14 @@ export const releaseQuarantine = internalMutation({
  */
 export const ingestBankEmail = internalMutation({
   args: {
-    to: v.optional(v.string()), // inbox alias that received the email
-    alias: v.optional(v.string()), // legacy: local-part only
+    orgId: v.optional(v.id("organizations")),
+    to: v.optional(v.string()),
+    alias: v.optional(v.string()),
     from: v.string(),
     subject: v.optional(v.string()),
     textBody: v.optional(v.string()),
     htmlBody: v.optional(v.string()),
-    rawBody: v.optional(v.string()), // legacy
+    rawBody: v.optional(v.string()),
     messageId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -84,11 +85,17 @@ export const ingestBankEmail = internalMutation({
       .unique();
     if (seen) return { duplicate: true, emailId: seen._id };
 
-    // 2) Resolve org — prefer new bankInboxes, fall back to legacy org.bankEmailAlias
+    // 2) Resolve org.
+    //    Prefer the explicit orgId passed by the scheduler (GAS reads the
+    //    admin's personal inbox — the email's `to:` is their personal Gmail,
+    //    not an org-specific alias, so we can't derive orgId from the email
+    //    itself).
+    //    Fall back to bankInboxes / legacy org.bankEmailAlias for direct
+    //    webhook ingestion paths (e.g. a future Cloudflare Email Worker).
     const toLower = (args.to ?? "").toLowerCase();
-    let orgId: Id<"organizations"> | undefined;
+    let orgId: Id<"organizations"> | undefined = args.orgId;
 
-    if (toLower) {
+    if (!orgId && toLower) {
       const inbox = await ctx.db
         .query("bankInboxes")
         .withIndex("by_alias", (q) => q.eq("alias", toLower))

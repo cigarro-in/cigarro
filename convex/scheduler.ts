@@ -315,6 +315,7 @@ export const pokeGas = internalAction({
       const r: any = await ctx.runMutation(
         internal.payments.ingestBankEmail,
         {
+          orgId, // scheduler already knows whose scan this is
           to: em.to ? String(em.to).toLowerCase() : undefined,
           from: String(em.from),
           subject: em.subject ? String(em.subject) : undefined,
