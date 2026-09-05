@@ -518,7 +518,7 @@ function ProductPage() {
           product.origin || ''
         ].filter(Boolean) as string[]}
         image={gallery[0] || 'https://cigarro.in/logo.png'}
-        url={`https://cigarro.in${location.pathname}`}
+        url={product.canonical_url || `https://cigarro.in${location.pathname}`}
         type="product"
         price={getCurrentPrice().toString()}
         currency="INR"

@@ -10,9 +10,10 @@ export async function onRequest(context) {
     return next();
   }
   
-  // Apply SSR middleware for bots (handles product, category, brand pages)
+  // Apply SSR middleware for bots (must match BOT_USER_AGENTS in ssr-middleware.js —
+  // search crawlers + social/AI preview bots, otherwise link previews hit the age-gate SPA)
   const userAgent = request.headers.get('user-agent') || '';
-  const botUserAgents = ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot'];
+  const botUserAgents = ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain', 'pinterest', 'slackbot', 'vkshare', 'w3c_validator', 'whatsapp', 'gptbot', 'claudebot', 'anthropic', 'perplexity', 'applebot'];
   const isBot = botUserAgents.some(bot => userAgent.toLowerCase().includes(bot));
   
   if (isBot && (

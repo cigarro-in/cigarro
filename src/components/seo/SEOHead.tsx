@@ -71,8 +71,11 @@ export function SEOHead({
   };
   
   const canonicalUrl = buildCanonicalUrl();
-  
-  // Optimize description length (150-160 chars for best SEO)
+
+  // og:type only supports website/article/profile — never "product".
+  // For products we emit website + product: namespace tags below.
+  const ogType = type === 'article' ? 'article' : 'website';
+  const isDefaultImage = !image || image === 'https://cigarro.in/logo.png';
   const optimizedDescription = description.length > 160 
     ? description.substring(0, 157) + '...'
     : description;
@@ -162,23 +165,37 @@ export function SEOHead({
       <meta name="keywords" content={keywords.join(', ')} />
       <link rel="canonical" href={canonicalUrl} />
 
-      {/* Open Graph / Facebook */}
-      <meta property="og:type" content={type} />
+      {/* Open Graph / Facebook — og:type must be website/article, never "product" */}
+      <meta property="og:type" content={ogType} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:title" content={ogTitle || fullTitle} />
       <meta property="og:description" content={ogDescription || optimizedDescription} />
       <meta property="og:image" content={ogImage || image} />
-      <meta property="og:image:width" content="1200" />
-      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content={ogTitle || fullTitle} />
+      {!isDefaultImage && (
+        <>
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+        </>
+      )}
       <meta property="og:site_name" content="Cigarro" />
       <meta property="og:locale" content="en_IN" />
+      {type === 'product' && (
+        <>
+          {price && <meta property="product:price:amount" content={price} />}
+          <meta property="product:price:currency" content={currency} />
+          {brand && <meta property="product:brand" content={brand} />}
+          {availability && <meta property="product:availability" content={availability} />}
+        </>
+      )}
 
-      {/* Twitter */}
+      {/* Twitter — must use name=, not property= */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:url" content={canonicalUrl} />
       <meta name="twitter:title" content={twitterTitle || ogTitle || fullTitle} />
       <meta name="twitter:description" content={twitterDescription || ogDescription || optimizedDescription} />
       <meta name="twitter:image" content={twitterImage || ogImage || image} />
+      <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />
 
       {/* Additional Meta Tags */}
       <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />

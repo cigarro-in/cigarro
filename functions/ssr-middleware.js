@@ -5,6 +5,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // List of bot user agents that should receive pre-rendered HTML
+// Keep in sync with functions/_middleware.js
 const BOT_USER_AGENTS = [
   'googlebot',
   'bingbot',
@@ -24,7 +25,12 @@ const BOT_USER_AGENTS = [
   'slackbot',
   'vkshare',
   'w3c_validator',
-  'whatsapp'
+  'whatsapp',
+  'gptbot',
+  'claudebot',
+  'anthropic',
+  'perplexity',
+  'applebot'
 ];
 
 // Check if request is from a bot
@@ -39,7 +45,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name), price, description, short_description, meta_title, meta_description, og_image, product_variants(images, is_active)')
+      .select('id, name, slug, brand:brands(name), description, short_description, meta_title, meta_description, canonical_url, product_variants(images, is_active, price, variant_name)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -48,12 +54,37 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
       return null;
     }
 
-    const canonicalUrl = `https://cigarro.in/product/${slug}`;
+    const canonicalUrl = product.canonical_url || `https://cigarro.in/product/${slug}`;
     const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
     const variantImages = activeVariants.flatMap(v => v.images || []);
-    const imageUrl = variantImages[0] || product.og_image || faviconUrl;
+    // First active variant price is the source of truth (price lives on variants, not products)
+    const firstPricedVariant = activeVariants.find(v => v.price != null);
+    const price = firstPricedVariant?.price ?? null;
+    const imageUrl = variantImages[0] || faviconUrl;
     const title = product.meta_title || `${product.name} | Cigarro`;
     const description = product.meta_description || product.short_description || product.description?.substring(0, 160) || '';
+    // Related discovery for crawlers: same-brand products (avoids thin single-node pages)
+    let relatedLinks = '';
+    try {
+      const brandName = product.brand?.name;
+      if (brandName) {
+        const { data: related } = await supabase
+          .from('products')
+          .select('slug, name, brand:brands(name)')
+          .eq('is_active', true)
+          .neq('slug', slug)
+          .limit(50);
+        const sameBrand = (related || []).filter(p => {
+          const bn = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
+          return bn === brandName;
+        }).slice(0, 8);
+        if (sameBrand.length > 0) {
+          relatedLinks = `<nav aria-label="Related products"><h2>Related products</h2><ul>` +
+            sameBrand.map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
+            `</ul></nav>`;
+        }
+      }
+    } catch { /* related links are best-effort */ }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -74,12 +105,15 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <link rel="canonical" href="${canonicalUrl}">
   
   <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="product">
+  <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:alt" content="${escapeHtml(product.name)}">
   <meta property="og:site_name" content="Cigarro">
+  ${price != null ? `<meta property="product:price:amount" content="${price}">
+  <meta property="product:price:currency" content="INR">` : ''}
   
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
@@ -87,6 +121,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
   <meta name="twitter:image" content="${imageUrl}">
+  <meta name="twitter:image:alt" content="${escapeHtml(product.name)}">
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -95,18 +130,20 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
       '@type': 'Product',
       name: product.name,
       description: description,
-      image: imageUrl,
+      image: variantImages.length > 0 ? variantImages.slice(0, 5) : imageUrl,
       brand: {
         '@type': 'Brand',
         name: product.brand?.name || 'Cigarro'
       },
-      offers: {
-        '@type': 'Offer',
-        price: product.price,
-        priceCurrency: 'INR',
-        availability: 'https://schema.org/InStock',
-        url: canonicalUrl
-      }
+      ...(price != null ? {
+        offers: {
+          '@type': 'Offer',
+          price: price,
+          priceCurrency: 'INR',
+          availability: 'https://schema.org/InStock',
+          url: canonicalUrl
+        }
+      } : {})
     })}
   </script>
 </head>
@@ -114,8 +151,15 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <h1>${escapeHtml(product.name)}</h1>
   <p>${escapeHtml(description)}</p>
   <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
-  <p>Price: ₹${product.price}</p>
+  ${price != null ? `<p>Price: ₹${price}</p>` : ''}
   <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
+  <nav aria-label="Site"><ul>
+    <li><a href="https://cigarro.in/">Home</a></li>
+    <li><a href="https://cigarro.in/products">All products</a></li>
+    <li><a href="https://cigarro.in/categories">Categories</a></li>
+    <li><a href="https://cigarro.in/brands">Brands</a></li>
+  </ul></nav>
+  ${relatedLinks}
   
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
@@ -134,7 +178,7 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
   try {
     const { data: category, error } = await supabase
       .from('categories')
-      .select('id, name, slug, description')
+      .select('id, name, slug, description, meta_title, meta_description')
       .eq('slug', slug)
       .single();
 
@@ -143,8 +187,23 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
     }
 
     const canonicalUrl = `https://cigarro.in/category/${slug}`;
-    const title = `${category.name} | Cigarro`;
-    const description = category.description || `Shop premium ${category.name} at Cigarro`;
+    const title = category.meta_title || `${category.name} | Cigarro`;
+    const description = category.meta_description || category.description || `Shop premium ${category.name} at Cigarro`;
+    // Product links so bots can discover depth
+    let productLinks = '';
+    try {
+      const { data: links } = await supabase
+        .from('product_categories')
+        .select('product:products(slug, name, is_active)')
+        .eq('category_id', category.id)
+        .limit(20);
+      const items = (links || []).map(l => l.product).filter(p => p && p.is_active !== false && p.slug);
+      if (items.length > 0) {
+        productLinks = `<nav aria-label="Products in ${escapeHtml(category.name)}"><ul>` +
+          items.slice(0, 12).map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
+          `</ul></nav>`;
+      }
+    } catch { /* best-effort */ }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -175,6 +234,13 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
 <body>
   <h1>${escapeHtml(category.name)}</h1>
   <p>${escapeHtml(description)}</p>
+  <nav aria-label="Site"><ul>
+    <li><a href="https://cigarro.in/">Home</a></li>
+    <li><a href="https://cigarro.in/products">All products</a></li>
+    <li><a href="https://cigarro.in/categories">Categories</a></li>
+    <li><a href="https://cigarro.in/brands">Brands</a></li>
+  </ul></nav>
+  ${productLinks}
 </body>
 </html>`;
   } catch (error) {
@@ -183,12 +249,37 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
   }
 }
 
-// Generate HTML for brand pages
+// Generate HTML for brand pages — queried from DB, never guessed from slug
 async function generateBrandHTML(slug, supabase, faviconUrl) {
-  const brandName = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  const canonicalUrl = `https://cigarro.in/brand/${slug}`;
-  const title = `${brandName} Products | Cigarro`;
-  const description = `Shop premium ${brandName} cigarettes and tobacco products at Cigarro`;
+  try {
+    const { data: brand, error } = await supabase
+      .from('brands')
+      .select('id, name, slug, description, meta_title, meta_description, logo_url')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !brand) {
+      return null;
+    }
+
+    const canonicalUrl = `https://cigarro.in/brand/${slug}`;
+    const title = brand.meta_title || `${brand.name} Products | Cigarro`;
+    const description = brand.meta_description || brand.description || `Shop premium ${brand.name} cigarettes and tobacco products at Cigarro`;
+    let productLinks = '';
+    try {
+      const { data: products } = await supabase
+        .from('products')
+        .select('slug, name')
+        .eq('brand_id', brand.id)
+        .eq('is_active', true)
+        .limit(12);
+      if (products && products.length > 0) {
+        productLinks = `<nav aria-label="Products by ${escapeHtml(brand.name)}"><ul>` +
+          products.map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
+          `</ul></nav>`;
+      }
+    } catch { /* best-effort */ }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -204,21 +295,37 @@ async function generateBrandHTML(slug, supabase, faviconUrl) {
   <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  ${brand.logo_url ? `<meta property="og:image" content="${brand.logo_url}">
+  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">` : ''}
   
   <script type="application/ld+json">
   ${JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Brand',
-    name: brandName,
-    url: canonicalUrl
+    name: brand.name,
+    description: description,
+    url: canonicalUrl,
+    ...(brand.logo_url ? { logo: brand.logo_url } : {})
   })}
   </script>
 </head>
 <body>
-  <h1>${escapeHtml(brandName)}</h1>
+  <h1>${escapeHtml(brand.name)}</h1>
   <p>${escapeHtml(description)}</p>
+  <nav aria-label="Site"><ul>
+    <li><a href="https://cigarro.in/">Home</a></li>
+    <li><a href="https://cigarro.in/products">All products</a></li>
+    <li><a href="https://cigarro.in/categories">Categories</a></li>
+    <li><a href="https://cigarro.in/brands">Brands</a></li>
+  </ul></nav>
+  ${productLinks}
 </body>
 </html>`;
+  } catch (error) {
+    console.error('Error generating brand HTML:', error);
+    return null;
+  }
 }
 
 // Generate HTML for homepage

@@ -88,10 +88,14 @@ async function generateSitemap(supabase) {
     { url: '/blogs', priority: 0.7, changefreq: 'daily' },
     { url: '/about', priority: 0.6, changefreq: 'monthly' },
     { url: '/contact', priority: 0.6, changefreq: 'monthly' },
+    { url: '/legal', priority: 0.4, changefreq: 'monthly' },
     { url: '/privacy', priority: 0.3, changefreq: 'yearly' },
     { url: '/terms', priority: 0.3, changefreq: 'yearly' },
     { url: '/shipping', priority: 0.4, changefreq: 'monthly' },
   ];
+
+  // Known junk/test slugs — belt-and-braces; real fix is deactivating in DB
+  const EXCLUDED_BRAND_SLUGS = new Set(['ktnng']);
 
   // Fetch data (with error handling)
   const [productsResult, categoriesResult, brandsResult, blogResult] = await Promise.allSettled([
@@ -142,9 +146,10 @@ async function generateSitemap(supabase) {
 
   // Products with images
   products.forEach(product => {
+    if (!product.slug) return;
     const lastmod = product.updated_at ? new Date(product.updated_at).toISOString().split('T')[0] : today;
     xml += `  <url>
-    <loc>${BASE_URL}/product/${product.slug}</loc>
+    <loc>${BASE_URL}/product/${escapeXml(product.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>`;
@@ -173,31 +178,34 @@ async function generateSitemap(supabase) {
 
   // Categories
   categories.forEach(category => {
+    if (!category.slug) return;
     const lastmod = category.updated_at ? new Date(category.updated_at).toISOString().split('T')[0] : today;
     xml += `  <url>
-    <loc>${BASE_URL}/category/${category.slug}</loc>
+    <loc>${BASE_URL}/category/${escapeXml(category.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>\n`;
   });
 
-  // Brands
+  // Brands — skip known junk/test slugs (deactivate in DB for permanent fix)
   brands.forEach(brand => {
+    if (!brand.slug || EXCLUDED_BRAND_SLUGS.has(brand.slug)) return;
     const lastmod = brand.updated_at ? new Date(brand.updated_at).toISOString().split('T')[0] : today;
     xml += `  <url>
-    <loc>${BASE_URL}/brand/${brand.slug}</loc>
+    <loc>${BASE_URL}/brand/${escapeXml(brand.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>\n`;
   });
 
-  // Blog Posts
+  // Blog Posts — route is /blog/:slug (list lives at /blogs)
   blogPosts.forEach(post => {
+    if (!post.slug) return;
     const lastmod = post.updated_at ? new Date(post.updated_at).toISOString().split('T')[0] : today;
     xml += `  <url>
-    <loc>${BASE_URL}/blog/${post.slug}</loc>
+    <loc>${BASE_URL}/blog/${escapeXml(post.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

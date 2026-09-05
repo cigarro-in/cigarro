@@ -82,7 +82,7 @@
       "scripts": {
             "dev": "vite",
             "build": "vite build",
-            "build:copy-seo": "cp llms.txt public/llms.txt && cp robots.txt public/robots.txt && cp _redirects public/_redirects && cp _headers public/_headers",
+            "build:copy-seo": "node -e \"const fs=require('fs');const f=[['public/robots.txt','dist/robots.txt'],['public/llms.txt','dist/llms.txt'],['public/manifest.json','dist/manifest.json'],['_redirects','dist/_redirects'],['_headers','dist/_headers']];for(const [s,d] of f){try{if(fs.existsSync(s)){fs.copyFileSync(s,d);console.log('copied',s,'->',d)}else{console.log('skip missing',s)}}catch(e){console.log('copy failed',s,e.message)}}\"",
             "build:dynamic-sitemap": "npm run generate-sitemap && npm run build:copy-seo && vite build",
             "generate-sitemap": "tsx src/scripts/generate-sitemap.ts",
             "preview": "vite preview",
