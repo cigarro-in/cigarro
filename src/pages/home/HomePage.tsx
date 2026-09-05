@@ -24,7 +24,7 @@ export function HomePage() {
     <>
       <SEOHead
         title="Cigarro - Premium Cigarettes & Tobacco Online"
-        description="India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only."
+        description="India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery."
         url="https://cigarro.in/"
         type="website"
         keywords={['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes', 'luxury tobacco']}

@@ -332,7 +332,7 @@ async function generateBrandHTML(slug, supabase, faviconUrl) {
 function generateHomepageHTML(faviconUrl) {
   const canonicalUrl = 'https://cigarro.in/';
   const title = 'Cigarro - Premium Cigarettes & Tobacco Online';
-  const description = "India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery, 18+ only.";
+  const description = "India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery.";
 
   return `<!DOCTYPE html>
 <html lang="en">
