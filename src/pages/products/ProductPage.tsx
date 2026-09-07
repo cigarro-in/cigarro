@@ -114,7 +114,7 @@ function ProductPage() {
         // Fallback: Fetch product details with brand relation
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, name, slug, brand_id, brand:brands(id, name), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url')
+          .select('id, name, slug, brand_id, brand:brands(id, name), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url, rating_value, review_count')
           .eq('slug', slug)
           .single();
 
@@ -525,9 +525,7 @@ function ProductPage() {
         availability="in stock"
         brand={brandName}
         category={selectedVariant?.variant_type || 'Cigarettes'}
-        // Ratings pipeline: undefined (0 reviews) until the migration is applied
-        // and real reviews exist. NOTE: after running 001_product_ratings.sql, add
-        // rating_value, review_count to the product selects in this file.
+        // Ratings pipeline: undefined (0 reviews) until real reviews exist.
         ratingValue={(product as any)?.rating_value ?? undefined}
         reviewCount={(product as any)?.review_count ?? undefined}
       />

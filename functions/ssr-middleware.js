@@ -45,7 +45,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, product_variants(images, is_active, price, variant_name)')
+      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, price, variant_name)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -148,8 +148,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
         '@type': 'Brand',
         name: product.brand?.name || 'Cigarro'
       },
-      // NOTE: after running 001_product_ratings.sql, add rating_value, review_count
-      // to the product select above; the block below picks them up automatically.
+      // aggregateRating appears automatically once review_count > 0 (0 reviews = omitted).
       ...((product.rating_value != null && product.review_count > 0) ? {
         aggregateRating: {
           '@type': 'AggregateRating',
