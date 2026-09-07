@@ -45,7 +45,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name), description, short_description, meta_title, meta_description, canonical_url, product_variants(images, is_active, price, variant_name)')
+      .select('id, name, slug, brand:brands(name), description, short_description, meta_title, meta_description, canonical_url, specifications, product_variants(images, is_active, price, variant_name)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -53,6 +53,12 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
     if (error || !product) {
       return null;
     }
+
+    const specs = product.specifications && typeof product.specifications === 'object' ? product.specifications : {};
+    const specRows = Object.entries(specs)
+      .filter(([, v]) => v != null && String(v).trim() !== '')
+      .map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td></tr>`).join('');
+    const specTable = specRows ? `<h2>Specifications</h2><table>${specRows}</table>` : '';
 
     const canonicalUrl = product.canonical_url || `https://cigarro.in/product/${slug}`;
     const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
@@ -153,6 +159,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
   ${price != null ? `<p>Price: ₹${price}</p>` : ''}
   <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
+  ${specTable}
   <nav aria-label="Site"><ul>
     <li><a href="https://cigarro.in/">Home</a></li>
     <li><a href="https://cigarro.in/products">All products</a></li>

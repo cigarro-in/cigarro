@@ -78,6 +78,9 @@ function escapeXml(str) {
 async function generateSitemap(supabase) {
   const BASE_URL = 'https://cigarro.in';
   const today = new Date().toISOString().split('T')[0];
+  // Static pages change rarely — fixed date so Google trusts lastmod.
+  // Bump STATIC_LASTMOD only when static page content actually changes.
+  const STATIC_LASTMOD = '2026-09-07';
   
   // Static pages (NO user-specific pages like cart!)
   const staticPages = [
@@ -134,11 +137,11 @@ async function generateSitemap(supabase) {
   xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n';
   xml += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
-  // Static pages
+  // Static pages (lastmod pinned — see STATIC_LASTMOD above)
   staticPages.forEach(page => {
     xml += `  <url>
     <loc>${BASE_URL}${page.url}</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${STATIC_LASTMOD}</lastmod>
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
   </url>\n`;
