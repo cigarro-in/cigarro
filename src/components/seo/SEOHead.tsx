@@ -15,6 +15,12 @@ interface SEOHeadProps {
   availability?: 'in stock' | 'out of stock' | 'preorder';
   brand?: string;
   category?: string;
+  // Ratings pipeline (populated from product.rating_value / product.review_count once live).
+  // aggregateRating + review are only emitted when reviewCount > 0 — emitting placeholder
+  // ratings with zero reviews violates Google's spam policies and can get rich results suppressed.
+  ratingValue?: number;
+  reviewCount?: number;
+  reviews?: Array<{ author: string; rating: number; body: string; datePublished?: string }>;
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
@@ -38,6 +44,9 @@ export function SEOHead({
   availability = 'in stock',
   brand,
   category,
+  ratingValue,
+  reviewCount,
+  reviews,
   ogTitle,
   ogDescription,
   ogImage,
@@ -92,6 +101,7 @@ export function SEOHead({
     };
 
     if (type === 'product' && price) {
+      const hasRealReviews = reviewCount != null && reviewCount > 0 && ratingValue != null;
       return {
         ...baseData,
         '@type': 'Product',
@@ -106,9 +116,70 @@ export function SEOHead({
           seller: {
             '@type': 'Organization',
             name: 'Cigarro'
+          },
+          // Standard shipping: 5-7 business days, free, India-wide
+          shippingDetails: {
+            '@type': 'OfferShippingDetails',
+            shippingRate: {
+              '@type': 'MonetaryAmount',
+              value: 0,
+              currency
+            },
+            shippingDestination: {
+              '@type': 'DefinedRegion',
+              addressCountry: 'IN'
+            },
+            deliveryTime: {
+              '@type': 'ShippingDeliveryTime',
+              handlingTime: {
+                '@type': 'QuantitativeValue',
+                minValue: 1,
+                maxValue: 2,
+                unitCode: 'DAY'
+              },
+              transitTime: {
+                '@type': 'QuantitativeValue',
+                minValue: 5,
+                maxValue: 7,
+                unitCode: 'DAY'
+              }
+            }
+          },
+          // Consumables are non-returnable; damaged/incorrect items get a free
+          // replacement if reported within 48h — full policy at /returns
+          hasMerchantReturnPolicy: {
+            '@type': 'MerchantReturnPolicy',
+            applicableCountry: 'IN',
+            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            merchantReturnDays: 2,
+            merchantReturnLink: 'https://cigarro.in/returns'
           }
-        }
-        // Note: Only add aggregateRating when you have real reviews
+        },
+        // Only emitted with real reviews — never placeholders (Google spam policy)
+        ...(hasRealReviews
+          ? {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue,
+                reviewCount
+              },
+              ...(reviews && reviews.length > 0
+                ? {
+                    review: reviews.map(r => ({
+                      '@type': 'Review',
+                      author: { '@type': 'Person', name: r.author },
+                      reviewRating: {
+                        '@type': 'Rating',
+                        ratingValue: r.rating,
+                        bestRating: 5
+                      },
+                      reviewBody: r.body,
+                      ...(r.datePublished ? { datePublished: r.datePublished } : {})
+                    }))
+                  }
+                : {})
+            }
+          : {})
       };
     }
 

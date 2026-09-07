@@ -46,6 +46,7 @@ const LegalPage = lazy(() => import('../pages/legal/LegalPage').then(m => ({ def
 const TermsPage = lazy(() => import('../pages/legal/TermsPage').then(m => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('../pages/legal/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const ShippingPage = lazy(() => import('../pages/legal/ShippingPage').then(m => ({ default: m.ShippingPage })));
+const ReturnsPage = lazy(() => import('../pages/legal/ReturnsPage').then(m => ({ default: m.ReturnsPage })));
 
 // Admin - New modular admin system
 const AdminRouter = lazy(() => import('../adminnew/AdminRouter').then(m => ({ default: m.AdminRouter })));
@@ -106,6 +107,7 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
       <Route path={ROUTES.TERMS} element={<TermsPage />} />
       <Route path={ROUTES.SHIPPING} element={<ShippingPage />} />
+      <Route path={ROUTES.RETURNS} element={<ReturnsPage />} />
       <Route path={ROUTES.LEGAL} element={<LegalPage />} />
 
       {/* Catch-all route for broken links */}

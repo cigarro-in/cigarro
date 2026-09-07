@@ -154,7 +154,11 @@ export interface ProductFormData {
   meta_title?: string;
   meta_description?: string;
   canonical_url?: string;
-  
+
+  // Ratings pipeline (columns added by 001_product_ratings.sql; null/0 = no reviews yet)
+  rating_value?: number | null;
+  review_count?: number | null;
+
   // Variants (variants own images now)
   variants: VariantFormData[];
 }

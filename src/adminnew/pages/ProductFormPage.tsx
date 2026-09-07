@@ -63,7 +63,9 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     }],
     meta_title: '',
     meta_description: '',
-    canonical_url: ''
+    canonical_url: '',
+    rating_value: null,
+    review_count: 0
   });
 
   useEffect(() => {
@@ -186,7 +188,10 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         }],
         meta_title: data.meta_title || '',
         meta_description: data.meta_description || '',
-        canonical_url: data.canonical_url || ''
+        canonical_url: data.canonical_url || '',
+        // Ratings columns exist after 001_product_ratings.sql; undefined-safe before that
+        rating_value: (data as any).rating_value ?? null,
+        review_count: (data as any).review_count ?? 0
       };
 
       setFormData(mappedData);
@@ -366,6 +371,30 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         meta_title: formData.meta_title?.trim() || formData.name.trim(),
         meta_description: formData.meta_description?.trim() || '',
         canonical_url: formData.canonical_url?.trim() || ''
+        // NOTE: rating fields are saved separately below (saveRatings) so a missing
+        // 001_product_ratings.sql migration can never break product saves.
+      };
+
+      // Persist ratings only — isolated so unknown columns fail soft, not fatal.
+      const saveRatings = async (productId: string) => {
+        const rating_value = formData.rating_value == null || Number.isNaN(Number(formData.rating_value))
+          ? null
+          : Math.min(5, Math.max(0, Number(formData.rating_value)));
+        const review_count = formData.review_count == null || Number.isNaN(Number(formData.review_count))
+          ? 0
+          : Math.max(0, Math.floor(Number(formData.review_count)));
+        // Skip the extra round-trip when there's nothing to store yet (0 reviews).
+        if (rating_value == null && (review_count === 0 || formData.review_count == null)) return;
+        try {
+          const { error } = await supabase
+            .from('products')
+            .update({ rating_value, review_count })
+            .eq('id', productId);
+          if (error) throw error;
+        } catch (e) {
+          console.warn('Ratings not saved (run 001_product_ratings.sql):', e);
+          toast.info('Product saved. Ratings columns not migrated yet — run 001_product_ratings.sql to enable them.');
+        }
       };
 
       if (isEditMode) {
@@ -375,6 +404,9 @@ export function ProductFormPage({ }: ProductFormPageProps) {
           .eq('id', id);
 
         if (error) throw error;
+
+        // Ratings live in their own update so a pending migration never blocks saves
+        if (id) await saveRatings(id);
 
         // Delete removed variants
         if (deletedVariantIds.length > 0) {
@@ -457,6 +489,9 @@ export function ProductFormPage({ }: ProductFormPageProps) {
           .single();
 
         if (error) throw error;
+
+        // Ratings live in their own update so a pending migration never blocks saves
+        await saveRatings(newProduct.id);
 
         // Insert variants
         const variantsToInsert = formData.variants.map(variant => ({
@@ -1018,6 +1053,39 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rating_value">Rating (0–5)</Label>
+                  <Input
+                    id="rating_value"
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    value={formData.rating_value ?? ''}
+                    onChange={(e) => handleChange({ rating_value: e.target.value === '' ? null : Number(e.target.value) })}
+                    placeholder="e.g. 4.5"
+                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="review_count">Review count</Label>
+                  <Input
+                    id="review_count"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={formData.review_count ?? 0}
+                    onChange={(e) => handleChange({ review_count: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    placeholder="0"
+                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Shows as stars on the product page only once review count is above 0. Leave at 0 until the reviews pipeline is live.
+              </p>
             </AdminCardContent>
           </AdminCard>
         </div>

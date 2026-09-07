@@ -148,13 +148,39 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
         '@type': 'Brand',
         name: product.brand?.name || 'Cigarro'
       },
+      // NOTE: after running 001_product_ratings.sql, add rating_value, review_count
+      // to the product select above; the block below picks them up automatically.
+      ...((product.rating_value != null && product.review_count > 0) ? {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: product.rating_value,
+          reviewCount: product.review_count
+        }
+      } : {}),
       ...(price != null ? {
         offers: {
           '@type': 'Offer',
           price: price,
           priceCurrency: 'INR',
           availability: 'https://schema.org/InStock',
-          url: canonicalUrl
+          url: canonicalUrl,
+          shippingDetails: {
+            '@type': 'OfferShippingDetails',
+            shippingRate: { '@type': 'MonetaryAmount', value: 0, currency: 'INR' },
+            shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'IN' },
+            deliveryTime: {
+              '@type': 'ShippingDeliveryTime',
+              handlingTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2, unitCode: 'DAY' },
+              transitTime: { '@type': 'QuantitativeValue', minValue: 5, maxValue: 7, unitCode: 'DAY' }
+            }
+          },
+          hasMerchantReturnPolicy: {
+            '@type': 'MerchantReturnPolicy',
+            applicableCountry: 'IN',
+            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            merchantReturnDays: 2,
+            merchantReturnLink: 'https://cigarro.in/returns'
+          }
         }
       } : {})
     })}

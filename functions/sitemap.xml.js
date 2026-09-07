@@ -95,6 +95,7 @@ async function generateSitemap(supabase) {
     { url: '/privacy', priority: 0.3, changefreq: 'yearly' },
     { url: '/terms', priority: 0.3, changefreq: 'yearly' },
     { url: '/shipping', priority: 0.4, changefreq: 'monthly' },
+    { url: '/returns', priority: 0.4, changefreq: 'monthly' },
   ];
 
   // Known junk/test slugs — belt-and-braces; real fix is deactivating in DB

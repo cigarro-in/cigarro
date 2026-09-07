@@ -73,14 +73,14 @@ export function ShippingPage() {
                 {
                   icon: Clock,
                   title: "2. Delivery Times",
-                  content: "Standard delivery times vary by location:",
+                  content: "We keep it simple — one standard shipping option, free on every order across India:",
                   items: [
-                    "Metro cities: 2-3 business days",
-                    "Tier-2 cities: 3-5 business days",
-                    "Tier-3 cities and towns: 5-7 business days",
-                    "Remote areas: 7-10 business days"
+                    "Standard shipping: 5-7 business days, anywhere in India",
+                    "Free on all orders — no minimums, no tiers",
+                    "Dispatched within 1-2 business days of ordering",
+                    "Full tracking shared by email and SMS once your order ships"
                   ],
-                  note: "Delivery times are calculated from the date of dispatch, not the order date. Processing time is typically 1-2 business days."
+                  note: "Remote pin codes can occasionally take a day or two longer. If that happens, we'll keep you posted over SMS."
                 },
                 {
                   icon: Package,

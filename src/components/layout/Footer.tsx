@@ -117,6 +117,9 @@ const Footer = () => {
                     <Link to="/shipping" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Shipping Info
                     </Link>
+                    <Link to="/returns" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Returns Policy
+                    </Link>
                     <Link to="/privacy" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Privacy Policy
                     </Link>

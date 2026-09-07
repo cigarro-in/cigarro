@@ -525,6 +525,11 @@ function ProductPage() {
         availability="in stock"
         brand={brandName}
         category={selectedVariant?.variant_type || 'Cigarettes'}
+        // Ratings pipeline: undefined (0 reviews) until the migration is applied
+        // and real reviews exist. NOTE: after running 001_product_ratings.sql, add
+        // rating_value, review_count to the product selects in this file.
+        ratingValue={(product as any)?.rating_value ?? undefined}
+        reviewCount={(product as any)?.review_count ?? undefined}
       />
       <BreadcrumbSchema
         items={[

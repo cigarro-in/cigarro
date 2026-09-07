@@ -48,6 +48,7 @@ export const ROUTES = {
   PRIVACY: '/privacy',
   TERMS: '/terms',
   SHIPPING: '/shipping',
+  RETURNS: '/returns',
   
   // Admin
   ADMIN: '/admin/*',
@@ -126,6 +127,7 @@ export const ROUTE_GROUPS = {
     ROUTES.PRIVACY,
     ROUTES.TERMS,
     ROUTES.SHIPPING,
+    ROUTES.RETURNS,
   ],
 } as const;
 
