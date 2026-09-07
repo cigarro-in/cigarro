@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
+import { supabase } from '../../lib/supabase/client';
+
+interface FooterBrand { id: string; name: string; slug: string; }
 
 const Footer = () => {
+  const [brands, setBrands] = useState<FooterBrand[]>([]);
+  useEffect(() => {
+    supabase
+      .from('brands')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => { if (data) setBrands(data); });
+  }, []);
   return (
     <footer className="section bg-creme-light relative overflow-hidden z-10">
       {/* Background Video (optional) - Commented out until video file is added */}
@@ -41,7 +53,7 @@ const Footer = () => {
             
             {/* Menu Links */}
             <div className="lg:col-span-6">
-              <div className="grid grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                 {/* Shop Column */}
                 <div>
                   <h4 className="suptitle text-dark mb-4">Shop</h4>
@@ -52,15 +64,30 @@ const Footer = () => {
                     <Link to="/categories" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Categories
                     </Link>
-                    <Link to="/wishlist" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Wishlist
+                    <Link to="/category/cigarettes" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Cigarettes
                     </Link>
-                    <Link to="/cart" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Shopping Cart
+                    <Link to="/category/rolling-stuff" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Rolling Papers
                     </Link>
                   </div>
                 </div>
-                
+
+                {/* Brands Column — indexable deep links */}
+                <div>
+                  <h4 className="suptitle text-dark mb-4">Brands</h4>
+                  <div className="space-y-3">
+                    <Link to="/brands" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      All Brands
+                    </Link>
+                    {brands.slice(0, 8).map(b => (
+                      <Link key={b.id} to={`/brand/${b.slug}`} className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                        {b.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Account Column */}
                 <div>
                   <h4 className="suptitle text-dark mb-4">Account</h4>
@@ -71,24 +98,21 @@ const Footer = () => {
                     <Link to="/wishlist" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       My Wishlist
                     </Link>
-                    <Link to="/checkout" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Checkout
-                    </Link>
                     <Link to="/about" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       About Us
                     </Link>
+                    <Link to="/contact" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Contact
+                    </Link>
                   </div>
                 </div>
-                
+
                 {/* Information Column */}
                 <div>
                   <h4 className="suptitle text-dark mb-4">Information</h4>
                   <div className="space-y-3">
                     <Link to="/blogs" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Blog
-                    </Link>
-                    <Link to="/contact" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Contact Us
                     </Link>
                     <Link to="/shipping" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Shipping Info
@@ -99,6 +123,9 @@ const Footer = () => {
                     <Link to="/terms" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Terms of Service
                     </Link>
+                    <a href="/sitemap.xml" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      Sitemap
+                    </a>
                   </div>
                 </div>
               </div>

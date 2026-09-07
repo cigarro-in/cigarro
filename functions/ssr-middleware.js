@@ -69,28 +69,35 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
     const imageUrl = variantImages[0] || faviconUrl;
     const title = product.meta_title || `${product.name} | Cigarro`;
     const description = product.meta_description || product.short_description || product.description?.substring(0, 160) || '';
-    // Related discovery for crawlers: same-brand products (avoids thin single-node pages)
+    // Related discovery: same-brand first, fill with other active products (avoids thin
+    // single-node pages for brands like Marlboro that only have one SKU).
     let relatedLinks = '';
     try {
       const brandName = product.brand?.name;
-      if (brandName) {
-        const { data: related } = await supabase
-          .from('products')
-          .select('slug, name, brand:brands(name)')
-          .eq('is_active', true)
-          .neq('slug', slug)
-          .limit(50);
-        const sameBrand = (related || []).filter(p => {
-          const bn = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
-          return bn === brandName;
-        }).slice(0, 8);
-        if (sameBrand.length > 0) {
-          relatedLinks = `<nav aria-label="Related products"><h2>Related products</h2><ul>` +
-            sameBrand.map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
-            `</ul></nav>`;
-        }
+      const { data: related } = await supabase
+        .from('products')
+        .select('slug, name, brand:brands(name)')
+        .eq('is_active', true)
+        .neq('slug', slug)
+        .limit(50);
+      const list = related || [];
+      const sameBrand = brandName ? list.filter(p => {
+        const bn = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
+        return bn === brandName;
+      }) : [];
+      const other = list.filter(p => !sameBrand.includes(p));
+      const picks = [...sameBrand, ...other].slice(0, 8);
+      if (picks.length > 0) {
+        relatedLinks = `<nav aria-label="Related products"><h2>Related products</h2><ul>` +
+          picks.map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
+          `</ul></nav>`;
       }
     } catch { /* related links are best-effort */ }
+
+    // Always link the brand page (B2: every product page → its brand page)
+    const brandLink = product.brand?.name && product.brand?.slug
+      ? `<nav aria-label="Brand"><h2>Browse by brand</h2><ul><li><a href="https://cigarro.in/brand/${escapeHtml(product.brand.slug)}">All ${escapeHtml(product.brand.name)} products</a></li></ul></nav>`
+      : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -160,6 +167,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   ${price != null ? `<p>Price: ₹${price}</p>` : ''}
   <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
   ${specTable}
+  ${brandLink}
   <nav aria-label="Site"><ul>
     <li><a href="https://cigarro.in/">Home</a></li>
     <li><a href="https://cigarro.in/products">All products</a></li>
