@@ -339,8 +339,12 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     }
 
     if (!defaultVariant.images || defaultVariant.images.length === 0) {
-      toast.error('Default variant must have at least one image');
-      return;
+      // Imageless products are valid (photos get added later) — confirm instead of blocking,
+      // otherwise products created without images can never be saved at all.
+      const proceed = window.confirm(
+        'Default variant has no images. Product pages without photos rank poorly. Save anyway?'
+      );
+      if (!proceed) return;
     }
 
     setSaving(true);
