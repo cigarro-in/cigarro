@@ -45,7 +45,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name), description, short_description, meta_title, meta_description, canonical_url, specifications, product_variants(images, is_active, price, variant_name)')
+      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, product_variants(images, is_active, price, variant_name)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
