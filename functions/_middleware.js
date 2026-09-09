@@ -13,13 +13,25 @@ export async function onRequest(context) {
   // Apply SSR middleware for bots (must match BOT_USER_AGENTS in ssr-middleware.js —
   // search crawlers + social/AI preview bots, otherwise link previews hit the age-gate SPA)
   const userAgent = request.headers.get('user-agent') || '';
-  const botUserAgents = ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain', 'pinterest', 'slackbot', 'vkshare', 'w3c_validator', 'whatsapp', 'gptbot', 'claudebot', 'anthropic', 'perplexity', 'applebot'];
+  const botUserAgents = ['googlebot', 'google-extended', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'bytespider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain', 'pinterest', 'slackbot', 'vkshare', 'w3c_validator', 'whatsapp', 'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web', 'anthropic', 'perplexity', 'meta-externalagent', 'meta-externalfetch', 'applebot', 'amazonbot'];
   const isBot = botUserAgents.some(bot => userAgent.toLowerCase().includes(bot));
+
+  // Explicit ?format=json|md on read-only catalog routes: any UA.
+  // (ssr-middleware.js re-validates route + format; data = public catalog only)
+  const formatParam = (url.searchParams.get('format') || '').toLowerCase();
+  const isAgentFormatRoute =
+    url.pathname === '/agents' ||
+    url.pathname === '/products' ||
+    url.pathname.startsWith('/product/');
+  if ((formatParam === 'json' || formatParam === 'md') && isAgentFormatRoute) {
+    return ssrMiddleware(context);
+  }
   
   if (isBot && (
     url.pathname === '/' ||
     url.pathname === '/about' ||
     url.pathname === '/contact' ||
+    url.pathname === '/agents' ||
     url.pathname === '/products' ||
     url.pathname === '/categories' ||
     url.pathname === '/brands' ||

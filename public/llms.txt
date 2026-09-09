@@ -30,11 +30,23 @@ Cigarro is India's premier online marketplace for premium cigarettes, cigars, an
 - Romeo y Julieta
 
 # Key Pages
+> /agents
+Machine-readable entry point for AI shopping agents: search template, variant semantics, compliance rules
+
 > /
 Homepage with featured products and collections
 
 > /products
 Complete product catalog with filtering and search
+Agent search template: https://cigarro.in/products?search={query} (e.g. ?search=Dunhill+Red+carton)
+
+# Machine Formats (no login, any client)
+> /agents?format=json (or ?format=md)
+Agent manifest: search template, URL patterns, rules
+> /products?search={query}&format=json
+Live search results with per-variant INR price + stock status
+> /product/{slug}?format=json (or ?format=md)
+One product: variants, prices, stock, specs, related links
 
 > /category/[slug]
 Category-specific product listings

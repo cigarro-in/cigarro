@@ -40,6 +40,7 @@ const BlogsPage = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ defa
 const BlogPost = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogPost })));
 const AboutPage = lazy(() => import('../pages/company/AboutPage').then(m => ({ default: m.AboutPage })));
 const ContactPage = lazy(() => import('../pages/company/ContactPage').then(m => ({ default: m.ContactPage })));
+const AgentsPage = lazy(() => import('../pages/agents/AgentsPage').then(m => ({ default: m.AgentsPage })));
 
 // Legal
 const LegalPage = lazy(() => import('../pages/legal/LegalPage').then(m => ({ default: m.LegalPage })));
@@ -102,6 +103,7 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
       <Route path={ROUTES.ABOUT} element={<AboutPage />} />
       <Route path={ROUTES.CONTACT} element={<ContactPage />} />
+      <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
 
       {/* Legal */}
       <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />

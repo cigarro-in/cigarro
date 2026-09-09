@@ -91,6 +91,7 @@ async function generateSitemap(supabase) {
     { url: '/blogs', priority: 0.7, changefreq: 'daily' },
     { url: '/about', priority: 0.6, changefreq: 'monthly' },
     { url: '/contact', priority: 0.6, changefreq: 'monthly' },
+    { url: '/agents', priority: 0.5, changefreq: 'monthly' },
     { url: '/legal', priority: 0.4, changefreq: 'monthly' },
     { url: '/privacy', priority: 0.3, changefreq: 'yearly' },
     { url: '/terms', priority: 0.3, changefreq: 'yearly' },

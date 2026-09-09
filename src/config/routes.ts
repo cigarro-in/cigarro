@@ -42,6 +42,7 @@ export const ROUTES = {
   BLOG_POST: '/blog/:slug',
   ABOUT: '/about',
   CONTACT: '/contact',
+  AGENTS: '/agents',
   
   // Legal
   LEGAL: '/legal',

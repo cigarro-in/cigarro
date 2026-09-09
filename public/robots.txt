@@ -1,5 +1,8 @@
 # Cigarro - Premium Cigarette Marketplace
 # Last updated: December 2025
+#
+# AI shopping agents: start at https://cigarro.in/agents
+# Store manual for LLMs: https://cigarro.in/llms.txt
 
 Sitemap: https://cigarro.in/sitemap.xml
 

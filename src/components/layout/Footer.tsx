@@ -129,6 +129,9 @@ const Footer = () => {
                     <a href="/sitemap.xml" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Sitemap
                     </a>
+                    <Link to="/agents" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                      AI Agents
+                    </Link>
                   </div>
                 </div>
               </div>
