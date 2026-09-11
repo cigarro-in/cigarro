@@ -17,6 +17,9 @@ import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
 import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
+import { useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
+import { useOrg } from './lib/convex/useOrg';
 import { ThemeProvider, useTheme } from './themes';
 
 // Loading component - simplified to null for seamless transitions
@@ -31,6 +34,18 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const ThemeLayout = theme.slots.Layout;
+  const org = useOrg();
+  const upsertConvexUser = useMutation(api.userState.upsertUser);
+
+  // Phase 1: maintain the Convex user spine (lazy backfill — creates the row
+  // on first seen session; isAdmin stays on Supabase profiles until Phase 2).
+  useEffect(() => {
+    if (!user || !org) return;
+    const args: { orgId: typeof org._id; phone?: string; name?: string } = { orgId: org._id };
+    if (user.phone) args.phone = user.phone;
+    if (user.name) args.name = user.name;
+    upsertConvexUser(args).catch(() => {});
+  }, [user?.id, org?._id]);
   
   // Check localStorage immediately to prevent flash of age verification
   const [isAgeVerified, setIsAgeVerified] = useState(() => {

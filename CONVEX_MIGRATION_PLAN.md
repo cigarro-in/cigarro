@@ -66,13 +66,20 @@ Result: Phase 2 rewrites zero data rows and zero table schemas.
 
 - [x] Schema: `users`, `carts`, `wishlists`, `savedAddresses` (+indexes) — deployed
 - [x] Functions: `convex/userState.ts` (upsertUser/getMe, cart CRUD, wishlist toggle, address CRUD) — deployed
-- [ ] Rewrite `useCart` (Supabase `cart_items` → Convex; keep totals math + re-price-at-checkout)
-- [ ] Rewrite `useWishlist` (`user_wishlists` → Convex)
-- [ ] Profiles: `useAuth`/`useAdminAuth` profile reads → Convex `users` (+ backfill job for existing Supabase profiles)
+- [x] Rewrite `useCart` (Supabase `cart_items` → Convex; same state machine,
+  guest merge, totals; rehydrate rich items from catalog; cross-tab adopt)
+  (`82fff741`)
+- [x] Rewrite `useWishlist` (`user_wishlists` → Convex, realtime subscription,
+  guest localStorage preserved, rollback flag) (`3ef7d826`)
+- [x] Lazy profile spine: `AppContent` upserts Convex `users` per session
+  (no backfill script — rows create on next login/restored session).
+  `isAdmin` resolution stays on Supabase profiles → Phase 2 (memberships).
+- [x] Guest-transfer util neutralized (hooks merge; no Supabase writes, no
+  early localStorage clear, local-only new-user check)
 - [ ] Addresses: `AddressManager`/`AddressDrawer` (`saved_addresses` → Convex)
-- [ ] Backfill: one-shot script copying Supabase rows → Convex (idempotent, by userId)
 - [ ] Dual-read soak: 48h with mismatch logging, then Supabase reads removed
 - [ ] NEW: `productReviews` table + PDP UI + WhatsApp request hook (reviews never existed — build natively in Convex, not Supabase)
+- [ ] `pincode_lookup` EXCLUDED from migration (founder decision 2026-09-11: GPS lookup replaces it; do not transfer)
 
 **Acceptance:** cart/wishlist/address flows verified black-box against
 production build; no Supabase `cart_items`/`user_wishlists`/`saved_addresses`

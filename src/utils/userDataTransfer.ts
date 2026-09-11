@@ -1,28 +1,17 @@
-import { supabase } from '../lib/supabase/client';
-import { CartItem } from '../hooks/useCart';
-import { toast } from 'sonner';
-
 /**
- * Transfers guest cart and wishlist data to a new user account
- * This should only be called for new signups, not existing user logins
+ * Transfers guest cart and wishlist data to a new user account.
+ *
+ * Phase 1 (Convex migration): the useCart/useWishlist hooks now merge guest
+ * localStorage data into Convex-backed server state themselves on user
+ * change. This util therefore only nudges the hooks to reload — it must NOT
+ * write to the legacy Supabase tables or clear localStorage early, or guest
+ * items would bypass the Convex merge and be lost.
  */
 export const transferGuestDataToUser = async (userId: string): Promise<void> => {
   try {
-
-    // Transfer cart data
-    await transferGuestCartToUser(userId);
-
-    // Transfer wishlist data
-    await transferGuestWishlistToUser(userId);
-
-    // Clear localStorage after successful transfer
-    localStorage.removeItem('cart');
-    localStorage.removeItem('wishlist');
-
-    // Dispatch events to update UI counters
+    // Dispatch events to update UI counters; hooks merge guest data.
     window.dispatchEvent(new Event('cartUpdated'));
     window.dispatchEvent(new Event('wishlistUpdated'));
-
   } catch (error) {
     console.error('Error transferring guest data to user:', error);
     // Don't show error to user as this is a background operation
@@ -31,155 +20,18 @@ export const transferGuestDataToUser = async (userId: string): Promise<void> => 
 };
 
 /**
- * Transfers guest cart from localStorage to user's database cart
- */
-const transferGuestCartToUser = async (userId: string): Promise<void> => {
-  const guestCartData = localStorage.getItem('cart');
-  if (!guestCartData) {
-
-    return;
-  }
-
-  try {
-    const guestCart: CartItem[] = JSON.parse(guestCartData);
-    if (!guestCart.length) {
-
-      return;
-    }
-
-    // Check if user already has cart items (shouldn't happen for new users, but safety check)
-    const { data: existingCartItems } = await supabase
-      .from('cart_items')
-      .select('product_id, variant_id, combo_id')
-      .eq('user_id', userId);
-
-    const existingItemKeys = new Set(
-      (existingCartItems || []).map(item =>
-        `${item.product_id}-${item.variant_id || 'null'}-${item.combo_id || 'null'}`
-      )
-    );
-
-    // Prepare cart items for insertion, avoiding duplicates
-    const cartItemsToInsert = guestCart
-      .filter(item => {
-        const itemKey = `${item.id}-${item.variant_id || 'null'}-${item.combo_id || 'null'}`;
-        return !existingItemKeys.has(itemKey);
-      })
-      .map(item => ({
-        user_id: userId,
-        product_id: item.id,
-        quantity: item.quantity,
-        variant_id: item.variant_id || null,
-        combo_id: item.combo_id || null,
-        variant_price: item.variant_price || null,
-        combo_price: item.combo_price || null,
-        created_at: new Date().toISOString()
-      }));
-
-    if (cartItemsToInsert.length > 0) {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert(cartItemsToInsert);
-
-      if (error) {
-        throw error;
-      }
-
-    } else {
-      // All cart items already exist
-    }
-
-  } catch (error) {
-    console.error('Error parsing or transferring guest cart:', error);
-    throw error;
-  }
-};
-
-/**
- * Transfers guest wishlist from localStorage to user's database wishlist
- */
-const transferGuestWishlistToUser = async (userId: string): Promise<void> => {
-  const guestWishlistData = localStorage.getItem('wishlist');
-  if (!guestWishlistData) {
-
-    return;
-  }
-
-  try {
-    const guestWishlist: string[] = JSON.parse(guestWishlistData);
-    if (!guestWishlist.length) {
-
-      return;
-    }
-
-    // Check if user already has wishlist items (shouldn't happen for new users, but safety check)
-    const { data: existingWishlistItems } = await supabase
-      .from('user_wishlists')
-      .select('product_id')
-      .eq('user_id', userId);
-
-    const existingProductIds = new Set(
-      (existingWishlistItems || []).map(item => item.product_id)
-    );
-
-    // Filter out products that are already in the user's wishlist
-    const wishlistItemsToInsert = guestWishlist
-      .filter(productId => !existingProductIds.has(productId))
-      .map(productId => ({
-        user_id: userId,
-        product_id: productId,
-        created_at: new Date().toISOString()
-      }));
-
-    if (wishlistItemsToInsert.length > 0) {
-      const { error } = await supabase
-        .from('user_wishlists')
-        .insert(wishlistItemsToInsert);
-
-      if (error) {
-        throw error;
-      }
-
-    } else {
-      // All wishlist items already exist
-    }
-
-  } catch (error) {
-    console.error('Error parsing or transferring guest wishlist:', error);
-    throw error;
-  }
-};
-
-/**
- * Checks if this is a new user signup vs existing user login
- * Returns true if this is a new user who should have their guest data transferred
+ * Checks if this is a new user signup vs existing user login.
+ * Phase 1: local-only check — hooks dedupe against server state on merge,
+ * so the only question is whether guest data exists at all.
  */
 export const shouldTransferGuestData = async (userId: string): Promise<boolean> => {
   try {
-    // Check if user has any existing cart or wishlist data
-    const [cartResult, wishlistResult] = await Promise.all([
-      supabase
-        .from('cart_items')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1),
-      supabase
-        .from('user_wishlists')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1)
-    ]);
-
-    // If user has no existing cart or wishlist data, they're likely a new user
-    const hasExistingData = (cartResult.data?.length || 0) > 0 || (wishlistResult.data?.length || 0) > 0;
-
-    // Also check if there's guest data to transfer
+    // Hooks merge guest localStorage into server state with dedupe, so only
+    // guest-side presence matters here.
     const hasGuestCart = !!(localStorage.getItem('cart') && JSON.parse(localStorage.getItem('cart') || '[]').length > 0);
     const hasGuestWishlist = !!(localStorage.getItem('wishlist') && JSON.parse(localStorage.getItem('wishlist') || '[]').length > 0);
 
-    const shouldTransfer = !hasExistingData && (hasGuestCart || hasGuestWishlist);
-
-    return shouldTransfer;
+    return hasGuestCart || hasGuestWishlist;
   } catch (error) {
     console.error('Error checking if should transfer guest data:', error);
     return false; // Default to not transferring on error
