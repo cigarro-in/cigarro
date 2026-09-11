@@ -76,7 +76,17 @@ Result: Phase 2 rewrites zero data rows and zero table schemas.
   `isAdmin` resolution stays on Supabase profiles → Phase 2 (memberships).
 - [x] Guest-transfer util neutralized (hooks merge; no Supabase writes, no
   early localStorage clear, local-only new-user check)
-- [ ] Addresses: `AddressManager`/`AddressDrawer` (`saved_addresses` → Convex)
+- [x] Addresses: adapter (`useAddresses`) + theme-safe `useMyAddresses`;
+  `AddressManager`/`AddressDrawer`/`AddressesPage`/`VividAddresses`/
+  mobile-checkout fetch rewired; `updateAddress` deployed. Desktop
+  `CheckoutPage` money-path stays Supabase → Phase 2 (GPS fields, dual
+  `addresses` table, untestable here).
+- [x] Profiles: lazy Convex spine + name writes via theme-safe
+  `useMyProfile` (`PhoneAuthDialog`, both profile pages). Session +
+  `isAdmin` reads stay → Phase 2.
+- [x] Legacy Supabase fallback branches DELETED everywhere user-state
+  (fresh start — no rollback theater). Verified: zero `cart_items`/
+  `user_wishlists` refs in `src/`; `saved_addresses` only in CheckoutPage.
 - [ ] Dual-read soak: 48h with mismatch logging, then Supabase reads removed
 - [ ] NEW: `productReviews` table + PDP UI + WhatsApp request hook (reviews never existed — build natively in Convex, not Supabase)
 - [ ] `pincode_lookup` EXCLUDED from migration (founder decision 2026-09-11: GPS lookup replaces it; do not transfer)
