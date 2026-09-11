@@ -157,7 +157,11 @@ delta beyond ±5% pauses the program.
 - [ ] Apply migration `083_audit_logs_sink_repair.sql` (Dashboard SQL Editor, 2 min)
 - [ ] `ktnng` cleanup done 2026-09-11 (deleted, 301s to ESSE)
 
-## 11. Progress log
+- 2026-09-11 — Wave 2 content: schema + public queries + backfill
+  (8 posts incl. 2 new guides, 5 cats, 4 heroes, 6 sections, 6 components,
+  site singleton). Field parity verified vs Supabase (slugs + all display
+  fields). Blog listing/detail/related swapped to theme-safe `useContent`
+  hooks (`d79fc121`). backfillContent retained till verification passes.
 
 - 2026-09-11 — Phase 0 inventory complete (OTP chain, R2 unbound, schema mapped).
 - 2026-09-11 — Phase 1 schema + `convex/userState.ts` deployed to production Convex.
