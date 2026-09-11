@@ -23,6 +23,14 @@ export async function onRequest(context) {
     return Response.redirect(new URL('/blogs', url).toString(), 301);
   }
 
+  // Dead brand slugs: ktnng ("KTnnG", deleted typo of KT&G) and ktng never
+  // existed as real brands — consolidate their residual traffic/links onto
+  // ESSE (KT&G's brand). Host-relative: safe on localhost too.
+  if (url.pathname === '/brand/ktnng' || url.pathname === '/brand/ktnng/' ||
+      url.pathname === '/brand/ktng' || url.pathname === '/brand/ktng/') {
+    return Response.redirect(new URL('/brand/esse', url).toString(), 301);
+  }
+
   // Explicit ?format=json|md on read-only catalog routes: any UA.
   // (ssr-middleware.js re-validates route + format; data = public catalog only)
   const formatParam = (url.searchParams.get('format') || '').toLowerCase();
