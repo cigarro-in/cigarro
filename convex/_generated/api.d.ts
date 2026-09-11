@@ -23,6 +23,7 @@ import type * as orders from "../orders.js";
 import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
 import type * as scheduler from "../scheduler.js";
+import type * as userState from "../userState.js";
 import type * as wallet from "../wallet.js";
 
 import type {
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   organizations: typeof organizations;
   payments: typeof payments;
   scheduler: typeof scheduler;
+  userState: typeof userState;
   wallet: typeof wallet;
 }>;
 

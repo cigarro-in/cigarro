@@ -307,4 +307,56 @@ export default defineSchema({
     payload: v.any(),
     createdAt: v.number(),
   }).index("by_org_time", ["orgId", "createdAt"]),
+
+  // ---- Phase 1: user state (migrated off Supabase) ----
+  // userId = Supabase auth.users.id during Phase 1 (bridge unchanged).
+  // Phase 2 keeps these exact strings as the stable identity when the
+  // issuer changes (Convex users table maps phone -> legacy userId).
+  users: defineTable({
+    // Stable identity, shared across auth providers. Today: Supabase sub.
+    userId: v.string(),
+    phone: v.optional(v.string()), // E.164, e.g. +919876543210
+    name: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_phone", ["phone"]),
+
+  carts: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    variantId: v.optional(v.string()),
+    productId: v.string(),
+    comboId: v.optional(v.string()),
+    name: v.string(),
+    variantName: v.optional(v.string()),
+    // Snapshot of the unit price in rupees at add-to-cart time; the
+    // checkout always re-prices from the catalog before creating an order.
+    unitPriceRupees: v.number(),
+    qty: v.number(),
+    imageUrl: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_org_user", ["orgId", "userId"])
+    .index("by_org_user_variant", ["orgId", "userId", "variantId"]),
+
+  wishlists: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    productId: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_org_user", ["orgId", "userId"])
+    .index("by_org_user_product", ["orgId", "userId", "productId"]),
+
+  savedAddresses: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    label: v.optional(v.string()),
+    address: addressV,
+    isDefault: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_org_user", ["orgId", "userId"]),
 });
