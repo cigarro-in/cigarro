@@ -15,6 +15,8 @@ import { WishlistProvider } from './hooks/useWishlist';
 import { supabase } from './lib/supabase/client';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
+import { ConsentBanner } from './components/consent/ConsentBanner';
+import { initAnalytics, trackEvent, trackPageView } from './lib/analytics/ga';
 import { ThemeProvider, useTheme } from './themes';
 
 // Loading component - simplified to null for seamless transitions
@@ -41,6 +43,12 @@ function AppContent() {
     site_name: 'Cigarro',
   });
 
+  // Analytics: load gtag once (consent-denied by default; no collection
+  // until the visitor accepts the banner).
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
   useEffect(() => {
     const fetchSiteSettings = async () => {
       const { data, error } = await supabase
@@ -60,6 +68,12 @@ function AppContent() {
 
   const isAdminPath = location.pathname.startsWith('/admin');
 
+  // SPA page views: only for verified, non-admin storefront routes.
+  useEffect(() => {
+    if (!isAgeVerified || isAdminPath) return;
+    trackPageView(location.pathname + location.search);
+  }, [location.pathname, location.search, isAgeVerified, isAdminPath]);
+
   useEffect(() => {
     // Only redirect admins to /admin when they are not already inside the admin area
     if (user?.isAdmin && !isAdminPath) {
@@ -69,6 +83,11 @@ function AppContent() {
 
   // Manual scroll restoration is now handled by SmoothScrollToTop inside PageTransition
   const isUserPage = !isAdminPath;
+
+  const handleAgeVerified = () => {
+    setIsAgeVerified(true);
+    trackEvent('age_gate_completed');
+  };
 
   // Add/remove admin-page class to body for conditional styling
   useEffect(() => {
@@ -84,16 +103,17 @@ function AppContent() {
     if (ThemedAgeGate) {
       return (
         <Suspense fallback={null}>
-          <ThemedAgeGate onVerify={() => setIsAgeVerified(true)} />
+          <ThemedAgeGate onVerify={handleAgeVerified} />
         </Suspense>
       );
     }
-    return <AgeVerification onVerify={() => setIsAgeVerified(true)} />;
+    return <AgeVerification onVerify={handleAgeVerified} />;
   }
 
   return (
     <HelmetProvider>
       <ReferralTracker />
+      {isUserPage && <ConsentBanner />}
       <Helmet>
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />

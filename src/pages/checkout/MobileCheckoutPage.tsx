@@ -19,6 +19,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
+import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -180,6 +181,14 @@ export function MobileCheckoutPage() {
     : (isBuyNow && localBuyNowItem
       ? (localBuyNowItem.variant_price || localBuyNowItem.price) * localBuyNowItem.quantity
       : cartTotalPrice);
+
+  // GA4 begin_checkout: once per checkout entry (funnel entry point).
+  const checkoutTrackedRef = useRef(false);
+  useEffect(() => {
+    if (checkoutTrackedRef.current || items.length === 0) return;
+    checkoutTrackedRef.current = true;
+    trackBeginCheckout(items, Number(totalPrice ?? 0));
+  }, [items, totalPrice]);
 
   // State management
   const [selectedShipping, setSelectedShipping] = useState('standard');
@@ -524,6 +533,9 @@ export function MobileCheckoutPage() {
       });
 
       isNavigatingRef.current = true;
+
+      // GA4: order created in Convex = purchase (UPI capture follows async).
+      trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
 
       // Open UPI app if we have a URL (skip for wallet-only orders)
       if (result.upiUrl) {

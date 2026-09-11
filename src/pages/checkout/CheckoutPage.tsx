@@ -23,6 +23,7 @@ import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 import QRCode from 'qrcode';
 
 // Helper function to safely get brand name from various formats
@@ -151,6 +152,14 @@ export function CheckoutPage() {
       return () => clearTimeout(timer);
     }
   }, [user, authLoading, isOrderProcessing, orderComplete]);
+
+  // GA4 begin_checkout: once per checkout entry (funnel entry point).
+  const checkoutTrackedRef = useRef(false);
+  useEffect(() => {
+    if (checkoutTrackedRef.current || items.length === 0) return;
+    checkoutTrackedRef.current = true;
+    trackBeginCheckout(items, Number(totalPrice ?? 0));
+  }, [items, totalPrice]);
 
   // Load saved addresses and preload QR code on component mount
   useEffect(() => {
@@ -987,6 +996,9 @@ export function CheckoutPage() {
       });
 
       if (user) await saveAddressOnOrderSuccess();
+
+      // GA4: order created in Convex = purchase (UPI capture follows async).
+      trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
 
       if (result.upiUrl) {
         try {

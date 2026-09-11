@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { useAuth } from './useAuth';
 import { supabase } from '../lib/supabase/client';
 import { CartItemWithVariant } from '../types/variants';
+import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
 
 // Updated to match new schema - images on variants, brand via relation
 export interface Product {
@@ -539,6 +540,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       variant_price: variant.price
     };
     await addToCart(productWithVariant, quantity, variant.id);
+    trackAddToCart(mapCartItem({ ...productWithVariant, quantity }));
   };
 
   // Helper function to add a combo to cart

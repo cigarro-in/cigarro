@@ -19,6 +19,7 @@ import { formatINR } from '../../utils/currency';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+import { trackViewItem } from '../../lib/analytics/ga';
 import {
   getDefaultVariant,
   getVariantAvailability,
@@ -494,6 +495,19 @@ function ProductPage() {
   const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
   // Discount display: only when compare_at_price is a genuine higher MRP.
   const offerDiscount = getVariantDiscount(offerVariant);
+
+  // GA4 view_item: once per product slug, with the offered variant's price.
+  const viewedSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!product || !offerVariant || viewedSlugRef.current === product.slug) return;
+    viewedSlugRef.current = product.slug;
+    trackViewItem({
+      id: String(product.slug),
+      name: String(product.name),
+      price: Number(offerVariant.price ?? 0) || 0,
+      quantity: 1,
+    });
+  }, [product, offerVariant]);
   // Add-to-cart guard state: only when stock is positively known to be empty
   // (unknown stock never blocks purchase).
   const offerOutOfStock = !!offerVariant
