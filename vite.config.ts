@@ -26,7 +26,36 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
-          // Cache Supabase storage images (any Supabase project)
+          // Cache product images (R2 CDN + legacy Supabase storage during transition)
+          {
+            urlPattern: /^https:\/\/.*\.r2\.dev\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'r2-images',
+              expiration: {
+                maxEntries: 300,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/cdn\.cigarro\.in\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'r2-images',
+              expiration: {
+                maxEntries: 300,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Cache Supabase storage images (legacy, during R2 transition)
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
             handler: 'CacheFirst',
