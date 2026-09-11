@@ -76,6 +76,24 @@ function ProductPage() {
   const { addToCart, addVariantToCart, addComboToCart, isLoading } = useCart();
   const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
 
+  // GA4 view_item: once per product slug, with the offered variant's price.
+  // NOTE: this hook must live here with the other hooks — never after the
+  // `if (!product) return <Loading/>` early return (React #310 crash). It
+  // only uses bindings declared above (product/selectedVariant/variants).
+  const viewedSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!product) return;
+    const ov = selectedVariant ?? getDefaultVariant(variants);
+    if (!ov || viewedSlugRef.current === product.slug) return;
+    viewedSlugRef.current = product.slug;
+    trackViewItem({
+      id: String(product.slug),
+      name: String(product.name),
+      price: Number(ov.price ?? 0) || 0,
+      quantity: 1,
+    });
+  }, [product, selectedVariant, variants]);
+
   // Reset to first image when variant changes
   useEffect(() => {
     setActiveImage(0);
@@ -495,19 +513,6 @@ function ProductPage() {
   const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
   // Discount display: only when compare_at_price is a genuine higher MRP.
   const offerDiscount = getVariantDiscount(offerVariant);
-
-  // GA4 view_item: once per product slug, with the offered variant's price.
-  const viewedSlugRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!product || !offerVariant || viewedSlugRef.current === product.slug) return;
-    viewedSlugRef.current = product.slug;
-    trackViewItem({
-      id: String(product.slug),
-      name: String(product.name),
-      price: Number(offerVariant.price ?? 0) || 0,
-      quantity: 1,
-    });
-  }, [product, offerVariant]);
   // Add-to-cart guard state: only when stock is positively known to be empty
   // (unknown stock never blocks purchase).
   const offerOutOfStock = !!offerVariant
