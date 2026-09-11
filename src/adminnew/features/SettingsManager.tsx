@@ -153,12 +153,14 @@ export function SettingsManager() {
 
     setIsPurgingCloudflare(true);
     const loading = toast.loading('Purging Cloudflare cache...');
-    
+
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch('https://cigarro.in/api/invalidate-cache', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
       });
       const data = await response.json();
@@ -167,7 +169,8 @@ export function SettingsManager() {
       if (response.ok && data.success) {
         const successCount = data.results?.filter((r: any) => r.success).length || 0;
         const totalCount = data.results?.length || 0;
-        toast.success(`Cloudflare cache purged! ${successCount}/${totalCount} endpoints cleared.`, { duration: 4000 });
+        const modeNote = data.mode === 'warm' ? ' (warmed — add purge credentials for true purges)' : '';
+        toast.success(`Cloudflare cache purged! ${successCount}/${totalCount} endpoints cleared${modeNote}.`, { duration: 4000 });
       } else {
         console.error('Cache purge failed:', data);
         toast.error(data.error || 'Failed to purge Cloudflare cache');
@@ -551,7 +554,7 @@ export function SettingsManager() {
               Cloudflare CDN Cache
             </AdminCardTitle>
             <AdminCardDescription>
-              Purge the 24-hour Cloudflare cache after making content changes
+              Purge edge cache (bot HTML ~1h, API/data) after making content or price changes
             </AdminCardDescription>
           </AdminCardHeader>
           <AdminCardContent className="space-y-4">
@@ -559,10 +562,10 @@ export function SettingsManager() {
               <div className="flex items-start gap-4">
                 <div className="flex-1">
                   <h4 className="font-medium text-sm mb-2">Purge All Cached Pages</h4>
-                  <p className="text-xs text-[var(--color-dark)]/60 mb-3">
-                    All pages are cached for 24 hours: Homepage, Products, Categories, Brands, Featured Products.
-                    After updating any content, click here to refresh ALL caches immediately and show fresh data across the entire site.
-                  </p>
+                    <p className="text-xs text-[var(--color-dark)]/60 mb-3">
+                      Clears the edge cache for key pages, sitemap and API endpoints (HTML prerender ~1h, data feeds).
+                      After updating any content or prices, click here to refresh caches immediately across the entire site.
+                    </p>
                   <div className="flex gap-3">
                     <Button
                       onClick={handlePurgeCloudflareCache}
