@@ -82,7 +82,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, is_default, price, variant_name, variant_slug, variant_type, stock, track_inventory)')
+      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, is_default, price, compare_at_price, variant_name, variant_slug, variant_type, stock, track_inventory)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -124,6 +124,31 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
       ? `${canonicalUrl}?variant=${encodeURIComponent(defaultVariantKey)}`
       : canonicalUrl;
     const defaultVariantLabel = defaultVariant?.variant_name || null;
+    // Visible MRP discount — only when compare_at_price is a genuine higher MRP.
+    const mrp = Number(defaultVariant?.compare_at_price ?? NaN);
+    const hasDiscount = price != null && Number.isFinite(mrp) && mrp > price;
+    const discountPct = hasDiscount ? Math.round(((mrp - price) / mrp) * 100) : 0;
+    // Carton offer (audit: expose discounted carton to bots, not just the
+    // packet). Carton-type variant with a genuine higher MRP, never the
+    // default variant twice. Bots then index both price points.
+    const cartonVariant = activeVariants.find(v =>
+      v !== defaultVariant &&
+      v.variant_type === 'carton' &&
+      Number.isFinite(Number(v.price)) && Number(v.price) >= 0 &&
+      Number.isFinite(Number(v.compare_at_price)) &&
+      Number(v.compare_at_price) > Number(v.price)) || null;
+    const cartonInStock = cartonVariant
+      ? (cartonVariant.track_inventory === false || Number(cartonVariant.stock ?? 0) > 0)
+      : false;
+    const cartonKey = cartonVariant
+      ? String(cartonVariant.variant_slug || cartonVariant.variant_name || '').toLowerCase().trim().replace(/\s+/g, '-')
+      : '';
+    const cartonOfferUrl = cartonVariant
+      ? `${canonicalUrl}?variant=${encodeURIComponent(cartonKey)}`
+      : canonicalUrl;
+    const cartonPct = cartonVariant
+      ? Math.round(((Number(cartonVariant.compare_at_price) - Number(cartonVariant.price)) / Number(cartonVariant.compare_at_price)) * 100)
+      : 0;
     // Honest cross-variant note when the default is out of stock.
     const altInStockVariant = !defaultInStock
       ? activeVariants.find(v => v !== defaultVariant &&
@@ -236,7 +261,8 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
         }
       } : {}),
       ...(price != null ? {
-        offers: {
+        offers: [
+          {
           '@type': 'Offer',
           price: price,
           priceCurrency: 'INR',
@@ -259,7 +285,34 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
             merchantReturnDays: 2,
             merchantReturnLink: 'https://cigarro.in/returns'
           }
-        }
+        },
+        ...(cartonVariant ? [{
+          '@type': 'Offer',
+          price: Number(cartonVariant.price),
+          priceCurrency: 'INR',
+          availability: cartonInStock
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/OutOfStock',
+          url: cartonOfferUrl,
+          shippingDetails: {
+            '@type': 'OfferShippingDetails',
+            shippingRate: { '@type': 'MonetaryAmount', value: 0, currency: 'INR' },
+            shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'IN' },
+            deliveryTime: {
+              '@type': 'ShippingDeliveryTime',
+              handlingTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2, unitCode: 'DAY' },
+              transitTime: { '@type': 'QuantitativeValue', minValue: 5, maxValue: 7, unitCode: 'DAY' }
+            }
+          },
+          hasMerchantReturnPolicy: {
+            '@type': 'MerchantReturnPolicy',
+            applicableCountry: 'IN',
+            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            merchantReturnDays: 2,
+            merchantReturnLink: 'https://cigarro.in/returns'
+          }
+        }] : [])
+        ]
       } : {})
     })}
   </script>
@@ -273,6 +326,8 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <p>${escapeHtml(description)}</p>
   <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
   ${price != null ? `<p>Price: ₹${price}${defaultVariantLabel ? ` (${escapeHtml(defaultVariantLabel)})` : ''} — ${defaultInStock ? 'In stock' : 'Out of stock'}</p>` : ''}
+  ${hasDiscount ? `<p>MRP: <s>₹${mrp}</s> — ${discountPct}% off (you save ₹${mrp - price})</p>` : ''}
+  ${cartonVariant ? `<p>Carton (${cartonVariant.units_contained || 10} ${escapeHtml(cartonVariant.unit || 'packets')}): ₹${cartonVariant.price} <s>MRP ₹${cartonVariant.compare_at_price}</s> — ${cartonPct}% off (you save ₹${Number(cartonVariant.compare_at_price) - Number(cartonVariant.price)})</p>` : ''}
   ${!defaultInStock && altInStockVariant ? `<p>${escapeHtml(defaultVariantLabel || 'Default variant')} out of stock — ${escapeHtml(altInStockVariant.variant_name || 'another variant')} available.</p>` : ''}
   <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
   ${specTable}

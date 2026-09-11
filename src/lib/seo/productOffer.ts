@@ -80,6 +80,25 @@ function variantLabel(variant: { variant_name?: string } | null | undefined): st
   return variant?.variant_name || 'Default variant';
 }
 
+export interface VariantDiscount {
+  mrp: number;
+  save: number;
+  pct: number;
+}
+
+// Discount display model: shown only when compare_at_price is a genuine
+// higher MRP. Never fabricate a discount (schema/policy compliance).
+export function getVariantDiscount(
+  variant: Pick<ProductVariant, 'price' | 'compare_at_price'> | null | undefined
+): VariantDiscount | null {
+  const price = Number(variant?.price ?? NaN);
+  const mrp = Number(variant?.compare_at_price ?? NaN);
+  if (!Number.isFinite(price) || !Number.isFinite(mrp)) return null;
+  if (mrp <= price || price < 0) return null;
+  const save = mrp - price;
+  return { mrp, save, pct: Math.round((save / mrp) * 100) };
+}
+
 // Honest cross-variant note, e.g. "Packet out of stock — Carton available".
 // Null when the given variant is in stock or nothing else is available.
 export function getVariantStockNote<

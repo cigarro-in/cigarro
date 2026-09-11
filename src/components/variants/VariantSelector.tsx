@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
 import { ProductVariant } from '../../types/product';
 import { formatINR } from '../../utils/currency';
+import { getVariantDiscount } from '../../lib/seo/productOffer';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
@@ -32,7 +33,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     <div className="flex flex-wrap justify-start gap-3">
       {variants.map((variant) => {
         const isSelected = selectedVariant?.id === variant.id;
-        
+        const discount = getVariantDiscount(variant);
+
         return (
           <button
             key={variant.id}
@@ -45,7 +47,16 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
               }
             `}
           >
-            {variant.variant_name}
+            {variant.variant_name} · {formatINR(variant.price)}
+            {discount && (
+              <span
+                className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  isSelected ? 'bg-creme text-dark' : 'bg-green-700 text-white'
+                }`}
+              >
+                −{discount.pct}%
+              </span>
+            )}
           </button>
         );
       })}

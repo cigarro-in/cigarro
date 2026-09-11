@@ -22,6 +22,7 @@ import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import {
   getDefaultVariant,
   getVariantAvailability,
+  getVariantDiscount,
   getVariantOfferUrl,
   getVariantStockNote,
   isVariantInStock,
@@ -491,6 +492,8 @@ function ProductPage() {
   const stockNote = getVariantStockNote(offerVariant, variants);
   const seoCanonicalUrl = product.canonical_url || `https://cigarro.in${location.pathname}`;
   const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
+  // Discount display: only when compare_at_price is a genuine higher MRP.
+  const offerDiscount = getVariantDiscount(offerVariant);
   // Add-to-cart guard state: only when stock is positively known to be empty
   // (unknown stock never blocks purchase).
   const offerOutOfStock = !!offerVariant
@@ -640,6 +643,29 @@ function ProductPage() {
               >
                 {formatINR(getCurrentPrice())}
               </motion.p>
+              {/* Visible carton/MRP discount — only when a genuine higher MRP exists */}
+              {offerDiscount && (
+                <p
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 500,
+                    fontSize: 'max(12px, 1.4vw)',
+                    lineHeight: 1.4,
+                    letterSpacing: '-0.02em',
+                    marginTop: 2
+                  }}
+                >
+                  <span style={{ color: '#8a7f74', textDecoration: 'line-through' }}>
+                    {formatINR(offerDiscount.mrp)}
+                  </span>{' '}
+                  <span style={{ color: '#2f7d4f', fontWeight: 700 }}>
+                    {offerDiscount.pct}% OFF
+                  </span>{' '}
+                  <span style={{ color: '#2f7d4f' }}>
+                    (Save {formatINR(offerDiscount.save)})
+                  </span>
+                </p>
+              )}
               {/* Honest stock state for the offered variant */}
               <p
                 style={{
@@ -1129,6 +1155,11 @@ function ProductPage() {
                       {selectedVariant && selectedVariant.compare_at_price && (
                         <span className="text-xl text-dark/40 line-through">
                           {formatINR(selectedVariant.compare_at_price)}
+                        </span>
+                      )}
+                      {offerDiscount && (
+                        <span className="text-sm font-bold text-green-700 bg-green-700/10 rounded-full px-3 py-1">
+                          {offerDiscount.pct}% OFF · Save {formatINR(offerDiscount.save)}
                         </span>
                       )}
                     </div>
