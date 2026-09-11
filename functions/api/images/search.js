@@ -1,9 +1,10 @@
-// Cloudflare Worker for Image Search using DuckDuckGo
-// Free image search API - no API key required
+// Cloudflare Function for Image Search using Brave Search API
+// Key-based API (DDG scraping died: i.js 403s). Key lives in Cloudflare env
+// as BRAVE_API_KEY (Secret) — never in code. Same {images[]} shape back.
 // URL: https://cigarro.in/api/images/search?q=product+name
 
 export async function onRequest(context) {
-    const { request } = context;
+    const { request, env } = context;
 
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
@@ -25,64 +26,56 @@ export async function onRequest(context) {
         );
     }
 
+    const apiKey = env.BRAVE_API_KEY;
+    if (!apiKey) {
+        console.log('[ImageSearch] BRAVE_API_KEY not configured');
+        return new Response(
+            JSON.stringify({ images: [], error: 'Image search not configured' }),
+            { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+    }
+
     try {
-        // Append product context for better results
+        // Append product context for better results (as before)
         const searchQuery = `${query} product`;
 
-        // Step 1: Get the vqd token from DuckDuckGo
-        const tokenUrl = `https://duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&iax=images&ia=images`;
-        const tokenResponse = await fetch(tokenUrl, {
+        const braveUrl = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(searchQuery)}&count=20&country=IN&search_lang=en&safesearch=strict`;
+        const braveResponse = await fetch(braveUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        });
-
-        const html = await tokenResponse.text();
-
-        // Extract vqd token from response
-        const vqdMatch = html.match(/vqd=["']?([^"'&]+)/);
-        if (!vqdMatch) {
-            console.log('[ImageSearch] Could not extract vqd token');
-            return new Response(
-                JSON.stringify({ images: [], error: 'Token extraction failed' }),
-                { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-            );
-        }
-
-        const vqd = vqdMatch[1];
-
-        // Step 2: Fetch the images
-        const imageUrl = `https://duckduckgo.com/i.js?l=wt-wt&o=json&q=${encodeURIComponent(searchQuery)}&vqd=${vqd}&f=,,,,,&p=1`;
-
-        const imageResponse = await fetch(imageUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'application/json',
-                'Referer': 'https://duckduckgo.com/',
+                'Accept-Encoding': 'gzip',
+                'X-Subscription-Token': apiKey,
             },
         });
 
-        if (!imageResponse.ok) {
-            console.log('[ImageSearch] DuckDuckGo response not ok:', imageResponse.status);
+        if (!braveResponse.ok) {
+            console.log('[ImageSearch] Brave response not ok:', braveResponse.status);
             return new Response(
-                JSON.stringify({ images: [] }),
+                JSON.stringify({ images: [], error: `Search failed (${braveResponse.status})` }),
                 { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
             );
         }
 
-        const data = await imageResponse.json();
+        const data = await braveResponse.json();
 
-        // Extract and format image URLs (16 images for 4x4 grid)
+        // Map to the modal's shape (16 images for 4x4 grid).
+        // thumbnail.src = Brave proxy (reliable for grid display);
+        // properties.url = original (best for upload).
         const images = (data.results || [])
-            .slice(0, 16)
-            .map((img) => ({
-                url: img.image,
-                thumbnail: img.thumbnail,
-                title: img.title || '',
-                source: img.source || '',
-                width: img.width,
-                height: img.height,
-            }));
+            .map((img) => {
+                const original = img.properties && img.properties.url;
+                const thumb = img.thumbnail && img.thumbnail.src;
+                return {
+                    url: original || thumb || '',
+                    thumbnail: thumb || original || '',
+                    title: img.title || '',
+                    source: img.url || '',
+                    width: (img.properties && img.properties.width) || undefined,
+                    height: (img.properties && img.properties.height) || undefined,
+                };
+            })
+            .filter((img) => img.url)
+            .slice(0, 16);
 
         console.log(`[ImageSearch] Found ${images.length} images for "${query}"`);
 
@@ -90,7 +83,7 @@ export async function onRequest(context) {
             status: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+                'Cache-Control': 'public, max-age=3600', // Cache 1h — Brave bills per request
                 ...corsHeaders,
             },
         });
