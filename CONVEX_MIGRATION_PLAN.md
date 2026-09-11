@@ -132,6 +132,14 @@ delta beyond ±5% pauses the program.
   - BLOCKED: r2.dev returns **403** on public fetches — bucket public access
     not effective yet. DO NOT rewrite DB image URLs until public serving
     confirmed, or every product image breaks site-wide.
+  - DONE 2026-09-11: public serving confirmed (propagation delay). DB URL
+    rewrite applied: 88 refs across variants/brands/categories/posts/heroes/
+    collections/settings → R2 URLs (plus 1 dead hero image repointed to the
+    slide's live image). Post-verify: **zero Supabase storage URLs remain**;
+    spot checks (variant/hero/favicon) 200 from R2. Supabase objects kept as
+    rollback. Fixed a real rewrite bug mid-flight (multi-index rows clobbered
+    — now one read-modify-write per cell, verified to zero).
+  - TODO: delete the single-use R2 API token after this session.
 - [ ] Founder: legal verdict (gates content scale, not migration)
 - [ ] Apply migration `083_audit_logs_sink_repair.sql` (Dashboard SQL Editor, 2 min)
 - [ ] `ktnng` cleanup done 2026-09-11 (deleted, 301s to ESSE)
