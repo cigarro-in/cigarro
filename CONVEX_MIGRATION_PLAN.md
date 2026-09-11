@@ -153,3 +153,7 @@ delta beyond ±5% pauses the program.
 - 2026-09-11 — Phase 1 schema + `convex/userState.ts` deployed to production Convex.
 - 2026-09-11 — Wishlist hook rewired to Convex (`3ef7d826`); schema committed (`f0ef917c`).
   Rollback: `VITE_USE_CONVEX_USERSTATE=false`. Guest localStorage path untouched.
+- 2026-09-11 — User wipe (fresh start): 10 dev-seed test accounts deleted
+  (auth users + profiles + carts + wishlists + addresses, 15→5 users).
+  Preserved: 3 phone users, founder email, admin@test (lockout + real-customer
+  risk). Convex user tables untouched (keyed by UUID, orphan-free).
