@@ -191,3 +191,6 @@ supabase/.temp/
 
 # Netlify
 .netlify
+
+# Local SEO audit reports + raw GSC exports (not for version control)
+SEO Audits/

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { buildRoute } from '../../config/routes';
-import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check, Heart, ChevronDown, ChevronUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../../components/ui/button';
@@ -20,6 +19,13 @@ import { formatINR } from '../../utils/currency';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+import {
+  getDefaultVariant,
+  getVariantAvailability,
+  getVariantOfferUrl,
+  getVariantStockNote,
+  isVariantInStock,
+} from '../../lib/seo/productOffer';
 
 // Updated to match new schema - images now on variants, brand via brand_id
 interface ProductDetails {
@@ -27,7 +33,7 @@ interface ProductDetails {
   name: string;
   slug: string;
   brand_id?: string;
-  brand?: { id: string; name: string };
+  brand?: { id: string; name: string; slug?: string };
   description: string;
   short_description?: string;
   is_active: boolean;
@@ -96,8 +102,8 @@ function ProductPage() {
               const activeVariants = (productData.product_variants || []).filter((v: any) => v.is_active !== false);
               setVariants(activeVariants);
               
-              // Auto-select default variant
-              const defaultVariant = activeVariants.find((v: any) => v.is_default) || activeVariants[0];
+              // Auto-select default variant (single source of truth)
+              const defaultVariant = getDefaultVariant(activeVariants);
               if (defaultVariant) {
                 setSelectedVariant(defaultVariant);
               }
@@ -114,7 +120,7 @@ function ProductPage() {
         // Fallback: Fetch product details with brand relation
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('id, name, slug, brand_id, brand:brands(id, name), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url, rating_value, review_count')
+          .select('id, name, slug, brand_id, brand:brands(id, name, slug), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url, rating_value, review_count')
           .eq('slug', slug)
           .single();
 
@@ -140,7 +146,7 @@ function ProductPage() {
 
         if (!variantsError && variantsData) {
           setVariants(variantsData);
-          const defaultVariant = variantsData.find((v: any) => v.is_default) || variantsData[0];
+          const defaultVariant = getDefaultVariant(variantsData);
           if (defaultVariant) {
             setSelectedVariant(defaultVariant);
           }
@@ -353,6 +359,18 @@ function ProductPage() {
       return;
     }
 
+    // Honest stock: never add a variant known to be out of stock.
+    const variantToAdd = selectedVariant ?? getDefaultVariant(variants);
+    if (
+      variantToAdd &&
+      variantToAdd.track_inventory !== false &&
+      variantToAdd.stock != null &&
+      Number(variantToAdd.stock) <= 0
+    ) {
+      toast.error(`${variantToAdd.variant_name || 'This variant'} is out of stock.`);
+      return;
+    }
+
     setIsAddingToCart(true);
     
     try {
@@ -364,7 +382,7 @@ function ProductPage() {
       } else {
         // Add default variant to cart
 
-        const defaultVariant = variants.find(v => v.is_default);
+        const defaultVariant = getDefaultVariant(variants);
         if (defaultVariant) {
           await addVariantToCart(product, defaultVariant, quantity);
         } else if (variants.length > 0) {
@@ -447,18 +465,8 @@ function ProductPage() {
   };
 
   const getCurrentPrice = () => {
-    if (selectedVariant) {
-      return selectedVariant.price;
-    }
-    
-    // If no variant is selected, find the default variant
-    const defaultVariant = variants.find(v => v.is_default);
-    if (defaultVariant) {
-      return defaultVariant.price;
-    }
-    
-    // Fallback to first variant or 0
-    return variants.length > 0 ? variants[0].price : 0;
+    const offerVariant = selectedVariant ?? getDefaultVariant(variants);
+    return offerVariant ? offerVariant.price : 0;
   };
 
   const getCurrentImages = () => {
@@ -474,6 +482,21 @@ function ProductPage() {
   };
 
   const gallery = getCurrentImages();
+
+  // Single default-variant source of truth for the whole page: visible price,
+  // SEOHead meta, JSON-LD offer and stock messaging all derive from here.
+  const offerVariant = selectedVariant ?? getDefaultVariant(variants);
+  const offerAvailability = getVariantAvailability(offerVariant);
+  const offerVariantInStock = isVariantInStock(offerVariant);
+  const stockNote = getVariantStockNote(offerVariant, variants);
+  const seoCanonicalUrl = product.canonical_url || `https://cigarro.in${location.pathname}`;
+  const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
+  // Add-to-cart guard state: only when stock is positively known to be empty
+  // (unknown stock never blocks purchase).
+  const offerOutOfStock = !!offerVariant
+    && offerVariant.track_inventory !== false
+    && offerVariant.stock != null
+    && Number(offerVariant.stock) <= 0;
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -496,15 +519,16 @@ function ProductPage() {
     }
   };
 
-  // Helper to get brand name safely
+  // Helper to get brand name safely (slug always comes from the DB row,
+  // never rebuilt from the display name — e.g. "Benson & Hedges" spellings)
   const brandName = product.brand?.name || 'Premium';
-  const brandSlug = brandName.toLowerCase().replace(/\s+/g, '-');
+  const brandSlug = product.brand?.slug || brandName.toLowerCase().replace(/\s+/g, '-');
 
   return (
     <div>
       <SEOHead
-        title={selectedVariant 
-          ? `${product.name} - ${selectedVariant.variant_name} | ${brandName}`
+        title={offerVariant
+          ? `${product.name} - ${offerVariant.variant_name} | ${brandName}`
           : product.meta_title || `${product.name} | ${brandName} | Cigarro`
         }
         description={product.meta_description || product.short_description || product.description}
@@ -517,12 +541,13 @@ function ProductPage() {
           selectedVariant?.variant_name || '',
           product.origin || ''
         ].filter(Boolean) as string[]}
-        image={gallery[0] || 'https://cigarro.in/logo.png'}
-        url={product.canonical_url || `https://cigarro.in${location.pathname}`}
+        image={gallery[0] || 'https://cigarro.in/og-default.jpg'}
+        url={seoCanonicalUrl}
         type="product"
-        price={getCurrentPrice().toString()}
+        price={offerVariant ? offerVariant.price.toString() : undefined}
         currency="INR"
-        availability="in stock"
+        availability={offerAvailability}
+        offerUrl={offerUrl}
         brand={brandName}
         category={selectedVariant?.variant_type || 'Cigarettes'}
         // Ratings pipeline: undefined (0 reviews) until real reviews exist.
@@ -537,10 +562,8 @@ function ProductPage() {
           { name: product.name, url: `https://cigarro.in/product/${product.slug}` }
         ]}
       />
-      <Helmet>
-        <meta name="product:price:amount" content={getCurrentPrice().toString()} />
-        <meta name="product:price:currency" content="INR" />
-      </Helmet>
+      {/* product:price:* meta is emitted once by SEOHead above — do not
+          duplicate it here; Helmet would merge both tags into the head. */}
       
       <div className="min-h-screen bg-creme md:bg-creme text-dark pb-24 md:pb-0">
         {/* Mobile Layout */}
@@ -617,6 +640,20 @@ function ProductPage() {
               >
                 {formatINR(getCurrentPrice())}
               </motion.p>
+              {/* Honest stock state for the offered variant */}
+              <p
+                style={{
+                  color: offerVariantInStock ? '#2f7d4f' : '#a33b2e',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontWeight: 500,
+                  fontSize: 'max(13px, 1.5vw)',
+                  lineHeight: 1.4,
+                  letterSpacing: '-0.02em',
+                  marginTop: 4
+                }}
+              >
+                {stockNote ?? (offerVariantInStock ? 'In stock' : 'Out of stock')}
+              </p>
             </div>
           </motion.div>
 
@@ -1095,6 +1132,10 @@ function ProductPage() {
                         </span>
                       )}
                     </div>
+                    {/* Honest stock state for the offered variant */}
+                    <p className={`text-sm font-medium ${offerVariantInStock ? 'text-green-700' : 'text-red-700'}`}>
+                      {stockNote ?? (offerVariantInStock ? 'In stock' : 'Out of stock')}
+                    </p>
                   </div>
                 </div>
 
@@ -1140,7 +1181,7 @@ function ProductPage() {
                     {/* Add to Cart Button - Fixed and properly styled */}
                     <button
                       onClick={handleAddToCart}
-                      disabled={isAddingToCart}
+                      disabled={isAddingToCart || offerOutOfStock}
                       className="px-10 h-14 text-lg font-medium rounded-full transition-all duration-300 bg-dark hover:bg-dark/90 text-creme shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       {showAddedFeedback ? (
@@ -1148,6 +1189,8 @@ function ProductPage() {
                           <Check className="w-5 h-5 mr-2" />
                           <span>Added</span>
                         </div>
+                      ) : offerOutOfStock ? (
+                        'Out of stock'
                       ) : (
                         'Add to cart'
                       )}
@@ -1175,7 +1218,9 @@ function ProductPage() {
                     )}
                     <div className="flex justify-between items-center py-2 border-b border-coyote/10 last:border-0">
                       <span className="text-sm text-dark/60 font-medium">Availability</span>
-                      <span className="text-sm font-semibold text-green-600">In Stock</span>
+                      <span className={`text-sm font-semibold ${offerVariantInStock ? 'text-green-600' : 'text-red-600'}`}>
+                        {stockNote ?? (offerVariantInStock ? 'In Stock' : 'Out of Stock')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1318,8 +1363,9 @@ function ProductPage() {
                     handleAddToCart();
                   }
                 }}
+                disabled={offerOutOfStock}
                 whileTap={{ scale: 0.98 }}
-                className="flex-1 h-10 bg-dark text-creme rounded-full transition-all hover:bg-dark/90 active:shadow-inner"
+                className="flex-1 h-10 bg-dark text-creme rounded-full transition-all hover:bg-dark/90 active:shadow-inner disabled:opacity-50"
                 style={{
                   fontFamily: 'DM Sans, sans-serif',
                   fontSize: '13px',
@@ -1354,7 +1400,7 @@ function ProductPage() {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                     >
-                      Add to cart
+                      {offerOutOfStock ? 'Out of stock' : 'Add to cart'}
                     </motion.span>
                   )}
                 </AnimatePresence>

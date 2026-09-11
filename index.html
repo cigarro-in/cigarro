@@ -26,7 +26,10 @@
     <meta property="og:url" content="https://cigarro.in/">
     <meta property="og:title" content="Cigarro - The Tobacco Marketplace">
     <meta property="og:description" content="The finest selection of premium imported cigarettes and luxury cigars. Shop exclusive tobacco products online.">
-    <meta property="og:image" content="https://cigarro.in/logo.png">
+    <meta property="og:image" content="https://cigarro.in/og-default.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cigarro - The Tobacco Marketplace">
     <meta property="og:site_name" content="Cigarro">
     <meta property="og:locale" content="en_IN">
     
@@ -35,7 +38,7 @@
     <meta name="twitter:url" content="https://cigarro.in/">
     <meta name="twitter:title" content="Cigarro - The Tobacco Marketplace">
     <meta name="twitter:description" content="The finest selection of premium imported cigarettes, and luxury cigars.">
-    <meta name="twitter:image" content="https://cigarro.in/logo.png">
+    <meta name="twitter:image" content="https://cigarro.in/og-default.jpg">
     <meta name="twitter:image:alt" content="Cigarro - The Tobacco Marketplace">
     
     <!-- Favicon - Dynamic from admin settings (React Helmet will override) -->
@@ -114,6 +117,31 @@
 
     <body>
       <div id="root"></div>
+      <!-- Crawlable catalog summary for no-JS clients (A9). Factual copy only:
+           no health/safety claims. All links are real anchors with hrefs. -->
+      <noscript>
+        <h1>Cigarro - cigarettes, cigars and tobacco products in India</h1>
+        <p>Cigarro.in is an online catalogue of cigarettes, cigars, rolling products and accessories sold in India. Purchase requires age verification (18+, 21+ in Karnataka).</p>
+        <nav aria-label="Catalogue">
+          <ul>
+            <li><a href="/products">All products</a></li>
+            <li><a href="/categories">Categories</a></li>
+            <li><a href="/brands">Brands</a></li>
+            <li><a href="/category/cigarettes">Cigarettes</a></li>
+            <li><a href="/category/rolling-stuff">Rolling Stuff</a></li>
+            <li><a href="/brand/marlboro">Marlboro</a></li>
+            <li><a href="/brand/dunhill">Dunhill</a></li>
+            <li><a href="/brand/camel">Camel</a></li>
+            <li><a href="/brand/esse">Esse</a></li>
+            <li><a href="/brand/davidoff">Davidoff</a></li>
+            <li><a href="/blogs">Blog</a></li>
+            <li><a href="/about">About</a></li>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </nav>
+      </noscript>
       <script type="module" src="/src/main.tsx"></script>
     </body>
   </html>

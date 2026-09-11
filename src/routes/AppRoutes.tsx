@@ -52,6 +52,9 @@ const ReturnsPage = lazy(() => import('../pages/legal/ReturnsPage').then(m => ({
 // Admin - New modular admin system
 const AdminRouter = lazy(() => import('../adminnew/AdminRouter').then(m => ({ default: m.AdminRouter })));
 
+// 404 — unknown URLs render noindex NotFoundPage (audit T7), never HomePage
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+
 interface AppRoutesProps {
   isAdminRoute?: boolean;
   onStatsUpdate?: () => void;
@@ -113,7 +116,7 @@ export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: App
       <Route path={ROUTES.LEGAL} element={<LegalPage />} />
 
       {/* Catch-all route for broken links */}
-      <Route path="*" element={<HomePage />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 };

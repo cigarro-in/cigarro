@@ -16,6 +16,13 @@ export async function onRequest(context) {
   const botUserAgents = ['googlebot', 'google-extended', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'bytespider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain', 'pinterest', 'slackbot', 'vkshare', 'w3c_validator', 'whatsapp', 'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web', 'anthropic', 'perplexity', 'meta-externalagent', 'meta-externalfetch', 'applebot', 'amazonbot'];
   const isBot = botUserAgents.some(bot => userAgent.toLowerCase().includes(bot));
 
+  // Bare /blog is not a route (listing lives at /blogs, posts at
+  // /blog/:slug): permanent redirect for every UA so no crawler or user
+  // lands on the empty SPA shell. Host-relative: safe on localhost too.
+  if (url.pathname === '/blog' || url.pathname === '/blog/') {
+    return Response.redirect(new URL('/blogs', url).toString(), 301);
+  }
+
   // Explicit ?format=json|md on read-only catalog routes: any UA.
   // (ssr-middleware.js re-validates route + format; data = public catalog only)
   const formatParam = (url.searchParams.get('format') || '').toLowerCase();

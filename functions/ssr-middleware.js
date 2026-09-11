@@ -48,12 +48,41 @@ function isBot(userAgent) {
   return BOT_USER_AGENTS.some(bot => ua.includes(bot));
 }
 
+// A2: default share image — real 1200x630 JPEG shipped from public/og-default.jpg.
+const OG_DEFAULT_IMAGE = 'https://cigarro.in/og-default.jpg';
+
+// A6: BreadcrumbList JSON-LD + matching visible breadcrumb nav. `items` must be the
+// exact ordered model rendered by the visible nav — never include a level that has
+// no visible link. All URLs are absolute canonical URLs.
+function breadcrumbJsonLd(items) {
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      item: item.url
+    }))
+  });
+}
+
+function breadcrumbNavHtml(items) {
+  const links = items.map((item, i) => {
+    const isLast = i === items.length - 1;
+    return isLast
+      ? `<li aria-current="page">${escapeHtml(item.name)}</li>`
+      : `<li><a href="${escapeHtml(item.url)}">${escapeHtml(item.name)}</a></li>`;
+  }).join('');
+  return `<nav aria-label="Breadcrumb"><ol>${links}</ol></nav>`;
+}
+
 // Generate HTML for product pages
 async function generateProductHTML(slug, supabase, faviconUrl) {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, price, variant_name)')
+      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, is_default, price, variant_name, variant_slug, variant_type, stock, track_inventory)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single();
@@ -71,10 +100,39 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
     const canonicalUrl = product.canonical_url || `https://cigarro.in/product/${slug}`;
     const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
     const variantImages = activeVariants.flatMap(v => v.images || []);
-    // First active variant price is the source of truth (price lives on variants, not products)
-    const firstPricedVariant = activeVariants.find(v => v.price != null);
-    const price = firstPricedVariant?.price ?? null;
-    const imageUrl = variantImages[0] || faviconUrl;
+    // Single source of truth (mirrors src/lib/seo/productOffer.ts): the
+    // is_default variant, else a deterministic slug/name fallback — never the
+    // first priced variant. Price AND availability come from this variant.
+    const defaultVariant = activeVariants.find(v => v.is_default === true)
+      || [...activeVariants].sort((a, b) =>
+        String(a.variant_slug || a.variant_name || '').localeCompare(
+          String(b.variant_slug || b.variant_name || '')))[0]
+      || null;
+    const price = defaultVariant?.price ?? null;
+    // Same stock rule as the ?format=json feed: track_inventory === false
+    // means "don't track" → available.
+    const defaultInStock = defaultVariant
+      ? (defaultVariant.track_inventory === false || Number(defaultVariant.stock ?? 0) > 0)
+      : false;
+    const availability = defaultInStock
+      ? 'https://schema.org/InStock'
+      : 'https://schema.org/OutOfStock';
+    const defaultVariantKey = defaultVariant
+      ? String(defaultVariant.variant_slug || defaultVariant.variant_name || '').toLowerCase().trim().replace(/\s+/g, '-')
+      : '';
+    const offerUrl = defaultVariantKey
+      ? `${canonicalUrl}?variant=${encodeURIComponent(defaultVariantKey)}`
+      : canonicalUrl;
+    const defaultVariantLabel = defaultVariant?.variant_name || null;
+    // Honest cross-variant note when the default is out of stock.
+    const altInStockVariant = !defaultInStock
+      ? activeVariants.find(v => v !== defaultVariant &&
+          (v.track_inventory === false || Number(v.stock ?? 0) > 0))
+      : null;
+    const imageUrl = variantImages[0] || OG_DEFAULT_IMAGE;
+    const imageDims = imageUrl === OG_DEFAULT_IMAGE
+      ? `\n  <meta property="og:image:width" content="1200">\n  <meta property="og:image:height" content="630">`
+      : '';
     const title = product.meta_title || `${product.name} | Cigarro`;
     const description = product.meta_description || product.short_description || product.description?.substring(0, 160) || '';
     // Related discovery: same-brand first, fill with other active products (avoids thin
@@ -107,6 +165,17 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
       ? `<nav aria-label="Brand"><h2>Browse by brand</h2><ul><li><a href="https://cigarro.in/brand/${escapeHtml(product.brand.slug)}">All ${escapeHtml(product.brand.name)} products</a></li></ul></nav>`
       : '';
 
+    // A6: breadcrumb model mirrors the visible nav — the brand level is only
+    // included when the brand page is visibly linked above.
+    const crumbItems = [
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Products', url: 'https://cigarro.in/products' },
+    ];
+    if (product.brand?.name && product.brand?.slug) {
+      crumbItems.push({ name: product.brand.name, url: `https://cigarro.in/brand/${product.brand.slug}` });
+    }
+    crumbItems.push({ name: product.name, url: canonicalUrl });
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,7 +202,7 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:image" content="${imageUrl}">
-  <meta property="og:image:alt" content="${escapeHtml(product.name)}">
+  <meta property="og:image:alt" content="${escapeHtml(product.name)}">${imageDims}
   <meta property="og:site_name" content="Cigarro">
   ${price != null ? `<meta property="product:price:amount" content="${price}">
   <meta property="product:price:currency" content="INR">` : ''}
@@ -171,8 +240,8 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
           '@type': 'Offer',
           price: price,
           priceCurrency: 'INR',
-          availability: 'https://schema.org/InStock',
-          url: canonicalUrl,
+          availability: availability,
+          url: offerUrl,
           shippingDetails: {
             '@type': 'OfferShippingDetails',
             shippingRate: { '@type': 'MonetaryAmount', value: 0, currency: 'INR' },
@@ -194,12 +263,17 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
       } : {})
     })}
   </script>
+  <script type="application/ld+json">
+  ${breadcrumbJsonLd(crumbItems)}
+  </script>
 </head>
 <body>
+  ${breadcrumbNavHtml(crumbItems)}
   <h1>${escapeHtml(product.name)}</h1>
   <p>${escapeHtml(description)}</p>
   <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
-  ${price != null ? `<p>Price: ₹${price}</p>` : ''}
+  ${price != null ? `<p>Price: ₹${price}${defaultVariantLabel ? ` (${escapeHtml(defaultVariantLabel)})` : ''} — ${defaultInStock ? 'In stock' : 'Out of stock'}</p>` : ''}
+  ${!defaultInStock && altInStockVariant ? `<p>${escapeHtml(defaultVariantLabel || 'Default variant')} out of stock — ${escapeHtml(altInStockVariant.variant_name || 'another variant')} available.</p>` : ''}
   <p>Brand: ${escapeHtml(product.brand?.name || 'Cigarro')}</p>
   ${specTable}
   ${brandLink}
@@ -268,7 +342,11 @@ async function fetchProductData(slug, supabase) {
   const variants = (product.product_variants || [])
     .filter(v => v.is_active !== false)
     .map(normalizeVariant);
-  const def = variants.find(v => v.is_default) || variants[0] || null;
+  // Same default-variant rule as bot HTML: is_default, else deterministic
+  // name order (never database return order).
+  const def = variants.find(v => v.is_default)
+    || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
+    || null;
   const images = (product.product_variants || []).flatMap(v => v.images || []);
   let related = [];
   try {
@@ -375,7 +453,9 @@ async function fetchSearchResults(query, supabase) {
       };
     }
     const variants = variantsByProduct[r.id] || [];
-    const def = variants.find(v => v.is_default) || variants[0] || null;
+    const def = variants.find(v => v.is_default)
+      || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
+      || null;
     return {
       kind: 'product',
       name: r.name,
@@ -508,6 +588,13 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image" content="${OG_DEFAULT_IMAGE}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(title)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${OG_DEFAULT_IMAGE}">
+  <meta name="twitter:image:alt" content="${escapeHtml(title)}">
   
   <script type="application/ld+json">
   ${JSON.stringify({
@@ -518,8 +605,20 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
       url: canonicalUrl
     })}
   </script>
+  <script type="application/ld+json">
+  ${breadcrumbJsonLd([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Categories', url: 'https://cigarro.in/categories' },
+      { name: category.name, url: canonicalUrl }
+    ])}
+  </script>
 </head>
 <body>
+  ${breadcrumbNavHtml([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Categories', url: 'https://cigarro.in/categories' },
+      { name: category.name, url: canonicalUrl }
+    ])}
   <h1>${escapeHtml(category.name)}</h1>
   <p>${escapeHtml(description)}</p>
   <nav aria-label="Site"><ul>
@@ -585,7 +684,13 @@ async function generateBrandHTML(slug, supabase, faviconUrl) {
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   ${brand.logo_url ? `<meta property="og:image" content="${brand.logo_url}">
-  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">` : ''}
+  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">` : `<meta property="og:image" content="${OG_DEFAULT_IMAGE}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">`}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${brand.logo_url || OG_DEFAULT_IMAGE}">
+  <meta name="twitter:image:alt" content="${escapeHtml(brand.name)}">
   
   <script type="application/ld+json">
   ${JSON.stringify({
@@ -597,8 +702,20 @@ async function generateBrandHTML(slug, supabase, faviconUrl) {
     ...(brand.logo_url ? { logo: brand.logo_url } : {})
   })}
   </script>
+  <script type="application/ld+json">
+  ${breadcrumbJsonLd([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Brands', url: 'https://cigarro.in/brands' },
+      { name: brand.name, url: canonicalUrl }
+    ])}
+  </script>
 </head>
 <body>
+  ${breadcrumbNavHtml([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Brands', url: 'https://cigarro.in/brands' },
+      { name: brand.name, url: canonicalUrl }
+    ])}
   <h1>${escapeHtml(brand.name)}</h1>
   <p>${escapeHtml(description)}</p>
   <nav aria-label="Site"><ul>
@@ -645,7 +762,10 @@ function generateHomepageHTML(faviconUrl) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${faviconUrl}">
+  <meta property="og:image" content="${OG_DEFAULT_IMAGE}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(title)}">
   <meta property="og:site_name" content="Cigarro">
   
   <!-- Twitter -->
@@ -653,7 +773,8 @@ function generateHomepageHTML(faviconUrl) {
   <meta name="twitter:url" content="${canonicalUrl}">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${faviconUrl}">
+  <meta name="twitter:image" content="${OG_DEFAULT_IMAGE}">
+  <meta name="twitter:image:alt" content="${escapeHtml(title)}">
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -763,7 +884,10 @@ function generateStaticPageHTML(pathname, faviconUrl) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(pageInfo.title)}">
   <meta property="og:description" content="${escapeHtml(pageInfo.description)}">
-  <meta property="og:image" content="${faviconUrl}">
+  <meta property="og:image" content="${OG_DEFAULT_IMAGE}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(pageInfo.title)}">
   <meta property="og:site_name" content="Cigarro">
   
   <!-- Twitter -->
@@ -771,7 +895,8 @@ function generateStaticPageHTML(pathname, faviconUrl) {
   <meta name="twitter:url" content="${canonicalUrl}">
   <meta name="twitter:title" content="${escapeHtml(pageInfo.title)}">
   <meta name="twitter:description" content="${escapeHtml(pageInfo.description)}">
-  <meta name="twitter:image" content="${faviconUrl}">
+  <meta name="twitter:image" content="${OG_DEFAULT_IMAGE}">
+  <meta name="twitter:image:alt" content="${escapeHtml(pageInfo.title)}">
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -811,7 +936,8 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
     }
 
     const canonicalUrl = `https://cigarro.in/blog/${slug}`;
-    const imageUrl = post.featured_image || faviconUrl;
+    // A2: no featured image → omit og:image entirely (never substitute a logo).
+    const imageUrl = post.featured_image || null;
     const title = post.meta_title || `${post.title} | Cigarro Blog`;
     const description = post.meta_description || post.excerpt || post.content?.substring(0, 160) || '';
     const authorName = post.author?.name || 'Cigarro';
@@ -836,7 +962,8 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${imageUrl}">
+  ${imageUrl ? `<meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:alt" content="${escapeHtml(post.title)}">` : ''}
   <meta property="og:site_name" content="Cigarro">
   <meta property="article:published_time" content="${publishedDate}">
   <meta property="article:author" content="${escapeHtml(authorName)}">
@@ -846,7 +973,8 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
   <meta name="twitter:url" content="${canonicalUrl}">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${imageUrl}">
+  ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}">
+  <meta name="twitter:image:alt" content="${escapeHtml(post.title)}">` : ''}
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -855,7 +983,7 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
       '@type': 'Article',
       headline: post.title,
       description: description,
-      image: imageUrl,
+      ...(imageUrl ? { image: imageUrl } : {}),
       datePublished: publishedDate,
       dateModified: publishedDate,
       author: {
@@ -876,12 +1004,24 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
       }
     })}
   </script>
+  <script type="application/ld+json">
+  ${breadcrumbJsonLd([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Blog', url: 'https://cigarro.in/blogs' },
+      { name: post.title, url: canonicalUrl }
+    ])}
+  </script>
 </head>
 <body>
+  ${breadcrumbNavHtml([
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: 'Blog', url: 'https://cigarro.in/blogs' },
+      { name: post.title, url: canonicalUrl }
+    ])}
   <article>
     <h1>${escapeHtml(post.title)}</h1>
     <p><strong>By ${escapeHtml(authorName)}</strong> | <time datetime="${publishedDate}">${new Date(publishedDate).toLocaleDateString()}</time></p>
-    <img src="${imageUrl}" alt="${escapeHtml(post.title)}">
+    ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(post.title)}">` : ''}
     <p>${escapeHtml(post.excerpt || description)}</p>
   </article>
   
@@ -991,6 +1131,53 @@ function isExcludedPath(pathname) {
     pathname.startsWith('/orders') ||
     pathname.startsWith('/wishlist') ||
     pathname.startsWith('/payment');
+}
+
+// Returns the entity slug when pathname is a single-segment catalog detail URL
+// (/product/:slug, /brand/:slug, /category/:slug, /blog/:slug), else null.
+// Multi-segment paths (e.g. /category/:category/:brand, a valid SPA route) are
+// NOT catalog detail URLs and fall through to normal SPA routing untouched.
+function catalogSlug(pathname) {
+  const m = pathname.match(/^\/(product|brand|category|blog)\/([^/]+?)\/?$/);
+  return m ? decodeURIComponent(m[2]) : null;
+}
+
+// Branded 404 for dead catalog URLs (audit A5). Served with HTTP 404 +
+// noindex so crawlers drop the URL instead of burning budget on the 200
+// age-gate SPA shell (soft 404). No canonical: 404s must not be canonicalized.
+// No offer/price markup here by design — there is no entity to describe.
+function generateNotFoundHTML(requestedPath, faviconUrl) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page not found | Cigarro</title>
+  <meta name="description" content="The page you requested does not exist. Browse Cigarro's catalog, brands and categories instead.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="icon" href="${faviconUrl}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Page not found | Cigarro">
+  <meta property="og:description" content="This page does not exist. Browse the Cigarro catalog instead.">
+  <meta property="og:site_name" content="Cigarro">
+</head>
+<body>
+  <h1>Page not found</h1>
+  <p>No page exists at ${escapeHtml(requestedPath)}. It may have been removed or the link may be incorrect.</p>
+  <form action="https://cigarro.in/products" method="get" role="search">
+    <label for="q">Search the catalog</label>
+    <input id="q" type="search" name="search" placeholder="Brand or product, e.g. Dunhill">
+    <button type="submit">Search</button>
+  </form>
+  <nav aria-label="Site"><ul>
+    <li><a href="https://cigarro.in/">Home</a></li>
+    <li><a href="https://cigarro.in/products">All products</a></li>
+    <li><a href="https://cigarro.in/categories">Categories</a></li>
+    <li><a href="https://cigarro.in/brands">Brands</a></li>
+    <li><a href="https://cigarro.in/blogs">Blog</a></li>
+  </ul></nav>
+</body>
+</html>`;
 }
 
 // Read-only catalog routes eligible for explicit ?format= (any UA)
@@ -1120,6 +1307,10 @@ export async function onRequest(context) {
     }
 
     let html = null;
+    // True when the path looked like a catalog detail URL but the DB lookup
+    // returned no ACTIVE entity (audit A5). Inactive products stay
+    // non-indexable: they hit this branch exactly like unknown slugs.
+    let catalogMiss = false;
 
     // Generate appropriate HTML based on route
     if (url.pathname === '/' || url.pathname === '') {
@@ -1133,17 +1324,41 @@ export async function onRequest(context) {
       url.pathname === '/shipping' || url.pathname === '/legal') {
       html = generateStaticPageHTML(url.pathname, faviconUrl);
     } else if (url.pathname.startsWith('/product/')) {
-      const slug = url.pathname.replace('/product/', '');
-      html = await generateProductHTML(slug, supabase, faviconUrl);
+      const slug = catalogSlug(url.pathname);
+      if (slug !== null) {
+        html = await generateProductHTML(slug, supabase, faviconUrl);
+        if (!html) catalogMiss = true;
+      }
     } else if (url.pathname.startsWith('/category/')) {
-      const slug = url.pathname.replace('/category/', '');
-      html = await generateCategoryHTML(slug, supabase, faviconUrl);
+      const slug = catalogSlug(url.pathname);
+      if (slug !== null) {
+        html = await generateCategoryHTML(slug, supabase, faviconUrl);
+        if (!html) catalogMiss = true;
+      }
     } else if (url.pathname.startsWith('/brand/')) {
-      const slug = url.pathname.replace('/brand/', '');
-      html = await generateBrandHTML(slug, supabase, faviconUrl);
+      const slug = catalogSlug(url.pathname);
+      if (slug !== null) {
+        html = await generateBrandHTML(slug, supabase, faviconUrl);
+        if (!html) catalogMiss = true;
+      }
     } else if (url.pathname.startsWith('/blog/')) {
-      const slug = url.pathname.replace('/blog/', '');
-      html = await generateBlogHTML(slug, supabase, faviconUrl);
+      const slug = catalogSlug(url.pathname);
+      if (slug !== null) {
+        html = await generateBlogHTML(slug, supabase, faviconUrl);
+        if (!html) catalogMiss = true;
+      }
+    }
+
+    // Dead catalog URL: branded 404, never the SPA shell (soft 404).
+    if (!html && catalogMiss) {
+      return new Response(generateNotFoundHTML(url.pathname, faviconUrl), {
+        status: 404,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Robots-Tag': 'noindex, follow'
+        }
+      });
     }
 
     // If we generated HTML, return it

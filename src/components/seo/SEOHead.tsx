@@ -1,5 +1,10 @@
 import { Helmet } from 'react-helmet-async';
 
+// A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
+// The 512px icon is a valid image for Organization/publisher logos (never a share image).
+const DEFAULT_SHARE_IMAGE = 'https://cigarro.in/og-default.jpg';
+const SITE_LOGO_URL = 'https://cigarro.in/icons/android-chrome-512x512.png';
+
 interface SEOHeadProps {
   title?: string;
   description?: string;
@@ -13,6 +18,10 @@ interface SEOHeadProps {
   price?: string;
   currency?: string;
   availability?: 'in stock' | 'out of stock' | 'preorder';
+  // Exact-variant offer URL (canonical page URL + ?variant=<slug>). When set,
+  // JSON-LD offers.url names the variant while <link rel="canonical"> stays
+  // clean. Sole emitter of product:price:* meta on product pages.
+  offerUrl?: string;
   brand?: string;
   category?: string;
   // Ratings pipeline (populated from product.rating_value / product.review_count once live).
@@ -27,13 +36,16 @@ interface SEOHeadProps {
   twitterTitle?: string;
   twitterDescription?: string;
   twitterImage?: string;
+  // Crawl directive override — default keeps every existing caller indexable;
+  // NotFoundPage passes 'noindex, follow'.
+  robots?: string;
 }
 
 export function SEOHead({
   title = 'Cigarro - Premium Cigarettes & Tobacco Online',
   description = 'India\'s premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery.',
   keywords = ['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes'],
-  image = 'https://cigarro.in/logo.png',
+  image,
   url = 'https://cigarro.in',
   type = 'website',
   author,
@@ -42,6 +54,7 @@ export function SEOHead({
   price,
   currency = 'INR',
   availability = 'in stock',
+  offerUrl,
   brand,
   category,
   ratingValue,
@@ -52,7 +65,8 @@ export function SEOHead({
   ogImage,
   twitterTitle,
   twitterDescription,
-  twitterImage
+  twitterImage,
+  robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
 }: SEOHeadProps) {
   const fullTitle = title.includes('Cigarro') ? title : `${title} | Cigarro`;
   
@@ -84,7 +98,12 @@ export function SEOHead({
   // og:type only supports website/article/profile — never "product".
   // For products we emit website + product: namespace tags below.
   const ogType = type === 'article' ? 'article' : 'website';
-  const isDefaultImage = !image || image === 'https://cigarro.in/logo.png';
+  // A2: articles with no featured/og image omit og:image entirely rather than
+  // substituting a logo. All other templates fall back to the default share image.
+  const omitImage = type === 'article' && !image && !ogImage && !twitterImage;
+  const resolvedImage = image ?? DEFAULT_SHARE_IMAGE;
+  const shareImage = omitImage ? undefined : (ogImage || resolvedImage);
+  const twitterShareImage = omitImage ? undefined : (twitterImage || ogImage || resolvedImage);
   const optimizedDescription = description.length > 160 
     ? description.substring(0, 157) + '...'
     : description;
@@ -97,7 +116,7 @@ export function SEOHead({
       name: fullTitle,
       description: optimizedDescription,
       url: canonicalUrl,
-      image
+      image: shareImage
     };
 
     if (type === 'product' && price) {
@@ -112,7 +131,7 @@ export function SEOHead({
           price,
           priceCurrency: currency,
           availability: `https://schema.org/${availability === 'in stock' ? 'InStock' : 'OutOfStock'}`,
-          url: canonicalUrl,
+          url: offerUrl || canonicalUrl,
           seller: {
             '@type': 'Organization',
             name: 'Cigarro'
@@ -194,7 +213,7 @@ export function SEOHead({
           name: 'Cigarro',
           logo: {
             '@type': 'ImageObject',
-            url: 'https://cigarro.in/logo.png'
+            url: SITE_LOGO_URL
           }
         },
         datePublished: publishedTime,
@@ -211,7 +230,7 @@ export function SEOHead({
         url: 'https://cigarro.in',
         logo: {
           '@type': 'ImageObject',
-          url: 'https://cigarro.in/logo.png'
+          url: SITE_LOGO_URL
         }
       },
       potentialAction: {
@@ -225,8 +244,8 @@ export function SEOHead({
   return (
     <Helmet>
       {/* Preload LCP image if provided */}
-      {image && image !== 'https://cigarro.in/logo.png' && (
-        <link rel="preload" as="image" href={image} fetchPriority="high" />
+      {shareImage && shareImage !== DEFAULT_SHARE_IMAGE && (
+        <link rel="preload" as="image" href={shareImage} fetchPriority="high" />
       )}
 
       {/* Primary Meta Tags */}
@@ -241,10 +260,10 @@ export function SEOHead({
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:title" content={ogTitle || fullTitle} />
       <meta property="og:description" content={ogDescription || optimizedDescription} />
-      <meta property="og:image" content={ogImage || image} />
-      <meta property="og:image:alt" content={ogTitle || fullTitle} />
-      {!isDefaultImage && (
+      {shareImage && (
         <>
+          <meta property="og:image" content={shareImage} />
+          <meta property="og:image:alt" content={ogTitle || fullTitle} />
           <meta property="og:image:width" content="1200" />
           <meta property="og:image:height" content="630" />
         </>
@@ -265,13 +284,17 @@ export function SEOHead({
       <meta name="twitter:url" content={canonicalUrl} />
       <meta name="twitter:title" content={twitterTitle || ogTitle || fullTitle} />
       <meta name="twitter:description" content={twitterDescription || ogDescription || optimizedDescription} />
-      <meta name="twitter:image" content={twitterImage || ogImage || image} />
-      <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />
+      {twitterShareImage && (
+        <>
+          <meta name="twitter:image" content={twitterShareImage} />
+          <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />
+        </>
+      )}
 
       {/* Additional Meta Tags */}
-      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-      <meta name="googlebot" content="index, follow" />
-      <meta name="bingbot" content="index, follow" />
+      <meta name="robots" content={robots} />
+      <meta name="googlebot" content={robots} />
+      <meta name="bingbot" content={robots} />
       <meta name="language" content="English" />
       <meta name="revisit-after" content="7 days" />
       <meta name="author" content={author || 'Cigarro'} />
@@ -297,7 +320,7 @@ export function SEOHead({
           '@type': 'Organization',
           name: 'Cigarro',
           url: 'https://cigarro.in',
-          logo: 'https://cigarro.in/logo.png',
+          logo: SITE_LOGO_URL,
           description: 'India\'s premier online marketplace for premium cigarettes and tobacco products',
           address: {
             '@type': 'PostalAddress',
