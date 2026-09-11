@@ -55,21 +55,9 @@ export default defineConfig({
               }
             }
           },
-          // Cache Supabase storage images (legacy, during R2 transition)
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'supabase-images',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
+          // Legacy Supabase storage pattern removed 2026-09-11: all DB image
+          // URLs now resolve to R2 (cdn.cigarro.in). Old cached entries in
+          // users' browsers simply stop matching and age out.
           // Cache API responses (homepage data, products, etc.)
           {
             urlPattern: /\/api\/(homepage-data|products|categories|brands)/i,

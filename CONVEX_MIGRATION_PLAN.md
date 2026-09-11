@@ -140,6 +140,9 @@ delta beyond ±5% pauses the program.
     rollback. Fixed a real rewrite bug mid-flight (multi-index rows clobbered
     — now one read-modify-write per cell, verified to zero).
   - TODO: delete the single-use R2 API token after this session.
+  - DONE 2026-09-11: `cdn.cigarro.in` live; DB URLs rewritten r2.dev → CDN
+    (58 rows); **zero r2.dev + zero Supabase storage refs remain**. Removed
+    dead Supabase-images SW runtime pattern (R2 patterns kept).
 - [ ] Founder: legal verdict (gates content scale, not migration)
 - [ ] Apply migration `083_audit_logs_sink_repair.sql` (Dashboard SQL Editor, 2 min)
 - [ ] `ktnng` cleanup done 2026-09-11 (deleted, 301s to ESSE)
