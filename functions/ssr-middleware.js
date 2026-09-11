@@ -1078,6 +1078,7 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
     <p><strong>By ${escapeHtml(authorName)}</strong> | <time datetime="${publishedDate}">${new Date(publishedDate).toLocaleDateString()}</time></p>
     ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(post.title)}">` : ''}
     <p>${escapeHtml(post.excerpt || description)}</p>
+    ${sanitizeBlogHtml(post.content)}
   </article>
   
   <!-- This content is for search engines. Real users get the SPA. -->
@@ -1090,6 +1091,29 @@ async function generateBlogHTML(slug, supabase, faviconUrl) {
     console.error('Error generating blog HTML:', error);
     return null;
   }
+}
+
+// Sanitized blog body for bot HTML: full article text with real crawlable
+// links. Allowlist-based — strips scripts, styles, event handlers,
+// javascript:/data: URLs and non-content tags. Relative hrefs/srcs become
+// absolute canonical URLs. Anything unparseable degrades to plain text.
+function sanitizeBlogHtml(html) {
+  if (!html || typeof html !== 'string') return '';
+  let out = String(html);
+  out = out.replace(/<script[\s\S]*?<\/script\s*>/gi, '');
+  out = out.replace(/<style[\s\S]*?<\/style\s*>/gi, '');
+  out = out.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  out = out.replace(/<(\/?)(?!(p|h2|h3|h4|ul|ol|li|a|strong|em|b|i|br|blockquote)\b)[a-zA-Z][^>]*>/g, '');
+  out = out.replace(/<a(\s[^>]*)?>/gi, (tag) => {
+    const href = /href\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i.exec(tag);
+    if (!href) return '<a>';
+    let url = href[1].replace(/^['"]|['"]$/g, '');
+    if (/^\s*(javascript|data|vbscript):/i.test(url)) return '<a>';
+    if (url.startsWith('/')) url = `https://cigarro.in${url}`;
+    if (!/^https:\/\/cigarro\.in\//i.test(url)) return '<a>';
+    return `<a href="${url}">`;
+  });
+  return out;
 }
 
 // Generate HTML for the /agents entry point (AI shopping agents).
