@@ -14,6 +14,42 @@ console.error = (...args) => {
   originalError.apply(console, args);
 };
 
+// Deploy-skew recovery: an open tab from a previous deployment may keep
+// running old code whose lazy chunks no longer exist on the CDN (aggressive
+// SW updates can evict them mid-session). A single reload fetches a fresh
+// index.html; the session flag prevents reload loops (e.g. offline).
+const CHUNK_RELOAD_KEY = 'cigarro-chunk-reload';
+function isChunkLoadFailure(message: unknown): boolean {
+  if (typeof message !== 'string') return false;
+  return /dynamically imported module|Loading chunk \d+ failed|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+}
+function reloadOnceForFreshChunks(): void {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+  } catch {
+    return;
+  }
+  window.location.reload();
+}
+window.addEventListener('error', (event) => {
+  if (isChunkLoadFailure((event as ErrorEvent)?.message)) reloadOnceForFreshChunks();
+});
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = (event as PromiseRejectionEvent)?.reason;
+  const message = typeof reason === 'string' ? reason : reason?.message;
+  if (isChunkLoadFailure(message)) reloadOnceForFreshChunks();
+});
+// Clear the guard once the app boots cleanly so the *next* deploy can
+// recover the same way (a crashed boot never reaches here — no loop).
+setTimeout(() => {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}, 8000);
+
 const UpdateSW = () => {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
