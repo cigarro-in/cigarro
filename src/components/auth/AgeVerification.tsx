@@ -125,6 +125,9 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
 
           {/* Footer Button */}
           <div className="p-6 md:p-10 border-t border-coyote/20 bg-creme/30">
+              <p className="text-center text-dark/60 font-sans text-xs md:text-sm leading-relaxed mb-4">
+                  Proceeding confirms you are 18+ and accept our use of cookies. <a href="/privacy" className="underline underline-offset-2">Privacy</a>
+              </p>
               <Button 
                   onClick={handleVerify}
                   className="w-full bg-dark text-creme-light hover:bg-canyon hover:text-creme-light py-6 md:py-7 rounded-full font-sans font-medium text-base md:text-lg tracking-wide uppercase transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"

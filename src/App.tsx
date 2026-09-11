@@ -16,7 +16,7 @@ import { supabase } from './lib/supabase/client';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
-import { initAnalytics, trackEvent, trackPageView } from './lib/analytics/ga';
+import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
 import { ThemeProvider, useTheme } from './themes';
 
 // Loading component - simplified to null for seamless transitions
@@ -86,8 +86,16 @@ function AppContent() {
 
   const handleAgeVerified = () => {
     setIsAgeVerified(true);
+    // Entering through the gate is the consent moment (stated on the gate).
+    setConsent('granted');
     trackEvent('age_gate_completed');
   };
+
+  // Already-verified visitors never see the gate again: offer them the
+  // one-time banner instead so analytics is never silently enabled.
+  const [legacyConsentNeeded] = useState(
+    () => localStorage.getItem('ageVerified') === 'true' && getConsent() === null
+  );
 
   // Add/remove admin-page class to body for conditional styling
   useEffect(() => {
@@ -113,7 +121,7 @@ function AppContent() {
   return (
     <HelmetProvider>
       <ReferralTracker />
-      {isUserPage && <ConsentBanner />}
+      {isUserPage && legacyConsentNeeded && <ConsentBanner />}
       <Helmet>
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />

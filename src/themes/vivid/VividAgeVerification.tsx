@@ -63,6 +63,10 @@ export function VividAgeVerification({ onVerify }: Props) {
             <ShieldCheck className="w-3.5 h-3.5" />
             Your answer is stored locally only
           </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-[#8a8b95]">
+            Continuing confirms you are 18+ and accept our use of cookies.{' '}
+            <a href="/privacy" className="underline underline-offset-2">Privacy</a>
+          </p>
         </div>
       </div>
     </div>
