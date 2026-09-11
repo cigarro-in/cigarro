@@ -122,7 +122,16 @@ delta beyond ±5% pauses the program.
 
 ## 10. Open items / dependencies
 
-- [ ] Founder: create R2 bucket `cigarro-assets` + public base URL (`cdn.cigarro.in` or R2.dev) — needed for Phase 3
+- [x] Founder: create R2 bucket `cigarro-assets` + public base URL (`cdn.cigarro.in` or R2.dev) — needed for Phase 3
+  - DONE 2026-09-11: bucket `cigarro-assets` live, public via
+    `https://pub-7628019679ab4ea3a3d4c00c2dde1409.r2.dev`
+  - TODO: R2 API token (Object Read+Write, bucket-scoped) for bulk copy
+  - DONE 2026-09-11: bulk copy complete — 189 objects (`asset_images/`,
+    `images/` incl. nested), byte-verified vs Supabase, content-types fixed.
+    Scripts: `r2_copy.py`, `r2_verify.py` (kept outside repo, Temp dir).
+  - BLOCKED: r2.dev returns **403** on public fetches — bucket public access
+    not effective yet. DO NOT rewrite DB image URLs until public serving
+    confirmed, or every product image breaks site-wide.
 - [ ] Founder: legal verdict (gates content scale, not migration)
 - [ ] Apply migration `083_audit_logs_sink_repair.sql` (Dashboard SQL Editor, 2 min)
 - [ ] `ktnng` cleanup done 2026-09-11 (deleted, 301s to ESSE)
