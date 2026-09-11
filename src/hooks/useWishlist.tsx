@@ -3,14 +3,10 @@ import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { supabase } from '../lib/supabase/client';
 import { toast } from 'sonner';
 
-// Phase 1 (Convex migration): wishlist reads/writes go to Convex when the
-// flag is on and org context is ready. Set VITE_USE_CONVEX_USERSTATE=false
-// to fall back to the legacy Supabase path (rollback switch per plan).
-const USE_CONVEX = import.meta.env.VITE_USE_CONVEX_USERSTATE !== 'false';
-
+// Phase 1 complete: wishlist lives in Convex for signed-in users,
+// localStorage for guests. No Supabase paths remain.
 interface WishlistContextType {
   wishlistItems: string[];
   isWishlisted: (productId: string) => boolean;
@@ -39,7 +35,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const org = useOrg();
 
-  const useConvexPath = USE_CONVEX && !!user && !!org;
+  const useConvexPath = !!user && !!org;
   const convexRows = useQuery(
     api.userState.listWishlist,
     useConvexPath ? { orgId: org!._id } : 'skip'
@@ -52,51 +48,11 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     : localItems;
   const wishlistCount = wishlistItems.length;
 
-  // Legacy Supabase path (guests always; logged-in when flag off / org missing)
-  const loadLegacyWishlist = async () => {
-    if (!user) {
-      setLocalItems(readLocalWishlist());
-      return;
-    }
-    try {
-      const { data: wishlistData, error } = await supabase
-        .from('user_wishlists')
-        .select('product_id')
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error loading wishlist from database:', error);
-        setLocalItems(readLocalWishlist());
-        return;
-      }
-      setLocalItems((wishlistData || []).map((item) => item.product_id));
-    } catch (error) {
-      console.error('Error loading wishlist:', error);
-      setLocalItems([]);
-    }
-  };
-
+  // Guests load localStorage; server state arrives via subscription.
   useEffect(() => {
     if (!useConvexPath) {
-      loadLegacyWishlist();
+      setLocalItems(readLocalWishlist());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, useConvexPath]);
-
-  // Listen for wishlist update events (from data transfer)
-  useEffect(() => {
-    const handleWishlistUpdate = () => {
-      if (!useConvexPath) {
-        loadLegacyWishlist();
-      }
-      // Convex path refreshes automatically via subscription.
-    };
-
-    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
-    return () => {
-      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, useConvexPath]);
 
   const isWishlisted = (productId: string): boolean => {
@@ -107,8 +63,6 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      const isCurrentlyWishlisted = isWishlisted(productId);
-
       if (useConvexPath) {
         const result = await convexToggle({ orgId: org!._id, productId });
         toast.success(result.wishlisted ? 'Added to wishlist' : 'Removed from wishlist');
@@ -116,64 +70,16 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!user) {
-        // Handle localStorage for guests
-        const newWishlistItems = isCurrentlyWishlisted
-          ? localItems.filter((id) => id !== productId)
-          : [...localItems, productId];
-
-        setLocalItems(newWishlistItems);
-        localStorage.setItem('wishlist', JSON.stringify(newWishlistItems));
-
-        // Dispatch event for header counter update
-        window.dispatchEvent(new Event('wishlistUpdated'));
-
-        toast.success(isCurrentlyWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
-        return;
-      }
-
-      // Handle database for logged-in users (legacy Supabase path)
-      if (isCurrentlyWishlisted) {
-        // Remove from wishlist
-        const { error } = await supabase
-          .from('user_wishlists')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('product_id', productId);
-
-        if (error) throw error;
-
-        setLocalItems((prev) => prev.filter((id) => id !== productId));
-        toast.success('Removed from wishlist');
-      } else {
-        // Add to wishlist
-        const { error } = await supabase
-          .from('user_wishlists')
-          .insert({
-            user_id: user.id,
-            product_id: productId
-          });
-
-        if (error) {
-          // Handle duplicate entry error gracefully
-          if (error.code === '23505') {
-            // Item already in wishlist, just update local state
-            if (!localItems.includes(productId)) {
-              setLocalItems((prev) => [...prev, productId]);
-            }
-            toast.success('Added to wishlist');
-          } else {
-            throw error;
-          }
-        } else {
-          setLocalItems((prev) => [...prev, productId]);
-          toast.success('Added to wishlist');
-        }
-      }
-
-      // Dispatch event for header counter update
+      // Guests (or org still resolving): localStorage
+      const current = readLocalWishlist();
+      const isCurrentlyWishlisted = current.includes(productId);
+      const next = isCurrentlyWishlisted
+        ? current.filter((id) => id !== productId)
+        : [...current, productId];
+      setLocalItems(next);
+      localStorage.setItem('wishlist', JSON.stringify(next));
       window.dispatchEvent(new Event('wishlistUpdated'));
-
+      toast.success(isCurrentlyWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
     } catch (error) {
       console.error('Error toggling wishlist:', error);
       toast.error('Failed to update wishlist');
@@ -192,28 +98,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         toast.success('Wishlist cleared');
         return;
       }
-
-      if (!user) {
-        // Clear localStorage for guests
-        localStorage.setItem('wishlist', JSON.stringify([]));
-        setLocalItems([]);
-        window.dispatchEvent(new Event('wishlistUpdated'));
-        toast.success('Wishlist cleared');
-        return;
-      }
-
-      // Clear database for logged-in users
-      const { error } = await supabase
-        .from('user_wishlists')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
+      localStorage.setItem('wishlist', JSON.stringify([]));
       setLocalItems([]);
       window.dispatchEvent(new Event('wishlistUpdated'));
       toast.success('Wishlist cleared');
-
     } catch (error) {
       console.error('Error clearing wishlist:', error);
       toast.error('Failed to clear wishlist');

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent } from '../ui/dialog';
 import { supabase } from '../../lib/supabase/client';
 import { useAuth } from '../../hooks/useAuth';
+import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useOTPWidget } from '../../hooks/useOTPWidget';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
@@ -21,6 +22,7 @@ type Step = 'phone' | 'otp' | 'verifying' | 'name';
 
 export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
   const { signInWithPhone, user } = useAuth();
+  const { updateDisplayName } = useMyProfile();
   const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [step, setStep] = useState<Step>('phone');
@@ -39,8 +41,8 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
         return;
       }
       setStep('verifying');
-      setSubmitting(true);
-      try {
+    setSubmitting(true);
+    try {
         const result = await signInWithPhone({ phone: phoneInput, token, countryCode });
         if (result.isNewUser) {
           setSubmitting(false);
@@ -167,8 +169,10 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
     const trimmed = name.trim();
     if (!trimmed || !user?.id) return;
     setSubmitting(true);
-    try {
-      await supabase.from('profiles').update({ name: trimmed }).eq('id', user.id);
+      try {
+      // Phase 1: display name lives in Convex users; auth metadata stays
+      // on Supabase Auth until the Phase 2 cutover.
+      await updateDisplayName(trimmed).catch(() => {});
       await supabase.auth.updateUser({ data: { name: trimmed } });
       onOpenChange(false);
       onAuthSuccess?.();

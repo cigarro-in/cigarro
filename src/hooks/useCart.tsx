@@ -7,13 +7,12 @@ import { supabase } from '../lib/supabase/client';
 import { CartItemWithVariant } from '../types/variants';
 import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
 
-// Phase 1 (Convex migration): logged-in cart persistence moves to Convex
-// (`convex/userState.ts`) while item state, merge logic, totals and the
-// public API stay identical. Set VITE_USE_CONVEX_USERSTATE=false to restore
-// the legacy Supabase persistence (rollback switch per migration plan).
-// Guests always use localStorage. Checkout re-prices from the catalog, so
-// persisted unit prices are display snapshots only.
-const USE_CONVEX = import.meta.env.VITE_USE_CONVEX_USERSTATE !== 'false';
+// Phase 1 complete: logged-in cart persistence is Convex
+// (`convex/userState.ts`) — full-replace via clear + per-line adds — while
+// item state, merge logic, totals and the public API are unchanged.
+// Guests use localStorage. Checkout re-prices from the catalog, so persisted
+// unit prices are display snapshots only. Catalog reads below stay on
+// Supabase until Phase 3 (rehydration only).
 
 // Updated to match new schema - images on variants, brand via relation
 export interface Product {
@@ -82,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const org = useOrg();
 
-  const useConvexPath = USE_CONVEX && !!user && !!org;
+  const useConvexPath = !!user && !!org;
   const convexAdd = useMutation(api.userState.addToCart);
   const convexSetQty = useMutation(api.userState.setCartQty);
   const convexRemove = useMutation(api.userState.removeCartLine);
@@ -259,7 +258,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const loadCart = async () => {
-    if (!user) {
+    // No user, or org not resolved yet (transient at startup): device-local
+    // cart. Once org arrives the Convex path merges it server-side.
+    if (!user || !org) {
       // Load from localStorage for guests
       const savedCart = localStorage.getItem('cart');
       if (savedCart) {
@@ -278,17 +279,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     // Convex path: server lines -> rehydrate -> merge guest cart
+    // Convex: server lines -> rehydrate rich items -> merge guest cart.
     if (useConvexPath && org) {
       try {
         const guestCart = localStorage.getItem('cart');
         const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
 
-        // Direct query via subscription cache is async here; rehydrate from
-        // a fresh read through the same query args is not available outside
-        // hooks, so resolve lines through a lightweight fetch of current
-        // subscription value is impossible — instead merge guest items into
-        // whatever is currently displayed, then persist the union.
-        // First paint: adopt subscription lines on next render cycle.
         const currentLines = (convexLineCount ?? []).map((l) => ({
           productId: l.productId,
           variantId: l.variantId,
@@ -323,184 +319,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
           setItems(serverItems);
         }
       } catch (error) {
-        console.error('❌ Failed to load cart:', error);
+        console.error('Failed to load cart:', error);
         setItems([]);
       }
-      return;
-    }
-
-    try {
-      // Check if there's a guest cart to merge
-      const guestCart = localStorage.getItem('cart');
-      const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
-
-      // Get cart items from Supabase (legacy path)
-      const { data: cartItems, error } = await supabase
-        .from('cart_items')
-        .select(`
-          id,
-          quantity,
-          product_id,
-          variant_id,
-          combo_id,
-          products (
-            id,
-            name,
-            slug,
-            brand_id,
-            brand:brands(id, name),
-            description,
-            is_active
-          ),
-          product_variants (
-            id,
-            variant_name,
-            price,
-            images
-          ),
-          combos (
-            id,
-            name,
-            combo_price
-          )
-        `)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('❌ Failed to load cart from database:', error);
-        throw error;
-      }
-
-      // Transform Supabase data to CartItem format
-      const userItems: CartItem[] = cartItems?.filter(item => item.products).map(item => {
-        const product = item.products as any;
-        const variant = item.product_variants as any;
-        const combo = item.combos as any;
-
-        // Convert null to undefined for proper comparison
-        const variantId = item.variant_id || undefined;
-        const comboId = item.combo_id || undefined;
-
-        // Extract brand name - handle array format from Supabase relations
-        const getBrandName = (brand: any): string => {
-          if (!brand) return 'Premium';
-          if (typeof brand === 'string') return brand;
-          if (Array.isArray(brand)) return brand[0]?.name || 'Premium';
-          if (typeof brand === 'object') return brand.name || 'Premium';
-          return 'Premium';
-        };
-
-        const cartItem = {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          brand: getBrandName(product.brand),
-          price: variant?.price || product.price || 0,
-          description: product.description,
-          is_active: product.is_active,
-          image: variant?.images?.[0] || '',
-          quantity: item.quantity,
-          variant_id: variantId,
-          variant_name: variant?.variant_name,
-          variant_price: variant?.price,
-          combo_id: comboId,
-          combo_name: combo?.name,
-          combo_price: combo?.combo_price
-        };
-
-        return cartItem as CartItem;
-      }) || [];
-
-      // Merge guest cart with user cart
-      if (guestItems.length > 0) {
-        const mergedItems = [...userItems];
-
-        for (const guestItem of guestItems) {
-          const existingItemIndex = mergedItems.findIndex(item =>
-            item.id === guestItem.id &&
-            item.variant_id === guestItem.variant_id &&
-            item.combo_id === guestItem.combo_id
-          );
-          if (existingItemIndex >= 0) {
-            // Add quantities if item exists
-            mergedItems[existingItemIndex].quantity += guestItem.quantity;
-            // Update in database
-            const updateQuery = supabase
-              .from('cart_items')
-              .update({ quantity: mergedItems[existingItemIndex].quantity })
-              .eq('user_id', user.id)
-              .eq('product_id', guestItem.id);
-
-            if (guestItem.variant_id) {
-              updateQuery.eq('variant_id', guestItem.variant_id);
-            }
-            if (guestItem.combo_id) {
-              updateQuery.eq('combo_id', guestItem.combo_id);
-            }
-
-            await updateQuery;
-          } else {
-            // Add new item
-            mergedItems.push(guestItem);
-            // Insert into database
-            await supabase
-              .from('cart_items')
-              .insert({
-                user_id: user.id,
-                product_id: guestItem.id,
-                quantity: guestItem.quantity,
-                variant_id: guestItem.variant_id,
-                combo_id: guestItem.combo_id
-              });
-          }
-        }
-
-        // Save merged cart and clear localStorage
-        setItems(mergedItems);
-        localStorage.removeItem('cart');
-      } else {
-        setItems(userItems);
-      }
-    } catch (error) {
-      console.error('❌ Failed to load cart:', error);
-      // Fallback to empty cart on error
-      setItems([]);
     }
   };
 
   const saveCartToServer = async (newItems: CartItem[]) => {
     if (!user) return;
-
-    // Convex path: full-replace via clear + per-line adds
-    if (useConvexPath) {
-      await persistAllConvex(newItems);
+    if (!org) {
+      // Org transiently unresolved: keep a device-local backup; the Convex
+      // path merges it on the next load once org resolves.
+      localStorage.setItem('cart', JSON.stringify(newItems));
       return;
     }
-
-    try {
-      // First, clear all existing cart items for this user
-      await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
-      // Insert new cart items
-      if (newItems.length > 0) {
-        const cartItemsToInsert = newItems.map(item => ({
-          user_id: user.id,
-          product_id: item.id,
-          quantity: item.quantity,
-          variant_id: item.variant_id,
-          combo_id: item.combo_id
-        }));
-
-        await supabase
-          .from('cart_items')
-          .insert(cartItemsToInsert);
-      }
-    } catch (error) {
-      console.error('Failed to save cart to server:', error);
-    }
+    await persistAllConvex(newItems);
   };
 
   const saveCart = async (newItems: CartItem[]) => {

@@ -9,11 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Switch } from '../../components/ui/switch';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase/client';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
 import { toast } from 'sonner';
 
 export function ProfileSettingsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const org = useOrg();
+  const convexUpsertUser = useMutation(api.userState.upsertUser);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -45,19 +50,16 @@ export function ProfileSettingsPage() {
       });
 
       if (error) throw error;
-      
-      // Also update profiles table if it exists/is used
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user!.id,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          updated_at: new Date().toISOString()
-        });
 
-        // Ignore profile error if table doesn't exist or RLS issues, primary is auth
-        if (profileError) console.warn('Profile table update warning:', profileError);
+      // Phase 1: mirror display name/phone into Convex users (best-effort;
+      // auth metadata remains the source until the Phase 2 cutover).
+      if (org) {
+        convexUpsertUser({
+          orgId: org._id,
+          name: formData.fullName,
+          phone: formData.phone || undefined,
+        }).catch((e) => console.warn('Convex profile mirror warning:', e));
+      }
 
       toast.success('Profile updated successfully');
     } catch (error: any) {

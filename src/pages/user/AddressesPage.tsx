@@ -5,7 +5,7 @@ import { Plus, MapPin } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase/client';
+import { useAddresses } from '../../lib/convex/useAddresses';
 import { toast } from 'sonner';
 import { Address } from '../../components/checkout/address/AddressCard';
 import { AddressForm } from '../../components/checkout/address/AddressForm';
@@ -14,10 +14,19 @@ import { AddressCard } from '../../components/checkout/address/AddressCard';
 export function AddressesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  // Phase 1: address store (Convex). Local mirror keeps render behavior.
+  const {
+    fetchNow: fetchStoreAddresses,
+    saveAddress: storeSaveAddress,
+    deleteAddress: storeDeleteAddress,
+  } = useAddresses(user);
+  const [legacyAddresses, setLegacyAddresses] = useState<Address[]>([]);
+  const [legacyLoading, setLegacyLoading] = useState(true);
+
+  const shownAddresses = legacyAddresses;
+  const isLoading = legacyLoading;
 
   useEffect(() => {
     if (user) {
@@ -29,20 +38,13 @@ export function AddressesPage() {
 
   const fetchAddresses = async () => {
     try {
-      const { data, error } = await supabase
-        .from('saved_addresses')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAddresses(data || []);
+      const rows = await fetchStoreAddresses();
+      setLegacyAddresses(rows);
     } catch (error) {
       console.error('Error fetching addresses:', error);
       toast.error('Failed to load addresses');
     } finally {
-      setIsLoading(false);
+      setLegacyLoading(false);
     }
   };
 
@@ -50,8 +52,8 @@ export function AddressesPage() {
     if (!user) return;
 
     try {
-      const dbData = {
-        user_id: user.id,
+      await storeSaveAddress({
+        id: addressData.id,
         full_name: addressData.full_name,
         phone: addressData.phone,
         address: addressData.address,
@@ -60,26 +62,8 @@ export function AddressesPage() {
         state: addressData.state,
         country: addressData.country,
         label: addressData.label,
-        is_default: addressData.is_default
-      };
-
-      let error;
-
-      if (addressData.id) {
-        const { error: updateError } = await supabase
-          .from('saved_addresses')
-          .update(dbData)
-          .eq('id', addressData.id);
-        error = updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('saved_addresses')
-          .insert(dbData);
-        error = insertError;
-      }
-
-      if (error) throw error;
-
+        is_default: (addressData as any).is_default,
+      });
       toast.success(addressData.id ? 'Address updated' : 'Address added');
       await fetchAddresses();
       setView('list');
@@ -92,16 +76,9 @@ export function AddressesPage() {
 
   const handleDeleteAddress = async (id: string) => {
       if (!confirm('Are you sure you want to delete this address?')) return;
-      
+
       try {
-          const { error } = await supabase
-            .from('saved_addresses')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', user!.id);
-            
-          if (error) throw error;
-          
+          await storeDeleteAddress(id);
           toast.success('Address deleted');
           fetchAddresses();
       } catch (error) {
@@ -147,7 +124,7 @@ export function AddressesPage() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {view === 'list' ? (
             <>
-              {addresses.length === 0 ? (
+              {shownAddresses.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                     <MapPin className="w-8 h-8 text-muted-foreground" />
@@ -162,7 +139,7 @@ export function AddressesPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {addresses.map((addr) => (
+                  {shownAddresses.map((addr) => (
                     <div key={addr.id} className="relative group">
                         <AddressCard
                           address={addr}

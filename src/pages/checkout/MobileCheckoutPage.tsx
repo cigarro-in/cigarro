@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -37,6 +38,9 @@ export function MobileCheckoutPage() {
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
+  // Phase 1: address reads share the adapter with AddressDrawer so saves
+  // stay visible (single backend, no split brain).
+  const { fetchNow: fetchStoreAddresses } = useAddresses(user);
 
   const org = useOrg();
   const convexWallet = useQuery(api.wallet.getMyBalance, org ? { orgId: org._id } : 'skip');
@@ -370,6 +374,7 @@ export function MobileCheckoutPage() {
   });
 
   // Fetch saved addresses and auto-select (memoized to prevent re-render loops)
+  // Phase 1: adapter-backed (Convex or Supabase) so Drawer saves stay visible.
   const fetchSavedAddresses = useCallback(async () => {
     if (!user?.id) {
       return;
@@ -378,20 +383,10 @@ export function MobileCheckoutPage() {
     // Use ref values to avoid dependency changes
     const { isRetryPayment, retryOrder, defaultUserName, defaultUserPhone } = fetchContextRef.current;
     try {
-      // Always fetch saved addresses from database
-      const { data: addresses, error } = await supabase
-        .from('saved_addresses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching addresses:', error);
-        return;
-      }
-
-      if (addresses && addresses.length > 0) {
-        setSavedAddresses(addresses);
+      // Always fetch saved addresses from the address store
+      const rows = await fetchStoreAddresses();
+      if (rows && rows.length > 0) {
+        setSavedAddresses(rows);
       } else {
         setSavedAddresses([]);
       }

@@ -10,7 +10,7 @@ import {
 import { AddressList } from './AddressList';
 import { AddressForm } from './AddressForm';
 import { Address } from './AddressCard';
-import { supabase } from '../../../lib/supabase/client';
+import { useAddresses } from '../../../lib/convex/useAddresses';
 import { toast } from 'sonner';
 import { Button } from '../../ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -37,13 +37,13 @@ export const AddressDrawer = memo(function AddressDrawer({
 }: AddressDrawerProps) {
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const { saveAddress } = useAddresses(user);
   const handleSaveAddress = async (addressData: Address) => {
     if (!user) return;
 
     try {
-      // Prepare data for DB
-      const dbData = {
-        user_id: user.id,
+      const saved = await saveAddress({
+        id: addressData.id,
         full_name: addressData.full_name,
         phone: addressData.phone,
         address: addressData.address,
@@ -52,42 +52,15 @@ export const AddressDrawer = memo(function AddressDrawer({
         state: addressData.state,
         country: addressData.country,
         label: addressData.label,
-        is_default: addressData.is_default
-      };
-
-      let error;
-      let savedData;
-
-      if (addressData.id) {
-        // Update
-        const { data, error: updateError } = await supabase
-          .from('saved_addresses')
-          .update(dbData)
-          .eq('id', addressData.id)
-          .select()
-          .single();
-        error = updateError;
-        savedData = data;
-      } else {
-        // Insert
-        const { data, error: insertError } = await supabase
-          .from('saved_addresses')
-          .insert(dbData)
-          .select()
-          .single();
-        error = insertError;
-        savedData = data;
-      }
-
-      if (error) throw error;
+        is_default: (addressData as any).is_default,
+      });
+      const savedData = { ...addressData, ...saved } as Address;
 
       toast.success(addressData.id ? 'Address updated' : 'Address added');
 
       await onAddressesUpdate();
 
-      if (savedData) {
-        onAddressSelect(savedData);
-      }
+      onAddressSelect(savedData);
 
       setView('list');
       setEditingAddress(null);

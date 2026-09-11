@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Pencil, Trash2, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
 import { useAuth } from '../../hooks/useAuth';
+import { useMyAddresses } from '../../hooks/data/useMyAddresses';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { AddressForm } from '../../components/checkout/address/AddressForm';
 import type { Address } from '../../components/checkout/address/AddressCard';
@@ -11,8 +11,13 @@ import type { Address } from '../../components/checkout/address/AddressCard';
 export function VividAddresses() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    addresses,
+    loading,
+    reload: reloadStore,
+    saveAddress: storeSaveAddress,
+    deleteAddress: storeDeleteAddress,
+  } = useMyAddresses();
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Address | null>(null);
 
@@ -27,38 +32,30 @@ export function VividAddresses() {
 
   async function fetch() {
     if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false });
-    if (error) toast.error('Failed to load addresses');
-    setAddresses((data as any) || []);
-    setLoading(false);
+    await reloadStore();
   }
 
   async function save(data: Address) {
     if (!user) return;
-    const payload = {
-      user_id: user.id,
-      full_name: data.full_name,
-      phone: data.phone,
-      address: data.address,
-      pincode: data.pincode,
-      city: data.city,
-      state: data.state,
-      country: data.country,
-      label: data.label,
-      is_default: data.is_default,
-    };
-    const { error } = data.id
-      ? await supabase.from('saved_addresses').update(payload).eq('id', data.id)
-      : await supabase.from('saved_addresses').insert(payload);
-    if (error) return toast.error('Failed to save');
+    try {
+      await storeSaveAddress({
+        id: data.id,
+        full_name: data.full_name,
+        phone: data.phone,
+        address: data.address,
+        pincode: data.pincode,
+        city: data.city,
+        state: data.state,
+        country: data.country,
+        label: data.label,
+        is_default: (data as any).is_default,
+      });
+    } catch {
+      toast.error('Failed to save');
+      return;
+    }
     toast.success(data.id ? 'Address updated' : 'Address added');
-    await fetch();
+    await reloadStore();
     setView('list');
     setEditing(null);
   }
@@ -66,10 +63,14 @@ export function VividAddresses() {
   async function remove(id?: string) {
     if (!id || !user) return;
     if (!confirm('Delete this address?')) return;
-    const { error } = await supabase.from('saved_addresses').delete().eq('id', id).eq('user_id', user.id);
-    if (error) return toast.error('Failed to delete');
+    try {
+      await storeDeleteAddress(id);
+    } catch {
+      toast.error('Failed to delete');
+      return;
+    }
     toast.success('Address deleted');
-    fetch();
+    reloadStore();
   }
 
   return (

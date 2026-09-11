@@ -8,6 +8,7 @@ import { Separator } from '../ui/separator';
 import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { supabase } from '../../lib/supabase/client';
+import { useAddresses } from '../../lib/convex/useAddresses';
 import { toast } from 'sonner';
 
 interface Address {
@@ -56,6 +57,14 @@ export function AddressManager({
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
+  // Phase 1: address store behind the flat-shape adapter (Convex or Supabase).
+  const {
+    addresses: storeAddresses,
+    fetchNow: fetchStoreAddresses,
+    saveAddress: storeSaveAddress,
+    deleteAddress: storeDeleteAddress,
+    useConvexPath,
+  } = useAddresses(user);
 
   // Address form state
   const [addressForm, setAddressForm] = useState({
@@ -82,7 +91,7 @@ export function AddressManager({
   // Load saved addresses
   const loadSavedAddresses = async () => {
     if (!user) return;
-    
+
     // If addresses are provided via props, use them
     if (propSavedAddresses && propSavedAddresses.length > 0) {
       setSavedAddresses(propSavedAddresses);
@@ -90,23 +99,27 @@ export function AddressManager({
     }
 
     try {
-      const { data, error } = await supabase
-        .from('saved_addresses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setSavedAddresses(data);
-        if (data.length > 0 && !selectedAddress) {
-          // Select the most recent address
-          onAddressSelect(data[0]);
-        }
+      const rows = await fetchStoreAddresses();
+      setSavedAddresses(rows as Address[]);
+      if (rows.length > 0 && !selectedAddress) {
+        // Select the most recent address
+        onAddressSelect(rows[0] as Address);
       }
     } catch (error) {
       console.error('Error loading addresses:', error);
     }
   };
+
+  // Convex path: mirror the subscribed store rows into local state so the
+  // list below (and its auto-select) behaves exactly like the legacy path.
+  useEffect(() => {
+    if (!useConvexPath || (propSavedAddresses && propSavedAddresses.length > 0)) return;
+    setSavedAddresses(storeAddresses as Address[]);
+    if (storeAddresses.length > 0 && !selectedAddress) {
+      onAddressSelect(storeAddresses[0] as Address);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeAddresses, useConvexPath]);
 
   // Pincode lookup functionality
   const fetchLocationFromPincode = async (pincode: string) => {
@@ -253,13 +266,7 @@ export function AddressManager({
   // Handle delete address
   const handleDeleteAddress = async (addressId: string) => {
     try {
-      const { error } = await supabase
-        .from('saved_addresses')
-        .delete()
-        .eq('id', addressId)
-        .eq('user_id', user!.id);
-
-      if (error) throw error;
+      await storeDeleteAddress(addressId);
 
       // Remove from local state
       setSavedAddresses(prev => prev.filter(addr => addr.id !== addressId));
@@ -297,41 +304,25 @@ export function AddressManager({
 
     setIsSavingAddress(true);
     try {
-      const finalLabel = addressForm.label === 'other' ? customLabel : 
+      const finalLabel = addressForm.label === 'other' ? customLabel :
         addressSuggestions.find(s => s.id === addressForm.label)?.label || 'My Address';
-
-      const addressData = {
-        user_id: user.id,
-        full_name: addressForm.full_name.trim(),
-        phone: addressForm.phone.trim(),
-        address: addressForm.address.trim(),
-        pincode: addressForm.pincode.trim(),
-        city: addressForm.city.trim(),
-        state: addressForm.state.trim(),
-        country: addressForm.country,
-        label: finalLabel
-      };
 
       let data, error;
 
-      if (editingAddress) {
-        const result = await supabase
-          .from('saved_addresses')
-          .update(addressData)
-          .eq('id', editingAddress.id)
-          .eq('user_id', user.id)
-          .select()
-          .single();
-        data = result.data;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('saved_addresses')
-          .insert(addressData)
-          .select()
-          .single();
-        data = result.data;
-        error = result.error;
+      try {
+        data = await storeSaveAddress({
+          id: editingAddress?.id,
+          full_name: addressForm.full_name.trim(),
+          phone: addressForm.phone.trim(),
+          address: addressForm.address.trim(),
+          pincode: addressForm.pincode.trim(),
+          city: addressForm.city.trim(),
+          state: addressForm.state.trim(),
+          country: addressForm.country,
+          label: finalLabel,
+        });
+      } catch (e) {
+        error = e;
       }
 
       if (error) throw error;

@@ -362,3 +362,54 @@ export const clearWishlist = mutation({
     return rows.length;
   },
 });
+
+export const updateAddress = mutation({
+  args: {
+    orgId: v.id("organizations"),
+    addressId: v.id("savedAddresses"),
+    label: v.optional(v.string()),
+    line1: v.string(),
+    line2: v.optional(v.string()),
+    city: v.string(),
+    state: v.string(),
+    pincode: v.string(),
+    name: v.string(),
+    phone: v.string(),
+    isDefault: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireMember(ctx, args.orgId);
+    const row = await ctx.db.get(args.addressId);
+    if (!row || row.userId !== userId || row.orgId !== args.orgId) {
+      throw new ConvexError({ code: "NOT_FOUND" });
+    }
+    if (args.isDefault) {
+      const all = await ctx.db
+        .query("savedAddresses")
+        .withIndex("by_org_user", (q) =>
+          q.eq("orgId", args.orgId).eq("userId", userId),
+        )
+        .collect();
+      await Promise.all(
+        all.map((a) =>
+          ctx.db.patch(a._id, { isDefault: a._id === args.addressId }),
+        ),
+      );
+    }
+    await ctx.db.patch(args.addressId, {
+      label: args.label,
+      address: {
+        line1: args.line1,
+        line2: args.line2,
+        city: args.city,
+        state: args.state,
+        pincode: args.pincode,
+        name: args.name,
+        phone: args.phone,
+      },
+      ...(args.isDefault !== undefined ? { isDefault: args.isDefault } : {}),
+      updatedAt: Date.now(),
+    });
+    return args.addressId;
+  },
+});
