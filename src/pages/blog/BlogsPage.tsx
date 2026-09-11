@@ -4,48 +4,15 @@ import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { getBlogImageUrl } from '../../lib/supabase/storage';
-import { supabase } from '../../lib/supabase/client';
 import type { BlogPost as BlogPostType } from '../../types/blog';
 import DOMPurify from 'dompurify';
+import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
 
 export function BlogsPage() {
   const location = useLocation();
-  const [posts, setPosts] = useState<BlogPostType[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadBlogPosts();
-  }, []);
-
-  const loadBlogPosts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          author:profiles(name, email),
-          category:blog_categories(name, color),
-          tags:blog_post_tags(
-            tag:blog_tags(name, color)
-          )
-        `)
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
-
-      if (error) throw error;
-
-      const formattedPosts = data?.map(post => ({
-        ...post,
-        tags: post.tags?.map((t: any) => t.tag) || []
-      })) || [];
-
-      setPosts(formattedPosts);
-    } catch (error) {
-      console.error('Error loading blog posts:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Wave 2: blog listing reads from Convex (realtime subscription).
+  const { posts, loading } = useBlogPosts(50);
+  const isLoading = loading;
 
   return (
     <>
@@ -190,73 +157,14 @@ export function BlogsPage() {
 export function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
-  const [post, setPost] = useState<BlogPostType | null>(null);
-  const [relatedPosts, setRelatedPosts] = useState<BlogPostType[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (slug) {
-      loadBlogPost(slug);
-    }
-  }, [slug]);
-
-  const loadBlogPost = async (postSlug: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          author:profiles(name, email),
-          category:blog_categories(name, color),
-          tags:blog_post_tags(
-            tag:blog_tags(name, color)
-          )
-        `)
-        .eq('slug', postSlug)
-        .eq('status', 'published')
-        .single();
-
-      if (error) throw error;
-
-      const formattedPost = {
-        ...data,
-        tags: data.tags?.map((t: any) => t.tag) || []
-      };
-
-      setPost(formattedPost);
-
-      // Load related posts
-      if (data.category_id) {
-        const { data: relatedData, error: relatedError } = await supabase
-          .from('blog_posts')
-          .select(`
-            *,
-            author:profiles(name, email),
-            category:blog_categories(name, color),
-            tags:blog_post_tags(
-              tag:blog_tags(name, color)
-            )
-          `)
-          .eq('category_id', data.category_id)
-          .eq('status', 'published')
-          .neq('id', data.id)
-          .order('published_at', { ascending: false })
-          .limit(3);
-
-        if (!relatedError && relatedData) {
-          const formattedRelated = relatedData.map(post => ({
-            ...post,
-            tags: post.tags?.map((t: any) => t.tag) || []
-          }));
-          setRelatedPosts(formattedRelated);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading blog post:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Wave 2: detail + related read from Convex (realtime subscriptions).
+  const { post, loading } = useBlogPost(slug);
+  const { posts: relatedPosts } = useRelatedPosts(
+    (post as any)?.categorySlug,
+    post?.slug,
+    3
+  );
+  const isLoading = loading;
 
   if (isLoading) {
     return (

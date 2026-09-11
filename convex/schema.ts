@@ -359,4 +359,104 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_org_user", ["orgId", "userId"]),
+
+  // ---- Wave 2: content tables (Supabase -> Convex) ----
+  // Content is GLOBAL (no orgId): one catalog, one blog, one homepage.
+  // Tenant scoping applies to user/order/wallet data only; if a second
+  // tenant ever needs its own catalog, add orgId here + backfill.
+  blogCategories: defineTable({
+    slug: v.string(),
+    name: v.string(),
+    color: v.optional(v.string()),
+    description: v.optional(v.string()),
+    isActive: v.boolean(),
+    sortOrder: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active_sort", ["isActive", "sortOrder"]),
+
+  blogPosts: defineTable({
+    slug: v.string(),
+    title: v.string(),
+    excerpt: v.optional(v.string()),
+    content: v.string(),
+    featuredImage: v.optional(v.string()),
+    status: v.string(), // published | draft
+    // Plain string — no profiles join (Supabase author rows not migrated).
+    authorName: v.string(),
+    categorySlug: v.optional(v.string()),
+    readingTime: v.optional(v.number()),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    ogTitle: v.optional(v.string()),
+    ogDescription: v.optional(v.string()),
+    ogImage: v.optional(v.string()),
+    canonicalUrl: v.optional(v.string()),
+    isFeatured: v.optional(v.boolean()),
+    isPinned: v.optional(v.boolean()),
+    likeCount: v.optional(v.number()),
+    viewCount: v.optional(v.number()),
+    sortOrder: v.optional(v.number()),
+    publishedAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_status_published", ["status", "publishedAt"])
+    .index("by_category_status", ["categorySlug", "status", "publishedAt"]),
+
+  heroSlides: defineTable({
+    title: v.optional(v.string()),
+    subtitle: v.optional(v.string()),
+    suptitle: v.optional(v.string()),
+    description: v.optional(v.string()),
+    buttonText: v.optional(v.string()),
+    buttonUrl: v.optional(v.string()),
+    buttonStyle: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    mobileImageUrl: v.optional(v.string()),
+    productImageUrl: v.optional(v.string()),
+    productName: v.optional(v.string()),
+    productPrice: v.optional(v.number()),
+    smallImageUrl: v.optional(v.string()),
+    overlayOpacity: v.optional(v.number()),
+    textColor: v.optional(v.string()),
+    textPosition: v.optional(v.string()),
+    sortOrder: v.number(),
+    isActive: v.boolean(),
+  }).index("by_active_sort", ["isActive", "sortOrder"]),
+
+  sectionConfigurations: defineTable({
+    sectionName: v.string(),
+    title: v.optional(v.string()),
+    subtitle: v.optional(v.string()),
+    description: v.optional(v.string()),
+    backgroundImage: v.optional(v.string()),
+    buttonText: v.optional(v.string()),
+    buttonUrl: v.optional(v.string()),
+    config: v.optional(v.any()),
+    maxItems: v.optional(v.number()),
+    isEnabled: v.optional(v.boolean()),
+  }).index("by_name", ["sectionName"]),
+
+  homepageComponentConfig: defineTable({
+    componentName: v.string(),
+    config: v.optional(v.any()),
+    isEnabled: v.boolean(),
+    displayOrder: v.number(),
+    sectionId: v.optional(v.string()),
+  })
+    .index("by_order", ["displayOrder"])
+    .index("by_component", ["componentName"]),
+
+  siteSettings: defineTable({
+    key: v.string(), // singleton: key = "main"
+    siteName: v.optional(v.string()),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    faviconUrl: v.optional(v.string()),
+    activeTheme: v.optional(v.string()),
+    upiId: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+    updatedBy: v.optional(v.string()),
+  }).index("by_key", ["key"]),
 });
