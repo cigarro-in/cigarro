@@ -124,3 +124,5 @@ delta beyond ±5% pauses the program.
 
 - 2026-09-11 — Phase 0 inventory complete (OTP chain, R2 unbound, schema mapped).
 - 2026-09-11 — Phase 1 schema + `convex/userState.ts` deployed to production Convex.
+- 2026-09-11 — Wishlist hook rewired to Convex (`3ef7d826`); schema committed (`f0ef917c`).
+  Rollback: `VITE_USE_CONVEX_USERSTATE=false`. Guest localStorage path untouched.

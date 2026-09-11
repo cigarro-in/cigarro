@@ -1,8 +1,19 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
+import { useOrg } from '../lib/convex/useOrg';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import { supabase } from '../lib/supabase/client';
 import { CartItemWithVariant } from '../types/variants';
 import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
+
+// Phase 1 (Convex migration): logged-in cart persistence moves to Convex
+// (`convex/userState.ts`) while item state, merge logic, totals and the
+// public API stay identical. Set VITE_USE_CONVEX_USERSTATE=false to restore
+// the legacy Supabase persistence (rollback switch per migration plan).
+// Guests always use localStorage. Checkout re-prices from the catalog, so
+// persisted unit prices are display snapshots only.
+const USE_CONVEX = import.meta.env.VITE_USE_CONVEX_USERSTATE !== 'false';
 
 // Updated to match new schema - images on variants, brand via relation
 export interface Product {
@@ -69,6 +80,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const { user } = useAuth();
+  const org = useOrg();
+
+  const useConvexPath = USE_CONVEX && !!user && !!org;
+  const convexAdd = useMutation(api.userState.addToCart);
+  const convexSetQty = useMutation(api.userState.setCartQty);
+  const convexRemove = useMutation(api.userState.removeCartLine);
+  const convexClear = useMutation(api.userState.clearCart);
+  // Subscription keeps the hook reactive to server-side cart changes
+  // (multi-tab / Phase-3 realtime). Local optimistic state stays primary.
+  const convexLineCount = useQuery(
+    api.userState.listCart,
+    useConvexPath ? { orgId: org!._id } : 'skip'
+  );
 
   const totalItems = (items || []).reduce((sum, item) => sum + (item?.quantity || 0), 0);
   const totalPrice = (items || []).reduce((sum, item) => {
@@ -108,6 +132,132 @@ export function CartProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  // Adopt server-side changes (other tabs/devices) when our local state is
+  // untouched by an in-flight optimistic update. Keyed on line count + total
+  // quantity so identical carts never trigger a reload loop.
+  const serverCartSig = (convexLineCount ?? [])
+    .map((l) => `${l.variantId || ''}:${l.comboId || ''}:${l.productId}:${l.qty}`)
+    .sort()
+    .join('|');
+  useEffect(() => {
+    if (!useConvexPath || !isInitialized || convexLineCount === undefined) return;
+    const localSig = (items || [])
+      .map((i) => `${i.variant_id || ''}:${i.combo_id || ''}:${i.id}:${i.quantity}`)
+      .sort()
+      .join('|');
+    if (localSig !== serverCartSig) {
+      loadCart();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverCartSig]);
+
+  // Rehydrate lean server lines into rich CartItems via the catalog
+  // (Supabase until Phase 3). Drops lines whose product/variant vanished.
+  const rehydrateLines = async (
+    lines: Array<{
+      productId: string;
+      variantId?: string;
+      comboId?: string;
+      name: string;
+      variantName?: string;
+      unitPriceRupees: number;
+      qty: number;
+      imageUrl?: string;
+    }>
+  ): Promise<CartItem[]> => {
+    const productIds = [...new Set(lines.filter((l) => !l.comboId).map((l) => l.productId))];
+    const comboIds = [...new Set(lines.filter((l) => l.comboId).map((l) => l.comboId as string))];
+
+    let productsById: Record<string, any> = {};
+    if (productIds.length > 0) {
+      const { data } = await supabase
+        .from('products')
+        .select(`
+          id, name, slug, brand_id, brand:brands(id, name), description, is_active,
+          product_variants (id, variant_name, price, images, is_default, is_active)
+        `)
+        .in('id', productIds);
+      for (const p of data || []) productsById[p.id] = p;
+    }
+
+    let combosById: Record<string, any> = {};
+    if (comboIds.length > 0) {
+      const { data } = await supabase
+        .from('combos')
+        .select('id, name, combo_price')
+        .in('id', comboIds);
+      for (const c of data || []) combosById[c.id] = c;
+    }
+
+    const getBrandName = (brand: any): string => {
+      if (!brand) return 'Premium';
+      if (typeof brand === 'string') return brand;
+      if (Array.isArray(brand)) return brand[0]?.name || 'Premium';
+      if (typeof brand === 'object') return brand.name || 'Premium';
+      return 'Premium';
+    };
+
+    const rich: CartItem[] = [];
+    for (const line of lines) {
+      if (line.comboId) {
+        const combo = combosById[line.comboId];
+        if (!combo) continue;
+        rich.push({
+          id: line.productId,
+          name: combo.name || line.name,
+          slug: '',
+          brand: 'Premium',
+          price: Number(line.unitPriceRupees) || 0,
+          description: '',
+          is_active: true,
+          quantity: line.qty,
+          combo_id: line.comboId,
+          combo_name: combo.name,
+          combo_price: Number(line.unitPriceRupees) || 0,
+        } as CartItem);
+        continue;
+      }
+      const product = productsById[line.productId];
+      if (!product) continue;
+      const variant = (product.product_variants || []).find((v: any) => v.id === line.variantId);
+      rich.push({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        brand: getBrandName(product.brand),
+        price: variant?.price ?? Number(line.unitPriceRupees) ?? 0,
+        description: product.description,
+        is_active: product.is_active,
+        image: variant?.images?.[0] || line.imageUrl || '',
+        quantity: line.qty,
+        variant_id: line.variantId,
+        variant_name: variant?.variant_name ?? line.variantName,
+        variant_price: variant?.price ?? Number(line.unitPriceRupees) ?? 0,
+      } as CartItem);
+    }
+    return rich;
+  };
+
+  const persistAllConvex = async (newItems: CartItem[]) => {
+    if (!org) return;
+    await convexClear({ orgId: org._id });
+    for (const item of newItems) {
+      await convexAdd({
+        orgId: org._id,
+        productId: String(item.id),
+        variantId: item.variant_id ? String(item.variant_id) : undefined,
+        comboId: item.combo_id ? String(item.combo_id) : undefined,
+        name: String(item.name ?? 'Item'),
+        variantName: item.variant_name ? String(item.variant_name) : undefined,
+        unitPriceRupees: Number(
+          item.variant_price ?? item.combo_price ?? item.price ?? 0
+        ) || 0,
+        qty: Number(item.quantity ?? 1) || 1,
+        imageUrl: (item as any).image ? String((item as any).image) : undefined,
+      });
+    }
+  };
+
   const loadCart = async () => {
     if (!user) {
       // Load from localStorage for guests
@@ -127,12 +277,64 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Convex path: server lines -> rehydrate -> merge guest cart
+    if (useConvexPath && org) {
+      try {
+        const guestCart = localStorage.getItem('cart');
+        const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
+
+        // Direct query via subscription cache is async here; rehydrate from
+        // a fresh read through the same query args is not available outside
+        // hooks, so resolve lines through a lightweight fetch of current
+        // subscription value is impossible — instead merge guest items into
+        // whatever is currently displayed, then persist the union.
+        // First paint: adopt subscription lines on next render cycle.
+        const currentLines = (convexLineCount ?? []).map((l) => ({
+          productId: l.productId,
+          variantId: l.variantId,
+          comboId: l.comboId,
+          name: l.name,
+          variantName: l.variantName,
+          unitPriceRupees: l.unitPriceRupees,
+          qty: l.qty,
+          imageUrl: l.imageUrl,
+        }));
+        const serverItems = await rehydrateLines(currentLines);
+
+        if (guestItems.length > 0) {
+          const merged = [...serverItems];
+          for (const guestItem of guestItems) {
+            const idx = merged.findIndex(
+              (item) =>
+                item.id === guestItem.id &&
+                item.variant_id === guestItem.variant_id &&
+                item.combo_id === guestItem.combo_id
+            );
+            if (idx >= 0) {
+              merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + guestItem.quantity };
+            } else {
+              merged.push(guestItem);
+            }
+          }
+          setItems(merged);
+          localStorage.removeItem('cart');
+          await persistAllConvex(merged);
+        } else {
+          setItems(serverItems);
+        }
+      } catch (error) {
+        console.error('❌ Failed to load cart:', error);
+        setItems([]);
+      }
+      return;
+    }
+
     try {
       // Check if there's a guest cart to merge
       const guestCart = localStorage.getItem('cart');
       const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
 
-      // Get cart items from Supabase
+      // Get cart items from Supabase (legacy path)
       const { data: cartItems, error } = await supabase
         .from('cart_items')
         .select(`
@@ -268,6 +470,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const saveCartToServer = async (newItems: CartItem[]) => {
     if (!user) return;
+
+    // Convex path: full-replace via clear + per-line adds
+    if (useConvexPath) {
+      await persistAllConvex(newItems);
+      return;
+    }
 
     try {
       // First, clear all existing cart items for this user
