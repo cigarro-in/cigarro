@@ -459,4 +459,150 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  // ---- Wave 3: catalog (migrating off Supabase) ----
+  // Authorship moves to Convex; Supabase stays a read replica during soak.
+  // Money in catalog tables is RUPEES (numbers, as in Supabase); integer
+  // PAISE applies only at the order/wallet boundary (rupeesToPaise).
+  // supabaseId preserves the original UUID for idempotent backfill + join
+  // rebuild; slugs keep uniqueness via indexes (enforced in mutations).
+  catalogBrands: defineTable({
+    supabaseId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    logoUrl: v.optional(v.string()),
+    websiteUrl: v.optional(v.string()),
+    countryOfOrigin: v.optional(v.string()),
+    heritage: v.optional(v.any()), // JSON object in Supabase (founder, year, …)
+    isActive: v.boolean(),
+    sortOrder: v.optional(v.number()),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_supabase", ["supabaseId"])
+    .index("by_active_sort", ["isActive", "sortOrder"]),
+
+  catalogCategories: defineTable({
+    supabaseId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    image: v.optional(v.string()),
+    imageAltText: v.optional(v.string()),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_supabase", ["supabaseId"]),
+
+  catalogProducts: defineTable({
+    supabaseId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+    brandSupabaseId: v.optional(v.string()),
+    description: v.optional(v.string()),
+    shortDescription: v.optional(v.string()),
+    origin: v.optional(v.string()),
+    specifications: v.optional(v.any()),
+    isActive: v.boolean(),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    canonicalUrl: v.optional(v.string()),
+    ratingValue: v.optional(v.number()),
+    reviewCount: v.optional(v.number()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_supabase", ["supabaseId"])
+    .index("by_brand_active", ["brandSupabaseId", "isActive"])
+    .index("by_active_created", ["isActive", "createdAt"]),
+
+  catalogVariants: defineTable({
+    supabaseId: v.string(),
+    productSupabaseId: v.string(),
+    variantName: v.string(),
+    variantSlug: v.string(),
+    variantType: v.optional(v.string()),
+    unitsContained: v.optional(v.number()),
+    unit: v.optional(v.string()),
+    images: v.optional(v.array(v.string())),
+    imageAltText: v.optional(v.string()),
+    priceRupees: v.number(),
+    compareAtPriceRupees: v.optional(v.number()),
+    costPriceRupees: v.optional(v.number()),
+    stock: v.optional(v.number()),
+    trackInventory: v.optional(v.boolean()),
+    isDefault: v.optional(v.boolean()),
+    isActive: v.boolean(),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_supabase", ["supabaseId"])
+    .index("by_product", ["productSupabaseId"])
+    .index("by_product_slug", ["productSupabaseId", "variantSlug"]),
+
+  catalogProductCategories: defineTable({
+    productSupabaseId: v.string(),
+    categorySupabaseId: v.string(),
+    order: v.optional(v.number()),
+  })
+    .index("by_product", ["productSupabaseId"])
+    .index("by_category", ["categorySupabaseId"]),
+
+  catalogCollections: defineTable({
+    supabaseId: v.string(),
+    title: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    type: v.optional(v.string()),
+    rules: v.optional(v.any()),
+    sortOrder: v.optional(v.number()),
+    isActive: v.boolean(),
+    seoTitle: v.optional(v.string()),
+    seoDescription: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_supabase", ["supabaseId"]),
+
+  catalogCollectionProducts: defineTable({
+    collectionSupabaseId: v.string(),
+    productSupabaseId: v.string(),
+    sortOrder: v.optional(v.number()),
+  })
+    .index("by_collection", ["collectionSupabaseId"])
+    .index("by_product", ["productSupabaseId"]),
+
+  catalogCombos: defineTable({
+    supabaseId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    comboPriceRupees: v.number(),
+    originalPriceRupees: v.optional(v.number()),
+    discountPercentage: v.optional(v.number()),
+    image: v.optional(v.string()),
+    galleryImages: v.optional(v.array(v.string())),
+    isActive: v.boolean(),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_supabase", ["supabaseId"]),
+
+  catalogComboItems: defineTable({
+    comboSupabaseId: v.string(),
+    variantSupabaseId: v.string(),
+    quantity: v.number(),
+    sortOrder: v.optional(v.number()),
+  }).index("by_combo", ["comboSupabaseId"]),
 });
