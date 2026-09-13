@@ -1,8 +1,18 @@
 // Dynamic sitemap.xml endpoint for Cloudflare Pages
 // Automatically serves fresh sitemap from database
 // URL: https://cigarro.in/sitemap.xml
+// Wave 3: catalog reads from Convex (blogs already on Convex).
 
-import { createClient } from '@supabase/supabase-js';
+async function cxQuery(baseUrl, path, args) {
+  const res = await fetch(`${baseUrl}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  return body.value;
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -20,14 +30,11 @@ export async function onRequest(context) {
   }
   
   try {
-    // Initialize Supabase
-    const supabase = createClient(
-      env.VITE_SUPABASE_URL,
-      env.VITE_SUPABASE_ANON_KEY
-    );
+    // Convex URL rides the same Pages env as the client bundle.
+    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
 
     // Generate sitemap XML
-    const xml = await generateSitemap(supabase);
+    const xml = await generateSitemap(convexUrl);
     
     return new Response(xml, {
       headers: {
@@ -75,7 +82,7 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-async function generateSitemap(supabase) {
+async function generateSitemap(convexUrl) {
   const BASE_URL = 'https://cigarro.in';
   const today = new Date().toISOString().split('T')[0];
   // Static pages change rarely — fixed date so Google trusts lastmod.
@@ -102,37 +109,29 @@ async function generateSitemap(supabase) {
   // Known junk/test slugs — belt-and-braces; real fix is deactivating in DB
   const EXCLUDED_BRAND_SLUGS = new Set(['ktnng']);
 
-  // Fetch data (with error handling)
-  const [productsResult, categoriesResult, brandsResult, blogResult] = await Promise.allSettled([
-    supabase
-      .from('products')
-      .select('slug, updated_at, name, product_variants(images, is_active)')
-      .eq('is_active', true)
-      .limit(1000), // Limit for performance
-    
-    supabase
-      .from('categories')
-      .select('slug, updated_at')
-      .limit(100),
-    
-    // Use brands table directly instead of deprecated brand column
-    supabase
-      .from('brands')
-      .select('slug, updated_at')
-      .eq('is_active', true)
-      .limit(100),
-    
-    supabase
-      .from('blog_posts')
-      .select('slug, updated_at')
-      .eq('status', 'published')
-      .limit(100)
+  // Fetch data (with error handling) — Convex is the catalog source.
+  const [catalogResult, blogResult] = await Promise.allSettled([
+    cxQuery(convexUrl, 'catalog:sitemapCatalog', {}),
+
+    cxQuery(convexUrl, 'content:listBlogPosts', { limit: 100 }),
   ]);
 
-  const products = productsResult.status === 'fulfilled' ? productsResult.value.data || [] : [];
-  const categories = categoriesResult.status === 'fulfilled' ? categoriesResult.value.data || [] : [];
-  const brands = brandsResult.status === 'fulfilled' ? brandsResult.value.data || [] : [];
-  const blogPosts = blogResult.status === 'fulfilled' ? blogResult.value.data || [] : [];
+  const catalog = catalogResult.status === 'fulfilled' ? catalogResult.value : null;
+  const products = catalog?.products || [];
+  const categories = catalog?.categories || [];
+  const brands = catalog?.brands || [];
+  const blogPosts = (blogResult.status === 'fulfilled' ? blogResult.value : []).map(p => ({
+    slug: p.slug,
+    // content queries return ms timestamps; sitemap wants YYYY-MM-DD.
+    updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : null,
+  }));
+
+  // lastmod accepts Supabase ISO strings or Convex ms timestamps.
+  const day = (v) => {
+    if (!v) return today;
+    if (typeof v === 'number') return new Date(v).toISOString().split('T')[0];
+    return String(v).split('T')[0];
+  };
 
   // Generate XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -149,10 +148,10 @@ async function generateSitemap(supabase) {
   </url>\n`;
   });
 
-  // Products with images
+  // Products with images (Convex supplies active-variant images, max 5)
   products.forEach(product => {
     if (!product.slug) return;
-    const lastmod = product.updated_at ? new Date(product.updated_at).toISOString().split('T')[0] : today;
+    const lastmod = day(product.updatedAt ?? product.updated_at);
     xml += `  <url>
     <loc>${BASE_URL}/product/${escapeXml(product.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
@@ -160,9 +159,7 @@ async function generateSitemap(supabase) {
     <priority>0.8</priority>`;
     
     // Add product images (up to 5 per product for performance)
-    const gallery_images = product.product_variants
-      ?.filter(v => v.is_active !== false) // Handle null/undefined as true or strict checking
-      .flatMap(v => v.images || []) || [];
+    const gallery_images = product.images || [];
       
     if (gallery_images.length > 0) {
       const images = gallery_images.slice(0, 5);
@@ -184,7 +181,7 @@ async function generateSitemap(supabase) {
   // Categories
   categories.forEach(category => {
     if (!category.slug) return;
-    const lastmod = category.updated_at ? new Date(category.updated_at).toISOString().split('T')[0] : today;
+    const lastmod = day(category.updatedAt ?? category.updated_at);
     xml += `  <url>
     <loc>${BASE_URL}/category/${escapeXml(category.slug)}</loc>
     <lastmod>${lastmod}</lastmod>
@@ -196,7 +193,7 @@ async function generateSitemap(supabase) {
   // Brands — skip known junk/test slugs (deactivate in DB for permanent fix)
   brands.forEach(brand => {
     if (!brand.slug || EXCLUDED_BRAND_SLUGS.has(brand.slug)) return;
-    const lastmod = brand.updated_at ? new Date(brand.updated_at).toISOString().split('T')[0] : today;
+    const lastmod = day(brand.updatedAt ?? brand.updated_at);
     xml += `  <url>
     <loc>${BASE_URL}/brand/${escapeXml(brand.slug)}</loc>
     <lastmod>${lastmod}</lastmod>

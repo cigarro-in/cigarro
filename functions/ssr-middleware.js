@@ -77,19 +77,54 @@ function breadcrumbNavHtml(items) {
   return `<nav aria-label="Breadcrumb"><ol>${links}</ol></nav>`;
 }
 
-// Generate HTML for product pages
-async function generateProductHTML(slug, supabase, faviconUrl) {
-  try {
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('id, name, slug, brand:brands(name, slug), description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, product_variants(images, is_active, is_default, price, compare_at_price, variant_name, variant_slug, variant_type, stock, track_inventory)')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .single();
+// Wave 3: catalog reads come from Convex. Templates below are untouched —
+// Convex rows are adapted to the exact Supabase shapes the templates expect,
+// so bot HTML stays byte-identical (gate: canonical/H1/schema asserted).
+async function cxQuery(baseUrl, path, args) {
+  const res = await fetch(`${baseUrl}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  return body.value;
+}
 
-    if (error || !product) {
+// Generate HTML for product pages
+async function generateProductHTML(slug, supabase, faviconUrl, convexUrl) {
+  try {
+    const detail = await cxQuery(convexUrl, 'catalog:getProductBySlug', { slug });
+    if (!detail || !detail.product || detail.product.isActive === false) {
       return null;
     }
+    const p = detail.product;
+    const product = {
+      id: p.supabaseId,
+      name: p.name,
+      slug: p.slug,
+      brand: detail.brand ? { name: detail.brand.name, slug: detail.brand.slug } : null,
+      description: p.description,
+      short_description: p.shortDescription,
+      meta_title: p.metaTitle,
+      meta_description: p.metaDescription,
+      canonical_url: p.canonicalUrl,
+      specifications: p.specifications,
+      rating_value: p.ratingValue,
+      review_count: p.reviewCount,
+      product_variants: (detail.variants || []).map(x => ({
+        images: x.images,
+        is_active: x.isActive,
+        is_default: x.isDefault,
+        price: x.priceRupees,
+        compare_at_price: x.compareAtPriceRupees,
+        variant_name: x.variantName,
+        variant_slug: x.variantSlug,
+        variant_type: x.variantType,
+        stock: x.stock,
+        track_inventory: x.trackInventory,
+      })),
+    };
 
     const specs = product.specifications && typeof product.specifications === 'object' ? product.specifications : {};
     const specRows = Object.entries(specs)
@@ -165,13 +200,12 @@ async function generateProductHTML(slug, supabase, faviconUrl) {
     let relatedLinks = '';
     try {
       const brandName = product.brand?.name;
-      const { data: related } = await supabase
-        .from('products')
-        .select('slug, name, brand:brands(name)')
-        .eq('is_active', true)
-        .neq('slug', slug)
-        .limit(50);
-      const list = related || [];
+      const links = await cxQuery(convexUrl, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 50 });
+      const list = (links || []).map(r => ({
+        slug: r.slug,
+        name: r.name,
+        brand: r.brandName ? { name: r.brandName } : null,
+      }));
       const sameBrand = brandName ? list.filter(p => {
         const bn = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
         return bn === brandName;
@@ -597,17 +631,20 @@ function agentFormatResponse(body, format) {
 }
 
 // Generate HTML for category pages
-async function generateCategoryHTML(slug, supabase, faviconUrl) {
+async function generateCategoryHTML(slug, supabase, faviconUrl, convexUrl) {
   try {
-    const { data: category, error } = await supabase
-      .from('categories')
-      .select('id, name, slug, description, meta_title, meta_description')
-      .eq('slug', slug)
-      .single();
-
-    if (error || !category) {
+    const detail = await cxQuery(convexUrl, 'catalog:getCategoryDetail', { slug });
+    if (!detail || !detail.category) {
       return null;
     }
+    const category = {
+      id: detail.category.supabaseId,
+      name: detail.category.name,
+      slug: detail.category.slug,
+      description: detail.category.description,
+      meta_title: detail.category.metaTitle,
+      meta_description: detail.category.metaDescription,
+    };
 
     const canonicalUrl = `https://cigarro.in/category/${slug}`;
     const title = category.meta_title || `${category.name} | Cigarro`;
@@ -615,12 +652,7 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
     // Product links so bots can discover depth
     let productLinks = '';
     try {
-      const { data: links } = await supabase
-        .from('product_categories')
-        .select('product:products(slug, name, is_active)')
-        .eq('category_id', category.id)
-        .limit(20);
-      const items = (links || []).map(l => l.product).filter(p => p && p.is_active !== false && p.slug);
+      const items = (detail.products || []).slice(0, 20);
       if (items.length > 0) {
         productLinks = `<nav aria-label="Products in ${escapeHtml(category.name)}"><ul>` +
           items.slice(0, 12).map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
@@ -692,30 +724,28 @@ async function generateCategoryHTML(slug, supabase, faviconUrl) {
 }
 
 // Generate HTML for brand pages — queried from DB, never guessed from slug
-async function generateBrandHTML(slug, supabase, faviconUrl) {
+async function generateBrandHTML(slug, supabase, faviconUrl, convexUrl) {
   try {
-    const { data: brand, error } = await supabase
-      .from('brands')
-      .select('id, name, slug, description, meta_title, meta_description, logo_url')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !brand) {
+    const detail = await cxQuery(convexUrl, 'catalog:getBrandDetail', { slug });
+    if (!detail || !detail.brand) {
       return null;
     }
+    const brand = {
+      id: detail.brand.supabaseId,
+      name: detail.brand.name,
+      slug: detail.brand.slug,
+      description: detail.brand.description,
+      meta_title: detail.brand.metaTitle,
+      meta_description: detail.brand.metaDescription,
+      logo_url: detail.brand.logoUrl,
+    };
 
     const canonicalUrl = `https://cigarro.in/brand/${slug}`;
     const title = brand.meta_title || `${brand.name} Products | Cigarro`;
     const description = brand.meta_description || brand.description || `Shop premium ${brand.name} cigarettes and tobacco products at Cigarro`;
     let productLinks = '';
     try {
-      const { data: products } = await supabase
-        .from('products')
-        .select('slug, name')
-        .eq('brand_id', brand.id)
-        .eq('is_active', true)
-        .limit(12);
+      const products = (detail.products || []).slice(0, 12);
       if (products && products.length > 0) {
         productLinks = `<nav aria-label="Products by ${escapeHtml(brand.name)}"><ul>` +
           products.map(p => `<li><a href="https://cigarro.in/product/${p.slug}">${escapeHtml(p.name)}</a></li>`).join('') +
@@ -977,18 +1007,24 @@ function generateStaticPageHTML(pathname, faviconUrl) {
 }
 
 // Generate HTML for blog posts
-async function generateBlogHTML(slug, supabase, faviconUrl) {
+async function generateBlogHTML(slug, supabase, faviconUrl, convexUrl) {
   try {
-    const { data: post, error } = await supabase
-      .from('blog_posts')
-      .select('id, title, slug, excerpt, content, featured_image, meta_title, meta_description, published_at, author:profiles(name)')
-      .eq('slug', slug)
-      .eq('status', 'published')
-      .single();
-
-    if (error || !post) {
+    const row = await cxQuery(convexUrl, 'content:getBlogPostBySlug', { slug });
+    if (!row) {
       return null;
     }
+    const post = {
+      id: row._id,
+      title: row.title,
+      slug: row.slug,
+      excerpt: row.excerpt,
+      content: row.content,
+      featured_image: row.featuredImage,
+      meta_title: row.metaTitle,
+      meta_description: row.metaDescription,
+      published_at: row.publishedAt ? new Date(row.publishedAt).toISOString() : null,
+      author: { name: row.authorName },
+    };
 
     const canonicalUrl = `https://cigarro.in/blog/${slug}`;
     // A2: no featured image → omit og:image entirely (never substitute a logo).
@@ -1330,11 +1366,13 @@ export async function onRequest(context) {
   }
 
   try {
-    // Initialize Supabase
+    // Initialize Supabase (search + ?format= agent feeds stay Supabase until
+    // the Wave 3 search redesign; bot HTML catalog reads use Convex).
     const supabase = createClient(
       env.VITE_SUPABASE_URL,
       env.VITE_SUPABASE_ANON_KEY
     );
+    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
 
     // Use static favicon path (no database fetch needed)
     const faviconUrl = 'https://cigarro.in/icons/android-chrome-512x512.png';
@@ -1405,25 +1443,25 @@ export async function onRequest(context) {
     } else if (url.pathname.startsWith('/product/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateProductHTML(slug, supabase, faviconUrl);
+        html = await generateProductHTML(slug, supabase, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/category/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateCategoryHTML(slug, supabase, faviconUrl);
+        html = await generateCategoryHTML(slug, supabase, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/brand/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBrandHTML(slug, supabase, faviconUrl);
+        html = await generateBrandHTML(slug, supabase, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/blog/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBlogHTML(slug, supabase, faviconUrl);
+        html = await generateBlogHTML(slug, supabase, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     }

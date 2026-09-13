@@ -432,3 +432,127 @@ export const backfillCatalog = mutation({
     return counts;
   },
 });
+
+// ---------- Prerender / sitemap support (byte-diff gates) ----------
+// These queries return exactly what the edge generators need so the swap
+// is data-source-only: templates stay untouched.
+
+async function brandNameBySupabaseId(ctx: any, brandSupabaseId?: string) {
+  if (!brandSupabaseId) return null;
+  const b = await ctx.db
+    .query("catalogBrands")
+    .withIndex("by_supabase", (q: any) => q.eq("supabaseId", brandSupabaseId))
+    .unique();
+  return b ? { name: b.name, slug: b.slug } : null;
+}
+
+// Sitemap: active products with images + updatedAt, categories, brands.
+export const sitemapCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const products = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_active_created", (q) => q.eq("isActive", true))
+      .collect();
+    const withImages = [];
+    for (const p of products) {
+      const variants = await ctx.db
+        .query("catalogVariants")
+        .withIndex("by_product", (q) =>
+          q.eq("productSupabaseId", p.supabaseId),
+        )
+        .collect();
+      const images = variants
+        .filter((x) => x.isActive !== false)
+        .flatMap((x) => x.images ?? [])
+        .filter(Boolean)
+        .slice(0, 5);
+      withImages.push({
+        slug: p.slug,
+        name: p.name,
+        updatedAt: p.updatedAt,
+        images,
+      });
+    }
+    const categories = (
+      await ctx.db.query("catalogCategories").collect()
+    ).map((c) => ({ slug: c.slug, updatedAt: c.updatedAt }));
+    const brands = (
+      await ctx.db
+        .query("catalogBrands")
+        .withIndex("by_active_sort", (q) => q.eq("isActive", true))
+        .collect()
+    ).map((b) => ({ slug: b.slug, updatedAt: b.updatedAt }));
+    return { products: withImages, categories, brands };
+  },
+});
+
+// Related-product links for PDP prerender (same-brand first is done in the
+// template; this returns the candidate pool with brand names).
+export const relatedProductLinks = query({
+  args: { excludeSlug: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_active_created", (q) => q.eq("isActive", true))
+      .take(args.limit ?? 50);
+    const out = [];
+    for (const p of rows) {
+      if (p.slug === args.excludeSlug) continue;
+      const brand = await brandNameBySupabaseId(ctx, p.brandSupabaseId);
+      out.push({ slug: p.slug, name: p.name, brandName: brand?.name ?? null });
+    }
+    return out;
+  },
+});
+
+export const getCategoryDetail = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const category = await ctx.db
+      .query("catalogCategories")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (!category) return null;
+    const joins = await ctx.db
+      .query("catalogProductCategories")
+      .withIndex("by_category", (q) =>
+        q.eq("categorySupabaseId", category.supabaseId),
+      )
+      .take(20);
+    const products = [];
+    for (const j of joins) {
+      const p = await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_supabase", (q) =>
+          q.eq("supabaseId", j.productSupabaseId),
+        )
+        .unique();
+      if (p && p.isActive && p.slug) products.push({ slug: p.slug, name: p.name });
+    }
+    return { category: categoryShape(category), products };
+  },
+});
+
+export const getBrandDetail = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const brand = await ctx.db
+      .query("catalogBrands")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (!brand || !brand.isActive) return null;
+    const rows = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_brand_active", (q) =>
+        q.eq("brandSupabaseId", brand.supabaseId).eq("isActive", true),
+      )
+      .take(12);
+    return {
+      brand: brandShape(brand),
+      products: rows
+        .filter((p) => p.slug)
+        .map((p) => ({ slug: p.slug, name: p.name })),
+    };
+  },
+});
