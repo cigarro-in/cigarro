@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ConvexSupabaseProvider } from './lib/convex/ConvexSupabaseProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
-import { supabase } from './lib/supabase/client';
+import { useSiteSettings } from './hooks/data/useContent';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
@@ -57,6 +57,8 @@ function AppContent() {
     meta_description: 'The finest selection of premium cigarettes and cigars.',
     site_name: 'Cigarro',
   });
+  // Wave 2: meta/site settings come from Convex (was Supabase).
+  const { settings: convexSettings } = useSiteSettings();
 
   // Analytics: load gtag once (consent-denied by default; no collection
   // until the visitor accepts the banner).
@@ -65,21 +67,13 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const fetchSiteSettings = async () => {
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('meta_title, meta_description, site_name')
-        .single();
-      if (data) {
-        setSiteSettings({
-          meta_title: data.meta_title || 'Cigarro',
-          meta_description: data.meta_description || 'The finest selection of premium cigarettes and cigars.',
-          site_name: data.site_name || 'Cigarro',
-        });
-      }
-    };
-    fetchSiteSettings();
-  }, []);
+    if (!convexSettings) return;
+    setSiteSettings({
+      meta_title: convexSettings.meta_title || 'Cigarro',
+      meta_description: convexSettings.meta_description || 'The finest selection of premium cigarettes and cigars.',
+      site_name: convexSettings.site_name || 'Cigarro',
+    });
+  }, [convexSettings]);
 
   const isAdminPath = location.pathname.startsWith('/admin');
 

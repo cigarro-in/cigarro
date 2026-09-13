@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { supabase } from '../lib/supabase/client';
+import { useSiteSettings } from '../hooks/data/useContent';
 import { themes, DEFAULT_THEME_ID, getTheme } from './registry';
 import type { ThemeManifest } from './types';
 
@@ -20,24 +20,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(STORAGE_KEY) || DEFAULT_THEME_ID;
   });
 
+  const { settings } = useSiteSettings();
+
   useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from('site_settings')
-      .select('active_theme')
-      .single()
-      .then(({ data }) => {
-        if (cancelled) return;
-        const remote = (data as any)?.active_theme;
-        if (remote && remote !== themeId && getTheme(remote)) {
-          setThemeIdState(remote);
-          localStorage.setItem(STORAGE_KEY, remote);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    // Wave 2: remote theme comes from Convex site settings (was Supabase).
+    const remote = settings?.active_theme;
+    if (remote && remote !== themeId && getTheme(remote)) {
+      setThemeIdState(remote);
+      localStorage.setItem(STORAGE_KEY, remote);
+    }
+  }, [settings?.active_theme]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeId);

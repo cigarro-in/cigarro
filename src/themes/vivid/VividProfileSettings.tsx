@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase/client';
+import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { SEOHead } from '../../components/seo/SEOHead';
 
 export function VividProfileSettings() {
   const { user } = useAuth();
+  const { updateDisplayName } = useMyProfile();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,8 +28,10 @@ export function VividProfileSettings() {
     if (!user) return;
     setSaving(true);
     try {
-      await supabase.auth.updateUser({ data: { name, full_name: name } });
-      await supabase.from('profiles').update({ name, email: email || null }).eq('id', user.id);
+      // Theme files must not touch Supabase: display name lives in Convex
+      // (Phase 1 spine) via useMyProfile. Email is read-only here (contact
+      // support to change), mirroring the classic settings page.
+      await updateDisplayName(name || undefined);
       toast.success('Profile updated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update');
@@ -65,13 +68,12 @@ export function VividProfileSettings() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={saving}
-              className="vv-input"
+              disabled
+              className="vv-input bg-[var(--vv-bg-inset)] text-[var(--vv-fg-muted)] cursor-not-allowed"
               placeholder="you@example.com"
             />
             <p className="text-xs text-[var(--vv-fg-subtle)] mt-1.5">
-              For order receipts. Phone is your primary identifier.
+              For order receipts. To change email, please contact support.
             </p>
           </div>
 

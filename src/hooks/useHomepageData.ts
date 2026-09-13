@@ -1,6 +1,7 @@
-import { HomepageData } from '../types/home';
+import { HomepageData, HeroSlide, SectionConfig, ShowcaseConfig, BlogSectionConfig, BlogPost } from '../types/home';
 import { supabase } from '../lib/supabase/client';
 import { useCached } from '../lib/cache/swrCache';
+import { useHeroSlides, useSectionConfig, useBlogPosts } from './data/useContent';
 
 const API_URL = '/api/homepage-data';
 const CACHE_KEY = 'homepage:v1';
@@ -89,5 +90,99 @@ export function useHomepageData() {
     { ttl: TTL }
   );
 
-  return { data, isLoading, error };
+  // Wave 2: heroes, section configs, and homepage blog posts read from
+  // Convex (realtime). Catalog (products/categories/brands) stays on the
+  // cached API/Supabase path until Wave 3. Convex wins when present;
+  // the cached payload is the fallback so the page never hangs if a
+  // subscription is slow.
+  const { slides, loading: slidesLoading } = useHeroSlides();
+  const { config: featuredCfg } = useSectionConfig('featured_products');
+  const { config: showcaseCfg } = useSectionConfig('product_showcase');
+  const { config: blogSecCfg } = useSectionConfig('blog_section');
+  const { posts: convexPosts } = useBlogPosts(6);
+
+  const merged: HomepageData | undefined = data
+    ? {
+        ...data,
+        heroSlides:
+          !slidesLoading && slides.length > 0
+            ? slides.map(mapHeroSlide)
+            : data.heroSlides,
+        featuredSectionConfig:
+          featuredCfg != null ? mapSection(featuredCfg) : data.featuredSectionConfig,
+        showcaseConfig:
+          showcaseCfg != null ? mapShowcase(showcaseCfg) : data.showcaseConfig,
+        blogSectionConfig:
+          blogSecCfg != null ? mapBlogSection(blogSecCfg) : data.blogSectionConfig,
+        blogPosts:
+          convexPosts.length > 0 ? convexPosts.map(mapHomePost) : data.blogPosts,
+      }
+    : data;
+
+  return { data: merged, isLoading, error };
+}
+
+// ---------- Convex (camelCase + compat aliases) -> home shapes ----------
+
+function mapHeroSlide(s: any): HeroSlide {
+  return {
+    id: String(s._id ?? s.id),
+    title: s.title ?? '',
+    suptitle: s.suptitle,
+    description: s.description,
+    image_url: s.image_url ?? s.imageUrl ?? '',
+    mobile_image_url: s.mobile_image_url ?? s.mobileImageUrl,
+    button_text: s.button_text ?? s.buttonText,
+    button_url: s.button_url ?? s.buttonUrl,
+    product_name: s.product_name ?? s.productName,
+    product_price:
+      s.product_price ??
+      (s.productPrice != null ? String(s.productPrice) : undefined),
+    product_image_url: s.product_image_url ?? s.productImageUrl,
+    is_active: s.is_active ?? true,
+    sort_order: s.sort_order ?? s.sortOrder ?? 0,
+  };
+}
+
+function mapSection(c: any): SectionConfig {
+  return {
+    title: c.title ?? '',
+    subtitle: c.subtitle,
+    description: c.description,
+    button_text: c.button_text ?? c.buttonText,
+    button_url: c.button_url ?? c.buttonUrl,
+    is_enabled: c.is_enabled ?? c.isEnabled,
+  };
+}
+
+function mapShowcase(c: any): ShowcaseConfig {
+  return {
+    title: c.title,
+    background_image: c.background_image ?? c.backgroundImage,
+    button_text: c.button_text ?? c.buttonText,
+    button_url: c.button_url ?? c.buttonUrl,
+    is_enabled: c.is_enabled ?? c.isEnabled,
+  };
+}
+
+function mapBlogSection(c: any): BlogSectionConfig {
+  return {
+    title: c.title,
+    subtitle: c.subtitle,
+    description: c.description,
+  };
+}
+
+function mapHomePost(p: any): BlogPost {
+  return {
+    id: String(p._id ?? p.id),
+    title: p.title,
+    slug: p.slug,
+    excerpt: p.excerpt,
+    featured_image: p.featured_image ?? p.featuredImage,
+    published_at: p.published_at ?? '',
+    reading_time: p.reading_time ?? p.readingTime,
+    author: p.author ?? (p.authorName ? { name: p.authorName } : undefined),
+    category: p.category,
+  };
 }
