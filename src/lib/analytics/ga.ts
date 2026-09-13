@@ -6,8 +6,12 @@
 // No hardcoded fallback: the ID must come from VITE_GA_MEASUREMENT_ID
 // (Cloudflare Pages env). If it is missing, init is skipped with a warning
 // rather than sending hits to the wrong property.
+// NOTE: keep the canonical `import.meta.env.X` shape (no optional chaining
+// on import.meta). Vite only inlines the exact pattern; `import.meta?.env`
+// sails through the build untouched and is always undefined in the browser,
+// which silently kills the whole tag. That exact bug shipped here before.
 const MEASUREMENT_ID: string | undefined =
-  (import.meta as any)?.env?.VITE_GA_MEASUREMENT_ID || undefined;
+  import.meta.env.VITE_GA_MEASUREMENT_ID || undefined;
 
 const CONSENT_KEY = 'cigarro-analytics-consent';
 
