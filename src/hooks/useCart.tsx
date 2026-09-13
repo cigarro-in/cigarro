@@ -4,7 +4,7 @@ import { useOrg } from '../lib/convex/useOrg';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { CartItemWithVariant } from '../types/variants';
-import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
+import { mapCartItem, trackAddToCart, trackRemoveFromCart } from '../lib/analytics/ga';
 
 // Phase 1 complete: logged-in cart persistence is Convex
 // (`convex/userState.ts`) — full-replace via clear + per-line adds — while
@@ -406,6 +406,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         await saveCartToServer(newItems);
       }
+      // GA4: every add path funnels through here (PLP quick-add, PDP,
+      // vivid cards, combos). Resolve the sold variant's rupee price —
+      // default variant when none was picked — so hits are honest.
+      const soldVariant = (product.product_variants || []).find((v: any) => v.id === (variantId ?? comboId))
+        ?? (product.product_variants || []).find((v: any) => v.is_default)
+        ?? (product.product_variants || [])[0];
+      trackAddToCart(mapCartItem({
+        ...product,
+        variant_name: (product as any).variant_name ?? soldVariant?.variant_name,
+        variant_price: (product as any).variant_price ?? (product as any).combo_price ?? soldVariant?.price ?? (product as any).price ?? 0,
+        quantity,
+      }));
     } catch (error) {
       // Revert on error
       setItems(items);
@@ -462,6 +474,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         await saveCartToServer(newItems);
       }
+      // GA4 reorder (OrdersPage): one add_to_cart per restored line.
+      for (let i = 0; i < products.length; i++) {
+        trackAddToCart(mapCartItem({ ...products[i], quantity: quantities[i] }));
+      }
     } catch (error) {
       // Revert on error
       setItems(items);
@@ -472,6 +488,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const removeFromCart = async (productId: string, variantId?: string, comboId?: string) => {
     const originalItems = items;
+    const removed = items.find(item =>
+      item.id === productId && item.variant_id === variantId && item.combo_id === comboId
+    );
     const newItems = items.filter(item =>
       !(item.id === productId && item.variant_id === variantId && item.combo_id === comboId)
     );
@@ -486,6 +505,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         await saveCartToServer(newItems);
       }
+      if (removed) trackRemoveFromCart(removed);
     } catch (error) {
       // Revert on error
       setItems(originalItems);
@@ -576,7 +596,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       variant_price: variant.price
     };
     await addToCart(productWithVariant, quantity, variant.id);
-    trackAddToCart(mapCartItem({ ...productWithVariant, quantity }));
   };
 
   // Helper function to add a combo to cart

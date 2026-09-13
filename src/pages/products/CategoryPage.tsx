@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Product } from '../../hooks/useCart';
@@ -7,6 +7,7 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Grid3X3, Grid2X2, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
+import { trackViewItemList } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
 import {
   Select,
@@ -158,6 +159,17 @@ export function CategoryPage() {
 
   const pageTitle = category?.meta_title || category?.name || 'Products';
   const pageDescription = category?.meta_description || category?.description || 'Premium tobacco products';
+  const listName = category?.name || (searchQuery ? 'search_results' : 'all_products');
+
+  // GA4 view_item_list: once per distinct result set.
+  const listSentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isLoading || sortedProducts.length === 0) return;
+    const key = `${listName}:${sortedProducts.map((p) => p.id).join(',')}`;
+    if (listSentRef.current === key) return;
+    listSentRef.current = key;
+    trackViewItemList(sortedProducts, listName);
+  }, [sortedProducts, isLoading, listName]);
 
   const sortOptions = [
     { label: 'Name (A-Z)', value: 'name' },
@@ -304,6 +316,7 @@ export function CategoryPage() {
                   onAddToCart={handleAddToCart}
                   isLoading={cartLoading}
                   index={index}
+                  listName={listName}
                 />
               ))}
             </div>

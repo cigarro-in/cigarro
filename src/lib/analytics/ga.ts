@@ -151,6 +151,55 @@ export function trackAddToCart(item: GAItem): void {
   });
 }
 
+// Resolves a catalog product row (default-variant price in rupees) into a
+// GA4 item. List pages (PLP / category / brand / search, both themes) share
+// this so item ids and prices stay consistent everywhere.
+export function mapProductToItem(product: any): GAItem {
+  const variants = product?.product_variants || [];
+  const def = variants.find((v: any) => v.is_default) || variants[0];
+  const price = Number(def?.price ?? product?.price ?? 0);
+  const nameParts = [product?.name, def?.variant_name].filter(Boolean);
+  return {
+    id: String(product?.slug ?? def?.id ?? product?.id ?? 'item'),
+    name: nameParts.length > 0 ? nameParts.join(' — ') : 'Item',
+    price: Number.isFinite(price) ? price : 0,
+    quantity: 1,
+  };
+}
+
+export function trackViewItemList(products: any[], listName: string): void {
+  if (!products?.length) return;
+  trackEvent('view_item_list', {
+    item_list_name: listName,
+    items: products.slice(0, 40).map(mapProductToItem),
+  });
+}
+
+export function trackSelectItem(product: any, listName: string): void {
+  trackEvent('select_item', {
+    item_list_name: listName,
+    items: [mapProductToItem(product)],
+  });
+}
+
+export function trackViewCart(items: any[], value: number): void {
+  if (!items?.length) return;
+  trackEvent('view_cart', {
+    currency: 'INR',
+    value: Number(value ?? 0) || 0,
+    items: gaItems(items),
+  });
+}
+
+export function trackRemoveFromCart(item: any): void {
+  const g = mapCartItem({ ...item, quantity: Number(item?.quantity ?? 1) || 1 });
+  trackEvent('remove_from_cart', {
+    currency: 'INR',
+    value: g.price * g.quantity,
+    items: [g],
+  });
+}
+
 export function trackBeginCheckout(items: any[], value: number): void {
   trackEvent('begin_checkout', {
     currency: 'INR',

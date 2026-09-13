@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { trackSelectItem } from '../../lib/analytics/ga';
 import { Product as CartProduct } from '../../hooks/useCart';
 import { Product as DBProduct, ProductVariant } from '../../types/product';
 
@@ -37,6 +38,7 @@ interface ProductCardProps {
   isLoading?: boolean;
   index?: number;
   variant?: 'default' | 'list' | 'featured';
+  listName?: string;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -44,7 +46,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   isLoading = false,
   index = 0,
-  variant = 'default'
+  variant = 'default',
+  listName = 'products'
 }) => {
   const [imageError, setImageError] = useState(false);
   const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
@@ -205,7 +208,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         />
       </button>
 
-      <Link to={`/product/${product.slug}`} className="block">
+      <Link to={`/product/${product.slug}`} className="block" onClick={() => trackSelectItem(product, listName)}>
         {/* Product Image - Responsive aspect ratio */}
         <div className="relative aspect-square overflow-hidden bg-white">
           <img

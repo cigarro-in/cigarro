@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { trackViewItemList } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { VividProductCard } from './VividProductCard';
 import { VividCartPanel } from './VividCartPanel';
@@ -94,6 +95,18 @@ export function VividProductList({ mode }: Props) {
       : search
       ? `Search: "${search}"`
       : 'All Products';
+  const listName =
+    mode === 'category' ? categoryName || 'category' : search ? 'search_results' : 'all_products';
+
+  // GA4 view_item_list: once per distinct result set.
+  const listSentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || sorted.length === 0) return;
+    const key = `${listName}:${sorted.map((p) => p.id).join(',')}`;
+    if (listSentRef.current === key) return;
+    listSentRef.current = key;
+    trackViewItemList(sorted, listName);
+  }, [sorted, loading, listName]);
 
   return (
     <>
@@ -151,7 +164,7 @@ export function VividProductList({ mode }: Props) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {sorted.map((p) => (
-                <VividProductCard key={p.id} product={p} />
+                <VividProductCard key={p.id} product={p} listName={listName} />
               ))}
             </div>
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { useCatalogProduct } from '../../hooks/data/useCatalog';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { trackViewItem } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
 import type { ProductVariant } from '../../types/product';
 
@@ -56,6 +57,22 @@ export default function VividProduct() {
   useEffect(() => {
     setActiveImage(0);
   }, [selected]);
+
+  // GA4 view_item: once per product slug, with the offered variant's price
+  // (mirrors classic ProductPage).
+  const viewedSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!product) return;
+    const ov = selected ?? variants.find((v) => (v as any).is_default) ?? variants[0];
+    if (!ov || viewedSlugRef.current === product.slug) return;
+    viewedSlugRef.current = product.slug;
+    trackViewItem({
+      id: String(product.slug),
+      name: String(product.name),
+      price: Number((ov as any).price ?? 0) || 0,
+      quantity: 1,
+    });
+  }, [product, selected, variants]);
 
   if (loading) {
     return (

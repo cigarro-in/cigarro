@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { Helmet } from 'react-helmet-async';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { trackViewCart } from '../../lib/analytics/ga';
 import { Card, CardContent } from '../../components/ui/card';
 
 // Helper function to format price in Indian numbering system
@@ -279,6 +280,16 @@ export default function CartPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // GA4 view_cart: once per distinct cart content.
+  const cartSentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (items.length === 0) return;
+    const key = items.map((i: any) => `${i.id}:${i.variant_id || ''}:${i.combo_id || ''}:${i.quantity}`).join('|');
+    if (cartSentRef.current === key) return;
+    cartSentRef.current = key;
+    trackViewCart(items, totalPrice);
+  }, [items, totalPrice]);
 
   const handleCheckout = () => {
     if (user) {

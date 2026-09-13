@@ -2,16 +2,18 @@ import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { getProductImageUrl } from '../../lib/supabase/storage';
+import { trackSelectItem } from '../../lib/analytics/ga';
 import { useCart } from '../../hooks/useCart';
 import type { HomepageProduct } from '../../types/home';
 
 interface Props {
   product: HomepageProduct;
+  listName?: string;
 }
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
-export function VividProductCard({ product }: Props) {
+export function VividProductCard({ product, listName = 'products' }: Props) {
   const { addToCart } = useCart();
 
   const defaultVariant =
@@ -40,6 +42,7 @@ export function VividProductCard({ product }: Props) {
   return (
     <Link
       to={`/product/${product.slug}`}
+      onClick={() => trackSelectItem(product, listName)}
       className="vv-card flex items-center gap-4 p-3"
     >
       <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-[var(--color-surface-2)] flex-shrink-0">

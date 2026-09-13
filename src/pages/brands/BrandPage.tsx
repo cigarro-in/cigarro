@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User, Globe } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
+import { trackViewItemList } from '../../lib/analytics/ga';
 import { Button } from '../../components/ui/button';
 
 interface Brand {
@@ -98,6 +99,16 @@ export function BrandPage() {
       toast.error('Failed to add to cart');
     }
   };
+
+  // GA4 view_item_list: once per distinct brand result set.
+  const listSentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isLoading || !brand || products.length === 0) return;
+    const key = `brand:${brand.slug}:${products.map((p) => p.id).join(',')}`;
+    if (listSentRef.current === key) return;
+    listSentRef.current = key;
+    trackViewItemList(products, brand.name);
+  }, [products, brand, isLoading]);
 
   if (isLoading) {
     return (
@@ -265,6 +276,7 @@ export function BrandPage() {
                   onAddToCart={handleAddToCart}
                   isLoading={cartLoading}
                   index={index}
+                  listName={brand.name}
                 />
               ))}
             </div>

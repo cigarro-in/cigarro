@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
+import { trackViewItemList } from '../../lib/analytics/ga';
 import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Search, X } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
@@ -404,6 +405,18 @@ export function ProductsPage() {
 
   // Show all products - lazy loading will be implemented
   const displayedProducts = sortedProducts;
+  const listName = urlSearchQuery ? 'search_results' : 'all_products';
+
+  // GA4 view_item_list: once per distinct result set (refires on
+  // filter/search change, not on every render).
+  const listSentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isLoading || displayedProducts.length === 0) return;
+    const key = `${listName}:${displayedProducts.map((p) => p.id).join(',')}`;
+    if (listSentRef.current === key) return;
+    listSentRef.current = key;
+    trackViewItemList(displayedProducts, listName);
+  }, [displayedProducts, isLoading, listName]);
 
   if (isLoading) {
     return (
@@ -763,6 +776,7 @@ export function ProductsPage() {
                         onAddToCart={handleAddToCart}
                         isLoading={cartLoading}
                         index={index}
+                        listName={listName}
                       />
                     </motion.div>
                   ))}
