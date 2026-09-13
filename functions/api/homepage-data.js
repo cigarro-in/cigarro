@@ -2,8 +2,25 @@
 // Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/homepage-data
+// Wave 3: catalog reads from Convex (fullCatalog bundle); heroes, section
+// configs, and blogs from the Convex content queries. Output shape is the
+// exact legacy Supabase JSON so the storefront is untouched. Known,
+// consumer-free deltas: hero created_at/updated_at/id (null/Convex id),
+// blog author email (name only).
 
-import { createClient } from '@supabase/supabase-js';
+async function cxQuery(baseUrl, path, args) {
+  const res = await fetch(`${baseUrl}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  return body.value;
+}
+
+// Supabase timestamptz serializes "+00:00"; Date.toISOString gives "Z".
+const iso = (ms) => (ms == null ? null : new Date(ms).toISOString().replace('Z', '+00:00'));
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -21,158 +38,151 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Homepage data request received');
 
-    // Initialize Supabase
-    const supabase = createClient(
-      env.VITE_SUPABASE_URL,
-      env.VITE_SUPABASE_ANON_KEY
-    );
-
-    // Fetch all homepage data in parallel
-    const [featuredProducts, categories, brands, heroSlides, sectionConfig, showcaseConfig, blogPosts, showcaseProducts, blogSectionConfig, categoriesWithProducts] = await Promise.all([
-      // Featured products
-      supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, description, is_active, created_at,
-          brand:brands(id, name),
-          product_variants(id, price, images, is_active, is_default, variant_name)
-        `)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(12),
-
-      // Categories for scroller and grid
-      supabase
-        .from('categories')
-        .select('id, name, slug, image, description')
-        .order('name')
-        .limit(20),
-
-      // Brands for scroller
-      supabase
-        .from('brands')
-        .select('id, name, slug, description, logo_url, is_active')
-        .eq('is_active', true)
-        .order('name')
-        .limit(20),
-
-      // Hero slides
-      supabase
-        .from('hero_slides')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-        .limit(10),
-
-      // Featured Products Section Config
-      supabase
-        .from('section_configurations')
-        .select('title, subtitle, description, button_text, button_url, is_enabled')
-        .eq('section_name', 'featured_products')
-        .single(),
-
-      // Product Showcase Section Config
-      supabase
-        .from('section_configurations')
-        .select('title, background_image, button_text, button_url, is_enabled')
-        .eq('section_name', 'product_showcase')
-        .single(),
-
-      // Blog Posts
-      supabase
-        .from('blog_posts')
-        .select(`
-          id, title, slug, excerpt, featured_image, published_at, reading_time,
-          author:profiles(name, email),
-          category:blog_categories(name, color)
-        `)
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(6),
-
-      // Showcase Products (6 products for the grid) - use different sort for variety
-      supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, description, is_active, created_at,
-          brand:brands(id, name),
-          product_variants(id, price, images, is_active, is_default, variant_name)
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true })
-        .limit(6),
-
-      // Blog Section Config
-      supabase
-        .from('section_configurations')
-        .select('title, subtitle, description')
-        .eq('section_name', 'blog_section')
-        .single(),
-
-      // Categories with products for CategoryShowcases (mobile)
-      supabase
-        .from('categories')
-        .select(`
-          id, name, slug, description, image,
-          products:product_categories(
-            products(
-              id, name, slug, brand_id, description, is_active, created_at,
-              brand:brands(id, name),
-              product_variants(id, price, images, is_active, is_default, variant_name)
-            )
-          )
-        `)
-        .order('name')
-        .limit(6)
+    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+    const [bundle, heroSlides, featuredCfg, showcaseCfg, blogSecCfg, blogRows, blogCats] = await Promise.all([
+      cxQuery(convexUrl, 'catalog:fullCatalog', {}),
+      cxQuery(convexUrl, 'content:listHeroSlides', {}),
+      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'featured_products' }),
+      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'product_showcase' }),
+      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'blog_section' }),
+      cxQuery(convexUrl, 'content:listBlogPosts', { limit: 6 }),
+      cxQuery(convexUrl, 'content:listBlogCategories', {}),
     ]);
 
-    // Check for errors with detailed logging
-    if (featuredProducts.error) {
-      console.error('Featured products error:', featuredProducts.error);
-      throw new Error(`Featured products: ${featuredProducts.error.message}`);
+    const brandById = new Map((bundle.brands || []).map((b) => [b.supabaseId, b]));
+    const variantsByProduct = new Map();
+    for (const x of bundle.variants || []) {
+      if (!variantsByProduct.has(x.productSupabaseId)) variantsByProduct.set(x.productSupabaseId, []);
+      variantsByProduct.get(x.productSupabaseId).push({
+        id: x.supabaseId,
+        price: x.priceRupees,
+        images: x.images ?? [],
+        is_active: x.isActive,
+        is_default: x.isDefault,
+        variant_name: x.variantName,
+      });
     }
-    if (categories.error) {
-      console.error('Categories error:', categories.error);
-      throw new Error(`Categories: ${categories.error.message}`);
-    }
-    if (brands.error) {
-      console.error('Brands error:', brands.error);
-      throw new Error(`Brands: ${brands.error.message}`);
-    }
-    if (heroSlides.error) {
-      console.error('Hero slides error:', heroSlides.error);
-      throw new Error(`Hero slides: ${heroSlides.error.message}`);
-    }
-    if (sectionConfig.error) {
-      console.error('Section config error:', sectionConfig.error);
-      throw new Error(`Section config: ${sectionConfig.error.message}`);
-    }
-    if (showcaseConfig.error) {
-      console.error('Showcase config error:', showcaseConfig.error);
-      throw new Error(`Showcase config: ${showcaseConfig.error.message}`);
-    }
-    if (showcaseProducts.error) {
-      console.error('Showcase products error:', showcaseProducts.error);
-      throw new Error(`Showcase products: ${showcaseProducts.error.message}`);
-    }
-    if (blogPosts.error) {
-      console.error('Blog posts error:', blogPosts.error);
-      throw new Error(`Blog posts: ${blogPosts.error.message}`);
-    }
-    if (blogSectionConfig.error) {
-      console.error('Blog section config error:', blogSectionConfig.error);
-      throw new Error(`Blog section config: ${blogSectionConfig.error.message}`);
-    }
-    if (categoriesWithProducts.error) {
-      console.error('Categories with products error:', categoriesWithProducts.error);
-      throw new Error(`Categories with products: ${categoriesWithProducts.error.message}`);
-    }
+    const shapeProduct = (p) => {
+      const b = p.brandSupabaseId ? brandById.get(p.brandSupabaseId) : null;
+      return {
+        id: p.supabaseId,
+        name: p.name,
+        slug: p.slug,
+        brand_id: p.brandSupabaseId ?? null,
+        description: p.description ?? null,
+        is_active: p.isActive,
+        created_at: iso(p.createdAt),
+        brand: b ? { id: b.supabaseId, name: b.name } : null,
+        product_variants: variantsByProduct.get(p.supabaseId) || [],
+      };
+    };
+
+    const activeProducts = (bundle.products || []).filter((p) => p.isActive);
+    const featuredProducts = [...activeProducts]
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+      .slice(0, 12)
+      .map(shapeProduct);
+    const showcaseProducts = [...activeProducts]
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .slice(0, 6)
+      .map(shapeProduct);
+
+    const categories = (bundle.categories || [])
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .slice(0, 20)
+      .map((c) => ({
+        id: c.supabaseId,
+        name: c.name,
+        slug: c.slug,
+        image: c.image ?? null,
+        description: c.description ?? null,
+      }));
+
+    const brands = (bundle.brands || [])
+      .filter((b) => b.isActive)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .slice(0, 20)
+      .map((b) => ({
+        id: b.supabaseId,
+        name: b.name,
+        slug: b.slug,
+        description: b.description ?? null,
+        logo_url: b.logoUrl ?? null,
+        is_active: b.isActive,
+      }));
+
+    const heroes = (heroSlides || []).map((s) => ({
+      id: s._id,
+      title: s.title ?? null,
+      suptitle: s.suptitle ?? null,
+      description: s.description ?? null,
+      image_url: s.imageUrl ?? null,
+      mobile_image_url: s.mobileImageUrl ?? null,
+      small_image_url: s.smallImageUrl ?? null,
+      button_text: s.buttonText ?? null,
+      button_url: s.buttonUrl ?? null,
+      product_name: s.productName ?? null,
+      product_price: s.productPrice ?? null,
+      product_image_url: s.productImageUrl ?? null,
+      is_active: true,
+      sort_order: s.sortOrder ?? 0,
+      created_at: null,
+      updated_at: null,
+      text_position: s.textPosition ?? null,
+      text_color: s.textColor ?? null,
+      overlay_opacity: s.overlayOpacity ?? null,
+      button_style: s.buttonStyle ?? null,
+      subtitle: s.subtitle ?? null,
+    }));
+
+    const sectionConfig = featuredCfg
+      ? {
+          title: featuredCfg.title ?? null,
+          subtitle: featuredCfg.subtitle ?? null,
+          description: featuredCfg.description ?? null,
+          button_text: featuredCfg.buttonText ?? null,
+          button_url: featuredCfg.buttonUrl ?? null,
+          is_enabled: featuredCfg.isEnabled,
+        }
+      : null;
+    const showcaseConfig = showcaseCfg
+      ? {
+          title: showcaseCfg.title ?? null,
+          background_image: showcaseCfg.backgroundImage ?? null,
+          button_text: showcaseCfg.buttonText ?? null,
+          button_url: showcaseCfg.buttonUrl ?? null,
+          is_enabled: showcaseCfg.isEnabled,
+        }
+      : null;
+    const blogSectionConfig = blogSecCfg
+      ? {
+          title: blogSecCfg.title ?? null,
+          subtitle: blogSecCfg.subtitle ?? null,
+          description: blogSecCfg.description ?? null,
+        }
+      : null;
+
+    const catBySlug = new Map((blogCats || []).map((c) => [c.slug, c]));
+    const blogPosts = (blogRows || []).map((p) => {
+      const c = p.categorySlug ? catBySlug.get(p.categorySlug) : null;
+      return {
+        id: p._id,
+        title: p.title,
+        slug: p.slug,
+        excerpt: p.excerpt ?? null,
+        featured_image: p.featuredImage ?? null,
+        published_at: iso(p.publishedAt),
+        reading_time: p.readingTime ?? null,
+        author: { name: p.authorName || 'Cigarro' },
+        category: c ? { name: c.name, color: c.color ?? null } : null,
+      };
+    });
 
     // Transform products to include gallery_images from variants and fix brand format
     const transformProducts = (products) => {
-      return (products || []).map(product => {
-        const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
-        const images = activeVariants.flatMap(v => v.images || []);
+      return (products || []).map((product) => {
+        const activeVariants = product.product_variants?.filter((v) => v.is_active !== false) || [];
+        const images = activeVariants.flatMap((v) => v.images || []);
         return {
           ...product,
           brand: Array.isArray(product.brand) ? product.brand[0] : product.brand,
@@ -182,41 +192,56 @@ export async function onRequest(context) {
       });
     };
 
-    const transformedFeaturedProducts = transformProducts(featuredProducts.data);
-    const transformedShowcaseProducts = transformProducts(showcaseProducts.data);
+    const transformedFeaturedProducts = transformProducts(featuredProducts);
+    const transformedShowcaseProducts = transformProducts(showcaseProducts);
 
-    // Transform categories with products
-    const transformedCategoriesWithProducts = (categoriesWithProducts.data || []).map(cat => {
-      const products = (cat.products || [])
-        .map(pc => pc.products)
-        .filter(p => p && p.is_active)
-        .map(p => {
-          const activeVariants = p.product_variants?.filter(v => v.is_active !== false) || [];
-          const images = activeVariants.flatMap(v => v.images || []);
-          return {
-            ...p,
-            brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
-            gallery_images: images,
-            image: images[0] || null
-          };
-        });
-      return {
-        ...cat,
-        products
-      };
-    }).filter(cat => cat.products.length > 0);
+    // Categories with products
+    const productById = new Map(activeProducts.map((p) => [p.supabaseId, p]));
+    const joinsByCategory = new Map();
+    for (const j of bundle.productCategories || []) {
+      if (!joinsByCategory.has(j.categorySupabaseId)) joinsByCategory.set(j.categorySupabaseId, []);
+      joinsByCategory.get(j.categorySupabaseId).push(j);
+    }
+    const transformedCategoriesWithProducts = (bundle.categories || [])
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .slice(0, 6)
+      .map((cat) => {
+        const products = (joinsByCategory.get(cat.supabaseId) || [])
+          .map((j) => productById.get(j.productSupabaseId))
+          .filter((p) => p && p.isActive)
+          .map((p) => {
+            const shaped = shapeProduct(p);
+            const activeVariants = shaped.product_variants?.filter((v) => v.is_active !== false) || [];
+            const images = activeVariants.flatMap((v) => v.images || []);
+            return {
+              ...shaped,
+              brand: Array.isArray(shaped.brand) ? shaped.brand[0] : shaped.brand,
+              gallery_images: images,
+              image: images[0] || null,
+            };
+          });
+        return {
+          id: cat.supabaseId,
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description ?? null,
+          image: cat.image ?? null,
+          products,
+        };
+      })
+      .filter((cat) => cat.products.length > 0);
 
     const data = {
       featuredProducts: transformedFeaturedProducts,
-      categories: categories.data || [],
-      brands: brands.data || [],
-      heroSlides: heroSlides.data || [],
-      featuredSectionConfig: sectionConfig.data || null,
-      showcaseConfig: showcaseConfig.data || null,
+      categories,
+      brands,
+      heroSlides: heroes,
+      featuredSectionConfig: sectionConfig,
+      showcaseConfig,
       showcaseProducts: transformedShowcaseProducts,
-      blogPosts: blogPosts.data || [],
-      blogSectionConfig: blogSectionConfig.data || null,
-      categoriesWithProducts: transformedCategoriesWithProducts
+      blogPosts,
+      blogSectionConfig,
+      categoriesWithProducts: transformedCategoriesWithProducts,
     };
 
     console.log('✅ Homepage data fetched successfully');
@@ -233,18 +258,14 @@ export async function onRequest(context) {
         ...corsHeaders,
       },
     });
-
   } catch (error) {
     console.error('Homepage data error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to fetch homepage data', details: error.message }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
-    );
+    return new Response(JSON.stringify({ error: 'Failed to fetch homepage data', details: error.message }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
+      },
+    });
   }
 }

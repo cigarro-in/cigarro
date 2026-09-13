@@ -20,6 +20,8 @@ const brandShape = (b: any) => ({
   sortOrder: b.sortOrder,
   metaTitle: b.metaTitle,
   metaDescription: b.metaDescription,
+  createdAt: b.createdAt,
+  updatedAt: b.updatedAt,
 });
 
 const categoryShape = (c: any) => ({
@@ -32,6 +34,8 @@ const categoryShape = (c: any) => ({
   imageAltText: c.imageAltText,
   metaTitle: c.metaTitle,
   metaDescription: c.metaDescription,
+  createdAt: c.createdAt,
+  updatedAt: c.updatedAt,
 });
 
 const productShape = (p: any) => ({
@@ -180,12 +184,14 @@ export const listCollections = query({
       slug: c.slug,
       description: c.description,
       imageUrl: c.imageUrl,
-      type: c.type,
-      sortOrder: c.sortOrder,
-      isActive: c.isActive,
-      seoTitle: c.seoTitle,
-      seoDescription: c.seoDescription,
-    }));
+    type: c.type,
+    sortOrder: c.sortOrder,
+    isActive: c.isActive,
+    seoTitle: c.seoTitle,
+    seoDescription: c.seoDescription,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  }));
   },
 });
 
@@ -206,6 +212,8 @@ export const listCombos = query({
         image: c.image,
         galleryImages: c.galleryImages ?? [],
         isActive: c.isActive,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
       }),
     );
     return list;
@@ -553,6 +561,35 @@ export const getBrandDetail = query({
       products: rows
         .filter((p) => p.slug)
         .map((p) => ({ slug: p.slug, name: p.name })),
+    };
+  },
+});
+
+// Full catalog bundle for the edge JSON APIs (/api/products, /api/brands,
+// /api/categories, /api/homepage-data). Returns raw camelCase docs; the
+// edge layer maps them to the exact legacy Supabase shapes (snake_case,
+// UUID ids, ISO timestamps, explicit nulls) so API JSON stays identical.
+export const fullCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const [products, variants, brands, categories, productCategories] =
+      await Promise.all([
+        ctx.db.query("catalogProducts").collect(),
+        ctx.db.query("catalogVariants").collect(),
+        ctx.db.query("catalogBrands").collect(),
+        ctx.db.query("catalogCategories").collect(),
+        ctx.db.query("catalogProductCategories").collect(),
+      ]);
+    return {
+      products: products.map(productShape),
+      variants: variants.map(variantShape),
+      brands: brands.map(brandShape),
+      categories: categories.map(categoryShape),
+      productCategories: productCategories.map((j) => ({
+        productSupabaseId: j.productSupabaseId,
+        categorySupabaseId: j.categorySupabaseId,
+        order: j.order,
+      })),
     };
   },
 });

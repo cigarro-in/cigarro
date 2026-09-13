@@ -2,12 +2,23 @@
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/categories
+// Wave 3: reads from Convex (fullCatalog bundle). Output shape is the exact
+// legacy Supabase JSON so consumers are untouched.
 
-import { createClient } from '@supabase/supabase-js';
+async function cxQuery(baseUrl, path, args) {
+  const res = await fetch(`${baseUrl}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  return body.value;
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
-  
+
   // CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -23,59 +34,84 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Categories API request received');
 
-    // Initialize Supabase client
-    const supabase = createClient(
-      env.VITE_SUPABASE_URL,
-      env.VITE_SUPABASE_ANON_KEY
-    );
-
-    // Fetch categories with products using direct query (not broken RPC)
-    const { data: rawData, error } = await supabase
-      .from('categories')
-      .select(`
-        id, name, slug, description, image,
-        products:product_categories(
-          products(
-            id, name, slug, brand_id, description, is_active, created_at,
-            brand:brands(id, name),
-            product_variants(id, price, images, is_active, is_default, variant_name)
-          )
-        )
-      `)
-      .order('name');
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch categories', details: error.message }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        }
-      );
+    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+    const bundle = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
+    const brandById = new Map((bundle.brands || []).map((b) => [b.supabaseId, b]));
+    const variantsByProduct = new Map();
+    for (const x of bundle.variants || []) {
+      if (!variantsByProduct.has(x.productSupabaseId)) variantsByProduct.set(x.productSupabaseId, []);
+      variantsByProduct.get(x.productSupabaseId).push(x);
     }
+    const joinsByCategory = new Map();
+    for (const j of bundle.productCategories || []) {
+      if (!joinsByCategory.has(j.categorySupabaseId)) joinsByCategory.set(j.categorySupabaseId, []);
+      joinsByCategory.get(j.categorySupabaseId).push(j);
+    }
+    const productById = new Map((bundle.products || []).map((p) => [p.supabaseId, p]));
+
+    const shapeVariant = (x) => ({
+      id: x.supabaseId,
+      price: x.priceRupees,
+      images: x.images ?? [],
+      is_active: x.isActive,
+      is_default: x.isDefault,
+      variant_name: x.variantName,
+    });
+
+    const shapeProduct = (p) => {
+      const b = p.brandSupabaseId ? brandById.get(p.brandSupabaseId) : null;
+      return {
+        id: p.supabaseId,
+        name: p.name,
+        slug: p.slug,
+        brand_id: p.brandSupabaseId ?? null,
+        description: p.description ?? null,
+        is_active: p.isActive,
+        created_at: p.createdAt ? new Date(p.createdAt).toISOString().replace('Z', '+00:00') : null,
+        brand: b ? { id: b.supabaseId, name: b.name } : null,
+        product_variants: (variantsByProduct.get(p.supabaseId) || []).map(shapeVariant),
+      };
+    };
+
+    // Legacy: categories name-ascending with nested active products.
+    const rawData = (bundle.categories || [])
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .map((c) => ({
+        id: c.supabaseId,
+        name: c.name,
+        slug: c.slug,
+        description: c.description ?? null,
+        image: c.image ?? null,
+        products: (joinsByCategory.get(c.supabaseId) || []).map((j) => ({
+          products: productById.has(j.productSupabaseId)
+            ? shapeProduct(productById.get(j.productSupabaseId))
+            : null,
+        })),
+      }));
 
     // Transform data to flatten products and add image info
-    const data = (rawData || []).map(cat => {
-      const products = (cat.products || [])
-        .map(pc => pc.products)
-        .filter(p => p && p.is_active)
-        .map(p => {
-          const activeVariants = p.product_variants?.filter(v => v.is_active !== false) || [];
-          const images = activeVariants.flatMap(v => v.images || []);
-          return {
-            ...p,
-            brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
-            gallery_images: images,
-            image: images[0] || null
-          };
-        });
-      return {
-        ...cat,
-        products,
-        product_count: products.length
-      };
-    }).filter(cat => cat.products.length > 0);
+    const data = (rawData || [])
+      .map((cat) => {
+        const products = (cat.products || [])
+          .map((pc) => pc.products)
+          .filter((p) => p && p.is_active)
+          .map((p) => {
+            const activeVariants = p.product_variants?.filter((v) => v.is_active !== false) || [];
+            const images = activeVariants.flatMap((v) => v.images || []);
+            return {
+              ...p,
+              brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
+              gallery_images: images,
+              image: images[0] || null,
+            };
+          });
+        return {
+          ...cat,
+          products,
+          product_count: products.length,
+        };
+      })
+      .filter((cat) => cat.products.length > 0);
 
     console.log(`✅ Fetched ${data?.length || 0} categories with products`);
 
@@ -89,18 +125,14 @@ export async function onRequest(context) {
         ...corsHeaders,
       },
     });
-
   } catch (error) {
     console.error('Worker error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
-    );
+    return new Response(JSON.stringify({ error: 'Internal server error', details: error.message }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
+      },
+    });
   }
 }
