@@ -35,6 +35,18 @@ Last updated: 2026-09-11.
 - **No partial hand-edits to large generated files.** `convex/schema.ts`
   clobbered 2026-09-11 by overlapping edits; restored from git. Append via
   unique anchors or rewrite whole file from a verified base.
+- **Two Convex deployments — verify against PROD, never DEV.**
+  Local `npx convex deploy` / `convex run` use `CONVEX_DEPLOY_KEY`
+  (`dev:proper-coyote-383`) → the DEV deployment. Production (what Pages
+  serves at `VITE_CONVEX_URL`) is `prestigious-bass-64`. Code auto-deploys
+  to PROD on every push to main (GitHub integration), but DATA never
+  syncs: every backfill must run per deployment (drivers take a CX_URL).
+  `npx convex deploy --prod` does not exist in this CLI; the local login
+  token has no prod-project access, so prod code moves via git push only.
+  2026-09-14 incident: edge swap to Convex 404'd all bot detail pages +
+  gutted the sitemap because PROD tables were empty while DEV was full.
+  Fixed by backfilling PROD directly (public mutations need no key).
+  Gate scripts must hit `prestigious-bass-64` for user-facing claims.
 - **Git transport stalls transiently** — retry with `-c http.version=HTTP/1.1`;
   `gh` CLI needs WRITE permission to push (READ fails with 404).
 - **Cloudflare Bot Management 403s non-browser UAs** — server-side fetches
