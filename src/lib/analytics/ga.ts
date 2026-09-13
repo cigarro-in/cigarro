@@ -59,6 +59,15 @@ export function initAnalytics(): void {
   const script = document.createElement('script');
   script.async = true;
   script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
+  // Silent tag failures are the #1 "GA shows nothing" trap: the gtag stub
+  // above exists even when the real script is blocked, so hits vanish with
+  // no error. These two logs make that observable in DevTools.
+  script.onload = () => {
+    console.info(`[analytics] gtag.js loaded (${MEASUREMENT_ID}); consent=${safeGet(CONSENT_KEY) ?? 'unset→denied'}.`);
+  };
+  script.onerror = () => {
+    console.error('[analytics] gtag.js blocked — hits are dropped. Turn off adblocker/Brave Shields and check CSP.');
+  };
   document.head.appendChild(script);
   window.gtag('js', new Date());
   // Manual page_view events (SPA); the automatic one would double-count.
@@ -82,6 +91,31 @@ export function setConsent(choice: ConsentChoice): void {
 
 function ready(): boolean {
   return initialized && typeof window !== 'undefined' && !!window.gtag;
+}
+
+// Owner self-test probe: paste `__gaStatus()` in DevTools console. Works
+// even when the measurement ID is missing (the most common silent case).
+export function getAnalyticsStatus(): {
+  measurementIdSet: boolean;
+  initialized: boolean;
+  gtagPresent: boolean;
+  scriptPresent: boolean;
+  consent: string | null;
+} {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return { measurementIdSet: !!MEASUREMENT_ID, initialized, gtagPresent: false, scriptPresent: false, consent: null };
+  }
+  return {
+    measurementIdSet: !!MEASUREMENT_ID,
+    initialized,
+    gtagPresent: typeof window.gtag === 'function',
+    scriptPresent: !!document.querySelector('script[src*="googletagmanager.com/gtag/js"]'),
+    consent: safeGet(CONSENT_KEY),
+  };
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).__gaStatus = getAnalyticsStatus;
 }
 
 export function trackEvent(name: string, params: Record<string, unknown> = {}): void {
