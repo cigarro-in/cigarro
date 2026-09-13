@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- DNS Prefetch for faster external connections -->
-    <link rel="dns-prefetch" href="https://ozdgnkohlnecuhjmxbir.supabase.co">
-    <link rel="preconnect" href="https://ozdgnkohlnecuhjmxbir.supabase.co" crossorigin>
+    <link rel="dns-prefetch" href="https://emecdqvsvskzzncmltna.supabase.co">
+    <link rel="preconnect" href="https://emecdqvsvskzzncmltna.supabase.co" crossorigin>
     
     <!-- Security Headers - Note: CSP and X-Frame-Options should be set via HTTP headers in production -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
@@ -19,23 +19,29 @@
     <meta name="keywords" content="premium imported cigarettes, luxury cigars, tobacco products, cigarette marketplace, online tobacco store, premium tobacco India">
     <meta name="author" content="Cigarro">
     <meta name="robots" content="index, follow">
-    <!-- Canonical tag is dynamically set by React Helmet for each page -->
+    <!-- Static canonical so the initial human HTML has one before React
+         Helmet mounts (per-page Helmet canonicals override this after verify). -->
+    <link rel="canonical" href="https://cigarro.in/">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://cigarro.in/">
     <meta property="og:title" content="Cigarro - The Tobacco Marketplace">
     <meta property="og:description" content="The finest selection of premium imported cigarettes and luxury cigars. Shop exclusive tobacco products online.">
-    <meta property="og:image" content="https://cigarro.in/logo.png">
+    <meta property="og:image" content="https://cigarro.in/og-default.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cigarro - The Tobacco Marketplace">
     <meta property="og:site_name" content="Cigarro">
     <meta property="og:locale" content="en_IN">
     
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://cigarro.in/">
-    <meta property="twitter:title" content="Cigarro - The Tobacco Marketplace">
-    <meta property="twitter:description" content="The finest selection of premium imported cigarettes, and luxury cigars.">
-    <meta property="twitter:image" content="https://cigarro.in/logo.png">
+    <!-- Twitter — must use name=, not property= -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://cigarro.in/">
+    <meta name="twitter:title" content="Cigarro - The Tobacco Marketplace">
+    <meta name="twitter:description" content="The finest selection of premium imported cigarettes, and luxury cigars.">
+    <meta name="twitter:image" content="https://cigarro.in/og-default.jpg">
+    <meta name="twitter:image:alt" content="Cigarro - The Tobacco Marketplace">
     
     <!-- Favicon - Dynamic from admin settings (React Helmet will override) -->
     <!-- Google Search requires favicon to be:
@@ -51,6 +57,10 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png">
     <link rel="manifest" href="/manifest.json">
+
+    <!-- AI shopping agents: start at /agents (in <head> so it ships even behind the age gate) -->
+    <link rel="help" href="/agents">
+    <link rel="alternate" type="text/plain" title="Store manual for AI agents" href="/llms.txt">
     
     <!-- Additional SEO -->
     <meta name="theme-color" content="#e8e0d2">
@@ -101,18 +111,43 @@
       }
     }
     </script>
-    
-    <!-- Cloudflare Web Analytics -->
-    <!-- <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "49bca12ae30e4a84ad89dc690aeb4bde"}'></script> -->
-    <!-- End Cloudflare Web Analytics -->
-      <script type="module" crossorigin src="/assets/index-BNcs_qQv.js"></script>
+    <!-- NOTE: Cloudflare Web Analytics is intentionally OFF in code. GA4
+         (consent-mode, env-only ID) is the single measurement layer to avoid
+         double counting + extra payload. To enable CF RUM as well, toggle it
+         in the Cloudflare dashboard (auto-injects, no code change needed). -->
+      <script type="module" crossorigin src="/assets/index-CV1D1_3v.js"></script>
       <link rel="modulepreload" crossorigin href="/assets/vendor-CTYTkcnE.js">
-      <link rel="modulepreload" crossorigin href="/assets/ui-BmhkA3Eh.js">
+      <link rel="modulepreload" crossorigin href="/assets/ui-BbPNuibo.js">
       <link rel="modulepreload" crossorigin href="/assets/supabase-CLG-Fze1.js">
-      <link rel="stylesheet" crossorigin href="/assets/index-BuB_mAbZ.css">
+      <link rel="stylesheet" crossorigin href="/assets/index-CmJ7FoV5.css">
     </head>
 
     <body>
       <div id="root"></div>
+      <!-- Crawlable catalog summary for no-JS clients (A9). Factual copy only:
+           no health/safety claims. All links are real anchors with hrefs. -->
+      <noscript>
+        <h1>Cigarro - cigarettes, cigars and tobacco products in India</h1>
+        <p>Cigarro.in is an online catalogue of cigarettes, cigars, rolling products and accessories sold in India. Purchase requires age verification (18+, 21+ in Karnataka).</p>
+        <nav aria-label="Catalogue">
+          <ul>
+            <li><a href="/products">All products</a></li>
+            <li><a href="/categories">Categories</a></li>
+            <li><a href="/brands">Brands</a></li>
+            <li><a href="/category/cigarettes">Cigarettes</a></li>
+            <li><a href="/category/rolling-stuff">Rolling Stuff</a></li>
+            <li><a href="/brand/marlboro">Marlboro</a></li>
+            <li><a href="/brand/dunhill">Dunhill</a></li>
+            <li><a href="/brand/camel">Camel</a></li>
+            <li><a href="/brand/esse">Esse</a></li>
+            <li><a href="/brand/davidoff">Davidoff</a></li>
+            <li><a href="/blogs">Blog</a></li>
+            <li><a href="/about">About</a></li>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </nav>
+      </noscript>
     </body>
   </html>

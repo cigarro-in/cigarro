@@ -16,6 +16,7 @@ import { ComboDisplayComponent } from '../../components/variants/VariantSelector
 import { ProductCombo } from '../../types/variants';
 import { ProductVariant } from '../../types/product';
 import { formatINR } from '../../utils/currency';
+import { slugify } from '../../utils/slugify';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
@@ -463,7 +464,7 @@ function ProductPage() {
   // Helper to get brand name safely (slug always comes from the DB row,
   // never rebuilt from the display name — e.g. "Benson & Hedges" spellings)
   const brandName = product.brand?.name || 'Premium';
-  const brandSlug = product.brand?.slug || brandName.toLowerCase().replace(/\s+/g, '-');
+  const brandSlug = product.brand?.slug || slugify(brandName);
 
   return (
     <div>

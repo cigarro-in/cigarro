@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { HeroSlide } from '../../types/home';
+import { slugify } from '../../utils/slugify';
 
 interface HeroProps {
   slides?: HeroSlide[];
@@ -149,7 +150,7 @@ const Hero = memo(function Hero({
                             </div>
                           </div>
                           <a 
-                            href={`/product/${currentSlideData.product_name?.toLowerCase().replace(/\s+/g, '-')}`} 
+                            href={`/product/${slugify(currentSlideData.product_name || '')}`} 
                             className="hidden group-hover:block inline-block w-[2.5rem] aspect-square border border-dark rounded-full relative transition-colors duration-300 overflow-hidden ml-auto mr-[0.625rem]"
                           >
                             <span className="inline-block w-full h-full relative -top-px -left-px transition-transform duration-500">
@@ -159,7 +160,7 @@ const Hero = memo(function Hero({
                         </div>
                         <div className="hidden group-hover:flex flex-nowrap text-center border-t border-coyote text-sm lg:text-base">
                           <a 
-                            href={`/product/${currentSlideData.product_name?.toLowerCase().replace(/\s+/g, '-')}`}
+                            href={`/product/${slugify(currentSlideData.product_name || '')}`}
                             className="flex-1 py-[1rem] px-[1.5rem] text-inherit text-sm leading-none w-1/2 cursor-pointer transition-all duration-500 hover:bg-creme-light"
                           >
                             Customize
