@@ -77,11 +77,14 @@ function AppContent() {
 
   const isAdminPath = location.pathname.startsWith('/admin');
 
-  // SPA page views: only for verified, non-admin storefront routes.
+  // SPA page views: only after the age gate. Admin routes are included so the
+  // owner's own visits show up in GA4 Realtime; exclude that noise with an
+  // IP-based internal-traffic filter in GA4 Admin > Data Settings (recommended),
+  // not by dropping hits here.
   useEffect(() => {
-    if (!isAgeVerified || isAdminPath) return;
+    if (!isAgeVerified) return;
     trackPageView(location.pathname + location.search);
-  }, [location.pathname, location.search, isAgeVerified, isAdminPath]);
+  }, [location.pathname, location.search, isAgeVerified]);
 
   useEffect(() => {
     // Only redirect admins to /admin when they are not already inside the admin area
@@ -130,7 +133,10 @@ function AppContent() {
   return (
     <HelmetProvider>
       <ReferralTracker />
-      {isUserPage && legacyConsentNeeded && <ConsentBanner />}
+      {/* Consent banner must render on admin routes too: admins are
+          auto-redirected to /admin, so gating on isUserPage left them
+          consent-denied forever and their visits never reached GA. */}
+      {legacyConsentNeeded && <ConsentBanner />}
       <Helmet>
         <title>{siteSettings.meta_title || 'Cigarro'}</title>
         <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />

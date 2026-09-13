@@ -54,6 +54,7 @@ export async function onRequest(context) {
     url.pathname === '/terms' ||
     url.pathname === '/privacy' ||
     url.pathname === '/shipping' ||
+    url.pathname === '/returns' ||
     url.pathname === '/legal' ||
     url.pathname.startsWith('/product/') ||
     url.pathname.startsWith('/category/') ||

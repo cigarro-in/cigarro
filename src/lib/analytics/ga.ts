@@ -3,8 +3,11 @@
 // - Loads gtag.js once, with consent-mode defaults DENIED (DPDP-safe).
 // - No automatic page views: the SPA sends them explicitly on route change.
 // - All money values are read as-is (rupees); this module never converts.
-const MEASUREMENT_ID =
-  (import.meta as any)?.env?.VITE_GA_MEASUREMENT_ID || 'G-GP06CR13RB';
+// No hardcoded fallback: the ID must come from VITE_GA_MEASUREMENT_ID
+// (Cloudflare Pages env). If it is missing, init is skipped with a warning
+// rather than sending hits to the wrong property.
+const MEASUREMENT_ID: string | undefined =
+  (import.meta as any)?.env?.VITE_GA_MEASUREMENT_ID || undefined;
 
 const CONSENT_KEY = 'cigarro-analytics-consent';
 
@@ -37,6 +40,10 @@ function safeSet(key: string, value: string): void {
 
 export function initAnalytics(): void {
   if (initialized || typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (!MEASUREMENT_ID) {
+    console.warn('[analytics] VITE_GA_MEASUREMENT_ID is not set — skipping GA init.');
+    return;
+  }
   initialized = true;
   window.dataLayer = window.dataLayer || [];
   window.gtag = function (...args: unknown[]) {
@@ -79,11 +86,29 @@ function ready(): boolean {
 
 export function trackEvent(name: string, params: Record<string, unknown> = {}): void {
   if (!ready()) return;
-  window.gtag!('event', name, params);
+  // ?ga_debug=1 routes hits to GA4 DebugView (for owner self-tests).
+  let debug: Record<string, unknown> = {};
+  try {
+    if (new URLSearchParams(window.location.search).has('ga_debug')) {
+      debug = { debug_mode: true };
+    }
+  } catch {
+    // URL parsing unavailable — send the event without debug flag
+  }
+  window.gtag!('event', name, { ...debug, ...params });
 }
 
 export function trackPageView(path: string): void {
-  trackEvent('page_view', { page_path: path });
+  let extras: Record<string, unknown> = {};
+  try {
+    extras = {
+      page_location: window.location.href,
+      page_title: document.title,
+    };
+  } catch {
+    // DOM unavailable — page_path alone is still a valid hit
+  }
+  trackEvent('page_view', { page_path: path, ...extras });
 }
 
 export interface GAItem {

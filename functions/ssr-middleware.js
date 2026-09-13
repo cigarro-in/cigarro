@@ -937,6 +937,10 @@ function generateStaticPageHTML(pathname, faviconUrl) {
       title: 'Shipping Policy - Delivery Information',
       description: 'Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India.'
     },
+    '/returns': {
+      title: 'Returns & Replacement Policy - Damaged Items',
+      description: 'Returns policy for Cigarro: damaged or incorrect tobacco items are replaced free if reported within 48 hours of delivery. Consumables are otherwise non-returnable.'
+    },
     '/legal': {
       title: 'Legal Information - Terms & Policies',
       description: 'Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace'
@@ -1438,7 +1442,8 @@ export async function onRequest(context) {
       url.pathname === '/products' || url.pathname === '/categories' ||
       url.pathname === '/brands' || url.pathname === '/blogs' ||
       url.pathname === '/terms' || url.pathname === '/privacy' ||
-      url.pathname === '/shipping' || url.pathname === '/legal') {
+      url.pathname === '/shipping' || url.pathname === '/returns' ||
+      url.pathname === '/legal') {
       html = generateStaticPageHTML(url.pathname, faviconUrl);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = catalogSlug(url.pathname);
