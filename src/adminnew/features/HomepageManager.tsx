@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Image, 
   Layout, 
   Plus, 
-  ArrowUp, 
-  ArrowDown, 
-  RefreshCw, 
+  ArrowUp,
+  ArrowDown,
   Eye,
   EyeOff,
   Trash2,
@@ -19,7 +18,8 @@ import { Button } from '../../components/ui/button';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -49,88 +49,60 @@ interface HeroSlide {
 
 export function HomepageManager() {
   const navigate = useNavigate();
-  const [components, setComponents] = useState<HomepageComponent[]>([]);
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadHomepageData();
-  }, []);
+  // Reactive Convex reads replace load + manual refresh (no Refresh button —
+  // the list is always live).
+  const componentRows = useQuery(api.content.listHomepageComponents, {});
+  const slideRows = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
+  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const setComponent = useMutation(api.adminCatalog.saveHomepageComponent);
+  const patchSlide = useMutation(api.adminCatalog.saveHeroSlide);
+  const removeSlide = useMutation(api.adminCatalog.deleteHeroSlide);
 
-  const loadHomepageData = async () => {
-    setIsLoading(true);
+  const collectionTitle = new Map(
+    (collectionRows || []).map((c: any) => [c.supabaseId, c.title])
+  );
+  const components: HomepageComponent[] = (componentRows || []).map((c: any) => ({
+    id: c.componentName,
+    component_name: c.componentName,
+    section_id: c.sectionId ?? '',
+    is_enabled: c.isEnabled,
+    display_order: c.displayOrder,
+    config: c.config,
+    section: c.sectionId
+      ? { id: c.sectionId, title: collectionTitle.get(c.sectionId) || c.sectionId, slug: '' }
+      : undefined,
+  }));
+  const heroSlides: HeroSlide[] = (slideRows || []).map((s: any) => ({
+    id: s._id,
+    title: s.title || '',
+    subtitle: s.subtitle ?? null,
+    image_url: s.imageUrl || '',
+    is_active: s.isActive,
+    sort_order: s.sortOrder,
+  }));
+  const isLoading = componentRows === undefined || slideRows === undefined;
+
+  const handleComponentToggle = async (componentName: string, enabled: boolean) => {
     try {
-      // Load component configuration
-      const { data: componentsData, error: componentsError } = await supabase
-        .from('homepage_component_config')
-        .select(`
-          *,
-          section:homepage_sections(id, title, slug)
-        `)
-        .order('display_order');
-
-      if (componentsError) throw componentsError;
-      setComponents(componentsData || []);
-
-      // Load hero slides
-      const { data: slidesData, error: slidesError } = await supabase
-        .from('hero_slides')
-        .select('id, title, subtitle, image_url, is_active, sort_order')
-        .order('sort_order');
-
-      if (slidesError) throw slidesError;
-      setHeroSlides(slidesData || []);
-    } catch (error) {
-      console.error('Error loading homepage data:', error);
-      toast.error('Failed to load homepage data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleComponentToggle = async (componentId: string, enabled: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('homepage_component_config')
-        .update({ is_enabled: enabled })
-        .eq('id', componentId);
-
-      if (error) throw error;
-
-      setComponents(prev => 
-        prev.map(comp => 
-          comp.id === componentId ? { ...comp, is_enabled: enabled } : comp
-        )
-      );
-
+      await setComponent({ componentName, patch: { isEnabled: enabled } });
       toast.success(`Component ${enabled ? 'enabled' : 'disabled'}`);
       await invalidateStorefront();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling component:', error);
-      toast.error('Failed to toggle component');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle component');
     }
   };
 
   const handleSlideToggle = async (slideId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('hero_slides')
-        .update({ is_active: isActive })
-        .eq('id', slideId);
-
-      if (error) throw error;
-
-      setHeroSlides(prev => 
-        prev.map(slide => 
-          slide.id === slideId ? { ...slide, is_active: isActive } : slide
-        )
-      );
-
+      const slide = heroSlides.find((s) => s.id === slideId);
+      await patchSlide({ id: slideId as any, slide: { isActive, sortOrder: slide?.sort_order ?? 0 } });
       toast.success(`Slide ${isActive ? 'activated' : 'deactivated'}`);
       await invalidateStorefront();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling slide:', error);
-      toast.error('Failed to toggle slide');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle slide');
     }
   };
 
@@ -138,19 +110,12 @@ export function HomepageManager() {
     if (!confirm(`Delete slide "${title}"?`)) return;
 
     try {
-      const { error } = await supabase
-        .from('hero_slides')
-        .delete()
-        .eq('id', slideId);
-
-      if (error) throw error;
-
-      setHeroSlides(prev => prev.filter(s => s.id !== slideId));
+      await removeSlide({ id: slideId as any });
       toast.success('Slide deleted');
       await invalidateStorefront();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting slide:', error);
-      toast.error('Failed to delete slide');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete slide');
     }
   };
 
@@ -165,20 +130,14 @@ export function HomepageManager() {
     [newSlides[slideIndex], newSlides[targetIndex]] = [newSlides[targetIndex], newSlides[slideIndex]];
 
     try {
-      // Update sort orders
       for (let i = 0; i < newSlides.length; i++) {
-        await supabase
-          .from('hero_slides')
-          .update({ sort_order: i })
-          .eq('id', newSlides[i].id);
+        await patchSlide({ id: newSlides[i].id as any, slide: { isActive: newSlides[i].is_active, sortOrder: i } });
       }
-
-      setHeroSlides(newSlides);
       toast.success('Slide order updated');
       await invalidateStorefront();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error reordering slides:', error);
-      toast.error('Failed to reorder slides');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to reorder slides');
     }
   };
 
@@ -212,10 +171,6 @@ export function HomepageManager() {
         title="Homepage Manager"
         description="Manage hero slides and homepage sections"
       >
-        <Button onClick={loadHomepageData} disabled={isLoading} variant="outline">
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
       </PageHeader>
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto">

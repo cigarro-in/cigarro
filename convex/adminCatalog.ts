@@ -767,6 +767,56 @@ export const deleteCombo = mutation({
 });
 
 // ---------------- Content ----------------
+// Admin blog list: ALL statuses (public query is published-only), newest
+// first, with category name/color resolved for the table badge.
+export const listBlogPostsForAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const posts = await ctx.db.query("blogPosts").collect();
+    posts.sort((a, b) => (b.publishedAt ?? b.updatedAt ?? 0) - (a.publishedAt ?? a.updatedAt ?? 0));
+    const cats = await ctx.db.query("blogCategories").collect();
+    const catBySlug = new Map(cats.map((c) => [c.slug, c]));
+    return posts.map((p) => ({
+      ...p,
+      category: p.categorySlug
+        ? (() => {
+            const c = catBySlug.get(p.categorySlug!);
+            return c ? { name: c.name, color: c.color } : null;
+          })()
+        : null,
+    }));
+  },
+});
+
+export const setBlogPostsStatus = mutation({
+  args: { ids: v.array(v.id("blogPosts")), status: v.string() },
+  handler: async (ctx, { ids, status }) => {
+    await requireCatalogAdmin(ctx);
+    if (!["draft", "published", "archived"].includes(status))
+      throw new ConvexError({ code: "BAD_STATUS" });
+    const now = Date.now();
+    for (const id of ids) {
+      const row = await ctx.db.get(id);
+      if (!row) continue;
+      await ctx.db.patch(id, {
+        status,
+        publishedAt: status === "published" ? (row.publishedAt ?? now) : row.publishedAt,
+        updatedAt: now,
+      });
+    }
+    return { updated: ids.length };
+  },
+});
+
+// Admin hero list: ALL slides (public query is active-only), sort order.
+export const listHeroSlidesForAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("heroSlides").collect();
+    rows.sort((a, b) => a.sortOrder - b.sortOrder);
+    return rows;
+  },
+});
 
 // Content rows carry no supabaseId (Wave 2 backfill didn't keep one), so
 // updates key on the Convex _id — Wave 6 forms read from Convex and get it.
@@ -781,7 +831,7 @@ export const saveBlogPost = mutation({
       content: v.string(),
       featuredImage: v.optional(v.string()),
       status: v.string(),
-      authorName: v.string(),
+      authorName: v.optional(v.string()),
       categorySlug: v.optional(v.string()),
       readingTime: v.optional(v.number()),
       metaTitle: v.optional(v.string()),
@@ -811,6 +861,7 @@ export const saveBlogPost = mutation({
       if (clash && clash._id !== id) throw new ConvexError({ code: "SLUG_TAKEN" });
       await ctx.db.patch(id, {
         ...post,
+        authorName: post.authorName ?? row.authorName,
         title: post.title.trim(),
         slug: post.slug.trim(),
         publishedAt: post.status === "published" ? (row.publishedAt ?? now) : undefined,
@@ -821,6 +872,7 @@ export const saveBlogPost = mutation({
     await assertSlugUnique(ctx, "blogPosts", post.slug.trim());
     const newId = await ctx.db.insert("blogPosts", {
       ...post,
+      authorName: post.authorName ?? "Cigarro",
       title: post.title.trim(),
       slug: post.slug.trim(),
       likeCount: 0,

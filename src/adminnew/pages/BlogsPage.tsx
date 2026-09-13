@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, BookOpen, Plus, ChevronDown, Star, Pin, Search } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -43,36 +44,37 @@ interface BlogPost {
 
 export function BlogsPage() {
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    fetchPosts();
-  }, []);
+  const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, {});
+  const removePost = useMutation(api.adminCatalog.deleteBlogPost);
+  const setStatus = useMutation(api.adminCatalog.setBlogPostsStatus);
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select(`
-          *,
-          category:blog_categories(id, name, color)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPosts(data || []);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-      toast.error('Failed to load blog posts');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Boundary: Convex camelCase → table shape (ids are Convex _ids now —
+  // content rows never carried supabaseIds).
+  const posts: BlogPost[] = (rows || []).map((p: any) => ({
+    id: p._id,
+    title: p.title,
+    slug: p.slug,
+    excerpt: p.excerpt ?? null,
+    featured_image: p.featuredImage ?? null,
+    status: p.status,
+    is_featured: p.isFeatured ?? false,
+    is_pinned: p.isPinned ?? false,
+    category_id: p.categorySlug ?? null,
+    published_at: p.publishedAt ? new Date(p.publishedAt).toISOString() : null,
+    view_count: p.viewCount ?? 0,
+    created_at: p.publishedAt
+      ? new Date(p.publishedAt).toISOString()
+      : p.updatedAt
+        ? new Date(p.updatedAt).toISOString()
+        : '',
+    updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : '',
+    category: p.category,
+  }));
+  const loading = rows === undefined;
 
   const handleAddPost = () => {
     navigate('/admin/blogs/new');
@@ -85,38 +87,23 @@ export function BlogsPage() {
   const handleBulkDelete = async (postIds: string[]) => {
     if (!confirm(`Delete ${postIds.length} posts? This cannot be undone.`)) return;
     try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .delete()
-        .in('id', postIds);
-
-      if (error) throw error;
+      for (const id of postIds) {
+        await removePost({ id: id as any });
+      }
       toast.success(`${postIds.length} posts deleted`);
       setSelectedPosts([]);
-      fetchPosts();
-    } catch (error) {
-      toast.error('Failed to delete posts');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete posts');
     }
   };
 
   const handleBulkStatusChange = async (postIds: string[], status: 'draft' | 'published' | 'archived') => {
     try {
-      const updateData: any = { status };
-      if (status === 'published') {
-        updateData.published_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('blog_posts')
-        .update(updateData)
-        .in('id', postIds);
-
-      if (error) throw error;
+      await setStatus({ ids: postIds as any, status });
       toast.success(`${postIds.length} posts updated to ${status}`);
       setSelectedPosts([]);
-      fetchPosts();
-    } catch (error) {
-      toast.error('Failed to update posts');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update posts');
     }
   };
 

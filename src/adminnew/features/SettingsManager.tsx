@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check } from 'lucide-react';
 import { useTheme } from '../../themes';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -69,40 +71,31 @@ export function SettingsManager() {
     timestamp: string;
   } | null>(null);
 
+  const serverSettings = useQuery(api.content.getSiteSettings, {});
+  const saveSettings = useMutation(api.adminCatalog.saveSiteSettings);
+  const populatedRef = useRef(false);
+
+  // Populate once from Convex (singleton key "main" — no numeric id anymore).
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Try to get the single row from site_settings
-      const { data, error } = await supabase
-        .from('site_settings')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Database error:', error);
-        throw error;
-      }
-
-      if (data) {
-        setSettings(data);
-      } else {
-        console.warn('No site_settings row found');
-        toast.error('No settings found in database');
-      }
-      setIsDirty(false);
-    } catch (error: any) {
-      console.error('Error fetching settings:', error);
-      toast.error(`Failed to load settings: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (!serverSettings || populatedRef.current) return;
+    populatedRef.current = true;
+    setSettings({
+      id: 1,
+      site_name: serverSettings.siteName || '',
+      favicon_url: serverSettings.faviconUrl || '',
+      meta_title: serverSettings.metaTitle || '',
+      meta_description: serverSettings.metaDescription || '',
+      upi_id: serverSettings.upiId || '',
+      active_theme: serverSettings.activeTheme || 'classic',
+      updated_at: serverSettings.updatedAt
+        ? new Date(serverSettings.updatedAt).toISOString()
+        : null,
+      updated_by: null,
+    });
+    setIsLoading(false);
+    setIsDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSettings]);
 
   const handleRegenerateSitemap = async () => {
     setIsRegeneratingSitemap(true);
@@ -125,15 +118,12 @@ export function SettingsManager() {
   const handleClearCache = async () => {
     setIsClearingCache(true);
     try {
-      // Clear browser cache for the site
+      // Clear browser cache for the site (Convex re-reads fresh on next visit)
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
-      
-      // Also trigger a reload of critical data
-      await fetchSettings();
-      
+
       toast.success('Cache cleared successfully');
     } catch (error) {
       console.error('Error clearing cache:', error);
@@ -186,72 +176,18 @@ export function SettingsManager() {
 
   const handleTestPerformance = async () => {
     setIsTestingPerformance(true);
-    const isProduction = window.location.hostname === 'cigarro.in';
 
     try {
-      if (!isProduction) {
-        // Development mode - test Supabase directly
-        const devLoading = toast.loading('Testing Supabase connection...');
-        
-        const tests = [
-          { name: 'Homepage Data', query: () => supabase.from('hero_slides').select('*').limit(10) },
-          { name: 'Categories', query: () => supabase.from('categories').select('id, name, slug, image').limit(20) },
-          { name: 'Products', query: () => supabase.from('products').select('id, name, slug, brand_id, is_active').limit(50) },
-          { name: 'Brands', query: () => supabase.from('brands').select('*').limit(20) },
-        ];
+      // Always test the live HTTP endpoints (same signal in dev and prod —
+      // no direct-DB branch, so no Supabase dependency here).
+      const loading = toast.loading('Testing CDN performance...');
 
-        const results: PerformanceResult[] = [];
-
-        for (const test of tests) {
-          try {
-            const start = performance.now();
-            const { data, error } = await test.query();
-            const end = performance.now();
-            const time = Math.round(end - start);
-            const sizeBytes = data ? JSON.stringify(data).length : 0;
-            const sizeKB = sizeBytes >= 1024 ? `${Math.round(sizeBytes / 1024)}KB` : `${sizeBytes}B`;
-
-            results.push({
-              name: test.name,
-              time,
-              cacheStatus: 'SUPABASE',
-              size: sizeKB,
-              status: !error ? '✅' : '❌',
-              error: error?.message || null
-            });
-          } catch (err: any) {
-            results.push({
-              name: test.name,
-              time: 0,
-              cacheStatus: 'ERROR',
-              size: 'N/A',
-              status: '❌',
-              error: err?.message || 'Unknown error'
-            });
-          }
-        }
-
-        toast.dismiss(devLoading);
-        const avgTime = Math.round(results.reduce((sum, r) => sum + r.time, 0) / results.length);
-        
-        setPerformanceResults({
-          mode: 'development',
-          results,
-          avgTime,
-          timestamp: new Date().toLocaleTimeString()
-        });
-
-        toast.success(`Development mode: Average ${avgTime}ms (Direct Supabase)`, { duration: 4000 });
-      } else {
-        // Production mode - test CDN endpoints
-        const loading = toast.loading('Testing CDN performance...');
-        
-        const endpoints = [
-          { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
-          { name: 'Categories', url: 'https://cigarro.in/api/categories' },
-          { name: 'Products', url: 'https://cigarro.in/api/products' },
-          { name: 'Brands', url: 'https://cigarro.in/api/brands' },
-        ];
+      const endpoints = [
+        { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
+        { name: 'Categories', url: 'https://cigarro.in/api/categories' },
+        { name: 'Products', url: 'https://cigarro.in/api/products' },
+        { name: 'Brands', url: 'https://cigarro.in/api/brands' },
+      ];
 
         const results: PerformanceResult[] = [];
 
@@ -300,7 +236,6 @@ export function SettingsManager() {
         });
 
         toast.success(`CDN Performance: Average ${avgTime}ms, ${hitCount}/${results.length} cache hits`, { duration: 4000 });
-      }
     } catch (error) {
       console.error('Performance test error:', error);
       toast.error('Failed to test performance');
@@ -321,29 +256,20 @@ export function SettingsManager() {
 
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('site_settings')
-        .update({
-          site_name: settings.site_name?.trim() || null,
-          favicon_url: settings.favicon_url?.trim() || null,
-          meta_title: settings.meta_title?.trim() || null,
-          meta_description: settings.meta_description?.trim() || null,
-          upi_id: settings.upi_id?.trim() || null,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.id
-        })
-        .eq('id', settings.id);
-
-      if (error) throw error;
+      // updatedBy stamps server-side from the Convex identity.
+      await saveSettings({
+        siteName: settings.site_name?.trim() || undefined,
+        faviconUrl: settings.favicon_url?.trim() || undefined,
+        metaTitle: settings.meta_title?.trim() || undefined,
+        metaDescription: settings.meta_description?.trim() || undefined,
+        upiId: settings.upi_id?.trim() || undefined,
+      });
 
       toast.success('Settings updated successfully');
       setIsDirty(false);
-      await fetchSettings();
     } catch (error: any) {
       console.error('Error updating settings:', error);
-      toast.error(`Failed to update settings: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to update settings: ${error?.data?.code || error.message || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -353,19 +279,36 @@ export function SettingsManager() {
     if (newThemeId === themeId) return;
     setIsSavingTheme(newThemeId);
     try {
-      const { error } = await supabase
-        .from('site_settings')
-        .update({ active_theme: newThemeId, updated_at: new Date().toISOString() })
-        .eq('id', settings.id);
-      if (error) throw error;
+      await saveSettings({ activeTheme: newThemeId });
       setTheme(newThemeId);
       setSettings(prev => ({ ...prev, active_theme: newThemeId }));
       toast.success(`Switched to ${availableThemes.find(t => t.id === newThemeId)?.name}`);
     } catch (error: any) {
-      toast.error(`Failed to switch theme: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to switch theme: ${error?.data?.code || error.message || 'Unknown error'}`);
     } finally {
       setIsSavingTheme(null);
     }
+  };
+
+  // Reset = repopulate from the live Convex singleton (reactive, no fetch).
+  const handleReset = () => {
+    if (!serverSettings) return;
+    populatedRef.current = false;
+    setSettings({
+      id: 1,
+      site_name: serverSettings.siteName || '',
+      favicon_url: serverSettings.faviconUrl || '',
+      meta_title: serverSettings.metaTitle || '',
+      meta_description: serverSettings.metaDescription || '',
+      upi_id: serverSettings.upiId || '',
+      active_theme: serverSettings.activeTheme || 'classic',
+      updated_at: serverSettings.updatedAt
+        ? new Date(serverSettings.updatedAt).toISOString()
+        : null,
+      updated_by: null,
+    });
+    populatedRef.current = true;
+    setIsDirty(false);
   };
 
   const handleChange = (field: keyof SiteSettings, value: string) => {
@@ -387,7 +330,7 @@ export function SettingsManager() {
         title="Site Settings"
         description="Manage your website configuration"
       >
-        <Button variant="outline" onClick={fetchSettings} disabled={isSaving}>
+        <Button variant="outline" onClick={handleReset} disabled={isSaving}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Reset
         </Button>

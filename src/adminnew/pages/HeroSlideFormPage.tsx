@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Save, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -11,7 +11,8 @@ import { Slider } from '../../components/ui/slider';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { toast } from 'sonner';
 
@@ -53,69 +54,47 @@ export function HeroSlideFormPage() {
   const isEditMode = Boolean(id && id !== 'new');
 
   const [form, setForm] = useState<HeroSlideFormData>(initialFormData);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
+  const populatedRef = useRef(false);
 
+  const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
+  const saveSlide = useMutation(api.adminCatalog.saveHeroSlide);
+  const removeSlide = useMutation(api.adminCatalog.deleteHeroSlide);
+
+  // Populate once / next sort order — both derive from the one list query.
   useEffect(() => {
+    if (!slides || populatedRef.current) return;
+    populatedRef.current = true;
     if (isEditMode && id) {
-      loadSlide(id);
-    } else {
-      // Get next sort order for new slides
-      getNextSortOrder();
-    }
-  }, [id, isEditMode]);
-
-  const loadSlide = async (slideId: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('hero_slides')
-        .select('*')
-        .eq('id', slideId)
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setForm({
-          title: data.title || '',
-          subtitle: data.subtitle || '',
-          description: data.description || '',
-          image_url: data.image_url || '',
-          mobile_image_url: data.mobile_image_url || '',
-          button_text: data.button_text || '',
-          button_url: data.button_url || '',
-          button_style: data.button_style || 'primary',
-          text_position: data.text_position || 'left',
-          text_color: data.text_color || 'light',
-          overlay_opacity: data.overlay_opacity ?? 40,
-          is_active: data.is_active ?? true,
-          sort_order: data.sort_order ?? 0
-        });
+      const data: any = slides.find((s: any) => s._id === id);
+      if (!data) {
+        toast.error('Slide not found');
+        navigate('/admin/homepage');
+        return;
       }
-    } catch (error) {
-      console.error('Error loading slide:', error);
-      toast.error('Failed to load slide');
-      navigate('/admin/homepage');
-    } finally {
+      setForm({
+        title: data.title || '',
+        subtitle: data.subtitle || '',
+        description: data.description || '',
+        image_url: data.imageUrl || '',
+        mobile_image_url: data.mobileImageUrl || '',
+        button_text: data.buttonText || '',
+        button_url: data.buttonUrl || '',
+        button_style: data.buttonStyle || 'primary',
+        text_position: data.textPosition || 'left',
+        text_color: data.textColor || 'light',
+        overlay_opacity: data.overlayOpacity ?? 40,
+        is_active: data.isActive ?? true,
+        sort_order: data.sortOrder ?? 0
+      });
       setLoading(false);
+    } else {
+      const max = Math.max(-1, ...slides.map((s: any) => s.sortOrder ?? 0));
+      setForm((prev) => ({ ...prev, sort_order: max + 1 }));
     }
-  };
-
-  const getNextSortOrder = async () => {
-    try {
-      const { data } = await supabase
-        .from('hero_slides')
-        .select('sort_order')
-        .order('sort_order', { ascending: false })
-        .limit(1);
-
-      if (data && data.length > 0) {
-        setForm(prev => ({ ...prev, sort_order: (data[0].sort_order || 0) + 1 }));
-      }
-    } catch (error) {
-      console.error('Error getting sort order:', error);
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slides]);
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -129,44 +108,31 @@ export function HeroSlideFormPage() {
 
     setSaving(true);
     try {
-      const slideData = {
-        title: form.title.trim(),
-        subtitle: form.subtitle.trim() || null,
-        description: form.description.trim() || null,
-        image_url: form.image_url,
-        mobile_image_url: form.mobile_image_url || null,
-        button_text: form.button_text.trim() || null,
-        button_url: form.button_url.trim() || null,
-        button_style: form.button_style,
-        text_position: form.text_position,
-        text_color: form.text_color,
-        overlay_opacity: form.overlay_opacity,
-        is_active: form.is_active,
-        sort_order: form.sort_order
-      };
-
-      if (isEditMode && id) {
-        const { error } = await supabase
-          .from('hero_slides')
-          .update(slideData)
-          .eq('id', id);
-
-        if (error) throw error;
-        toast.success('Slide updated');
-      } else {
-        const { error } = await supabase
-          .from('hero_slides')
-          .insert(slideData);
-
-        if (error) throw error;
-        toast.success('Slide created');
-      }
+      await saveSlide({
+        id: isEditMode && id ? (id as any) : undefined,
+        slide: {
+          title: form.title.trim(),
+          subtitle: form.subtitle.trim() || undefined,
+          description: form.description.trim() || undefined,
+          imageUrl: form.image_url,
+          mobileImageUrl: form.mobile_image_url || undefined,
+          buttonText: form.button_text.trim() || undefined,
+          buttonUrl: form.button_url.trim() || undefined,
+          buttonStyle: form.button_style,
+          textPosition: form.text_position,
+          textColor: form.text_color,
+          overlayOpacity: form.overlay_opacity,
+          isActive: form.is_active,
+          sortOrder: form.sort_order,
+        },
+      });
+      toast.success(isEditMode ? 'Slide updated' : 'Slide created');
 
       await invalidateStorefront();
       navigate('/admin/homepage');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving slide:', error);
-      toast.error('Failed to save slide');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to save slide');
     } finally {
       setSaving(false);
     }
@@ -178,16 +144,11 @@ export function HeroSlideFormPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('hero_slides')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeSlide({ id: id as any });
       toast.success('Slide deleted');
       await invalidateStorefront();
       navigate('/admin/homepage');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting slide:', error);
       toast.error('Failed to delete slide');
     } finally {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Trash2, Eye, EyeOff, Star, Pin, ExternalLink } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
@@ -28,9 +29,9 @@ import {
 import { format } from 'date-fns';
 
 interface BlogCategory {
-  id: string;
+  slug: string;
   name: string;
-  color: string;
+  color?: string;
 }
 
 interface BlogPost {
@@ -58,10 +59,21 @@ export function BlogFormPage() {
   const { id } = useParams();
   const isEditing = id && id !== 'new';
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
-  const [categories, setCategories] = useState<BlogCategory[]>([]);
   const [post, setPost] = useState<BlogPost | null>(null);
+  const populatedRef = useRef(false);
+
+  // Public category list (slug-keyed now — Convex posts link by categorySlug).
+  const categoryRows = useQuery(api.content.listBlogCategories, {});
+  const categories: BlogCategory[] = (categoryRows || []).map((c: any) => ({
+    slug: c.slug,
+    name: c.name,
+    color: c.color,
+  }));
+  const postRows = useQuery(api.adminCatalog.listBlogPostsForAdmin, {});
+  const savePost = useMutation(api.adminCatalog.saveBlogPost);
+  const removePost = useMutation(api.adminCatalog.deleteBlogPost);
 
   const [form, setForm] = useState({
     title: '',
@@ -77,65 +89,51 @@ export function BlogFormPage() {
     meta_description: '',
   });
 
+  // Populate once from the Convex admin list (route :id is the Convex _id now).
   useEffect(() => {
-    loadCategories();
-    if (isEditing) {
-      loadPost();
-    }
-  }, [id]);
-
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('blog_categories')
-        .select('id, name, color')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const loadPost = async () => {
-    if (!id || id === 'new') return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        setPost(data);
-        setForm({
-          title: data.title || '',
-          slug: data.slug || '',
-          excerpt: data.excerpt || '',
-          content: data.content || '',
-          featured_image: data.featured_image || '',
-          status: data.status || 'draft',
-          is_featured: data.is_featured ?? false,
-          is_pinned: data.is_pinned ?? false,
-          category_id: data.category_id || '',
-          meta_title: data.meta_title || '',
-          meta_description: data.meta_description || '',
-        });
-      }
-    } catch (error) {
-      console.error('Error loading post:', error);
-      toast.error('Failed to load post');
+    if (!isEditing || !postRows || populatedRef.current) return;
+    populatedRef.current = true;
+    const data: any = postRows.find((p: any) => p._id === id);
+    if (!data) {
+      toast.error('Post not found');
       navigate('/admin/blogs');
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+    setPost({
+      id: data._id,
+      title: data.title,
+      slug: data.slug,
+      excerpt: data.excerpt ?? null,
+      content: data.content,
+      featured_image: data.featuredImage ?? null,
+      status: data.status,
+      is_featured: data.isFeatured ?? false,
+      is_pinned: data.isPinned ?? false,
+      category_id: data.categorySlug ?? null,
+      meta_title: data.metaTitle ?? null,
+      meta_description: data.metaDescription ?? null,
+      published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : null,
+      reading_time: data.readingTime ?? null,
+      view_count: data.viewCount ?? 0,
+      created_at: '',
+      updated_at: '',
+    });
+    setForm({
+      title: data.title || '',
+      slug: data.slug || '',
+      excerpt: data.excerpt || '',
+      content: data.content || '',
+      featured_image: data.featuredImage || '',
+      status: data.status || 'draft',
+      is_featured: data.isFeatured ?? false,
+      is_pinned: data.isPinned ?? false,
+      category_id: data.categorySlug || '',
+      meta_title: data.metaTitle || '',
+      meta_description: data.metaDescription || '',
+    });
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postRows]);
 
   const generateSlug = (title: string) => {
     return title
@@ -168,45 +166,31 @@ export function BlogFormPage() {
     setSaving(true);
     try {
       const slug = form.slug || generateSlug(form.title);
-      const readingTime = calculateReadingTime(form.content);
 
-      const data = {
-        title: form.title.trim(),
-        slug,
-        excerpt: form.excerpt.trim() || null,
-        content: form.content || null,
-        featured_image: form.featured_image || null,
-        status: form.status,
-        is_featured: form.is_featured,
-        is_pinned: form.is_pinned,
-        category_id: form.category_id || null,
-        meta_title: form.meta_title.trim() || null,
-        meta_description: form.meta_description.trim() || null,
-        reading_time: readingTime,
-        published_at: form.status === 'published' && !post?.published_at
-          ? new Date().toISOString()
-          : post?.published_at || null,
-      };
-
-      if (isEditing && post) {
-        const { error } = await supabase
-          .from('blog_posts')
-          .update(data)
-          .eq('id', post.id);
-        if (error) throw error;
-        toast.success('Post updated successfully');
-      } else {
-        const { error } = await supabase
-          .from('blog_posts')
-          .insert({ ...data, view_count: 0 });
-        if (error) throw error;
-        toast.success('Post created successfully');
-      }
+      await savePost({
+        id: isEditing && post ? (post.id as any) : undefined,
+        post: {
+          slug,
+          title: form.title.trim(),
+          excerpt: form.excerpt.trim() || undefined,
+          content: form.content,
+          featuredImage: form.featured_image || undefined,
+          status: form.status,
+          isFeatured: form.is_featured,
+          isPinned: form.is_pinned,
+          categorySlug: form.category_id || undefined,
+          readingTime: calculateReadingTime(form.content),
+          metaTitle: form.meta_title.trim() || undefined,
+          metaDescription: form.meta_description.trim() || undefined,
+        },
+      });
+      toast.success(isEditing ? 'Post updated successfully' : 'Post created successfully');
 
       navigate('/admin/blogs');
     } catch (error: any) {
       console.error('Error saving post:', error);
-      if (error?.code === '23505') {
+      const code = error?.data?.code;
+      if (code === 'SLUG_TAKEN') {
         toast.error('A post with this slug already exists');
       } else {
         toast.error(error?.message || 'Failed to save post');
@@ -221,11 +205,7 @@ export function BlogFormPage() {
     if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
 
     try {
-      const { error } = await supabase
-        .from('blog_posts')
-        .delete()
-        .eq('id', post.id);
-      if (error) throw error;
+      await removePost({ id: post.id as any });
       toast.success('Post deleted');
       navigate('/admin/blogs');
     } catch (error: any) {
@@ -427,7 +407,7 @@ export function BlogFormPage() {
                   <SelectContent>
                     <SelectItem value="none">No Category</SelectItem>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
+                        <SelectItem key={cat.slug} value={cat.slug}>
                         <div className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
