@@ -7,6 +7,7 @@ import { api } from '../../../convex/_generated/api';
 // depended on real tag rows beyond display) — tags read as [].
 export interface BlogListPost {
   _id: string;
+  id: string;
   slug: string;
   title: string;
   excerpt?: string;
@@ -26,6 +27,11 @@ export interface BlogListPost {
   meta_title?: string;
   meta_description?: string;
   tags?: Array<{ name: string }>;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image?: string | null;
+  canonical_url?: string | null;
+  updated_at?: string;
 }
 
 export interface BlogDetailPost extends BlogListPost {
@@ -40,15 +46,23 @@ function withCompat(row: any): any {
   if (!row) return row;
   return {
     ...row,
+    id: row._id,
     featured_image: row.featuredImage ?? null,
     author: { name: row.authorName ?? 'Cigarro' },
     category: row.categorySlug ? { name: row.categorySlug } : undefined,
     published_at: row.publishedAt
       ? new Date(row.publishedAt).toISOString()
       : undefined,
+    updated_at: row.updatedAt
+      ? new Date(row.updatedAt).toISOString()
+      : undefined,
     reading_time: row.readingTime,
     meta_title: row.metaTitle,
     meta_description: row.metaDescription,
+    og_title: row.ogTitle ?? null,
+    og_description: row.ogDescription ?? null,
+    og_image: row.ogImage ?? null,
+    canonical_url: row.canonicalUrl ?? null,
     tags: [],
   };
 }
@@ -73,11 +87,13 @@ export function useBlogPost(slug: string | undefined) {
 }
 
 export function useRelatedPosts(categorySlug?: string, excludeSlug?: string, limit = 3) {
-  const rows = useQuery(api.content.listRelatedPosts, {
-    categorySlug,
-    excludeSlug,
-    limit,
-  });
+  // Skip until the detail post resolves: firing with both slugs undefined
+  // wastes a subscription and previously fed an invalid index query.
+  const args =
+    !categorySlug && !excludeSlug
+      ? 'skip'
+      : { categorySlug, excludeSlug, limit };
+  const rows = useQuery(api.content.listRelatedPosts, args);
   return { posts: ((rows ?? []).map(withCompat) as BlogListPost[]) };
 }
 

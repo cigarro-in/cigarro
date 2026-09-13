@@ -64,17 +64,26 @@ export const listRelatedPosts = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("blogPosts")
-      .withIndex("by_category_status", (q) =>
-        args.categorySlug
-          ? q
-              .eq("categorySlug", args.categorySlug)
-              .eq("status", "published")
-          : q.eq("status", "published" as never),
-      )
-      .order("desc")
-      .take((args.limit ?? 3) + 1);
+    // by_category_status is [categorySlug, status, publishedAt]: Convex
+    // requires equality on the leading index field, so the no-category
+    // case must use by_status_published (never query an index without
+    // its leading field — it throws and trips the app ErrorBoundary).
+    const limit = (args.limit ?? 3) + 1;
+    const rows = args.categorySlug
+      ? await ctx.db
+          .query("blogPosts")
+          .withIndex("by_category_status", (q) =>
+            q.eq("categorySlug", args.categorySlug).eq("status", "published"),
+          )
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("blogPosts")
+          .withIndex("by_status_published", (q) =>
+            q.eq("status", "published"),
+          )
+          .order("desc")
+          .take(limit);
     return rows
       .filter((r) => r.slug !== args.excludeSlug)
       .slice(0, args.limit ?? 3)
