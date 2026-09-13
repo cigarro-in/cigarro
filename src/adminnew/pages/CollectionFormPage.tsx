@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, LayoutGrid, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -10,7 +10,8 @@ import { Switch } from '../../components/ui/switch';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { ProductSelector } from '../components/shared/ProductSelector';
 import { PageHeader } from '../components/shared/PageHeader';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { generateSlug } from '../../types/product';
 
@@ -42,7 +43,7 @@ export function CollectionFormPage() {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
@@ -59,15 +60,46 @@ export function CollectionFormPage() {
     meta_description: ''
   });
 
+  const collectionRows = useQuery(api.adminCatalog.listCollectionsForAdmin, {});
+  const saveCollection = useMutation(api.adminCatalog.saveCollection);
+  const removeCollection = useMutation(api.adminCatalog.deleteCollection);
+  const populatedRef = useRef(false);
+
   useEffect(() => {
     if (isEditMode) {
-      loadCollection();
       setIsSlugManuallyEdited(true);
-    } else {
-      // Get next display order for new collections
-      getNextDisplayOrder();
+    } else if (collectionRows) {
+      // Next display order = max sortOrder + 1 (was a created_at query).
+      const max = Math.max(0, ...collectionRows.map((c: any) => c.sortOrder ?? 0));
+      setFormData((prev) => ({ ...prev, display_order: max + 1 }));
     }
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, collectionRows]);
+
+  // Populate once from the Convex admin list (carries linked product ids).
+  useEffect(() => {
+    if (!isEditMode || !collectionRows || populatedRef.current) return;
+    populatedRef.current = true;
+    const data: any = collectionRows.find((c: any) => c.supabaseId === id);
+    if (!data) {
+      toast.error('Collection not found');
+      navigate('/admin/collections');
+      return;
+    }
+    setFormData({
+      title: data.title || '',
+      slug: data.slug || '',
+      description: data.description || '',
+      image_url: data.imageUrl ? [data.imageUrl] : [],
+      is_active: data.isActive !== false,
+      display_order: data.sortOrder || 1,
+      meta_title: data.seoTitle || '',
+      meta_description: data.seoDescription || ''
+    });
+    setSelectedProductIds(data.productSupabaseIds || []);
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionRows]);
 
   useEffect(() => {
     setIsDirty(true);
@@ -76,63 +108,6 @@ export function CollectionFormPage() {
   useEffect(() => {
     setIsDirty(false);
   }, []);
-
-  const getNextDisplayOrder = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('collections')
-        .select('id')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-      
-      const nextOrder = (data?.length || 0) + 1;
-      setFormData(prev => ({ ...prev, display_order: nextOrder }));
-    } catch (error) {
-      console.error('Error getting next display order:', error);
-      setFormData(prev => ({ ...prev, display_order: 1 }));
-    }
-  };
-
-  const loadCollection = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('collections')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      setFormData({
-        title: data.title || '',
-        slug: data.slug || '',
-        description: data.description || '',
-        image_url: data.image_url ? [data.image_url] : [],
-        is_active: data.is_active !== false,
-        display_order: data.display_order || 1,
-        meta_title: data.meta_title || '',
-        meta_description: data.meta_description || ''
-      });
-
-      // Load associated products
-      const { data: productData, error: productError } = await supabase
-        .from('collection_products')
-        .select('product_id')
-        .eq('collection_id', id);
-
-      if (productError) throw productError;
-      
-      setSelectedProductIds(productData?.map(p => p.product_id) || []);
-    } catch (error) {
-      console.error('Error loading collection:', error);
-      toast.error('Failed to load collection');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTitleChange = (title: string) => {
     setFormData(prev => ({ ...prev, title }));
@@ -159,65 +134,34 @@ export function CollectionFormPage() {
 
     setSaving(true);
     try {
-      const collectionData = {
-        title: formData.title.trim(),
-        slug: formData.slug.trim(),
-        description: formData.description.trim(),
-        image_url: formData.image_url[0] || null,
-        is_active: formData.is_active,
-        display_order: formData.display_order,
-        meta_title: formData.meta_title.trim() || formData.title.trim(),
-        meta_description: formData.meta_description.trim()
-      };
-
-      let collectionId = id;
-
-      if (isEditMode) {
-        const { error } = await supabase
-          .from('collections')
-          .update(collectionData)
-          .eq('id', id);
-
-        if (error) throw error;
-        collectionId = id;
-        toast.success('Collection updated successfully');
-      } else {
-        const { data: newCollection, error } = await supabase
-          .from('collections')
-          .insert([collectionData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        collectionId = newCollection.id;
-        toast.success('Collection created successfully');
-      }
-
-      // Save product associations
-      // Delete existing associations
-      await supabase
-        .from('collection_products')
-        .delete()
-        .eq('collection_id', collectionId);
-
-      // Insert new associations
-      if (selectedProductIds.length > 0) {
-        const { error: associationError } = await supabase
-          .from('collection_products')
-          .insert(
-            selectedProductIds.map(productId => ({
-              collection_id: collectionId,
-              product_id: productId
-            }))
-          );
-
-        if (associationError) throw associationError;
-      }
+      // Joins ride inside saveCollection — one mutation, no separate writes.
+      await saveCollection({
+        supabaseId: isEditMode ? id : undefined,
+        collection: {
+          title: formData.title.trim(),
+          slug: formData.slug.trim(),
+          description: formData.description.trim() || undefined,
+          imageUrl: formData.image_url[0] || undefined,
+          isActive: formData.is_active,
+          sortOrder: formData.display_order,
+          seoTitle: formData.meta_title.trim() || formData.title.trim(),
+          seoDescription: formData.meta_description.trim() || undefined,
+        },
+        productSupabaseIds: selectedProductIds,
+      });
+      toast.success(isEditMode ? 'Collection updated successfully' : 'Collection created successfully');
 
       navigate('/admin/collections');
     } catch (error: any) {
       console.error('Error saving collection:', error);
-      toast.error(error.message || 'Failed to save collection');
+      const code = error?.data?.code;
+      toast.error(
+        code === 'SLUG_TAKEN'
+          ? 'Slug is taken by another collection'
+          : code === 'NOT_CATALOG_ADMIN'
+            ? 'Admin access required'
+            : error.message || 'Failed to save collection'
+      );
     } finally {
       setSaving(false);
     }
@@ -227,17 +171,12 @@ export function CollectionFormPage() {
     if (!confirm('Are you sure you want to delete this collection?')) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('collections')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeCollection({ supabaseId: id! });
       toast.success('Collection deleted successfully');
       navigate('/admin/collections');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting collection:', error);
-      toast.error('Failed to delete collection');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collection');
     } finally {
       setSaving(false);
     }

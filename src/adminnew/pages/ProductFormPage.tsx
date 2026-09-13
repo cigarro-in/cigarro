@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Plus, Trash2, X, Package, Box, Info, Search } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -13,7 +13,8 @@ import { ProductImageSearchModal } from '../components/shared/ProductImageSearch
 import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { PageHeader } from '../components/shared/PageHeader';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { ProductFormData, VariantFormData, Brand, Category, generateSlug, calculateProfitMargin } from '../../types/product';
@@ -25,16 +26,24 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [collections, setCollections] = useState<{ id: string; title: string }[]>([]);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
   const [imageSearchOpen, setImageSearchOpen] = useState(false);
   const [imageSearchVariantIndex, setImageSearchVariantIndex] = useState<number | null>(null);
+
+  // Reference lists (public catalog reads) mapped to the {id, name} shapes
+  // the dropdowns already expect — supabaseIds flow straight back on save.
+  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false });
+  const categoryRows = useQuery(api.catalog.listCategories, {});
+  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const brands = (brandRows || []).map((b: any) => ({ id: b.supabaseId, name: b.name })) as Brand[];
+  const categories = (categoryRows || []).map((c: any) => ({ id: c.supabaseId, name: c.name })) as Category[];
+  const collections = (collectionRows || []).map((c: any) => ({ id: c.supabaseId, title: c.title }));
+  const saveProduct = useMutation(api.adminCatalog.saveProduct);
+  const removeProduct = useMutation(api.adminCatalog.deleteProduct);
+  const populatedRef = useRef(false);
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
@@ -68,14 +77,15 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     review_count: 0
   });
 
+  // Edit loader: one Convex query (product + variants + join ids).
+  const editData = useQuery(
+    api.adminCatalog.getProductForEdit,
+    isEditMode && id ? { supabaseId: id } : 'skip'
+  );
+  const loading = isEditMode && editData === undefined;
+
   useEffect(() => {
-    loadBrands();
-    loadCategories();
-    loadCollections();
-    if (isEditMode) {
-      loadProduct();
-      setIsSlugManuallyEdited(true);
-    }
+    if (isEditMode) setIsSlugManuallyEdited(true);
   }, [id]);
 
   useEffect(() => {
@@ -86,122 +96,67 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     setIsDirty(false);
   }, []);
 
-  const loadBrands = async () => {
-    const { data } = await supabase
-      .from('brands')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-    setBrands(data || []);
-  };
-
-  const loadCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      console.error('Error loading categories:', error);
+  // Populate once when the edit query resolves (never clobber dirty edits).
+  useEffect(() => {
+    if (!isEditMode || !editData || populatedRef.current) return;
+    populatedRef.current = true;
+    if (!editData) {
+      toast.error('Product not found');
+      navigate('/admin/products');
       return;
     }
-    setCategories(data || []);
-  };
-
-  const loadCollections = async () => {
-    const { data } = await supabase
-      .from('collections')
-      .select('id, title')
-      .eq('is_active', true)
-      .order('title');
-    setCollections(data || []);
-  };
-
-  const loadProduct = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, product_variants(*)')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      // Load category associations
-      const { data: categoryData } = await supabase
-        .from('product_categories')
-        .select('category_id')
-        .eq('product_id', id);
-
-      const categoryIds = categoryData?.map(c => c.category_id) || [];
-
-      // Load collection associations
-      const { data: collectionData } = await supabase
-        .from('collection_products')
-        .select('collection_id')
-        .eq('product_id', id);
-
-      const collectionIds = collectionData?.map(c => c.collection_id) || [];
-
-      const mappedData: ProductFormData = {
-        name: data.name || '',
-        slug: data.slug || '',
-        brand_id: data.brand_id || '',
-        description: data.description || '',
-        short_description: data.short_description || '',
-        is_active: data.is_active !== false,
-        collections: collectionIds,
-        categories: categoryIds,
-        origin: data.origin || '',
-        specifications: data.specifications
-          ? Object.entries(data.specifications).map(([key, value]) => ({ key, value: String(value) }))
-          : [],
-        variants: data.product_variants?.map((v: any) => ({
-          id: v.id,
-          variant_name: v.variant_name,
-          variant_slug: v.variant_slug,
-          variant_type: v.variant_type || 'pack',
-          is_default: v.is_default || false,
-          units_contained: v.units_contained || 20,
-          unit: v.unit || 'sticks',
-          images: v.images || [],
-          price: v.price,
-          compare_at_price: v.compare_at_price,
-          cost_price: v.cost_price,
-          stock: v.stock || 0,
-          track_inventory: v.track_inventory ?? true,
-          is_active: v.is_active
-        })) || [{
-          variant_name: 'Packet',
-          variant_type: 'pack',
-          units_contained: 20,
-          unit: 'sticks',
-          price: 0,
-          stock: 0,
-          track_inventory: true,
-          is_active: true,
-          is_default: true,
-          images: [],
-          compare_at_price: 0,
-          cost_price: 0
-        }],
-        meta_title: data.meta_title || '',
-        meta_description: data.meta_description || '',
-        canonical_url: data.canonical_url || '',
-        // Ratings columns exist after 001_product_ratings.sql; undefined-safe before that
-        rating_value: (data as any).rating_value ?? null,
-        review_count: (data as any).review_count ?? 0
-      };
-
-      setFormData(mappedData);
-    } catch (error) {
-      console.error('Error loading product:', error);
-      toast.error('Failed to load product');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const data: any = editData.product;
+    const mappedData: ProductFormData = {
+      name: data.name || '',
+      slug: data.slug || '',
+      brand_id: data.brandSupabaseId || '',
+      description: data.description || '',
+      short_description: data.shortDescription || '',
+      is_active: data.isActive !== false,
+      collections: editData.collectionSupabaseIds || [],
+      categories: editData.categorySupabaseIds || [],
+      origin: data.origin || '',
+      specifications: data.specifications
+        ? Object.entries(data.specifications).map(([key, value]) => ({ key, value: String(value) }))
+        : [],
+      variants: editData.variants?.map((v: any) => ({
+        id: v.supabaseId,
+        variant_name: v.variantName,
+        variant_slug: v.variantSlug,
+        variant_type: v.variantType || 'pack',
+        is_default: v.isDefault || false,
+        units_contained: v.unitsContained || 20,
+        unit: v.unit || 'sticks',
+        images: v.images || [],
+        price: v.priceRupees,
+        compare_at_price: v.compareAtPriceRupees,
+        cost_price: v.costPriceRupees,
+        stock: v.stock || 0,
+        track_inventory: v.trackInventory ?? true,
+        is_active: v.isActive
+      })) || [{
+        variant_name: 'Packet',
+        variant_type: 'pack',
+        units_contained: 20,
+        unit: 'sticks',
+        price: 0,
+        stock: 0,
+        track_inventory: true,
+        is_active: true,
+        is_default: true,
+        images: [],
+        compare_at_price: 0,
+        cost_price: 0
+      }],
+      meta_title: data.metaTitle || '',
+      meta_description: data.metaDescription || '',
+      canonical_url: data.canonicalUrl || '',
+      rating_value: data.ratingValue ?? null,
+      review_count: data.reviewCount ?? 0
+    };
+    setFormData(mappedData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editData]);
 
   const handleNameChange = (name: string) => {
     setFormData(prev => ({ ...prev, name }));
@@ -354,186 +309,71 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
     setSaving(true);
     try {
-      const productData = {
-        name: formData.name.trim(),
-        slug: formData.slug.trim(),
-        brand_id: formData.brand_id || null,
-        description: formData.description.trim(),
-        short_description: formData.short_description?.trim() || '',
-        is_active: formData.is_active,
-        origin: formData.origin?.trim() || '',
-        specifications: formData.specifications.reduce((acc, spec) => {
-          if (spec.key && spec.value) {
-            acc[spec.key] = spec.value;
-          }
-          return acc;
-        }, {} as Record<string, string>),
-        meta_title: formData.meta_title?.trim() || formData.name.trim(),
-        meta_description: formData.meta_description?.trim() || '',
-        canonical_url: formData.canonical_url?.trim() || ''
-        // NOTE: rating fields are saved separately below (saveRatings) so a missing
-        // 001_product_ratings.sql migration can never break product saves.
-      };
-
-      // Persist ratings only — isolated so unknown columns fail soft, not fatal.
-      const saveRatings = async (productId: string) => {
-        const rating_value = formData.rating_value == null || Number.isNaN(Number(formData.rating_value))
-          ? null
+      // Boundary mapping: form snake_case → Convex camelCase. Ratings ride
+      // along (Convex columns exist — no soft-fail dance needed).
+      const ratingValue =
+        formData.rating_value == null || Number.isNaN(Number(formData.rating_value))
+          ? undefined
           : Math.min(5, Math.max(0, Number(formData.rating_value)));
-        const review_count = formData.review_count == null || Number.isNaN(Number(formData.review_count))
-          ? 0
+      const reviewCount =
+        formData.review_count == null || Number.isNaN(Number(formData.review_count))
+          ? undefined
           : Math.max(0, Math.floor(Number(formData.review_count)));
-        // Skip the extra round-trip when there's nothing to store yet (0 reviews).
-        if (rating_value == null && (review_count === 0 || formData.review_count == null)) return;
-        try {
-          const { error } = await supabase
-            .from('products')
-            .update({ rating_value, review_count })
-            .eq('id', productId);
-          if (error) throw error;
-        } catch (e) {
-          console.warn('Ratings not saved (run 001_product_ratings.sql):', e);
-          toast.info('Product saved. Ratings columns not migrated yet — run 001_product_ratings.sql to enable them.');
-        }
-      };
 
-      if (isEditMode) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', id);
+      await saveProduct({
+        supabaseId: isEditMode ? id : undefined,
+        product: {
+          name: formData.name.trim(),
+          slug: formData.slug.trim(),
+          brandSupabaseId: formData.brand_id || undefined,
+          description: formData.description.trim(),
+          shortDescription: formData.short_description?.trim() || undefined,
+          isActive: formData.is_active,
+          origin: formData.origin?.trim() || undefined,
+          specifications: formData.specifications.reduce((acc, spec) => {
+            if (spec.key && spec.value) acc[spec.key] = spec.value;
+            return acc;
+          }, {} as Record<string, string>),
+          metaTitle: formData.meta_title?.trim() || formData.name.trim(),
+          metaDescription: formData.meta_description?.trim() || undefined,
+          canonicalUrl: formData.canonical_url?.trim() || undefined,
+          ratingValue,
+          reviewCount,
+        },
+        variants: formData.variants.map((variant) => ({
+          supabaseId: variant.id,
+          variantName: variant.variant_name,
+          variantSlug: variant.variant_slug,
+          variantType: variant.variant_type,
+          isDefault: variant.is_default,
+          unitsContained: variant.units_contained,
+          unit: variant.unit,
+          images: variant.images,
+          priceRupees: variant.price,
+          compareAtPriceRupees: variant.compare_at_price,
+          costPriceRupees: variant.cost_price,
+          stock: variant.stock,
+          trackInventory: variant.track_inventory,
+          isActive: variant.is_active,
+        })),
+        deletedVariantSupabaseIds: deletedVariantIds,
+        categorySupabaseIds: formData.categories,
+        collectionSupabaseIds: formData.collections,
+      });
 
-        if (error) throw error;
-
-        // Ratings live in their own update so a pending migration never blocks saves
-        if (id) await saveRatings(id);
-
-        // Delete removed variants
-        if (deletedVariantIds.length > 0) {
-          await supabase
-            .from('product_variants')
-            .delete()
-            .in('id', deletedVariantIds);
-        }
-
-        // Update variants
-        for (const variant of formData.variants) {
-          const variantData = {
-            variant_name: variant.variant_name,
-            variant_slug: variant.variant_slug,
-            variant_type: variant.variant_type,
-            is_default: variant.is_default,
-            units_contained: variant.units_contained,
-            unit: variant.unit,
-            images: variant.images,
-            price: variant.price,
-            compare_at_price: variant.compare_at_price,
-            cost_price: variant.cost_price,
-            stock: variant.stock,
-            track_inventory: variant.track_inventory,
-            is_active: variant.is_active
-          };
-
-          if (variant.id) {
-            await supabase
-              .from('product_variants')
-              .update(variantData)
-              .eq('id', variant.id);
-          } else {
-            await supabase
-              .from('product_variants')
-              .insert([{ ...variantData, product_id: id }]);
-          }
-        }
-
-        // Update category associations
-        await supabase
-          .from('product_categories')
-          .delete()
-          .eq('product_id', id);
-
-        if (formData.categories.length > 0) {
-          await supabase
-            .from('product_categories')
-            .insert(
-              formData.categories.map(categoryId => ({
-                product_id: id,
-                category_id: categoryId
-              }))
-            );
-        }
-
-        // Update collection associations
-        await supabase
-          .from('collection_products')
-          .delete()
-          .eq('product_id', id);
-
-        if (formData.collections.length > 0) {
-          await supabase
-            .from('collection_products')
-            .insert(
-              formData.collections.map(collectionId => ({
-                product_id: id,
-                collection_id: collectionId
-              }))
-            );
-        }
-
-        toast.success('Product updated successfully');
-      } else {
-        const { data: newProduct, error } = await supabase
-          .from('products')
-          .insert([productData])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // Ratings live in their own update so a pending migration never blocks saves
-        await saveRatings(newProduct.id);
-
-        // Insert variants
-        const variantsToInsert = formData.variants.map(variant => ({
-          ...variant,
-          product_id: newProduct.id
-        }));
-
-        await supabase
-          .from('product_variants')
-          .insert(variantsToInsert);
-
-        // Insert category associations
-        if (formData.categories.length > 0) {
-          await supabase
-            .from('product_categories')
-            .insert(
-              formData.categories.map(categoryId => ({
-                product_id: newProduct.id,
-                category_id: categoryId
-              }))
-            );
-        }
-
-        // Insert collection associations
-        if (formData.collections.length > 0) {
-          await supabase
-            .from('collection_products')
-            .insert(
-              formData.collections.map(collectionId => ({
-                product_id: newProduct.id,
-                collection_id: collectionId
-              }))
-            );
-        }
-
-        toast.success('Product created successfully');
-      }
+      toast.success(isEditMode ? 'Product updated successfully' : 'Product created successfully');
 
       navigate('/admin/products');
     } catch (error: any) {
       console.error('Error saving product:', error);
-      toast.error(error.message || 'Failed to save product');
+      const code = error?.data?.code;
+      toast.error(
+        code === 'SLUG_TAKEN'
+          ? 'Slug is taken by another product'
+          : code === 'NOT_CATALOG_ADMIN'
+            ? 'Admin access required'
+            : error.message || 'Failed to save product'
+      );
     } finally {
       setSaving(false);
     }
@@ -543,17 +383,12 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     if (!confirm('Are you sure you want to delete this product?')) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeProduct({ supabaseId: id! });
       toast.success('Product deleted successfully');
       navigate('/admin/products');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete product');
     } finally {
       setSaving(false);
     }

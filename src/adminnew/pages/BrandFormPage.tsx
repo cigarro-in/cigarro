@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Building2, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -9,7 +9,8 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { Switch } from '../../components/ui/switch';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { generateSlug } from '../../types/product';
 
@@ -44,10 +45,11 @@ export function BrandFormPage() {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  const populatedRef = useRef(false);
 
   const [formData, setFormData] = useState<BrandFormData>({
     name: '',
@@ -61,12 +63,39 @@ export function BrandFormPage() {
     meta_description: ''
   });
 
+  const brandRows = useQuery(api.adminCatalog.listBrandsForAdmin, {});
+  const createBrand = useMutation(api.adminCatalog.createBrand);
+  const updateBrand = useMutation(api.adminCatalog.updateBrand);
+  const removeBrand = useMutation(api.adminCatalog.deleteBrand);
+
   useEffect(() => {
-    if (isEditMode) {
-      loadBrand();
-      setIsSlugManuallyEdited(true);
-    }
+    if (isEditMode) setIsSlugManuallyEdited(true);
   }, [id]);
+
+  // Populate once from the Convex list (ids are supabaseIds end to end).
+  useEffect(() => {
+    if (!isEditMode || !brandRows || populatedRef.current) return;
+    populatedRef.current = true;
+    const data: any = brandRows.find((b: any) => b.supabaseId === id);
+    if (!data) {
+      toast.error('Brand not found');
+      navigate('/admin/brands');
+      return;
+    }
+    setFormData({
+      name: data.name || '',
+      slug: data.slug || '',
+      description: data.description || '',
+      logo_url: data.logoUrl ? [data.logoUrl] : [],
+      website_url: data.websiteUrl || '',
+      country_of_origin: data.countryOfOrigin || '',
+      is_active: data.isActive !== false,
+      meta_title: data.metaTitle || '',
+      meta_description: data.metaDescription || ''
+    });
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandRows]);
 
   useEffect(() => {
     setIsDirty(true);
@@ -75,36 +104,6 @@ export function BrandFormPage() {
   useEffect(() => {
     setIsDirty(false);
   }, []);
-
-  const loadBrand = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      setFormData({
-        name: data.name || '',
-        slug: data.slug || '',
-        description: data.description || '',
-        logo_url: data.logo_url ? [data.logo_url] : [],
-        website_url: data.website_url || '',
-        country_of_origin: data.country_of_origin || '',
-        is_active: data.is_active !== false,
-        meta_title: data.meta_title || '',
-        meta_description: data.meta_description || ''
-      });
-    } catch (error) {
-      console.error('Error loading brand:', error);
-      toast.error('Failed to load brand');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleNameChange = (name: string) => {
     setFormData(prev => ({ ...prev, name }));
@@ -131,39 +130,37 @@ export function BrandFormPage() {
 
     setSaving(true);
     try {
-      const brandData = {
+      const args = {
         name: formData.name.trim(),
         slug: formData.slug.trim(),
-        description: formData.description.trim(),
-        logo_url: formData.logo_url[0] || null,
-        website_url: formData.website_url.trim() || null,
-        country_of_origin: formData.country_of_origin.trim() || null,
-        is_active: formData.is_active,
-        meta_title: formData.meta_title.trim() || formData.name.trim(),
-        meta_description: formData.meta_description.trim()
+        description: formData.description.trim() || undefined,
+        logoUrl: formData.logo_url[0] || undefined,
+        websiteUrl: formData.website_url.trim() || undefined,
+        countryOfOrigin: formData.country_of_origin.trim() || undefined,
+        isActive: formData.is_active,
+        metaTitle: formData.meta_title.trim() || formData.name.trim(),
+        metaDescription: formData.meta_description.trim() || undefined,
       };
 
       if (isEditMode) {
-        const { error } = await supabase
-          .from('brands')
-          .update(brandData)
-          .eq('id', id);
-
-        if (error) throw error;
+        await updateBrand({ supabaseId: id!, patch: args });
         toast.success('Brand updated successfully');
       } else {
-        const { error } = await supabase
-          .from('brands')
-          .insert([brandData]);
-
-        if (error) throw error;
+        await createBrand(args);
         toast.success('Brand created successfully');
       }
 
       navigate('/admin/brands');
     } catch (error: any) {
       console.error('Error saving brand:', error);
-      toast.error(error.message || 'Failed to save brand');
+      const code = error?.data?.code;
+      toast.error(
+        code === 'SLUG_TAKEN'
+          ? 'Slug is taken by another brand'
+          : code === 'NOT_CATALOG_ADMIN'
+            ? 'Admin access required'
+            : error.message || 'Failed to save brand'
+      );
     } finally {
       setSaving(false);
     }
@@ -173,17 +170,16 @@ export function BrandFormPage() {
     if (!confirm('Are you sure you want to delete this brand?')) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('brands')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeBrand({ supabaseId: id! });
       toast.success('Brand deleted successfully');
       navigate('/admin/brands');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting brand:', error);
-      toast.error('Failed to delete brand');
+      toast.error(
+        error?.data?.code === 'BRAND_IN_USE'
+          ? 'This brand has products and cannot be deleted'
+          : 'Failed to delete brand'
+      );
     } finally {
       setSaving(false);
     }

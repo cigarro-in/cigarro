@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as adminCatalog from "../adminCatalog.js";
 import type * as appConfig from "../appConfig.js";
 import type * as catalog from "../catalog.js";
 import type * as content from "../content.js";
@@ -36,6 +37,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  adminCatalog: typeof adminCatalog;
   appConfig: typeof appConfig;
   catalog: typeof catalog;
   content: typeof content;

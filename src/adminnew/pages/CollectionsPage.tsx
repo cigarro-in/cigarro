@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, FolderOpen, LayoutGrid, ArrowUpRight, Plus, ChevronDown } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -28,41 +29,24 @@ interface Collection {
 
 export function CollectionsPage() {
   const navigate = useNavigate();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCollections();
-  }, []);
+  const rows = useQuery(api.adminCatalog.listCollectionsForAdmin, {});
+  const removeCollection = useMutation(api.adminCatalog.deleteCollection);
+  const setActive = useMutation(api.adminCatalog.setCollectionsActive);
 
-  const fetchCollections = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('collections')
-        .select(`
-          *,
-          collection_products(count)
-        `)
-        .order('title', { ascending: true });
-
-      if (error) throw error;
-
-      const collectionsWithCount = data?.map(collection => ({
-        ...collection,
-        products_count: collection.collection_products?.length || 0
-      })) || [];
-
-      setCollections(collectionsWithCount);
-    } catch (error) {
-      console.error('Error fetching collections:', error);
-      toast.error('Failed to load collections');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const collections: Collection[] = (rows || []).map((c: any) => ({
+    id: c.supabaseId,
+    title: c.title,
+    slug: c.slug,
+    description: c.description,
+    image_url: c.imageUrl,
+    is_active: c.isActive,
+    display_order: c.sortOrder ?? 0,
+    products_count: c.product_count,
+  }));
+  const loading = rows === undefined;
 
   const handleAddCollection = () => {
     navigate('/admin/collections/new');
@@ -75,33 +59,23 @@ export function CollectionsPage() {
   const handleBulkDelete = async (collectionIds: string[]) => {
     if (!confirm(`Delete ${collectionIds.length} collections?`)) return;
     try {
-      const { error } = await supabase
-        .from('collections')
-        .delete()
-        .in('id', collectionIds);
-
-      if (error) throw error;
+      for (const supabaseId of collectionIds) {
+        await removeCollection({ supabaseId });
+      }
       toast.success(`${collectionIds.length} collections deleted`);
       setSelectedCollections([]);
-      fetchCollections();
-    } catch (error) {
-      toast.error('Failed to delete collections');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collections');
     }
   };
 
   const handleBulkStatusChange = async (collectionIds: string[], isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('collections')
-        .update({ is_active: isActive })
-        .in('id', collectionIds);
-
-      if (error) throw error;
+      await setActive({ supabaseIds: collectionIds, isActive });
       toast.success(`${collectionIds.length} collections ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCollections([]);
-      fetchCollections();
-    } catch (error) {
-      toast.error('Failed to update status');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 

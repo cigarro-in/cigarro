@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, Building2, Plus, ChevronDown } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -28,41 +29,25 @@ interface Brand {
 
 export function BrandsPage() {
   const navigate = useNavigate();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchBrands();
-  }, []);
+  const rows = useQuery(api.adminCatalog.listBrandsForAdmin, {});
+  const removeBrand = useMutation(api.adminCatalog.deleteBrand);
+  const setActive = useMutation(api.adminCatalog.setBrandsActive);
 
-  const fetchBrands = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('brands')
-        .select(`
-          *,
-          products(count)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const brandsWithCount = data?.map(brand => ({
-        ...brand,
-        product_count: brand.products?.length || 0
-      })) || [];
-
-      setBrands(brandsWithCount);
-    } catch (error) {
-      console.error('Error fetching brands:', error);
-      toast.error('Failed to load brands');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Boundary: Convex camelCase → table shape (ids stay supabaseIds).
+  const brands: Brand[] = (rows || []).map((b: any) => ({
+    id: b.supabaseId,
+    name: b.name,
+    slug: b.slug,
+    description: b.description ?? null,
+    logo_url: b.logoUrl ?? null,
+    is_active: b.isActive,
+    created_at: b.createdAt ? new Date(b.createdAt).toISOString() : '',
+    product_count: b.product_count,
+  }));
+  const loading = rows === undefined;
 
   const handleAddBrand = () => {
     navigate('/admin/brands/new');
@@ -75,33 +60,29 @@ export function BrandsPage() {
   const handleBulkDelete = async (brandIds: string[]) => {
     if (!confirm(`Delete ${brandIds.length} brands?`)) return;
     try {
-      const { error } = await supabase
-        .from('brands')
-        .delete()
-        .in('id', brandIds);
-
-      if (error) throw error;
+      for (const supabaseId of brandIds) {
+        await removeBrand({ supabaseId });
+      }
       toast.success(`${brandIds.length} brands deleted`);
       setSelectedBrands([]);
-      fetchBrands();
-    } catch (error) {
-      toast.error('Failed to delete brands');
+    } catch (error: any) {
+      toast.error(
+        error?.data?.code === 'BRAND_IN_USE'
+          ? 'A brand with products cannot be deleted'
+          : error?.data?.code === 'NOT_CATALOG_ADMIN'
+            ? 'Admin access required'
+            : 'Failed to delete brands'
+      );
     }
   };
 
   const handleBulkStatusChange = async (brandIds: string[], isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('brands')
-        .update({ is_active: isActive })
-        .in('id', brandIds);
-
-      if (error) throw error;
+      await setActive({ supabaseIds: brandIds, isActive });
       toast.success(`${brandIds.length} brands ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedBrands([]);
-      fetchBrands();
-    } catch (error) {
-      toast.error('Failed to update status');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Upload,
@@ -17,7 +17,8 @@ import {
   AdminCardHeader,
   AdminCardTitle,
 } from '../components/shared/AdminCard';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { toast } from 'sonner';
 
@@ -140,43 +141,29 @@ function str(v: unknown): string {
 // ---------- component ----------
 
 interface Props {
-  /** Optional callback so parent can refresh its product list after import */
-  onAfterImport?: () => void;
+  /** Admin list rows (products + variants + brand + join ids); export reads
+      these, import matches existing products by slug within them. */
+  products: any[];
 }
 
-export function ProductImportExport({ onAfterImport }: Props) {
+export function ProductImportExport({ products }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<SheetRow[] | null>(null);
   const [working, setWorking] = useState(false);
   const [progress, setProgress] = useState(0);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [collections, setCollections] = useState<Array<{ id: string; name: string }>>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: b }, { data: c }, colRes] = await Promise.all([
-        supabase.from('brands').select('id, name'),
-        supabase.from('categories').select('id, name'),
-        supabase
-          .from('collections')
-          .select('id, title')
-          .then((r) => r)
-          .catch(() => ({ data: [] as Array<{ id: string; title: string }> })),
-      ]);
-      setBrands(b || []);
-      setCategories(c || []);
-      setCollections(
-        ((colRes.data || []) as Array<{ id: string; title: string }>).map((c) => ({
-          id: c.id,
-          name: c.title,
-        }))
-      );
-    })();
-  }, []);
+  // Reference lists for name → supabaseId resolution (public catalog reads).
+  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false });
+  const categoryRows = useQuery(api.catalog.listCategories, {});
+  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const saveProduct = useMutation(api.adminCatalog.saveProduct);
+
+  const brands = (brandRows || []).map((b: any) => ({ id: b.supabaseId, name: b.name }));
+  const categories = (categoryRows || []).map((c: any) => ({ id: c.supabaseId, name: c.name }));
+  const collections = (collectionRows || []).map((c: any) => ({ id: c.supabaseId, name: c.title }));
 
   const onPick = (f: File | null) => {
     setSummary(null);
@@ -261,64 +248,15 @@ export function ProductImportExport({ onAfterImport }: Props) {
   const onExport = async () => {
     setWorking(true);
     try {
-      // Fetch products core + brand + variants. Matches the current schema
-      // after migration 076 (no is_featured on products, no weight on variants).
-      const { data: products, error } = await supabase
-        .from('products')
-        .select(
-          `id, name, slug, description, short_description, origin, specifications,
-           is_active, meta_title, meta_description, canonical_url,
-           brand:brands(name),
-           variants:product_variants(id, variant_name, variant_type, price, compare_at_price,
-             cost_price, stock, is_default, is_active, units_contained, unit, track_inventory)`
-        )
-        .order('name');
-      if (error) throw error;
-
-      const productIds = (products || []).map((p: any) => p.id);
-
-      // Categories — separate fetch, tolerant of schema differences
-      const categoryMap = new Map<string, string[]>();
-      if (productIds.length > 0) {
-        const { data: pc } = await supabase
-          .from('product_categories')
-          .select('product_id, category:categories(name)')
-          .in('product_id', productIds);
-        (pc || []).forEach((row: any) => {
-          const catName = Array.isArray(row.category) ? row.category[0]?.name : row.category?.name;
-          if (!catName) return;
-          const list = categoryMap.get(row.product_id) || [];
-          list.push(catName);
-          categoryMap.set(row.product_id, list);
-        });
-      }
-
-      // Collections — table uses "title", not "name"
-      const collectionMap = new Map<string, string[]>();
-      if (productIds.length > 0) {
-        try {
-          const { data: cp } = await supabase
-            .from('collection_products')
-            .select('product_id, collection:collections(title)')
-            .in('product_id', productIds);
-          (cp || []).forEach((row: any) => {
-            const colTitle = Array.isArray(row.collection) ? row.collection[0]?.title : row.collection?.title;
-            if (!colTitle) return;
-            const list = collectionMap.get(row.product_id) || [];
-            list.push(colTitle);
-            collectionMap.set(row.product_id, list);
-          });
-        } catch {
-          /* collections linkage may not exist — skip silently */
-        }
-      }
-
+      const catName = new Map(categories.map((c) => [c.id, c.name]));
+      const colName = new Map(collections.map((c) => [c.id, c.name]));
       const rows: SheetRow[] = [];
-      for (const p of (products as any[]) || []) {
-        const brand = Array.isArray(p.brand) ? p.brand[0]?.name : p.brand?.name;
-        const categoryNames = categoryMap.get(p.id) || [];
-        const collectionNames = collectionMap.get(p.id) || [];
-        const variants = p.variants || [];
+      const sorted = [...products].sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
+      for (const p of sorted as any[]) {
+        const brand = p.brand?.name;
+        const categoryNames = (p.categorySupabaseIds || []).map((id: string) => catName.get(id)).filter(Boolean);
+        const collectionNames = (p.collectionSupabaseIds || []).map((id: string) => colName.get(id)).filter(Boolean);
+        const variants = p.product_variants || [];
 
         const productCols = {
           Name: p.name,
@@ -326,13 +264,13 @@ export function ProductImportExport({ onAfterImport }: Props) {
           Brand: brand || '',
           Categories: categoryNames.join(', '),
           Collections: collectionNames.join(', '),
-          'Short Description': p.short_description || '',
+          'Short Description': p.shortDescription || '',
           Description: p.description || '',
           Origin: p.origin || '',
-          'Is Active': p.is_active ? 'yes' : 'no',
-          'Meta Title': p.meta_title || '',
-          'Meta Description': p.meta_description || '',
-          'Canonical URL': p.canonical_url || '',
+          'Is Active': p.isActive ? 'yes' : 'no',
+          'Meta Title': p.metaTitle || '',
+          'Meta Description': p.metaDescription || '',
+          'Canonical URL': p.canonicalUrl || '',
           Specifications: stringifySpecs(p.specifications),
         };
 
@@ -355,17 +293,17 @@ export function ProductImportExport({ onAfterImport }: Props) {
               } as Partial<typeof productCols>);
           rows.push({
             ...productPart,
-            'Variant Name': v.variant_name,
-            'Variant Type': v.variant_type,
-            Price: v.price,
-            'Compare At Price': v.compare_at_price ?? '',
-            'Cost Price': v.cost_price ?? '',
+            'Variant Name': v.variantName,
+            'Variant Type': v.variantType,
+            Price: v.priceRupees,
+            'Compare At Price': v.compareAtPriceRupees ?? '',
+            'Cost Price': v.costPriceRupees ?? '',
             Stock: v.stock,
-            'Is Default': v.is_default ? 'yes' : 'no',
-            'Is Variant Active': v.is_active === false ? 'no' : 'yes',
-            'Units Contained': v.units_contained ?? '',
+            'Is Default': v.isDefault ? 'yes' : 'no',
+            'Is Variant Active': v.isActive === false ? 'no' : 'yes',
+            'Units Contained': v.unitsContained ?? '',
             Unit: v.unit ?? '',
-            'Track Inventory': v.track_inventory ? 'yes' : 'no',
+            'Track Inventory': v.trackInventory ? 'yes' : 'no',
           });
         });
       }
@@ -454,72 +392,9 @@ export function ProductImportExport({ onAfterImport }: Props) {
         const explicitSlug = String(head.Slug ?? '').trim();
         const slug = explicitSlug || slugify(name);
 
-        // ---------- DEDUPE: look up existing product by slug ----------
-        const { data: existing } = await supabase
-          .from('products')
-          .select('id')
-          .eq('slug', slug)
-          .maybeSingle();
+        // ---------- DEDUPE: match existing product by slug (Convex list) ----------
+        const existing = products.find((p: any) => p.slug === slug);
 
-        const productPayload: any = {
-          name,
-          slug,
-          brand_id: brand?.id || null,
-          brand: brand?.name || str(head.Brand) || null,
-          description: str(head.Description),
-          short_description: str(head['Short Description']),
-          origin: str(head.Origin),
-          specifications: parseSpecs(head.Specifications),
-          is_active:
-            head['Is Active'] === undefined || head['Is Active'] === ''
-              ? true
-              : yes(head['Is Active']),
-          meta_title: str(head['Meta Title']),
-          meta_description: str(head['Meta Description']),
-          canonical_url: str(head['Canonical URL']),
-          price: toNumber(head.Price, 0),
-        };
-
-        let productId: string | null = null;
-
-        if (existing?.id) {
-          const { error: upErr } = await supabase
-            .from('products')
-            .update(productPayload)
-            .eq('id', existing.id);
-          if (upErr) {
-            result.errors.push({
-              row: (head._row as number) || 0,
-              reason: `Update "${name}": ${upErr.message}`,
-            });
-            result.skipped += 1;
-            setProgress(Math.round(((i + 1) / entries.length) * 100));
-            continue;
-          }
-          productId = existing.id;
-          result.productsUpdated += 1;
-        } else {
-          const { data: created, error: insErr } = await supabase
-            .from('products')
-            .insert(productPayload)
-            .select('id')
-            .single();
-          if (insErr || !created) {
-            result.errors.push({
-              row: (head._row as number) || 0,
-              reason: `Insert "${name}": ${insErr?.message || 'failed'}`,
-            });
-            result.skipped += 1;
-            setProgress(Math.round(((i + 1) / entries.length) * 100));
-            continue;
-          }
-          productId = created.id;
-          result.productsCreated += 1;
-        }
-
-        if (!productId) continue;
-
-        // ---------- Category & Collection links (replace set) ----------
         const cats = resolveCategories(head.Categories);
         const missingCats = splitList(head.Categories).filter(
           (n) => !cats.some((c) => c.name.toLowerCase() === n.toLowerCase())
@@ -527,13 +402,6 @@ export function ProductImportExport({ onAfterImport }: Props) {
         for (const miss of missingCats) {
           result.warnings.push(`"${name}": category "${miss}" not found`);
         }
-        await supabase.from('product_categories').delete().eq('product_id', productId);
-        if (cats.length > 0) {
-          await supabase.from('product_categories').insert(
-            cats.map((c) => ({ product_id: productId, category_id: c.id }))
-          );
-        }
-
         const cols = resolveCollections(head.Collections);
         const missingCols = splitList(head.Collections).filter(
           (n) => !cols.some((c) => c.name.toLowerCase() === n.toLowerCase())
@@ -541,68 +409,68 @@ export function ProductImportExport({ onAfterImport }: Props) {
         for (const miss of missingCols) {
           result.warnings.push(`"${name}": collection "${miss}" not found`);
         }
-        await supabase.from('collection_products').delete().eq('product_id', productId).catch(() => {});
-        if (cols.length > 0) {
-          await supabase.from('collection_products').insert(
-            cols.map((c) => ({ product_id: productId, collection_id: c.id }))
-          ).catch(() => {});
-        }
 
-        // ---------- Variants (match by variant_name within product) ----------
-        const { data: existingVariants } = await supabase
-          .from('product_variants')
-          .select('id, variant_name')
-          .eq('product_id', productId);
         const variantByName = new Map<string, string>();
-        (existingVariants || []).forEach((v) => variantByName.set(v.variant_name, v.id));
+        (existing?.product_variants || []).forEach((v: any) =>
+          variantByName.set(v.variantName, v.supabaseId)
+        );
 
         const hasDefault = productRows.some((r) => yes(r['Is Default']));
-        for (let v = 0; v < productRows.length; v++) {
-          const r = productRows[v];
+        const variants = productRows.map((r, v: number) => {
           const variantName = String(r['Variant Name']);
-          const payload: any = {
-            variant_name: variantName,
-            variant_type: str(r['Variant Type']) || 'pack',
-            price: toNumber(r.Price, 0),
-            compare_at_price: toNumber(r['Compare At Price']),
-            cost_price: toNumber(r['Cost Price']),
+          if (variantByName.has(variantName)) result.variantsUpdated += 1;
+          else result.variantsCreated += 1;
+          return {
+            supabaseId: variantByName.get(variantName),
+            variantName,
+            variantType: str(r['Variant Type']) || 'pack',
+            priceRupees: toNumber(r.Price, 0) ?? 0,
+            compareAtPriceRupees: toNumber(r['Compare At Price']) ?? undefined,
+            costPriceRupees: toNumber(r['Cost Price']) ?? undefined,
             stock: toInt(r.Stock, 0),
-            is_default: hasDefault ? yes(r['Is Default']) : v === 0,
-            is_active: r['Is Variant Active'] === '' || r['Is Variant Active'] === undefined
-              ? true
-              : yes(r['Is Variant Active']),
-            units_contained: toInt(r['Units Contained']) || null,
-            unit: str(r.Unit) || null,
-            track_inventory: yes(r['Track Inventory']),
+            isDefault: hasDefault ? yes(r['Is Default']) : v === 0,
+            isActive:
+              r['Is Variant Active'] === '' || r['Is Variant Active'] === undefined
+                ? true
+                : yes(r['Is Variant Active']),
+            unitsContained: toInt(r['Units Contained']) || undefined,
+            unit: str(r.Unit) || undefined,
+            trackInventory: yes(r['Track Inventory']),
           };
+        });
 
-          const existingVariantId = variantByName.get(variantName);
-          if (existingVariantId) {
-            const { error: vErr } = await supabase
-              .from('product_variants')
-              .update(payload)
-              .eq('id', existingVariantId);
-            if (vErr) {
-              result.errors.push({
-                row: (r._row as number) || 0,
-                reason: `Variant "${variantName}": ${vErr.message}`,
-              });
-            } else {
-              result.variantsUpdated += 1;
-            }
-          } else {
-            const { error: vErr } = await supabase
-              .from('product_variants')
-              .insert({ product_id: productId, ...payload });
-            if (vErr) {
-              result.errors.push({
-                row: (r._row as number) || 0,
-                reason: `Variant "${variantName}": ${vErr.message}`,
-              });
-            } else {
-              result.variantsCreated += 1;
-            }
-          }
+        try {
+          await saveProduct({
+            supabaseId: existing?.supabaseId,
+            product: {
+              name,
+              slug,
+              brandSupabaseId: brand?.id,
+              description: str(head.Description),
+              shortDescription: str(head['Short Description']),
+              origin: str(head.Origin),
+              specifications: parseSpecs(head.Specifications),
+              isActive:
+                head['Is Active'] === undefined || head['Is Active'] === ''
+                  ? true
+                  : yes(head['Is Active']),
+              metaTitle: str(head['Meta Title']),
+              metaDescription: str(head['Meta Description']),
+              canonicalUrl: str(head['Canonical URL']),
+            },
+            variants,
+            categorySupabaseIds: cats.map((c) => c.id),
+            collectionSupabaseIds: cols.map((c) => c.id),
+          });
+          if (existing) result.productsUpdated += 1;
+          else result.productsCreated += 1;
+        } catch (err: any) {
+          const code = err?.data?.code;
+          result.errors.push({
+            row: (head._row as number) || 0,
+            reason: `"${name}": ${code === 'SLUG_TAKEN' ? 'slug taken by another product' : code === 'NOT_CATALOG_ADMIN' ? 'admin access required' : err?.message || 'save failed'}`,
+          });
+          result.skipped += 1;
         }
 
         setProgress(Math.round(((i + 1) / entries.length) * 100));
@@ -610,8 +478,8 @@ export function ProductImportExport({ onAfterImport }: Props) {
 
       setSummary(result);
       if (result.productsCreated > 0 || result.productsUpdated > 0) {
+        // Convex list is reactive — no manual refresh needed.
         await invalidateStorefront();
-        onAfterImport?.();
       }
       toast.success(
         `${result.productsCreated + result.productsUpdated} product${

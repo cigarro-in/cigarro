@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, FolderTree, Plus, ChevronDown } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
@@ -9,9 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { supabase } from '../../lib/supabase/client';
-import { toast } from 'sonner';
-import { DataTable } from '../components/shared/DataTable';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { toast } from 'sonner';import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
 
@@ -28,41 +28,24 @@ interface Category {
 
 export function CategoriesPage() {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  const rows = useQuery(api.adminCatalog.listCategoriesForAdmin, {});
+  const removeCategory = useMutation(api.adminCatalog.deleteCategory);
+  const setActive = useMutation(api.adminCatalog.setCategoriesActive);
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select(`
-          *,
-          product_categories(count)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const categoriesWithCount = data?.map(category => ({
-        ...category,
-        product_count: category.product_categories?.length || 0
-      })) || [];
-
-      setCategories(categoriesWithCount);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const categories: Category[] = (rows || []).map((c: any) => ({
+    id: c.supabaseId,
+    name: c.name,
+    slug: c.slug,
+    description: c.description ?? null,
+    image: c.image ?? null,
+    created_at: c.createdAt ? new Date(c.createdAt).toISOString() : '',
+    is_active: c.isActive ?? true,
+    product_count: c.product_count,
+  }));
+  const loading = rows === undefined;
 
   const handleAddCategory = () => {
     navigate('/admin/categories/new');
@@ -75,33 +58,23 @@ export function CategoriesPage() {
   const handleBulkDelete = async (categoryIds: string[]) => {
     if (!confirm(`Delete ${categoryIds.length} categories?`)) return;
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .in('id', categoryIds);
-
-      if (error) throw error;
+      for (const supabaseId of categoryIds) {
+        await removeCategory({ supabaseId });
+      }
       toast.success(`${categoryIds.length} categories deleted`);
       setSelectedCategories([]);
-      fetchCategories();
-    } catch (error) {
-      toast.error('Failed to delete categories');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete categories');
     }
   };
 
   const handleBulkStatusChange = async (categoryIds: string[], isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_active: isActive })
-        .in('id', categoryIds);
-
-      if (error) throw error;
+      await setActive({ supabaseIds: categoryIds, isActive });
       toast.success(`${categoryIds.length} categories ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCategories([]);
-      fetchCategories();
-    } catch (error) {
-      toast.error('Failed to update status');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 

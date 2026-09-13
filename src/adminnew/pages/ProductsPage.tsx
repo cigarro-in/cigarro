@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, Package, Plus, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
@@ -31,54 +32,34 @@ interface Product {
 
 export function ProductsPage() {
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [importOpen, setImportOpen] = useState(false);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  // Convex is the catalog source of truth; the list is reactive so imports
+  // and edits refresh it with no manual refetch.
+  const rows = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const deleteProduct = useMutation(api.adminCatalog.deleteProduct);
+  const setActive = useMutation(api.adminCatalog.setProductsActive);
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*, brand:brands(id, name)')
-        .order('created_at', { ascending: false });
-
-      if (productsError) throw productsError;
-
-      const productIds = productsData?.map(p => p.id) || [];
-      let variantsMap: Record<string, any[]> = {};
-
-      if (productIds.length > 0) {
-        const { data: variantsData } = await supabase
-          .from('product_variants')
-          .select('*')
-          .in('product_id', productIds);
-
-        variantsData?.forEach(v => {
-          if (!variantsMap[v.product_id]) variantsMap[v.product_id] = [];
-          variantsMap[v.product_id].push(v);
-        });
-      }
-
-      const mergedData = productsData?.map(p => ({
-        ...p,
-        product_variants: variantsMap[p.id] || []
-      }));
-
-      setProducts(mergedData || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Boundary normalization: Convex (camelCase, priceRupees) → table shape.
+  const products: Product[] = (rows || []).map((p: any) => ({
+    id: p.supabaseId,
+    name: p.name,
+    slug: p.slug,
+    is_active: p.isActive,
+    created_at: p.createdAt ? new Date(p.createdAt).toISOString() : '',
+    brand: p.brand ? { id: p.brand.supabaseId, name: p.brand.name } : undefined,
+    product_variants: (p.product_variants || []).map((v: any) => ({
+      id: v.supabaseId,
+      variant_name: v.variantName,
+      price: v.priceRupees,
+      stock: v.stock ?? 0,
+      is_default: v.isDefault,
+      images: v.images || [],
+    })),
+  }));
+  const loading = rows === undefined;
 
   const handleAddProduct = () => {
     navigate('/admin/products/new');
@@ -91,33 +72,23 @@ export function ProductsPage() {
   const handleBulkDelete = async (productIds: string[]) => {
     if (!confirm(`Delete ${productIds.length} products?`)) return;
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .in('id', productIds);
-
-      if (error) throw error;
+      for (const supabaseId of productIds) {
+        await deleteProduct({ supabaseId });
+      }
       toast.success(`${productIds.length} products deleted`);
       setSelectedProducts([]);
-      fetchProducts();
-    } catch (error) {
-      toast.error('Failed to delete products');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete products');
     }
   };
 
   const handleBulkStatusChange = async (productIds: string[], isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: isActive })
-        .in('id', productIds);
-
-      if (error) throw error;
+      await setActive({ supabaseIds: productIds, isActive });
       toast.success(`${productIds.length} products ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedProducts([]);
-      fetchProducts();
-    } catch (error) {
-      toast.error('Failed to update status');
+    } catch (error: any) {
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 
@@ -253,7 +224,7 @@ export function ProductsPage() {
           <DialogHeader>
             <DialogTitle>Products · Import / Export</DialogTitle>
           </DialogHeader>
-          <ProductImportExport onAfterImport={fetchProducts} />
+          <ProductImportExport products={rows || []} />
         </DialogContent>
       </Dialog>
       

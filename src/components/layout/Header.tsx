@@ -10,7 +10,6 @@ import { Product } from '../../hooks/useCart';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
-import { searchProductsEnhanced } from '../../utils/search';
 import { SearchResult } from '../../types/variants';
 import Fuse from 'fuse.js';
 import { getProductImageUrl } from '../../lib/supabase/storage';

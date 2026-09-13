@@ -495,6 +495,8 @@ export default defineSchema({
     imageAltText: v.optional(v.string()),
     metaTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
+    // Optional: predates the Convex authorship cutover; absent = active.
+    isActive: v.optional(v.boolean()),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   })

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Plus, X, Package, Check, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
-import { supabase } from '../../../lib/supabase/client';
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 import { formatINR } from '../../../utils/currency';
 
@@ -27,99 +28,40 @@ interface ProductSelectorProps {
 }
 
 export function ProductSelector({ selectedProductIds, onSelectionChange, maxProducts }: ProductSelectorProps) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  // One Convex query replaces both Supabase fetches; selection resolves
+  // from the same rows (ids are supabaseIds end to end).
+  const rows = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const loading = rows === undefined;
 
-  useEffect(() => {
-    if (selectedProductIds.length > 0) {
-      fetchSelectedProducts();
-    } else {
-      setSelectedProducts([]);
-    }
-  }, [selectedProductIds]);
+  const products: Product[] = useMemo(
+    () =>
+      (rows || [])
+        .filter((p: any) => p.isActive)
+        .map((p: any) => ({
+          id: p.supabaseId,
+          name: p.name,
+          slug: p.slug,
+          brand: p.brand ? { name: p.brand.name } : null,
+          product_variants: (p.product_variants || []).map((v: any) => ({
+            id: v.supabaseId,
+            price: v.priceRupees,
+            images: v.images || [],
+            is_default: v.isDefault,
+          })),
+        })),
+    [rows]
+  );
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          slug,
-          brand:brands!inner(name),
-          product_variants(
-            id,
-            price,
-            images,
-            is_default
-          )
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      
-      const mappedProducts: Product[] = (data || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        slug: item.slug,
-        brand: Array.isArray(item.brand) ? item.brand[0] : item.brand,
-        product_variants: item.product_variants
-      }));
-
-      setProducts(mappedProducts);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSelectedProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          slug,
-          brand:brands!inner(name),
-          product_variants(
-            id,
-            price,
-            images,
-            is_default
-          )
-        `)
-        .in('id', selectedProductIds);
-
-      if (error) throw error;
-
-      const mappedSelectedProducts: Product[] = (data || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        slug: item.slug,
-        brand: Array.isArray(item.brand) ? item.brand[0] : item.brand,
-        product_variants: item.product_variants
-      }));
-
-      // Maintain order based on selectedProductIds
-      const orderedProducts = selectedProductIds
-        .map(id => mappedSelectedProducts.find(p => p.id === id))
-        .filter(Boolean) as Product[];
-
-      setSelectedProducts(orderedProducts);
-    } catch (error) {
-      console.error('Error fetching selected products:', error);
-    }
-  };
+  // Maintain order based on selectedProductIds
+  const selectedProducts = useMemo(
+    () =>
+      selectedProductIds
+        .map((id) => products.find((p) => p.id === id))
+        .filter(Boolean) as Product[],
+    [products, selectedProductIds]
+  );
 
   // Filter available products (exclude already selected)
   const availableProducts = products.filter(product => 
@@ -131,21 +73,15 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
   const handleAddProduct = (product: Product) => {
     if (maxProducts && selectedProductIds.length >= maxProducts) return;
     if (selectedProductIds.includes(product.id)) return;
-    
-    const newSelection = [...selectedProductIds, product.id];
-    onSelectionChange(newSelection);
-    setSelectedProducts([...selectedProducts, product]);
+    onSelectionChange([...selectedProductIds, product.id]);
   };
 
   const handleRemoveProduct = (productId: string) => {
-    const newSelection = selectedProductIds.filter(id => id !== productId);
-    onSelectionChange(newSelection);
-    setSelectedProducts(selectedProducts.filter(p => p.id !== productId));
+    onSelectionChange(selectedProductIds.filter(id => id !== productId));
   };
 
   const handleClearAll = () => {
     onSelectionChange([]);
-    setSelectedProducts([]);
   };
 
   const getDefaultVariant = (product: Product) => {

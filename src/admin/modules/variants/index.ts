@@ -1,1 +1,0 @@
-export { VariantsManager } from './VariantsManager';

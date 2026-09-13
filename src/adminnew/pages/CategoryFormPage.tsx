@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, FolderTree, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -10,7 +10,8 @@ import { Switch } from '../../components/ui/switch';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { ProductSelector } from '../components/shared/ProductSelector';
 import { PageHeader } from '../components/shared/PageHeader';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { generateSlug } from '../../types/product';
 
@@ -40,7 +41,7 @@ export function CategoryFormPage() {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
@@ -55,12 +56,39 @@ export function CategoryFormPage() {
     meta_description: ''
   });
 
+  const categoryRows = useQuery(api.adminCatalog.listCategoriesForAdmin, {});
+  const createCategory = useMutation(api.adminCatalog.createCategory);
+  const updateCategory = useMutation(api.adminCatalog.updateCategory);
+  const removeCategory = useMutation(api.adminCatalog.deleteCategory);
+  const linkProducts = useMutation(api.adminCatalog.setCategoryProducts);
+  const populatedRef = useRef(false);
+
   useEffect(() => {
-    if (isEditMode) {
-      loadCategory();
-      setIsSlugManuallyEdited(true);
-    }
+    if (isEditMode) setIsSlugManuallyEdited(true);
   }, [id]);
+
+  // Populate once from the Convex admin list (carries linked product ids).
+  useEffect(() => {
+    if (!isEditMode || !categoryRows || populatedRef.current) return;
+    populatedRef.current = true;
+    const data: any = categoryRows.find((c: any) => c.supabaseId === id);
+    if (!data) {
+      toast.error('Category not found');
+      navigate('/admin/categories');
+      return;
+    }
+    setFormData({
+      name: data.name || '',
+      slug: data.slug || '',
+      description: data.description || '',
+      image: data.image ? [data.image] : [],
+      meta_title: data.metaTitle || '',
+      meta_description: data.metaDescription || ''
+    });
+    setSelectedProductIds(data.productSupabaseIds || []);
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryRows]);
 
   useEffect(() => {
     setIsDirty(true);
@@ -69,43 +97,6 @@ export function CategoryFormPage() {
   useEffect(() => {
     setIsDirty(false);
   }, []);
-
-  const loadCategory = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      setFormData({
-        name: data.name || '',
-        slug: data.slug || '',
-        description: data.description || '',
-        image: data.image ? [data.image] : [],
-        meta_title: data.meta_title || '',
-        meta_description: data.meta_description || ''
-      });
-
-      // Load associated products
-      const { data: productData, error: productError } = await supabase
-        .from('product_categories')
-        .select('product_id')
-        .eq('category_id', id);
-
-      if (productError) throw productError;
-      
-      setSelectedProductIds(productData?.map(p => p.product_id) || []);
-    } catch (error) {
-      console.error('Error loading category:', error);
-      toast.error('Failed to load category');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleNameChange = (name: string) => {
     setFormData(prev => ({ ...prev, name }));
@@ -132,63 +123,39 @@ export function CategoryFormPage() {
 
     setSaving(true);
     try {
-      const categoryData = {
+      const args = {
         name: formData.name.trim(),
         slug: formData.slug.trim(),
-        description: formData.description.trim(),
-        image: formData.image[0] || null,
-        meta_title: formData.meta_title.trim() || formData.name.trim(),
-        meta_description: formData.meta_description.trim()
+        description: formData.description.trim() || undefined,
+        image: formData.image[0] || undefined,
+        metaTitle: formData.meta_title.trim() || formData.name.trim(),
+        metaDescription: formData.meta_description.trim() || undefined,
       };
 
       let categoryId = id;
-
       if (isEditMode) {
-        const { error } = await supabase
-          .from('categories')
-          .update(categoryData)
-          .eq('id', id);
-
-        if (error) throw error;
-        categoryId = id;
+        await updateCategory({ supabaseId: id!, patch: args });
         toast.success('Category updated successfully');
       } else {
-        const { data: newCategory, error } = await supabase
-          .from('categories')
-          .insert([categoryData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        categoryId = newCategory.id;
+        const { supabaseId } = await createCategory(args);
+        categoryId = supabaseId;
         toast.success('Category created successfully');
       }
 
-      // Save product associations
-      // Delete existing associations
-      await supabase
-        .from('product_categories')
-        .delete()
-        .eq('category_id', categoryId);
-
-      // Insert new associations
-      if (selectedProductIds.length > 0) {
-        const { error: associationError } = await supabase
-          .from('product_categories')
-          .insert(
-            selectedProductIds.map(productId => ({
-              category_id: categoryId,
-              product_id: productId
-            }))
-          );
-
-        if (associationError) throw associationError;
-      }
+      // Replace product links (same replace-set semantics as before).
+      await linkProducts({ supabaseId: categoryId!, productSupabaseIds: selectedProductIds });
 
       navigate('/admin/categories');
     } catch (error: any) {
       console.error('Error saving category:', error);
-      toast.error(error.message || 'Failed to save category');
+      const code = error?.data?.code;
+      toast.error(
+        code === 'SLUG_TAKEN'
+          ? 'Slug is taken by another category'
+          : code === 'NOT_CATALOG_ADMIN'
+            ? 'Admin access required'
+            : error.message || 'Failed to save category'
+      );
     } finally {
       setSaving(false);
     }
@@ -198,17 +165,12 @@ export function CategoryFormPage() {
     if (!confirm('Are you sure you want to delete this category?')) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeCategory({ supabaseId: id! });
       toast.success('Category deleted successfully');
       navigate('/admin/categories');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting category:', error);
-      toast.error('Failed to delete category');
+      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete category');
     } finally {
       setSaving(false);
     }

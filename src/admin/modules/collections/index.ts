@@ -1,1 +1,0 @@
-export { CollectionsManager } from './CollectionsManager';
