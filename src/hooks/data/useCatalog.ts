@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -138,27 +139,31 @@ function buildMaps(bundle: any) {
 }
 
 // Full catalog (30 products — one subscription, filter locally).
+// Memoized: consumers feed these identities into setState-in-effect syncs,
+// so a fresh object per render would retrigger them infinitely.
 export function useFullCatalog() {
   const bundle = useQuery(api.catalog.fullCatalog, {});
-  if (!bundle) {
+  return useMemo(() => {
+    if (!bundle) {
+      return {
+        products: [] as LegacyProduct[],
+        brands: [],
+        categories: [],
+        productCategories: [],
+        loading: true,
+      };
+    }
+    const { brandById, variantsByProduct, catsByProduct } = buildMaps(bundle);
     return {
-      products: [] as LegacyProduct[],
-      brands: [],
-      categories: [],
-      productCategories: [],
-      loading: true,
+      products: (bundle.products || []).map((p: any) =>
+        toLegacyProduct(p, brandById, variantsByProduct, catsByProduct),
+      ),
+      brands: bundle.brands ?? [],
+      categories: bundle.categories ?? [],
+      productCategories: bundle.productCategories ?? [],
+      loading: false,
     };
-  }
-  const { brandById, variantsByProduct, catsByProduct } = buildMaps(bundle);
-  return {
-    products: (bundle.products || []).map((p: any) =>
-      toLegacyProduct(p, brandById, variantsByProduct, catsByProduct),
-    ),
-    brands: bundle.brands ?? [],
-    categories: bundle.categories ?? [],
-    productCategories: bundle.productCategories ?? [],
-    loading: false,
-  };
+  }, [bundle]);
 }
 
 // PDP: single product with variants + brand (legacy shapes).
@@ -167,23 +172,25 @@ export function useCatalogProduct(slug: string | undefined) {
     api.catalog.getProductBySlug,
     slug ? { slug } : 'skip',
   );
-  if (detail === undefined) return { product: null, loading: true as boolean };
-  if (!detail) return { product: null, loading: false as boolean };
-  const brandById = new Map(
-    detail.brand ? [[detail.brand.supabaseId, detail.brand]] : [],
-  );
-  const variantsByProduct = new Map([
-    [detail.product.supabaseId, detail.variants || []],
-  ]);
-  return {
-    product: toLegacyProduct(detail.product, brandById, variantsByProduct),
-    loading: false as boolean,
-  };
+  return useMemo(() => {
+    if (detail === undefined) return { product: null, loading: true as boolean };
+    if (!detail) return { product: null, loading: false as boolean };
+    const brandById = new Map(
+      detail.brand ? [[detail.brand.supabaseId, detail.brand]] : [],
+    );
+    const variantsByProduct = new Map([
+      [detail.product.supabaseId, detail.variants || []],
+    ]);
+    return {
+      product: toLegacyProduct(detail.product, brandById, variantsByProduct),
+      loading: false as boolean,
+    };
+  }, [detail]);
 }
 
 // Combos are an empty table in prod: keep the legacy call-site contract
 // (list) without a Supabase dependency.
 export function useCatalogCombos() {
   const rows = useQuery(api.catalog.listCombos, { activeOnly: true });
-  return { combos: rows ?? [] };
+  return useMemo(() => ({ combos: rows ?? [] }), [rows]);
 }

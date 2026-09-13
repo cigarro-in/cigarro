@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -69,10 +70,13 @@ function withCompat(row: any): any {
 
 export function useBlogPosts(limit = 50) {
   const rows = useQuery(api.content.listBlogPosts, { limit });
-  return {
-    posts: ((rows ?? []).map(withCompat) as BlogDetailPost[]),
-    loading: rows === undefined,
-  };
+  return useMemo(
+    () => ({
+      posts: ((rows ?? []).map(withCompat) as BlogDetailPost[]),
+      loading: rows === undefined,
+    }),
+    [rows],
+  );
 }
 
 export function useBlogPost(slug: string | undefined) {
@@ -80,10 +84,13 @@ export function useBlogPost(slug: string | undefined) {
     api.content.getBlogPostBySlug,
     slug ? { slug } : 'skip'
   );
-  return {
-    post: (row ? withCompat(row) : null) as BlogDetailPost | null,
-    loading: row === undefined,
-  };
+  return useMemo(
+    () => ({
+      post: (row ? withCompat(row) : null) as BlogDetailPost | null,
+      loading: row === undefined,
+    }),
+    [row],
+  );
 }
 
 export function useRelatedPosts(categorySlug?: string, excludeSlug?: string, limit = 3) {
@@ -94,12 +101,15 @@ export function useRelatedPosts(categorySlug?: string, excludeSlug?: string, lim
       ? 'skip'
       : { categorySlug, excludeSlug, limit };
   const rows = useQuery(api.content.listRelatedPosts, args);
-  return { posts: ((rows ?? []).map(withCompat) as BlogListPost[]) };
+  return useMemo(
+    () => ({ posts: ((rows ?? []).map(withCompat) as BlogListPost[]) }),
+    [rows],
+  );
 }
 
 export function useBlogCategories() {
   const rows = useQuery(api.content.listBlogCategories, {});
-  return { categories: rows ?? [] };
+  return useMemo(() => ({ categories: rows ?? [] }), [rows]);
 }
 
 export interface HeroSlide {
@@ -141,10 +151,13 @@ function withSlideCompat(row: any): any {
 
 export function useHeroSlides() {
   const rows = useQuery(api.content.listHeroSlides, {});
-  return {
-    slides: ((rows ?? []).map(withSlideCompat) as HeroSlide[]),
-    loading: rows === undefined,
-  };
+  return useMemo(
+    () => ({
+      slides: ((rows ?? []).map(withSlideCompat) as HeroSlide[]),
+      loading: rows === undefined,
+    }),
+    [rows],
+  );
 }
 
 export function useSectionConfig(name: string | undefined) {
@@ -152,33 +165,37 @@ export function useSectionConfig(name: string | undefined) {
     api.content.getSectionConfig,
     name ? { name } : 'skip'
   );
-  if (!row) return { config: null, loading: row === undefined };
-  return {
-    config: {
-      ...row,
-      section_name: (row as any).sectionName,
-      background_image: (row as any).backgroundImage,
-      button_text: (row as any).buttonText,
-      button_url: (row as any).buttonUrl,
-      is_enabled: (row as any).isEnabled,
-    },
-    loading: false,
-  };
+  return useMemo(() => {
+    if (!row) return { config: null, loading: row === undefined };
+    return {
+      config: {
+        ...row,
+        section_name: (row as any).sectionName,
+        background_image: (row as any).backgroundImage,
+        button_text: (row as any).buttonText,
+        button_url: (row as any).buttonUrl,
+        is_enabled: (row as any).isEnabled,
+      },
+      loading: false,
+    };
+  }, [row]);
 }
 
 export function useSiteSettings() {
   const row = useQuery(api.content.getSiteSettings, {});
-  if (!row) return { settings: null, loading: row === undefined };
-  return {
-    settings: {
-      ...row,
-      site_name: (row as any).siteName,
-      meta_title: (row as any).metaTitle,
-      meta_description: (row as any).metaDescription,
-      favicon_url: (row as any).faviconUrl,
-      active_theme: (row as any).activeTheme,
-      upi_id: (row as any).upiId,
-    },
-    loading: false,
-  };
+  return useMemo(() => {
+    if (!row) return { settings: null, loading: row === undefined };
+    return {
+      settings: {
+        ...row,
+        site_name: (row as any).siteName,
+        meta_title: (row as any).metaTitle,
+        meta_description: (row as any).metaDescription,
+        favicon_url: (row as any).faviconUrl,
+        active_theme: (row as any).activeTheme,
+        upi_id: (row as any).upiId,
+      },
+      loading: false,
+    };
+  }, [row]);
 }

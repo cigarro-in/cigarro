@@ -51,6 +51,9 @@ function ProductPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [product, setProduct] = useState<ProductDetails | null>(null);
+  // Resolved-but-missing (slug not in catalog): render a real 404 instead of
+  // the infinite "Loading..." fallback below.
+  const [notFound, setNotFound] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [combos, setCombos] = useState<ProductCombo[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
@@ -112,8 +115,10 @@ function ProductPage() {
     if (!slug || catalogProductLoading) return;
     if (!catalogProduct || (catalogProduct as any).is_active === false) {
       setProduct(null);
+      setNotFound(true);
       return;
     }
+    setNotFound(false);
     const activeVariants = (
       (catalogProduct as any).product_variants || []
     ).filter((v: any) => v.is_active !== false);
@@ -367,6 +372,26 @@ function ProductPage() {
   };
 
   if (!product) {
+    if (notFound) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center px-4">
+          <SEOHead
+            title="Product not found"
+            description="This product is unavailable or no longer listed. Browse the catalog for alternatives."
+            robots="noindex, follow"
+          />
+          <div className="text-center max-w-md">
+            <h1 className="text-2xl font-serif mb-2">Product not found</h1>
+            <p className="text-muted-foreground mb-6">
+              This product is unavailable or the link is incorrect.
+            </p>
+            <Link to="/products">
+              <Button>Browse all products</Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return <div className="min-h-screen bg-background flex items-center justify-center"><p>Loading...</p></div>;
   }
 
