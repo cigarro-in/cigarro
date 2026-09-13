@@ -19,7 +19,9 @@
     <meta name="keywords" content="premium imported cigarettes, luxury cigars, tobacco products, cigarette marketplace, online tobacco store, premium tobacco India">
     <meta name="author" content="Cigarro">
     <meta name="robots" content="index, follow">
-    <!-- Canonical tag is dynamically set by React Helmet for each page -->
+    <!-- Static canonical so the initial human HTML has one before React
+         Helmet mounts (per-page Helmet canonicals override this after verify). -->
+    <link rel="canonical" href="https://cigarro.in/">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
@@ -109,10 +111,10 @@
       }
     }
     </script>
-    
-    <!-- Cloudflare Web Analytics -->
-    <!-- <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "49bca12ae30e4a84ad89dc690aeb4bde"}'></script> -->
-    <!-- End Cloudflare Web Analytics -->
+    <!-- NOTE: Cloudflare Web Analytics is intentionally OFF in code. GA4
+         (consent-mode, env-only ID) is the single measurement layer to avoid
+         double counting + extra payload. To enable CF RUM as well, toggle it
+         in the Cloudflare dashboard (auto-injects, no code change needed). -->
     </head>
 
     <body>

@@ -31,8 +31,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '../../components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
-import { useAdminAuth } from '../../hooks/useAdminAuth';
+import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import { useAuth } from '../../hooks/useAuth';
 
 /**
  * Navigation item configuration
@@ -88,7 +88,7 @@ const BRANDING_CONFIG = {
 export function AdminSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, adminProfile, signOut } = useAdminAuth();
+  const { user, signOut } = useAuth();
 
   const isActive = (path: string) => {
     if (path === '/admin' && location.pathname === '/admin') return true;
@@ -99,10 +99,8 @@ export function AdminSidebar() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
-      navigate('/');
     }
   };
 
@@ -161,14 +159,13 @@ export function AdminSidebar() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user?.user_metadata?.avatar_url} />
                 <AvatarFallback className="rounded-lg bg-canyon text-creme">
-                  {adminProfile?.full_name?.charAt(0) || 'A'}
+                  {user?.name?.charAt(0)?.toUpperCase() || 'A'}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{adminProfile?.full_name || 'Admin'}</span>
-                <span className="truncate text-xs">{user?.email}</span>
+                <span className="truncate font-semibold">{user?.name || 'Admin'}</span>
+                <span className="truncate text-xs">{user?.phone || user?.email}</span>
               </div>
               <LogOut className="ml-auto size-4" onClick={handleSignOut} />
             </SidebarMenuButton>

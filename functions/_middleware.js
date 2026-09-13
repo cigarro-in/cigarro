@@ -4,6 +4,13 @@ import { onRequest as ssrMiddleware } from './ssr-middleware.js';
 export async function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
+
+  // Admin host is app-only: never prerender, never index. Stamp noindex.
+  if (url.hostname.split('.')[0] === 'admin') {
+    const res = await next();
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return res;
+  }
   
   // Skip middleware for /functions/* routes - let them handle directly
   if (url.pathname.startsWith('/functions/')) {

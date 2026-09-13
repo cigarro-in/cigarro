@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AgeVerification } from './components/auth/AgeVerification';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -9,6 +9,7 @@ import { BreadcrumbNav } from './components/layout/BreadcrumbNav';
 import { PageTransition } from './components/layout/PageTransition';
 import Footer from './components/layout/Footer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { PhoneAuthDialog } from './components/auth/PhoneAuthDialog';
 import { ConvexSupabaseProvider } from './lib/convex/ConvexSupabaseProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
@@ -28,10 +29,75 @@ function LoadingSpinner() {
   return null;
 }
 
+// Admin subdomain (admin.cigarro.in): same phone identity as the storefront,
+// admin-only UX. No age gate, no shop, noindex so it never enters search.
+function AdminHostView() {
+  const { user, isLoading, signOut } = useAuth();
+  const [loginOpen, setLoginOpen] = useState(true);
+
+  if (isLoading) return null;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-creme px-4">
+        <div className="text-center space-y-3">
+          <p className="font-bold text-lg">Cigarro Admin</p>
+          <p className="text-sm text-muted-foreground">Sign in with your admin phone number.</p>
+          <button
+            onClick={() => setLoginOpen(true)}
+            className="h-11 px-6 rounded-xl bg-canyon text-creme font-semibold text-[15px]"
+          >
+            Sign in
+          </button>
+        </div>
+        <PhoneAuthDialog open={loginOpen} onOpenChange={setLoginOpen} />
+      </div>
+    );
+  }
+
+  if (!user.isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-creme px-4">
+        <div className="text-center space-y-3 max-w-sm">
+          <p className="font-bold text-lg">Access denied</p>
+          <p className="text-sm text-muted-foreground">
+            {user.phone || 'This number'} isn't an admin account. Use it on cigarro.in for shopping.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <a
+              href="https://cigarro.in"
+              className="h-11 px-6 inline-flex items-center rounded-xl bg-canyon text-creme font-semibold text-[15px]"
+            >
+              Go to store
+            </a>
+            <button
+              onClick={() => void signOut()}
+              className="h-11 px-6 rounded-xl border font-semibold text-[15px]"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <HelmetProvider>
+      <Helmet>
+        <meta name="robots" content="noindex, nofollow" />
+        <title>Cigarro Admin</title>
+      </Helmet>
+      <Suspense fallback={<LoadingSpinner />}>
+        <AppRoutes isAdminRoute={true} />
+      </Suspense>
+    </HelmetProvider>
+  );
+}
+
 function AppContent() {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const navigate = useNavigate();
   const location = useLocation();
   const ThemeLayout = theme.slots.Layout;
   const org = useOrg();
@@ -75,6 +141,8 @@ function AppContent() {
     });
   }, [convexSettings]);
 
+  const isAdminHost =
+    typeof window !== 'undefined' && window.location.hostname.split('.')[0] === 'admin';
   const isAdminPath = location.pathname.startsWith('/admin');
 
   // SPA page views: only after the age gate. Admin routes are included so the
@@ -86,12 +154,17 @@ function AppContent() {
     trackPageView(location.pathname + location.search);
   }, [location.pathname, location.search, isAgeVerified]);
 
-  useEffect(() => {
-    // Only redirect admins to /admin when they are not already inside the admin area
-    if (user?.isAdmin && !isAdminPath) {
-      navigate('/admin');
-    }
-  }, [user, navigate, isAdminPath]);
+  // Storefront host: /admin* never existed — homepage, no subdomain redirect.
+  // (Admin lives only on admin.cigarro.in; same phone number = storefront here.)
+  if (!isAdminHost && isAdminPath) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Admin host: phone-gated, admin-only. Same Supabase identity as the
+  // storefront (same number), but non-admins stop at a deny message.
+  if (isAdminHost) {
+    return <AdminHostView />;
+  }
 
   // Manual scroll restoration is now handled by SmoothScrollToTop inside PageTransition
   const isUserPage = !isAdminPath;

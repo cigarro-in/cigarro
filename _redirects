@@ -6,6 +6,15 @@
 # Add both cigarro.in and www.cigarro.in as custom domains
 # Cloudflare will automatically handle the www redirect
 
+# Canonical host: www always folds to the apex (dashboard custom-domain
+# entry for www is still required — this rule alone can't attach the host).
+https://www.cigarro.in/* https://cigarro.in/:splat 301
+
+# Legacy share image: old og:image target was /logo.png (never shipped as a
+# file, so it serves the SPA shell). Fold it onto the real 1200x630 JPEG.
+# Keep until Google recrawls all pages carrying the old tag.
+/logo.png /og-default.jpg 301
+
 # SPA routing is handled automatically by Cloudflare Pages
 # Static assets (/assets/*, /images/*, etc.) are served directly
 # Functions in /functions/ directory are served automatically

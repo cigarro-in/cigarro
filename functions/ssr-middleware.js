@@ -51,6 +51,16 @@ function isBot(userAgent) {
 // A2: default share image — real 1200x630 JPEG shipped from public/og-default.jpg.
 const OG_DEFAULT_IMAGE = 'https://cigarro.in/og-default.jpg';
 
+// Function responses bypass Cloudflare Pages `_headers`, so prerendered bot
+// HTML stamps the same security set inline. Mirrors the `/*` block.
+const SECURITY_HEADERS = {
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+};
+
 // A6: BreadcrumbList JSON-LD + matching visible breadcrumb nav. `items` must be the
 // exact ordered model rendered by the visible nav — never include a level that has
 // no visible link. All URLs are absolute canonical URLs.
@@ -1478,7 +1488,9 @@ export async function onRequest(context) {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
-          'X-Robots-Tag': 'noindex, follow'
+          'X-Robots-Tag': 'noindex, follow',
+          // Function responses bypass _headers — stamp the set here.
+          ...SECURITY_HEADERS,
         }
       });
     }
@@ -1489,7 +1501,8 @@ export async function onRequest(context) {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-          'X-Robots-Tag': 'index, follow'
+          'X-Robots-Tag': 'index, follow',
+          ...SECURITY_HEADERS,
         }
       });
     }
