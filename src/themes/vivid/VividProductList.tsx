@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
-import { useCached } from '../../lib/cache/swrCache';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { VividProductCard } from './VividProductCard';
 import { VividCartPanel } from './VividCartPanel';
@@ -12,42 +11,6 @@ interface ListResult {
   products: HomepageProduct[];
   categoryName: string | null;
   categoryDescription: string | null;
-}
-
-async function fetchAll(search: string): Promise<ListResult> {
-  let q = supabase
-    .from('products')
-    .select(
-      'id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, variant_name, price, is_default, is_active, images)'
-    )
-    .eq('is_active', true);
-  if (search.trim()) {
-    q = q.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-  }
-  const { data } = await q.order('created_at', { ascending: false });
-  return {
-    products: normalize(data || []),
-    categoryName: null,
-    categoryDescription: null,
-  };
-}
-
-async function fetchByCategory(slug: string): Promise<ListResult> {
-  const { data } = await supabase
-    .from('categories')
-    .select(
-      'id, name, description, products:product_categories!inner(products!inner(id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, variant_name, price, is_default, is_active, images)))'
-    )
-    .eq('slug', slug)
-    .eq('products.products.is_active', true)
-    .single();
-  if (!data) return { products: [], categoryName: null, categoryDescription: null };
-  const inner = ((data as any).products || []).map((pc: any) => pc.products).filter(Boolean);
-  return {
-    products: normalize(inner),
-    categoryName: (data as any).name,
-    categoryDescription: (data as any).description || null,
-  };
 }
 
 type SortKey = 'relevance' | 'price-low' | 'price-high' | 'newest';
@@ -63,16 +26,43 @@ export function VividProductList({ mode }: Props) {
 
   const search = new URLSearchParams(location.search).get('search') || '';
 
-  const cacheKey =
-    mode === 'all'
-      ? `products:all:${search || '_'}`
-      : `products:cat:${slug || '_'}`;
+  // Wave 3: list rows from the Convex catalog (same shapes). Search filters
+  // locally — no ilike round-trip.
+  const { products: catalogProducts, categories: catalogCategories, productCategories, loading } =
+    useFullCatalog();
 
-  const { data, isLoading: loading } = useCached<ListResult>(
-    cacheKey,
-    () => (mode === 'all' ? fetchAll(search) : slug ? fetchByCategory(slug) : Promise.resolve({ products: [], categoryName: null, categoryDescription: null })),
-    { ttl: 3 * 60_000, enabled: mode === 'all' || !!slug }
-  );
+  const data: ListResult | null = useMemo(() => {
+    if (loading) return null;
+    if (mode === 'all') {
+      const q = search.trim().toLowerCase();
+      let rows = (catalogProducts as any[]).filter((p: any) => p.is_active);
+      if (q) {
+        rows = rows.filter(
+          (p: any) =>
+            String(p.name || '').toLowerCase().includes(q) ||
+            String(p.description || '').toLowerCase().includes(q),
+        );
+      }
+      rows = [...rows].sort(
+        (a: any, b: any) =>
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+      );
+      return { products: normalize(rows), categoryName: null, categoryDescription: null };
+    }
+    if (!slug) return { products: [], categoryName: null, categoryDescription: null };
+    const cat = (catalogCategories as any[]).find((c: any) => c.slug === slug);
+    if (!cat) return { products: [], categoryName: null, categoryDescription: null };
+    const byId = new Map((catalogProducts as any[]).map((p: any) => [p.id, p]));
+    const inner = (productCategories as any[])
+      .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
+      .map((j: any) => byId.get(j.productSupabaseId))
+      .filter((p: any) => p && p.is_active);
+    return {
+      products: normalize(inner),
+      categoryName: cat.name,
+      categoryDescription: cat.description || null,
+    };
+  }, [mode, slug, search, catalogProducts, catalogCategories, productCategories, loading]);
 
   const products = data?.products || [];
   const categoryName = data?.categoryName || null;

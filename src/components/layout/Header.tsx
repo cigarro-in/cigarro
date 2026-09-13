@@ -6,8 +6,8 @@ import { Search, ShoppingBag, Menu, X, Heart, User, LogOut, Loader2, Package, Ex
 import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
 import { MiniCart } from '../cart/MiniCart';
 import { Badge } from '../ui/badge';
-import { supabase } from '../../lib/supabase/client';
 import { Product } from '../../hooks/useCart';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
 import { searchProductsEnhanced } from '../../utils/search';
@@ -82,25 +82,17 @@ const Header = () => {
   };
 
   // Fetch all products for client-side fuzzy search
+  // Wave 3: rows come from the Convex catalog (same shapes).
+  const { products: catalogProducts } = useFullCatalog();
+
   const fetchAllProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-          product_variants (
-            id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-          )
-        `)
-        .eq('is_active', true);
-
-      if (error) throw error;
-
-      // Normalize brand from array to object
-      const normalizedData = (data || []).map(p => ({
-        ...p,
-        brand: normalizeBrand(p.brand)
-      })) as Product[];
+      const normalizedData = (catalogProducts || [])
+        .filter((p: any) => p.is_active)
+        .map((p) => ({
+          ...p,
+          brand: normalizeBrand((p as any).brand),
+        })) as Product[];
 
       setAllProducts(normalizedData);
       initializeFuse(normalizedData);
@@ -223,19 +215,14 @@ const Header = () => {
         setSearchResults(results);
         setShowResults(true);
       } else {
-        // Fallback to database search - use brand_id join instead of brand column
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-            product_variants (
-              id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-            )
-          `)
-          .eq('is_active', true)
-          .or(`name.ilike.%${query}%,description.ilike.%${query}%`);
-
-        if (error) throw error;
+        // Fallback to local catalog filter (same fields the ilike query had).
+        const q = query.toLowerCase();
+        const data = (catalogProducts || []).filter(
+          (p: any) =>
+            p.is_active &&
+            (String(p.name || '').toLowerCase().includes(q) ||
+              String(p.description || '').toLowerCase().includes(q)),
+        );
 
         // Normalize brand and create proper SearchResult objects
         const basicResults: SearchResult[] = (data || []).map(product => {
@@ -289,10 +276,11 @@ const Header = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Fetch all products on component mount
+  // Fetch all products on component mount (and when catalog resolves)
   useEffect(() => {
     fetchAllProducts();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts]);
 
   // Listen for cart item added events to auto-show mini cart
   useEffect(() => {

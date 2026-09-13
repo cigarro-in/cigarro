@@ -3,9 +3,9 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, ShoppingCart, Trash2, ArrowLeft, Share2, Grid3X3, List } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
 import { Product, useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { getProductImageUrl } from '../../lib/supabase/storage';
@@ -176,57 +176,38 @@ export function WishlistPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
   const { wishlistItems, toggleWishlist, clearWishlist: clearWishlistHook } = useWishlist();
+  // Wave 3: rich product rows come from the Convex catalog (same shapes).
+  const { products: catalogProducts, loading: catalogLoading } = useFullCatalog();
 
   useEffect(() => {
-    fetchWishlistProducts();
-  }, [wishlistItems]);
-
-  const fetchWishlistProducts = async () => {
+    if (catalogLoading) return;
+    if (!wishlistItems || wishlistItems.length === 0) {
+      setWishlistProducts([]);
+      setIsLoading(false);
+      return;
+    }
     try {
-      setIsLoading(true);
-      
-      if (!wishlistItems || wishlistItems.length === 0) {
-        setWishlistProducts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: products, error } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, description, is_active, created_at,
-          brands!inner(id, name),
-          product_variants (
-            id, product_id, variant_name, variant_type, price, is_default, is_active, stock, images
-          )
-        `)
-        .in('id', wishlistItems)
-        .eq('is_active', true);
-
-      if (error) {
-        console.error('Error fetching wishlist products:', error);
-        toast.error('Failed to load wishlist products');
-        setWishlistProducts([]);
-      } else {
-        // Transform data to match expected format
-        const transformedProducts = (products || []).map(product => ({
+      const wanted = new Set(wishlistItems);
+      const rows = catalogProducts
+        .filter((p) => wanted.has(p.id) && p.is_active && p.brand != null)
+        .map((product) => ({
           ...product,
-          brand: product.brands?.[0] || { id: 'unknown', name: 'Unknown' },
-          price: product.product_variants?.find(v => v.is_default)?.price || 0,
-          product_variants: product.product_variants?.map(variant => ({
+          brand: product.brand || { id: 'unknown', name: 'Unknown' },
+          price: product.product_variants?.find((v) => v.is_default)?.price || 0,
+          product_variants: (product.product_variants || []).map((variant) => ({
             ...variant,
-            images: variant.images || []
-          })) || []
+            images: variant.images || [],
+          })) || [],
         }));
-        setWishlistProducts(transformedProducts);
-      }
+      setWishlistProducts(rows as Product[]);
     } catch (error) {
       console.error('Error loading wishlist:', error);
+      toast.error('Failed to load wishlist products');
       setWishlistProducts([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [wishlistItems, catalogProducts, catalogLoading]);
 
   const removeFromWishlist = async (productId: string) => {
     try {

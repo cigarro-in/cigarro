@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { ArrowRight, Star, Package } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
@@ -21,77 +21,38 @@ export function BrandsPage() {
   const location = useLocation();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Wave 3: brands + counts from the Convex catalog (same shapes).
+  const { products, brands: catalogBrands, loading } = useFullCatalog();
 
   useEffect(() => {
-    fetchBrands();
-  }, []);
-
-  const fetchBrands = async () => {
+    if (loading) return;
     try {
       setIsLoading(true);
-
-      // Try cached API first
-      try {
-        const response = await fetch('/api/brands');
-        if (response.ok) {
-          const brandsData = await response.json();
-          // Get product counts from cached products API
-          const productsResponse = await fetch('/api/products');
-          if (productsResponse.ok) {
-            const products = await productsResponse.json();
-            const brandsWithCounts = brandsData.map((brand: Brand) => ({
-              ...brand,
-              product_count: products.filter((p: any) => p.brand_id === brand.id).length
-            }));
-            const filteredBrands = brandsWithCounts
-              .filter((b: Brand) => b.product_count && b.product_count > 0)
-              .sort((a: Brand, b: Brand) => {
-                if (a.is_featured && !b.is_featured) return -1;
-                if (!a.is_featured && b.is_featured) return 1;
-                return (b.product_count || 0) - (a.product_count || 0);
-              });
-            setBrands(filteredBrands);
-            return;
-          }
-        }
-      } catch (apiError) {
-
+      const counts = new Map<string, number>();
+      for (const p of products as any[]) {
+        if (!p.is_active || !p.brand_id) continue;
+        counts.set(p.brand_id, (counts.get(p.brand_id) || 0) + 1);
       }
-
-      // Fallback: Fetch brands from database
-      const { data: brandsData, error: brandsError } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (brandsError) throw brandsError;
-
-      // Get product counts for each brand using brand_id
-      const brandsWithCounts = await Promise.all(
-        (brandsData || []).map(async (brand) => {
-          const { count } = await supabase
-            .from('products')
-            .select('id', { count: 'exact' })
-            .eq('brand_id', brand.id)
-            .eq('is_active', true);
-
-          return {
-            ...brand,
-            product_count: count || 0
-          };
-        })
-      );
-
+      const brandsWithCounts = (catalogBrands as any[])
+        .filter((b: any) => b.isActive)
+        .map((brand: any) => ({
+          id: brand.supabaseId,
+          name: brand.name,
+          slug: brand.slug,
+          description: brand.description ?? null,
+          logo_url: brand.logoUrl ?? null,
+          is_active: brand.isActive,
+          is_featured: false,
+          product_count: counts.get(brand.supabaseId) || 0,
+        }));
       // Filter out brands with no products and sort by featured, then product count
       const filteredBrands = brandsWithCounts
-        .filter(b => b.product_count && b.product_count > 0)
-        .sort((a, b) => {
+        .filter((b: Brand) => b.product_count && b.product_count > 0)
+        .sort((a: Brand, b: Brand) => {
           if (a.is_featured && !b.is_featured) return -1;
           if (!a.is_featured && b.is_featured) return 1;
-          return b.product_count! - a.product_count!;
+          return (b.product_count || 0) - (a.product_count || 0);
         });
-
       setBrands(filteredBrands);
     } catch (error) {
       console.error('Error fetching brands:', error);
@@ -99,7 +60,7 @@ export function BrandsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loading, products, catalogBrands]);
 
   if (isLoading) {
     return (

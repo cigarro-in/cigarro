@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User, Globe } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
@@ -37,84 +37,58 @@ export function BrandPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
+  // Wave 3: brand + products resolve from the Convex catalog (same shapes
+  // the Supabase fallback produced). No API-hop, no Supabase.
+  const { products: catalogProducts, brands: catalogBrands, loading: catalogLoading } =
+    useFullCatalog();
 
   useEffect(() => {
-    if (slug) {
-      fetchBrandData();
-    }
-  }, [slug]);
-
-  const fetchBrandData = async () => {
+    if (!slug || catalogLoading) return;
     try {
       setIsLoading(true);
-
-      // Try cached APIs first
-      try {
-        const [brandsResponse, productsResponse] = await Promise.all([
-          fetch('/api/brands'),
-          fetch('/api/products')
-        ]);
-        
-        if (brandsResponse.ok && productsResponse.ok) {
-          const brands = await brandsResponse.json();
-          const allProducts = await productsResponse.json();
-          
-          const brandData = brands.find((b: any) => b.slug === slug && b.is_active);
-          if (brandData) {
-            setBrand(brandData);
-            const brandProducts = allProducts.filter((p: any) => p.brand_id === brandData.id);
-            setProducts(brandProducts as Product[]);
-            return;
-          }
-        }
-      } catch (apiError) {
-
-      }
-
-      // Fallback: Fetch brand from database
-      const { data: brandData, error: brandError } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .single();
-
-      if (brandError) {
-        console.error('Brand not found:', brandError);
+      const brandData = (catalogBrands as any[]).find(
+        (b: any) => b.slug === slug && b.isActive,
+      );
+      if (!brandData) {
         setBrand(null);
         setIsLoading(false);
         return;
       }
-
-      setBrand(brandData);
-
-      // Fetch brand products using brand_id
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, description, is_active, created_at,
-          brand:brands(id, name),
-          product_variants(id, variant_name, price, is_default, is_active, images)
-        `)
-        .eq('brand_id', brandData.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (productsError) throw productsError;
-
-      const normalizedProducts = (productsData || []).map((p: any) => ({
-        ...p,
-        brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
-      }));
-
-      setProducts(normalizedProducts as Product[]);
+      setBrand({
+        id: brandData.supabaseId,
+        name: brandData.name,
+        slug: brandData.slug,
+        description: brandData.description ?? null,
+        logo_url: brandData.logoUrl ?? null,
+        website_url: brandData.websiteUrl ?? null,
+        is_active: brandData.isActive,
+        is_featured: false,
+        sort_order: brandData.sortOrder ?? 0,
+        meta_title: brandData.metaTitle ?? null,
+        meta_description: brandData.metaDescription ?? null,
+        heritage: brandData.heritage ?? null,
+        created_at: brandData.createdAt
+          ? new Date(brandData.createdAt).toISOString()
+          : '',
+        updated_at: brandData.updatedAt
+          ? new Date(brandData.updatedAt).toISOString()
+          : '',
+      });
+      setProducts(
+        catalogProducts
+          .filter((p: any) => p.brand_id === brandData.supabaseId && p.is_active)
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          ) as Product[],
+      );
     } catch (error) {
       console.error('Error fetching brand data:', error);
       toast.error('Failed to load brand information');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [slug, catalogLoading]);
 
   const handleAddToCart = async (product: Product) => {
     try {

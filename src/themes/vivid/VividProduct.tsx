@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
+import { useCatalogProduct } from '../../hooks/data/useCatalog';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { getProductImageUrl } from '../../lib/supabase/storage';
@@ -32,35 +32,26 @@ export default function VividProduct() {
   const [loading, setLoading] = useState(true);
   const { addVariantToCart, addToCart, isLoading } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
+  // Wave 3: product + variants from the Convex catalog (same shapes).
+  const { product: catalogProduct, loading: catalogLoading } = useCatalogProduct(slug);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!slug) return;
-      setLoading(true);
-      const { data } = await supabase
-        .from('products')
-        .select(
-          'id, name, slug, description, short_description, meta_title, meta_description, brand:brands(id, name), product_variants(id, variant_name, variant_type, price, stock, images, is_default, is_active)'
-        )
-        .eq('slug', slug)
-        .eq('is_active', true)
-        .single();
-      if (cancelled) return;
-      if (data) {
-        const p: any = data;
-        setProduct({ ...p, brand: Array.isArray(p.brand) ? p.brand[0] : p.brand });
-        const vars = (p.product_variants || []).filter((v: any) => v.is_active !== false);
-        setVariants(vars);
-        setSelected(vars.find((v: any) => v.is_default) || vars[0] || null);
-      }
-      setLoading(false);
+    if (catalogLoading) return;
+    setLoading(true);
+    const data = catalogProduct && (catalogProduct as any).is_active !== false ? catalogProduct : null;
+    if (data) {
+      const p: any = data;
+      setProduct({ ...p, brand: Array.isArray(p.brand) ? p.brand[0] : p.brand });
+      const vars = (p.product_variants || []).filter((v: any) => v.is_active !== false);
+      setVariants(vars);
+      setSelected(vars.find((v: any) => v.is_default) || vars[0] || null);
+    } else {
+      setProduct(null);
+      setVariants([]);
+      setSelected(null);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
+    setLoading(false);
+  }, [slug, catalogProduct, catalogLoading]);
 
   useEffect(() => {
     setActiveImage(0);

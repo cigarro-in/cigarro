@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
@@ -23,60 +23,34 @@ export function CategoriesPage() {
   const location = useLocation();
   const [categories, setCategories] = useState<CategoryWithProducts[]>([]);
   const { addToCart, isLoading } = useCart();
+  // Wave 3: categories + join + products from the Convex catalog.
+  const { products, categories: catalogCategories, productCategories, loading } =
+    useFullCatalog();
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        // Fetch categories with their products via product_categories junction
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('categories')
-          .select(`
-            id,
-            name,
-            slug,
-            description,
-            image,
-            products:product_categories(
-              products(
-                id, name, slug, brand_id, description, is_active, created_at,
-                brand:brands(id, name),
-                product_variants(id, variant_name, price, is_default, is_active, images)
-              )
-            )
-          `)
-          .order('name');
-
-        if (categoriesError) {
-          toast.error('Failed to load categories.');
-          console.error(categoriesError);
-          return;
-        }
-
-        // Transform data to match expected structure
-        const transformedCategories = (categoriesData || []).map((cat: any) => ({
-          category_id: cat.id,
+    if (loading) return;
+    try {
+      const byId = new Map(products.map((p: any) => [p.id, p]));
+      const transformedCategories = (catalogCategories as any[])
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+        .map((cat: any) => ({
+          category_id: cat.supabaseId,
           category_name: cat.name,
           category_slug: cat.slug,
           category_description: cat.description,
           category_image: cat.image,
-          products: (cat.products || [])
-            .map((pc: any) => pc.products)
-            .filter((p: any) => p && p.is_active)
-            .map((p: any) => ({
-              ...p,
-              brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
-            }))
-        })).filter((cat: any) => cat.products.length > 0);
-
-        setCategories(transformedCategories);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast.error('Failed to load categories.');
-      }
-    };
-
-    fetchCategories();
-  }, []);
+          products: (productCategories as any[])
+            .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
+            .map((j: any) => byId.get(j.productSupabaseId))
+            .filter((p: any) => p && p.is_active),
+        }))
+        .filter((cat: any) => cat.products.length > 0);
+      setCategories(transformedCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      toast.error('Failed to load categories.');
+    }
+  }, [loading, products, catalogCategories, productCategories]);
 
   const handleAddToCart = async (e: React.MouseEvent, product: Product) => {
     e.stopPropagation(); // Prevent click from bubbling up to the parent link

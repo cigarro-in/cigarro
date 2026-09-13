@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Menu, X, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
 import { Product } from '../../hooks/useCart';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SearchResult } from '../../types/variants';
 import { formatINR } from '../../utils/currency';
 import { getProductImageUrl } from '../../lib/supabase/storage';
@@ -69,26 +69,19 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
   };
 
   // Fetch all products for client-side fuzzy search
+  // Wave 3: rows come from the Convex catalog (same shapes).
+  const { products: catalogProducts } = useFullCatalog();
+
   const fetchAllProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, brand:brands(id, name), description, is_active, created_at,
-          product_variants (
-            id, product_id, variant_name, variant_type, price, stock, is_default, is_active, images
-          )
-        `)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      
       // Normalize brand from array to object
-      const normalizedData = (data || []).map(p => ({
-        ...p,
-        brand: normalizeBrand(p.brand)
-      })) as Product[];
-      
+      const normalizedData = (catalogProducts || [])
+        .filter((p: any) => p.is_active)
+        .map((p) => ({
+          ...p,
+          brand: normalizeBrand((p as any).brand),
+        })) as Product[];
+
       setAllProducts(normalizedData);
       initializeFuse(normalizedData);
     } catch (error) {
@@ -162,10 +155,11 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Fetch all products on component mount
+  // Fetch all products on mount (and when catalog resolves)
   useEffect(() => {
     fetchAllProducts();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts]);
 
   // Focus search input when search opens
   useEffect(() => {

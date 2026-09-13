@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 
 interface FooterBrand { id: string; name: string; slug: string; }
 
 const Footer = () => {
   const [brands, setBrands] = useState<FooterBrand[]>([]);
+  // Wave 3: footer brand list from the Convex catalog.
+  const { brands: catalogBrands, loading } = useFullCatalog();
   useEffect(() => {
-    supabase
-      .from('brands')
-      .select('id, name, slug')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => { if (data) setBrands(data); });
-  }, []);
+    if (loading) return;
+    setBrands(
+      (catalogBrands as any[])
+        .filter((b: any) => b.isActive)
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+        .map((b: any) => ({ id: b.supabaseId, name: b.name, slug: b.slug })),
+    );
+  }, [catalogBrands, loading]);
   return (
     <footer className="section bg-creme-light relative overflow-hidden z-10">
       {/* Background Video (optional) - Commented out until video file is added */}

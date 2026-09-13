@@ -593,3 +593,62 @@ export const fullCatalog = query({
     };
   },
 });
+
+// Cart rehydration: lean server lines carry Supabase UUIDs; resolve them to
+// the exact legacy row shapes (snake_case) so useCart logic is untouched.
+export const productsBySupabaseIds = query({
+  args: { ids: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const out = [];
+    for (const id of args.ids.slice(0, 100)) {
+      const p = await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_supabase", (q) => q.eq("supabaseId", id))
+        .unique();
+      if (!p) continue;
+      const variants = await ctx.db
+        .query("catalogVariants")
+        .withIndex("by_product", (q) => q.eq("productSupabaseId", p.supabaseId))
+        .collect();
+      const brand = await brandNameBySupabaseId(ctx, p.brandSupabaseId);
+      out.push({
+        id: p.supabaseId,
+        name: p.name,
+        slug: p.slug,
+        brand_id: p.brandSupabaseId ?? null,
+        brand: brand ? { id: p.brandSupabaseId, name: brand.name } : null,
+        description: p.description,
+        is_active: p.isActive,
+        product_variants: variants.map((x) => ({
+          id: x.supabaseId,
+          variant_name: x.variantName,
+          price: x.priceRupees,
+          images: x.images ?? [],
+          is_default: x.isDefault,
+          is_active: x.isActive,
+        })),
+      });
+    }
+    return out;
+  },
+});
+
+export const combosBySupabaseIds = query({
+  args: { ids: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const out = [];
+    for (const id of args.ids.slice(0, 100)) {
+      const c = await ctx.db
+        .query("catalogCombos")
+        .withIndex("by_supabase", (q) => q.eq("supabaseId", id))
+        .unique();
+      if (c)
+        out.push({
+          id: c.supabaseId,
+          name: c.name,
+          combo_price: c.comboPriceRupees,
+        });
+    }
+    return out;
+  },
+});

@@ -1,9 +1,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { supabase } from '../lib/supabase/client';
 import { CartItemWithVariant } from '../types/variants';
 import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
 
@@ -11,8 +10,8 @@ import { mapCartItem, trackAddToCart } from '../lib/analytics/ga';
 // (`convex/userState.ts`) — full-replace via clear + per-line adds — while
 // item state, merge logic, totals and the public API are unchanged.
 // Guests use localStorage. Checkout re-prices from the catalog, so persisted
-// unit prices are display snapshots only. Catalog reads below stay on
-// Supabase until Phase 3 (rehydration only).
+// unit prices are display snapshots only. Catalog rehydration reads from
+// Convex (Wave 3); shapes match the legacy Supabase rows.
 
 // Updated to match new schema - images on variants, brand via relation
 export interface Product {
@@ -80,6 +79,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const { user } = useAuth();
   const org = useOrg();
+  const convex = useConvex();
 
   const useConvexPath = !!user && !!org;
   const convexAdd = useMutation(api.userState.addToCart);
@@ -169,23 +169,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     let productsById: Record<string, any> = {};
     if (productIds.length > 0) {
-      const { data } = await supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, brand:brands(id, name), description, is_active,
-          product_variants (id, variant_name, price, images, is_default, is_active)
-        `)
-        .in('id', productIds);
-      for (const p of data || []) productsById[p.id] = p;
+      const rows = await convex.query(api.catalog.productsBySupabaseIds, {
+        ids: productIds,
+      });
+      for (const p of rows || []) productsById[p.id] = p;
     }
 
     let combosById: Record<string, any> = {};
     if (comboIds.length > 0) {
-      const { data } = await supabase
-        .from('combos')
-        .select('id, name, combo_price')
-        .in('id', comboIds);
-      for (const c of data || []) combosById[c.id] = c;
+      const rows = await convex.query(api.catalog.combosBySupabaseIds, {
+        ids: comboIds,
+      });
+      for (const c of rows || []) combosById[c.id] = c;
     }
 
     const getBrandName = (brand: any): string => {

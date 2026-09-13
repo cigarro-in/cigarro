@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
@@ -43,35 +43,45 @@ export function CategoryPage() {
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get('search') || '';
 
+  // Wave 3: products + joins from the Convex catalog (same shapes).
+  // Search filters locally (30 products) — no ilike round-trip.
+  const {
+    products: catalogProducts,
+    categories: catalogCategories,
+    productCategories,
+    loading: catalogLoading,
+  } = useFullCatalog();
+
   useEffect(() => {
+    if (catalogLoading) return;
     if (isProductsPage) {
       fetchAllProducts();
     } else if (slug) {
       fetchCategory();
     }
-  }, [slug, isProductsPage, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, isProductsPage, searchQuery, catalogLoading]);
 
   const fetchAllProducts = async () => {
     setIsLoading(true);
     try {
-      let query = supabase
-        .from('products')
-        .select('id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, variant_name, price, is_default, is_active, images)')
-        .eq('is_active', true);
+      let rows = (catalogProducts as any[]).filter((p: any) => p.is_active);
 
       if (searchQuery.trim()) {
-        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+        const q = searchQuery.trim().toLowerCase();
+        rows = rows.filter(
+          (p: any) =>
+            String(p.name || '').toLowerCase().includes(q) ||
+            String(p.description || '').toLowerCase().includes(q),
+        );
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      rows = [...rows].sort(
+        (a: any, b: any) =>
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+      );
 
-      if (error) throw error;
-      
-      const transformedProducts = (data || []).map((p: any) => ({
-        ...p,
-        brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
-      }));
-      setProducts(transformedProducts);
+      setProducts(rows as Product[]);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');
@@ -85,79 +95,27 @@ export function CategoryPage() {
     setIsLoading(true);
 
     try {
-      try {
-        const response = await fetch('/api/categories');
-        if (response.ok) {
-          const categoriesData = await response.json();
-          const categoryData = categoriesData.find((c: any) => c.slug === slug);
-          
-          if (categoryData) {
-            setCategory({
-              id: categoryData.id,
-              name: categoryData.name,
-              description: categoryData.description,
-              image: categoryData.image,
-              meta_title: categoryData.meta_title || '',
-              meta_description: categoryData.meta_description || ''
-            });
-            setProducts(categoryData.products || []);
-            return;
-          }
-        }
-      } catch (apiError) {
-      }
-
-      const { data, error } = await supabase
-        .from('categories')
-        .select(`
-          id,
-          name,
-          description,
-          image,
-          meta_title,
-          meta_description,
-          products:product_categories!inner(
-            order,
-            products!inner(
-              id,
-              name,
-              brand_id,
-              brand:brands(id, name),
-              description,
-              is_active,
-              slug,
-              created_at,
-              product_variants(id, variant_name, price, is_default, is_active, images)
-            )
-          )
-        `)
-        .eq('slug', slug)
-        .eq('products.products.is_active', true)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          navigate('/404');
-          return;
-        }
-        throw error;
+      const categoryData = (catalogCategories as any[]).find((c: any) => c.slug === slug);
+      if (!categoryData) {
+        navigate('/404');
+        return;
       }
 
       setCategory({
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        image: data.image,
-        meta_title: data.meta_title,
-        meta_description: data.meta_description
+        id: categoryData.supabaseId,
+        name: categoryData.name,
+        description: categoryData.description,
+        image: categoryData.image,
+        meta_title: categoryData.metaTitle || '',
+        meta_description: categoryData.metaDescription || '',
       });
 
-      const categoryProducts = (data.products?.map((pc: any) => pc.products).filter(Boolean) || [])
-        .map((p: any) => ({
-          ...p,
-          brand: Array.isArray(p.brand) ? p.brand[0] : p.brand
-        }));
-      setProducts(categoryProducts);
+      const byId = new Map((catalogProducts as any[]).map((p: any) => [p.id, p]));
+      const categoryProducts = (productCategories as any[])
+        .filter((j: any) => j.categorySupabaseId === categoryData.supabaseId)
+        .map((j: any) => byId.get(j.productSupabaseId))
+        .filter((p: any) => p && p.is_active);
+      setProducts(categoryProducts as Product[]);
     } catch (error) {
       console.error('Error fetching category:', error);
       toast.error('Failed to load category');

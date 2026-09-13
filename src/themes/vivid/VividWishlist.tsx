@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
 import { useWishlist } from '../../hooks/useWishlist';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { VividProductCard } from './VividProductCard';
 import type { HomepageProduct } from '../../types/home';
@@ -12,45 +12,33 @@ export function VividWishlist() {
   const { wishlistItems, clearWishlist } = useWishlist();
   const [products, setProducts] = useState<HomepageProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  // Wave 3: wishlist rows from the Convex catalog (same shapes).
+  const { products: catalogProducts, loading: catalogLoading } = useFullCatalog();
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!wishlistItems || wishlistItems.length === 0) {
-        if (!cancelled) {
-          setProducts([]);
-          setLoading(false);
-        }
-        return;
-      }
-      setLoading(true);
-      const { data } = await supabase
-        .from('products')
-        .select(
-          'id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, variant_name, price, is_default, is_active, images)'
-        )
-        .in('id', wishlistItems)
-        .eq('is_active', true);
-      if (cancelled) return;
-      const rows = (data || []).map((p: any) => {
+    if (catalogLoading) return;
+    if (!wishlistItems || wishlistItems.length === 0) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const wanted = new Set(wishlistItems);
+    const rows = (catalogProducts as any[])
+      .filter((p: any) => wanted.has(p.id) && p.is_active)
+      .map((p: any) => {
         const variants = (p.product_variants || []).filter((v: any) => v.is_active !== false);
         const images = variants.flatMap((v: any) => v.images || []);
         return {
           ...p,
-          brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
           product_variants: variants,
           gallery_images: images,
           image: images[0] || null,
         };
       });
-      setProducts(rows);
-      setLoading(false);
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [wishlistItems]);
+    setProducts(rows);
+    setLoading(false);
+  }, [wishlistItems, catalogProducts, catalogLoading]);
 
   const handleClear = async () => {
     if (!confirm('Clear your entire wishlist?')) return;

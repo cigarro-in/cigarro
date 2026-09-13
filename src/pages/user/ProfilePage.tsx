@@ -34,7 +34,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase/client';
+import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { useQuery } from 'convex/react';
@@ -123,6 +123,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const org = useOrg();
+  const { wishlistItems } = useWishlist();
   const [wishlistCount, setWishlistCount] = useState(0);
   const [activeTierIndex, setActiveTierIndex] = useState(0);
 
@@ -148,15 +149,9 @@ export function ProfilePage() {
   const isLoading = convexOrders === undefined || walletData === undefined;
 
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data: wishlist } = await supabase
-        .from('wishlist')
-        .select('id')
-        .eq('user_id', user.id);
-      if (wishlist) setWishlistCount(wishlist.length);
-    })();
-  }, [user]);
+    // Wave 3: wishlist lives in Convex (useWishlist) — no Supabase lookup.
+    setWishlistCount(wishlistItems.length);
+  }, [wishlistItems]);
 
   const getCurrentTier = (): MembershipTier => {
     return [...membershipTiers]

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { getProductImageUrl } from '../../lib/supabase/storage';
 
@@ -15,25 +15,25 @@ interface Brand {
 export function VividBrands() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  // Wave 3: brand list from the Convex catalog (same shape).
+  const { brands: catalogBrands, loading: catalogLoading } = useFullCatalog();
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const { data } = await supabase
-        .from('brands')
-        .select('id, name, slug, description, logo_url')
-        .eq('is_active', true)
-        .order('name');
-      if (!cancelled) {
-        setBrands((data as any) || []);
-        setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (catalogLoading) return;
+    setBrands(
+      (catalogBrands as any[])
+        .filter((b: any) => b.isActive)
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+        .map((b: any) => ({
+          id: b.supabaseId,
+          name: b.name,
+          slug: b.slug,
+          description: b.description ?? undefined,
+          logo_url: b.logoUrl ?? undefined,
+        })),
+    );
+    setLoading(false);
+  }, [catalogBrands, catalogLoading]);
 
   return (
     <>

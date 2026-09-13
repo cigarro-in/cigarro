@@ -8,7 +8,7 @@ import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
-import { supabase } from '../../lib/supabase/client';
+import { useCatalogProduct, useFullCatalog, useCatalogCombos } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { VariantSelector } from '../../components/variants/VariantSelector';
@@ -101,106 +101,36 @@ function ProductPage() {
 
   // Store all products for related product lookups
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  // Wave 3: product + catalog from Convex (same shapes the API/Supabase
+  // paths produced). Combos resolve via hook (empty table in prod).
+  const { product: catalogProduct, loading: catalogProductLoading } =
+    useCatalogProduct(slug);
+  const { products: catalogAllProducts } = useFullCatalog();
+  const { combos: catalogCombos } = useCatalogCombos();
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      if (!slug) return;
-      
-      try {
-        // Try cached API first for blazing fast load
-        try {
-          const response = await fetch('/api/products');
-          if (response.ok) {
-            const products = await response.json();
-            setAllProducts(products); // Store for related products
-            
-            const productData = products.find((p: any) => p.slug === slug);
-            if (productData) {
-              setProduct(productData);
-              
-              // Variants are already included in cached data
-              const activeVariants = (productData.product_variants || []).filter((v: any) => v.is_active !== false);
-              setVariants(activeVariants);
-              
-              // Auto-select default variant (single source of truth)
-              const defaultVariant = getDefaultVariant(activeVariants);
-              if (defaultVariant) {
-                setSelectedVariant(defaultVariant);
-              }
-              
-              // Combos still need separate fetch (complex nested data)
-              fetchCombos();
-              return;
-            }
-          }
-        } catch (apiError) {
+    if (!slug || catalogProductLoading) return;
+    if (!catalogProduct || (catalogProduct as any).is_active === false) {
+      setProduct(null);
+      return;
+    }
+    const activeVariants = (
+      (catalogProduct as any).product_variants || []
+    ).filter((v: any) => v.is_active !== false);
+    setProduct(catalogProduct as any);
+    setVariants(activeVariants);
+    // Auto-select default variant (single source of truth)
+    const defaultVariant = getDefaultVariant(activeVariants);
+    if (defaultVariant) {
+      setSelectedVariant(defaultVariant);
+    }
+    // Combos still need separate fetch (complex nested data)
+    setCombos(catalogCombos as any[]);
+  }, [slug, catalogProduct, catalogProductLoading, catalogCombos]);
 
-        }
-
-        // Fallback: Fetch product details with brand relation
-        const { data: productData, error: productError } = await supabase
-          .from('products')
-          .select('id, name, slug, brand_id, brand:brands(id, name, slug), description, short_description, is_active, origin, specifications, meta_title, meta_description, canonical_url, rating_value, review_count')
-          .eq('slug', slug)
-          .single();
-
-        if (productError) {
-          toast.error('Failed to fetch product details.');
-          return;
-        }
-
-        // Transform brand from array to single object
-        const transformedProduct = {
-          ...productData,
-          brand: Array.isArray(productData.brand) ? productData.brand[0] : productData.brand
-        };
-        setProduct(transformedProduct);
-
-        // Fetch variants
-        const { data: variantsData, error: variantsError } = await supabase
-          .from('product_variants')
-          .select('*')
-          .eq('product_id', productData.id)
-          .eq('is_active', true)
-          .order('is_default', { ascending: false });
-
-        if (!variantsError && variantsData) {
-          setVariants(variantsData);
-          const defaultVariant = getDefaultVariant(variantsData);
-          if (defaultVariant) {
-            setSelectedVariant(defaultVariant);
-          }
-        }
-
-        fetchCombos();
-      } catch (error) {
-        console.error('Error fetching product data:', error);
-        toast.error('Failed to load product details.');
-      }
-    };
-
-    const fetchCombos = async () => {
-      const { data: combosData, error: combosError } = await supabase
-        .from('combos')
-        .select(`
-          *,
-          combo_items (
-            *,
-            variant:product_variants (
-              *,
-              product:products (*)
-            )
-          )
-        `)
-        .eq('is_active', true);
-
-      if (!combosError && combosData) {
-        setCombos(combosData);
-      }
-    };
-
-    fetchProduct();
-  }, [slug]);
+  useEffect(() => {
+    setAllProducts(catalogAllProducts as any[]);
+  }, [catalogAllProducts]);
 
   // Lazy load brand products when section is visible - use cached data
   useEffect(() => {
@@ -215,31 +145,15 @@ function ProductPage() {
       return;
     }
 
-    // Fallback to Supabase
-    const fetchBrandProducts = async () => {
-      try {
-        const { data: brandData, error: brandError } = await supabase
-          .from('products')
-          .select(`
-            id, name, slug, brand_id, brand:brands(id, name),
-            product_variants (
-              id, product_id, variant_name, variant_type, price, is_default, is_active, images
-            )
-          `)
-          .eq('brand_id', product.brand_id)
-          .neq('id', product.id)
-          .eq('is_active', true)
-          .limit(3);
-
-        if (!brandError && brandData) {
-          setBrandProducts(brandData);
-        }
-      } catch (error) {
-        console.error('Error fetching brand products:', error);
-      }
-    };
-
-    fetchBrandProducts();
+    // Fallback: catalog data always resolves via hook (empty only on error)
+    if (allProducts.length === 0) return;
+    const brandProds = allProducts
+      .filter(
+        (p: any) =>
+          p.brand_id && p.brand_id === product.brand_id && p.id !== product.id,
+      )
+      .slice(0, 3);
+    setBrandProducts(brandProds);
   }, [shouldLoadBrandSection, product, allProducts]);
 
   // Lazy load recommended products when section is visible - use cached data
@@ -254,31 +168,11 @@ function ProductPage() {
       return;
     }
 
-    // Fallback to Supabase
-    const fetchRecommendedProducts = async () => {
-      try {
-        const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select(`
-            id, name, slug, brand_id, brand:brands(id, name), is_active,
-            product_variants (
-              id, product_id, variant_name, variant_type, price, is_default, is_active, images
-            )
-          `)
-          .neq('id', product.id)
-          .eq('is_active', true)
-          .limit(20);
-
-        if (!productsError && productsData) {
-          const shuffled = productsData.sort(() => Math.random() - 0.5);
-          setSimilarProducts(shuffled.slice(0, 8));
-        }
-      } catch (error) {
-        console.error('Error fetching recommended products:', error);
-      }
-    };
-
-    fetchRecommendedProducts();
+    // Fallback: catalog data always resolves via hook (empty only on error)
+    if (allProducts.length === 0) return;
+    const otherProducts = allProducts.filter((p: any) => p.id !== product.id);
+    const shuffled = [...otherProducts].sort(() => Math.random() - 0.5);
+    setSimilarProducts(shuffled.slice(0, 8));
   }, [shouldLoadRecommended, product, allProducts]);
 
   // Intersection Observer for lazy loading

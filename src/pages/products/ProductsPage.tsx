@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../../lib/supabase/client';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
@@ -65,6 +65,15 @@ export function ProductsPage() {
   
   const { addToCart, isLoading: cartLoading } = useCart();
 
+  // Wave 3: products + filter facets from the Convex catalog (same shapes
+  // the API/Supabase paths produced). Filtering stays client-side.
+  const {
+    products: catalogProducts,
+    brands: catalogBrands,
+    categories: catalogCategories,
+    loading: catalogLoading,
+  } = useFullCatalog();
+
   // Removed productsPerPage - showing all products for lazy loading
   
   // Dynamic filter sections based on database data
@@ -85,56 +94,23 @@ export function ProductsPage() {
   };
 
   useEffect(() => {
-    if (!isInitialLoad) return; // Prevent multiple initial loads
-    
+    if (!isInitialLoad || catalogLoading) return; // Prevent multiple initial loads
+
     const loadData = async () => {
       try {
-        // Try cached APIs first for faster initial load
-        try {
-          const [productsResponse, categoriesResponse, brandsResponse] = await Promise.all([
-            fetch('/api/products'),
-            fetch('/api/categories'),
-            fetch('/api/brands')
-          ]);
-          
-          if (productsResponse.ok && categoriesResponse.ok && brandsResponse.ok) {
-            const [productsData, categoriesData, brandsData] = await Promise.all([
-              productsResponse.json(),
-              categoriesResponse.json(),
-              brandsResponse.json()
-            ]);
-            
-            // Set products
-            setProducts(productsData);
-            
-            // Set filter data
-            setCategories(categoriesData.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug })));
-            setBrands(brandsData.map((b: any) => ({ brand: b.name, count: 1 })));
-            
-            setIsLoading(false);
-            setIsInitialLoad(false);
-            return;
-          }
-        } catch (apiError) {
-
-        }
-
-        // Fallback: Test database connection first
-
-        const { data: testData, error: testError } = await supabase
-          .from('products')
-          .select('id')
-          .limit(1);
-        
-        if (testError) {
-          console.error('Database connection failed:', testError);
-          toast.error('Database connection failed. Please check your configuration.');
-          setIsLoading(false);
-          setIsInitialLoad(false);
-          return;
-        }
-
-        await Promise.all([fetchProducts(), fetchFilterData()]);
+        applyFilters(catalogProducts as any[]);
+        setCategories(
+          (catalogCategories as any[]).map((c: any) => ({ id: c.supabaseId, name: c.name, slug: c.slug })),
+        );
+        setBrands(
+          (catalogBrands as any[])
+            .filter((b: any) => b.isActive)
+            .map((brand: any) => ({ brand: brand.name, count: 1 })),
+        );
+        // No origins/strengths/pack-size facets in the catalog (same as before).
+        setOrigins([]);
+        setStrengths([]);
+        setPackSizes([]);
         setIsInitialLoad(false);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -142,7 +118,7 @@ export function ProductsPage() {
         setIsInitialLoad(false);
       }
     };
-    
+
     // Add timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (isLoading) {
@@ -152,18 +128,18 @@ export function ProductsPage() {
         toast.error('Loading timeout. Please refresh the page.');
       }
     }, 10000); // 10 second timeout
-    
+
     loadData();
-    
+
     return () => clearTimeout(timeoutId);
-  }, [urlSearchQuery, isInitialLoad]);
+  }, [urlSearchQuery, isInitialLoad, catalogLoading]);
 
   // Refetch products when filters change (with debounce)
   useEffect(() => {
-    if (isInitialLoad) return; // Don't refetch during initial load
-    
+    if (isInitialLoad || catalogLoading) return; // Don't refetch during initial load
+
     const timeoutId = setTimeout(() => {
-      fetchProducts();
+      applyFilters(catalogProducts as any[]);
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
@@ -213,132 +189,74 @@ export function ProductsPage() {
     setFilterSections(sections);
   }, [categories, brands, origins, strengths, packSizes]);
 
-  const fetchFilterData = async () => {
-    try {
-
-      // Fetch all filter data in parallel
-      const [categoriesResult, brandsResult] = await Promise.all([
-        supabase.from('categories').select('id, name, slug').order('name'),
-        supabase.from('brands').select('name').eq('is_active', true).order('name')
-      ]);
-
-      const categoriesData = categoriesResult.data || [];
-      const brandsData = brandsResult.data || [];
-      
-      if (brandsData) {
-        const brandsWithCounts = brandsData.map(brand => ({ 
-          brand: brand.name, 
-          count: 1 // We'll get actual counts from products later if needed
-        }));
-        
-        setBrands(brandsWithCounts);
-      }
-
-      // Fetch unique origins
-      const { data: originsData } = await supabase
-        .from('products')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1); // Just check if table exists
-      
-      if (originsData) {
-        // No origins filter available
-        setOrigins([]);
-      }
-
-      // Fetch unique strengths
-      const { data: strengthsData } = await supabase
-        .from('products')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1); // Just check if table exists
-      
-      if (strengthsData) {
-        // No strength filter available
-        setStrengths([]);
-      }
-
-      // Fetch unique pack sizes
-      const { data: packSizesData } = await supabase
-        .from('products')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1); // Just check if table exists
-      
-      if (packSizesData) {
-        // No pack size filter available
-        setPackSizes([]);
-      }
-    } catch (error) {
-      console.error('Error fetching filter data:', error);
+  // Filter the Convex catalog locally (same semantics the Supabase
+  // query had: active only, search, category/brand facets, price ranges
+  // against the default-variant price in rupees, newest first).
+  const priceInRange = (price: number, range: string): boolean => {
+    switch (range) {
+      case 'Under ₹500':
+        return price < 500;
+      case '₹500 - ₹1000':
+        return price >= 500 && price < 1000;
+      case '₹1000 - ₹2000':
+        return price >= 1000 && price < 2000;
+      case '₹2000 - ₹5000':
+        return price >= 2000 && price < 5000;
+      case 'Above ₹5000':
+        return price >= 5000;
+      default:
+        return true;
     }
   };
 
-  const fetchProducts = async () => {
+  const applyFilters = (rows: any[]) => {
     try {
-      let query = supabase
-        .from('products')
-        .select(`
-          id, name, slug, brand_id, description, is_active, created_at,
-          brands!inner(id, name),
-          categories (name),
-          product_variants (
-            id, product_id, variant_name, variant_type, price, is_default, is_active, stock, images
-          )
-        `)
-        .eq('is_active', true);
+      let list = (rows || []).filter((p: any) => p.is_active);
 
       // Apply search filter
-      if (urlSearchQuery.trim()) {
-        query = query.or(`name.ilike.%${urlSearchQuery}%,brands.name.ilike.%${urlSearchQuery}%,description.ilike.%${urlSearchQuery}%`);
+      const q = urlSearchQuery.trim().toLowerCase();
+      if (q) {
+        list = list.filter(
+          (p: any) =>
+            String(p.name || '').toLowerCase().includes(q) ||
+            String(p.brand?.name || '').toLowerCase().includes(q) ||
+            String(p.description || '').toLowerCase().includes(q),
+        );
       }
 
       // Apply category filter
       if (selectedCategories.length > 0) {
-        // For categories with nested relationships, we need to use the correct syntax
-        query = query.in('categories.name', selectedCategories);
+        const set = new Set(selectedCategories);
+        list = list.filter((p: any) =>
+          (p.categories || []).some((c: any) => set.has(c.name)),
+        );
       }
 
       // Apply brand filter
       if (selectedBrands.length > 0) {
-        query = query.in('brands.name', selectedBrands);
+        const set = new Set(selectedBrands);
+        list = list.filter((p: any) => set.has(p.brand?.name));
       }
 
-      // Apply price range filter
+      // Apply price range filter (default-variant price, rupees)
       if (selectedPriceRange.length > 0) {
-        const priceConditions = selectedPriceRange.map(range => {
-          switch (range) {
-            case 'Under ₹500':
-              return 'price.lt.50000'; // 50000 cents = ₹500
-            case '₹500 - ₹1000':
-              return 'price.gte.50000,price.lt.100000';
-            case '₹1000 - ₹2000':
-              return 'price.gte.100000,price.lt.200000';
-            case '₹2000 - ₹5000':
-              return 'price.gte.200000,price.lt.500000';
-            case 'Above ₹5000':
-              return 'price.gte.500000';
-            default:
-              return '';
-          }
-        }).filter(Boolean);
-        
-        if (priceConditions.length > 0) {
-          query = query.or(priceConditions.join(','));
-        }
+        list = list.filter((p: any) => {
+          const variants = p.product_variants || [];
+          const def = variants.find((v: any) => v.is_default) || variants[0];
+          const price = Number(def?.price ?? 0);
+          return selectedPriceRange.some((range) => priceInRange(price, range));
+        });
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      list = [...list].sort(
+        (a: any, b: any) =>
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+      );
 
-      if (error) {
-        console.error('Products query error:', error);
-        throw error;
-      }
-      
       // Transform the data to match expected Product type
-      const products = (data || []).map(product => {
-        // Extract brand - handle both array and object formats from Supabase
-        const brandData = product.brands;
+      const products = list.map((product: any) => {
+        // Extract brand - handle both array and object formats
+        const brandData = product.brand;
         let brand: { id: string; name: string };
         if (Array.isArray(brandData)) {
           brand = brandData[0] || { id: 'unknown', name: 'Premium' };
@@ -347,21 +265,21 @@ export function ProductsPage() {
         } else {
           brand = { id: 'unknown', name: 'Premium' };
         }
-        
+
         return {
           ...product,
           brand,
-          product_variants: product.product_variants?.map(variant => ({
-            ...variant,
-            images: variant.images || []
-          })) || []
+          product_variants:
+            product.product_variants?.map((variant: any) => ({
+              ...variant,
+              images: variant.images || [],
+            })) || [],
         };
       });
-      
+
       setProducts(products);
-      
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error filtering products:', error);
       toast.error('Failed to load products');
     } finally {
       setIsLoading(false); // Add this line to fix the loading issue

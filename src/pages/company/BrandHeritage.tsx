@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getBrandHeritageImageUrl } from '../../lib/supabase/storage';
-import { supabase } from '../../lib/supabase/client';
+import { useSectionConfig } from '../../hooks/data/useContent';
 
 export function BrandHeritage() {
+  // Wave 3: section config reads from Convex (was Supabase).
+  const { config: remoteConfig } = useSectionConfig('brand_heritage');
   const [sectionData, setSectionData] = useState({
     title: 'Our Heritage',
     subtitle: 'Crafting Excellence Since 1847',
@@ -14,36 +16,18 @@ export function BrandHeritage() {
   });
 
   useEffect(() => {
-    loadSectionData();
-  }, []);
-
-  const loadSectionData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('section_configurations')
-        .select('*')
-        .eq('section_name', 'brand_heritage')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading brand heritage data:', error);
-        return;
-      }
-
-      if (data) {
-        setSectionData({
-          title: data.title || 'Our Heritage',
-          subtitle: data.subtitle || 'Crafting Excellence Since 1847',
-          description: data.description || 'For over two centuries, our master craftsmen have perfected the art of tobacco curation, selecting only the finest leaves from the most prestigious plantations around the world.',
-          backgroundImage: data.background_image ? getBrandHeritageImageUrl(data.background_image) : getBrandHeritageImageUrl('DSC07229_FULL_1.webp'),
-          buttonText: data.button_text || 'Learn More',
-          buttonUrl: data.button_url || '/about'
-        });
-      }
-    } catch (error) {
-      console.error('Error loading brand heritage data:', error);
-    }
-  };
+    if (!remoteConfig) return;
+    setSectionData({
+      title: remoteConfig.title || 'Our Heritage',
+      subtitle: remoteConfig.subtitle || 'Crafting Excellence Since 1847',
+      description: remoteConfig.description || 'For over two centuries, our master craftsmen have perfected the art of tobacco curation, selecting only the finest leaves from the most prestigious plantations around the world.',
+      backgroundImage: (remoteConfig.backgroundImage || remoteConfig.background_image)
+        ? getBrandHeritageImageUrl((remoteConfig.backgroundImage || remoteConfig.background_image) as string)
+        : getBrandHeritageImageUrl('DSC07229_FULL_1.webp'),
+      buttonText: (remoteConfig.buttonText || remoteConfig.button_text) || 'Learn More',
+      buttonUrl: (remoteConfig.buttonUrl || remoteConfig.button_url) || '/about'
+    });
+  }, [remoteConfig]);
 
   return (
     <section className="py-6 md:py-16 bg-creme md:min-h-screen md:flex md:items-center">

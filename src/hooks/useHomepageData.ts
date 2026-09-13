@@ -1,125 +1,104 @@
-import { HomepageData, HeroSlide, SectionConfig, ShowcaseConfig, BlogSectionConfig, BlogPost } from '../types/home';
-import { supabase } from '../lib/supabase/client';
-import { useCached } from '../lib/cache/swrCache';
+import {
+  HomepageData,
+  HeroSlide,
+  SectionConfig,
+  ShowcaseConfig,
+  BlogSectionConfig,
+  BlogPost,
+} from '../types/home';
 import { useHeroSlides, useSectionConfig, useBlogPosts } from './data/useContent';
+import { useFullCatalog } from './data/useCatalog';
 
-const API_URL = '/api/homepage-data';
-const CACHE_KEY = 'homepage:v1';
-const TTL = 5 * 60_000;
-
-function transformProducts(products: any[]) {
-  return (products || []).map((product) => {
-    const activeVariants = product.product_variants?.filter((v: any) => v.is_active !== false) || [];
-    const images = activeVariants.flatMap((v: any) => v.images || []);
-    return {
-      ...product,
-      gallery_images: images,
-      image: images[0] || null,
-    };
-  });
-}
-
-async function fetchFromSupabase(): Promise<HomepageData> {
-  const [featuredProducts, categories, brands, heroSlides, sectionConfig, showcaseConfig, blogPosts, showcaseProducts, blogSectionConfig, categoriesWithProductsResult] = await Promise.all([
-    supabase.from('products').select(`id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, price, images, is_active, is_default, variant_name)`).eq('is_active', true).order('created_at', { ascending: false }).limit(12),
-    supabase.from('categories').select('id, name, slug, image, description').order('name').limit(20),
-    supabase.from('brands').select('id, name, slug, description, logo_url, is_active').eq('is_active', true).order('name').limit(20),
-    supabase.from('hero_slides').select('*').eq('is_active', true).order('sort_order', { ascending: true }).limit(10),
-    supabase.from('section_configurations').select('title, subtitle, description, button_text, button_url, is_enabled').eq('section_name', 'featured_products').single(),
-    supabase.from('section_configurations').select('title, background_image, button_text, button_url, is_enabled').eq('section_name', 'product_showcase').single(),
-    supabase.from('blog_posts').select(`id, title, slug, excerpt, featured_image, published_at, reading_time, author:profiles(name, email), category:blog_categories(name, color)`).eq('status', 'published').order('published_at', { ascending: false }).limit(6),
-    supabase.from('products').select(`id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, price, images, is_active, is_default, variant_name)`).eq('is_active', true).order('name', { ascending: true }).limit(6),
-    supabase.from('section_configurations').select('title, subtitle, description').eq('section_name', 'blog_section').single(),
-    supabase.from('categories').select(`id, name, slug, description, image, products:product_categories(products(id, name, slug, brand_id, description, is_active, created_at, brand:brands(id, name), product_variants(id, price, images, is_active, is_default, variant_name)))`).order('name').limit(6)
-  ]);
-
-  const transformedBlogPosts = (blogPosts.data || []).map((post: any) => ({
-    ...post,
-    author: Array.isArray(post.author) ? post.author[0] : post.author,
-    category: Array.isArray(post.category) ? post.category[0] : post.category
-  }));
-
-  const categoriesWithProducts = (categoriesWithProductsResult.data || []).map((cat: any) => {
-    const products = (cat.products || [])
-      .map((pc: any) => pc.products)
-      .filter((p: any) => p && p.is_active)
-      .map((p: any) => {
-        const activeVariants = p.product_variants?.filter((v: any) => v.is_active !== false) || [];
-        const images = activeVariants.flatMap((v: any) => v.images || []);
-        return {
-          ...p,
-          brand: Array.isArray(p.brand) ? p.brand[0] : p.brand,
-          gallery_images: images,
-          image: images[0] || null
-        };
-      });
-    return { ...cat, products };
-  }).filter((cat: any) => cat.products.length > 0);
-
-  return {
-    featuredProducts: transformProducts(featuredProducts.data || []),
-    categories: categories.data || [],
-    brands: brands.data || [],
-    heroSlides: heroSlides.data || [],
-    featuredSectionConfig: sectionConfig.data || null,
-    showcaseConfig: showcaseConfig.data || null,
-    showcaseProducts: transformProducts(showcaseProducts.data || []),
-    blogPosts: transformedBlogPosts,
-    blogSectionConfig: blogSectionConfig.data || null,
-    categoriesWithProducts
-  };
-}
-
-async function fetchHomepageData(): Promise<HomepageData> {
-  try {
-    const response = await fetch(API_URL);
-    const contentType = response.headers.get('content-type');
-    if (response.ok && contentType?.includes('application/json')) {
-      return (await response.json()) as HomepageData;
-    }
-  } catch {
-    /* fall through to Supabase */
-  }
-  return fetchFromSupabase();
-}
-
+// Wave 3: homepage composes entirely from Convex hooks (catalog + content).
+// No API hop, no Supabase fallback. Shapes match the legacy HomepageData
+// contract; money stays rupees.
 export function useHomepageData() {
-  const { data, isLoading, error } = useCached<HomepageData>(
-    CACHE_KEY,
-    fetchHomepageData,
-    { ttl: TTL }
-  );
-
-  // Wave 2: heroes, section configs, and homepage blog posts read from
-  // Convex (realtime). Catalog (products/categories/brands) stays on the
-  // cached API/Supabase path until Wave 3. Convex wins when present;
-  // the cached payload is the fallback so the page never hangs if a
-  // subscription is slow.
+  const {
+    products: catalogProducts,
+    brands: catalogBrands,
+    categories: catalogCategories,
+    productCategories,
+    loading: catalogLoading,
+  } = useFullCatalog();
   const { slides, loading: slidesLoading } = useHeroSlides();
-  const { config: featuredCfg } = useSectionConfig('featured_products');
-  const { config: showcaseCfg } = useSectionConfig('product_showcase');
-  const { config: blogSecCfg } = useSectionConfig('blog_section');
-  const { posts: convexPosts } = useBlogPosts(6);
+  const { config: featuredCfg, loading: featuredLoading } =
+    useSectionConfig('featured_products');
+  const { config: showcaseCfg, loading: showcaseLoading } =
+    useSectionConfig('product_showcase');
+  const { config: blogSecCfg, loading: blogSecLoading } =
+    useSectionConfig('blog_section');
+  const { posts: convexPosts, loading: blogLoading } = useBlogPosts(6);
 
-  const merged: HomepageData | undefined = data
-    ? {
-        ...data,
-        heroSlides:
-          !slidesLoading && slides.length > 0
-            ? slides.map(mapHeroSlide)
-            : data.heroSlides,
-        featuredSectionConfig:
-          featuredCfg != null ? mapSection(featuredCfg) : data.featuredSectionConfig,
-        showcaseConfig:
-          showcaseCfg != null ? mapShowcase(showcaseCfg) : data.showcaseConfig,
-        blogSectionConfig:
-          blogSecCfg != null ? mapBlogSection(blogSecCfg) : data.blogSectionConfig,
-        blogPosts:
-          convexPosts.length > 0 ? convexPosts.map(mapHomePost) : data.blogPosts,
-      }
-    : data;
+  const isLoading =
+    catalogLoading ||
+    slidesLoading ||
+    featuredLoading ||
+    showcaseLoading ||
+    blogSecLoading ||
+    blogLoading;
 
-  return { data: merged, isLoading, error };
+  if (isLoading) {
+    return { data: undefined as HomepageData | undefined, isLoading: true, error: null };
+  }
+
+  const active = (catalogProducts as any[]).filter((p: any) => p.is_active);
+  const featuredProducts = [...active]
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    )
+    .slice(0, 12);
+  const showcaseProducts = [...active]
+    .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+    .slice(0, 6);
+  const categories = [...(catalogCategories as any[])].sort((a: any, b: any) =>
+    String(a.name).localeCompare(String(b.name)),
+  );
+  const brands = (catalogBrands as any[]).filter((b: any) => b.isActive);
+
+  const byId = new Map(active.map((p: any) => [p.id, p]));
+  const categoriesWithProducts = categories
+    .slice(0, 6)
+    .map((cat: any) => ({
+      id: cat.supabaseId,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description,
+      image: cat.image,
+      products: (productCategories as any[])
+        .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
+        .map((j: any) => byId.get(j.productSupabaseId))
+        .filter(Boolean),
+    }))
+    .filter((cat: any) => cat.products.length > 0);
+
+  const data: HomepageData = {
+    featuredProducts,
+    categories: categories.slice(0, 20).map((c: any) => ({
+      id: c.supabaseId,
+      name: c.name,
+      slug: c.slug,
+      image: c.image,
+      description: c.description,
+    })),
+    brands: brands.slice(0, 20).map((b: any) => ({
+      id: b.supabaseId,
+      name: b.name,
+      slug: b.slug,
+      description: b.description,
+      logo_url: b.logoUrl,
+      is_active: b.isActive,
+    })),
+    heroSlides: slides.map(mapHeroSlide),
+    featuredSectionConfig: featuredCfg ? mapSection(featuredCfg) : null,
+    showcaseConfig: showcaseCfg ? mapShowcase(showcaseCfg) : null,
+    showcaseProducts,
+    blogPosts: convexPosts.map(mapHomePost),
+    blogSectionConfig: blogSecCfg ? mapBlogSection(blogSecCfg) : null,
+    categoriesWithProducts,
+  };
+
+  return { data, isLoading: false, error: null };
 }
 
 // ---------- Convex (camelCase + compat aliases) -> home shapes ----------
