@@ -78,6 +78,10 @@ export const addressV = v.object({
   pincode: v.string(),
   name: v.string(),
   phone: v.string(),
+  // GPS capture (checkout autofill). Optional: absent on older rows.
+  latitude: v.optional(v.number()),
+  longitude: v.optional(v.number()),
+  userProvidedAddress: v.optional(v.string()),
 });
 
 export const orderItemV = v.object({

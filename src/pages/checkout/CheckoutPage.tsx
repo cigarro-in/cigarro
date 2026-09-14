@@ -11,7 +11,8 @@ import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase/client';
+import { useAddresses, FlatAddress } from '../../lib/convex/useAddresses';
+import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { useMutation } from 'convex/react';
@@ -43,6 +44,15 @@ export function CheckoutPage() {
   const { user, isLoading: authLoading } = useAuth();
   const org = useOrg();
   const createConvexOrder = useMutation(api.orders.createOrder);
+  const convexClient = useConvex();
+  // Single address book (Convex). The legacy dual-table
+  // saved_addresses/addresses Supabase writes are gone.
+  const {
+    saveAddress: saveStoreAddress,
+    deleteAddress: deleteStoreAddress,
+    setDefaultAddress: setStoreDefaultAddress,
+    fetchNow: fetchStoreAddresses,
+  } = useAddresses(user);
   
   // Check URL params to determine checkout type
   const searchParams = new URLSearchParams(window.location.search);
@@ -332,24 +342,16 @@ export function CheckoutPage() {
 
   const loadSavedAddresses = async (skipAutoFill = false) => {
     if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error loading saved addresses:', error);
-    } else {
+
+    try {
+      const data = await fetchStoreAddresses();
       setSavedAddresses(data || []);
-      
+
       // Only auto-fill with primary address on initial load, not on every reload
       if (!skipAutoFill) {
-        const primaryAddress = data?.find(addr => addr.is_default);
+        const primaryAddress = data?.find((addr) => addr.is_default);
         if (primaryAddress && !hasInitializedForm && !formData.address) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             fullName: primaryAddress.full_name || prev.fullName,
             phone: primaryAddress.phone?.replace(/^\+91\s*/, '') || prev.phone,
@@ -363,6 +365,8 @@ export function CheckoutPage() {
           setHasInitializedForm(true);
         }
       }
+    } catch (error) {
+      console.error('Error loading saved addresses:', error);
     }
   };
 
@@ -414,14 +418,13 @@ export function CheckoutPage() {
   const fetchLocationFromPincode = async (pincode: string) => {
     if (pincode.length === 6) {
       try {
-        // Query our local pincodes database
-        const { data, error } = await supabase
-          .from('pincode_lookup')
-          .select('*')
-          .eq('pincode', pincode)
-          .single();
-        
-        if (error) {
+        // India Post public API (no key): GPS-first strategy per founder
+        // verdict — pincode_lookup stays unmigrated and unread.
+        const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const body = await res.json().catch(() => null);
+        const office = Array.isArray(body) ? body[0]?.PostOffice?.[0] : null;
+
+        if (!office) {
           // Show warning that PIN code is not servicable
           setValidationErrors(prev => ({
             ...prev,
@@ -429,45 +432,29 @@ export function CheckoutPage() {
           }));
           return;
         }
-        
-        if (data) {
-          setFormData(prev => ({
-            ...prev,
-            city: data.city,
-            state: data.state,
-            country: data.country
-          }));
-          
-          // Set country code to +91 for Indian PIN codes (only if not already set)
-          if (countryCode !== '+91') {
-            setCountryCode('+91');
-          }
-          
-          // Clear validation errors for auto-filled fields
-          setValidationErrors(prev => ({
-            ...prev,
-            city: '',
-            state: '',
-            pincode: ''
-          }));
-          
-          // Update shipping method based on PIN code
-          if (data.shipping_method && data.shipping_method !== 'standard') {
-            setFormData(prev => ({
-              ...prev,
-              shippingMethod: data.shipping_method
-            }));
-          }
-          
-          // Show success message
-          toast.success(`Location found: ${data.city}, ${data.state}`);
-          
-        } else {
-          setValidationErrors(prev => ({
-            ...prev,
-            pincode: 'This PIN code is not servicable'
-          }));
+
+        setFormData(prev => ({
+          ...prev,
+          city: office.District || prev.city,
+          state: office.State || prev.state,
+          country: office.Country || prev.country
+        }));
+
+        // Set country code to +91 for Indian PIN codes (only if not already set)
+        if (countryCode !== '+91') {
+          setCountryCode('+91');
         }
+
+        // Clear validation errors for auto-filled fields
+        setValidationErrors(prev => ({
+          ...prev,
+          city: '',
+          state: '',
+          pincode: ''
+        }));
+
+        // Show success message
+        toast.success(`Location found: ${office.District}, ${office.State}`);
       } catch (error) {
         console.error('Error fetching location from pincode:', error);
         setValidationErrors(prev => ({
@@ -578,34 +565,28 @@ export function CheckoutPage() {
 
   const saveCurrentLocationAddress = async (addressData: any) => {
     if (!user) return;
-    
-    // Store digits-only local number; DB trigger will normalize further as needed
+
+    // Store digits-only local number
     const phoneDigits = String(addressData.phone).replace(/\D/g, '');
-    
-    const { error } = await supabase
-      .from('saved_addresses')
-      .insert({
-        user_id: user.id,
+
+    try {
+      await saveStoreAddress({
         label: 'Current Location',
         full_name: addressData.fullName,
         phone: phoneDigits,
         address: addressData.address,
-        user_provided_address: addressData.userProvidedAddress || addressData.address,
         city: addressData.city,
         state: addressData.state,
         pincode: addressData.pincode,
         country: addressData.country,
         latitude: currentLocationData?.lat,
         longitude: currentLocationData?.lng,
-        is_default: false
-      });
-    
-    if (!error) {
+        userProvidedAddress: addressData.userProvidedAddress || addressData.address,
+      } as FlatAddress);
       loadSavedAddresses(true); // Skip auto-fill when saving new address
       toast.success('Address saved successfully!');
-    } else {
+    } catch (error: any) {
       console.error('Error saving address:', error);
-      // @ts-ignore - supabase error typing
       toast.error(error?.message || 'Failed to save address');
     }
   };
@@ -646,21 +627,9 @@ export function CheckoutPage() {
 
   const setPrimaryAddress = async (addressId: string) => {
     if (!user) return;
-    
+
     try {
-      // First, remove primary status from all addresses
-      await supabase
-        .from('saved_addresses')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-      
-      // Then set the selected address as primary
-      await supabase
-        .from('saved_addresses')
-        .update({ is_default: true })
-        .eq('id', addressId)
-        .eq('user_id', user.id);
-      
+      await setStoreDefaultAddress(addressId);
       // Reload addresses
       await loadSavedAddresses(true); // Skip auto-fill when updating primary address
       toast.success('Primary address updated');
@@ -679,48 +648,33 @@ export function CheckoutPage() {
 
   const deleteSavedAddress = async (addressId: string) => {
     if (!user) return;
-    
-    const { error } = await supabase
-      .from('saved_addresses')
-      .delete()
-      .eq('id', addressId)
-      .eq('user_id', user.id);
-    
-    if (!error) {
+
+    try {
+      await deleteStoreAddress(addressId);
       toast.success('Address deleted successfully');
       loadSavedAddresses(true); // Skip auto-fill when deleting address
       // Clear selection if this address was selected
       if (selectedSavedAddress === addressId) {
         setSelectedSavedAddress('');
       }
-    } else {
+    } catch {
       toast.error('Failed to delete address');
     }
   };
 
   const checkForDuplicateAddress = async (excludeId?: string) => {
     if (!user) return false;
-    
+
     try {
-      let query = supabase
-        .from('saved_addresses')
-        .select('id, label')
-        .eq('user_id', user.id)
-        .eq('address', formData.address.trim())
-        .eq('pincode', formData.pincode.trim());
-      
-      if (excludeId) {
-        query = query.neq('id', excludeId);
-      }
-      
-      const { data, error } = await query.limit(1);
-      
-      if (error) {
-        console.error('Error checking for duplicates:', error);
-        return false;
-      }
-      
-      return data && data.length > 0;
+      const needle = formData.address.trim();
+      const pin = formData.pincode.trim();
+      const found = savedAddresses.some(
+        (a: any) =>
+          a.id !== excludeId &&
+          (a.address || '').trim() === needle &&
+          (a.pincode || '').trim() === pin
+      );
+      return found;
     } catch (error) {
       console.error('Error in duplicate check:', error);
       return false;
@@ -742,48 +696,27 @@ export function CheckoutPage() {
     }
     
     try {
-      // Store digits-only local number; DB trigger will normalize further as needed
+      // Store digits-only local number
       const phoneDigits = String(formData.phone).replace(/\D/g, '');
-      
+
       // Generate smart label for the address
       const addressLabel = generateSmartLabel();
-      
-      // Check existing addresses to understand the constraint situation
-      const { data: existingAddresses } = await supabase
-        .from('addresses')
-        .select('id, is_primary')
-        .eq('user_id', user.id);
-      // Determine if this should be primary based on existing addresses
-      const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
-      const shouldBePrimary = !hasPrimary;
-      // With the fixed constraint, we can now properly set is_primary
-      const addressData = {
-        user_id: user.id,
+
+      await saveStoreAddress({
         label: addressLabel,
-        recipient_name: formData.fullName.trim(),
+        full_name: formData.fullName.trim(),
         phone: phoneDigits,
-        address_line_1: formData.address.trim(),
+        address: formData.address.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
-        postal_code: formData.pincode.trim(),
+        pincode: formData.pincode.trim(),
         country: formData.country,
         latitude: currentLocationData?.lat,
         longitude: currentLocationData?.lng,
-        is_primary: shouldBePrimary // Set based on whether user has existing primary
-      };
-      
-      const { error } = await supabase
-        .from('addresses')
-        .insert(addressData);
-      
-      if (!error) {
-        toast.success(`Address saved as "${addressLabel}" for future orders`);
-        // Reload addresses to update the UI
-        await loadSavedAddresses(true);
-      } else {
-        console.error('Failed to save address:', error);
-        // The constraint is fundamentally broken - let's skip auto-save for now
-      }
+      } as FlatAddress);
+      toast.success(`Address saved as "${addressLabel}" for future orders`);
+      // Reload addresses to update the UI
+      await loadSavedAddresses(true);
     } catch (error) {
       console.error('Error saving address on order success:', error);
     }
@@ -820,83 +753,59 @@ export function CheckoutPage() {
       return;
     }
     
-    // Store digits-only local number; DB trigger will normalize further as needed
+    // Store digits-only local number
     const phoneDigits = String(formData.phone).replace(/\D/g, '');
-    
+
     // Smart label generation
     const existingEditing = editingAddressId ? savedAddresses.find(a => a.id === editingAddressId) : null;
     const addressLabel = customLabel || existingEditing?.label || generateSmartLabel();
-    
-    if (editingAddressId) {
-      // Update existing address
-      const { error } = await supabase
-        .from('saved_addresses')
-        .update({
+
+    try {
+      if (editingAddressId) {
+        // Update existing address
+        await saveStoreAddress({
+          id: editingAddressId,
           label: addressLabel,
           full_name: formData.fullName,
           phone: phoneDigits,
           address: formData.address,
-          user_provided_address: formData.address,
           city: formData.city,
           state: formData.state,
           pincode: formData.pincode,
           country: formData.country,
           latitude: currentLocationData?.lat,
           longitude: currentLocationData?.lng,
-        })
-        .eq('id', editingAddressId)
-        .eq('user_id', user.id);
-      if (!error) {
+          userProvidedAddress: formData.address,
+        } as FlatAddress);
         toast.success('Address updated');
         setShowSaveSuggestion(false);
         setIsNewAddress(false);
         setEditingAddressId(null);
         loadSavedAddresses(true);
-      } else {
-        console.error('Failed to update address:', error);
-        // @ts-ignore - supabase error typing
-        toast.error(error?.message || 'Failed to update address');
+        return;
       }
-      return;
-    }
 
-    // Check existing addresses to understand the constraint situation
-    const { data: existingAddresses } = await supabase
-      .from('addresses')
-      .select('id, is_primary')
-      .eq('user_id', user.id);
-    // Determine if this should be primary based on existing addresses
-    const hasPrimary = existingAddresses?.some(addr => addr.is_primary === true);
-    const shouldBePrimary = !hasPrimary;
-    // With the fixed constraint, we can now properly set is_primary
-    const addressData = {
-      user_id: user.id,
-      label: addressLabel,
-      recipient_name: formData.fullName,
-      phone: phoneDigits,
-      address_line_1: formData.address,
-      city: formData.city,
-      state: formData.state,
-      postal_code: formData.pincode,
-      country: formData.country,
-      latitude: currentLocationData?.lat,
-      longitude: currentLocationData?.lng,
-      is_primary: shouldBePrimary // Set based on whether user has existing primary
-    };
-    
-    const { error } = await supabase
-      .from('addresses')
-      .insert(addressData);
-    
-    if (!error) {
+      await saveStoreAddress({
+        label: addressLabel,
+        full_name: formData.fullName,
+        phone: phoneDigits,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode,
+        country: formData.country,
+        latitude: currentLocationData?.lat,
+        longitude: currentLocationData?.lng,
+        userProvidedAddress: formData.address,
+      } as FlatAddress);
+
       toast.success(`Address saved as "${addressLabel}"`);
       setShowSaveSuggestion(false);
       setIsNewAddress(false);
       setEditingAddressId(null);
       loadSavedAddresses(true);
-    } else {
+    } catch (error: any) {
       console.error('Failed to save address:', error);
-      // @ts-ignore - supabase error typing
       toast.error(`Failed to save address: ${error?.message || 'Unknown error'}`);
     }
   };
@@ -977,16 +886,44 @@ export function CheckoutPage() {
         phone: `${countryCode} ${formData.phone}`.trim(),
       };
 
-      const convexItems = items.map((item: any) => {
-        const unitRupees = Number(item.variant_price ?? item.combo_price ?? item.price ?? 0);
-        return {
-          productId: String(item.id),
-          variantId: item.variant_id ? String(item.variant_id) : undefined,
-          name: String(item.name ?? 'Item'),
-          qty: Number(item.quantity ?? 1),
-          unitPricePaise: rupeesToPaise(unitRupees),
-        };
-      });
+      const convexItems = await Promise.all(
+        items.map(async (item: any) => {
+          const snapshotRupees = Number(item.variant_price ?? item.combo_price ?? item.price ?? 0);
+          let unitRupees = snapshotRupees;
+          // Re-price from the catalog at order time (snapshots are display-only).
+          // Any failure falls back to the snapshot — checkout never blocks.
+          try {
+            if (item.combo_id && org) {
+              const combos = await convexClient.query(api.catalog.combosBySupabaseIds, {
+                ids: [String(item.combo_id)],
+              });
+              const live = combos?.[0]?.combo_price;
+              if (Number.isFinite(Number(live))) unitRupees = Number(live);
+            } else if (org) {
+              const found = await convexClient.query(api.catalog.productsBySupabaseIds, {
+                ids: [String(item.id)],
+              });
+              const variants = found?.[0]?.product_variants || [];
+              const match = item.variant_id
+                ? variants.find((v: any) => String(v.id) === String(item.variant_id))
+                : variants.find((v: any) => v.is_default) || variants[0];
+              if (match && Number.isFinite(Number(match.price))) unitRupees = Number(match.price);
+            }
+          } catch {
+            // fall through to snapshot
+          }
+          return {
+            productId: String(item.id),
+            variantId: item.variant_id ? String(item.variant_id) : undefined,
+            name: String(item.name ?? 'Item'),
+            qty: Number(item.quantity ?? 1),
+            unitPricePaise: rupeesToPaise(unitRupees),
+          };
+        })
+      );
+      if (convexItems.some((it, i) => it.unitPricePaise !== rupeesToPaise(Number((items[i] as any).variant_price ?? (items[i] as any).combo_price ?? (items[i] as any).price ?? 0)))) {
+        toast.info('Prices refreshed from the latest catalog');
+      }
 
       const result = await createConvexOrder({
         orgId: org._id,

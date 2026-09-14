@@ -18,6 +18,9 @@ export interface FlatAddress {
   label: string;
   is_default?: boolean;
   user_id?: string;
+  latitude?: number;
+  longitude?: number;
+  userProvidedAddress?: string;
 }
 
 function toFlat(row: any): FlatAddress {
@@ -34,6 +37,9 @@ function toFlat(row: any): FlatAddress {
     label: row.label ?? '',
     is_default: row.isDefault ?? row.is_default ?? false,
     user_id: row.userId ?? row.user_id,
+    latitude: a.latitude,
+    longitude: a.longitude,
+    userProvidedAddress: a.userProvidedAddress,
   };
 }
 
@@ -95,6 +101,9 @@ export function useAddresses(user: any) {
           pincode: flat.pincode.trim(),
           name: flat.full_name.trim(),
           phone: flat.phone.trim(),
+          latitude: flat.latitude,
+          longitude: flat.longitude,
+          userProvidedAddress: flat.userProvidedAddress,
         });
         return flat;
       }
@@ -107,6 +116,9 @@ export function useAddresses(user: any) {
         pincode: flat.pincode.trim(),
         name: flat.full_name.trim(),
         phone: flat.phone.trim(),
+        latitude: flat.latitude,
+        longitude: flat.longitude,
+        userProvidedAddress: flat.userProvidedAddress,
       });
       return { ...flat, id: String(id) };
     },
