@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Minus, Plus, Trash2 } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 

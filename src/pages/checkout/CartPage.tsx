@@ -8,7 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 import { Card, CardContent } from '../../components/ui/card';
 

@@ -3,7 +3,7 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import { getBlogImageUrl } from '../../lib/supabase/storage';
+import { getBlogImageUrl } from '../../lib/images/urls';
 import type { BlogPost as BlogPostType } from '../../types/blog';
 import DOMPurify from 'dompurify';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
@@ -61,7 +61,7 @@ export function BlogsPage() {
                         {/* Article Image */}
                         <div className="relative aspect-[16/10] overflow-hidden">
                           <img
-                            src={post.featured_image || getBlogImageUrl('placeholder.webp')}
+                            src={post.featured_image || getBlogImageUrl()}
                             alt={post.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />
@@ -244,7 +244,7 @@ export function BlogPost() {
             {/* Featured Image */}
             <div className="relative aspect-[16/9] overflow-hidden rounded-xl mb-8">
               <img
-                src={post.featured_image || getBlogImageUrl('placeholder.webp')}
+                src={post.featured_image || getBlogImageUrl()}
                 alt={post.title}
                 className="w-full h-full object-cover"
               />
@@ -295,7 +295,7 @@ export function BlogPost() {
                         {/* Article Image */}
                         <div className="relative aspect-[16/10] overflow-hidden">
                           <img
-                            src={relatedPost.featured_image || getBlogImageUrl('placeholder.webp')}
+                            src={relatedPost.featured_image || getBlogImageUrl()}
                             alt={relatedPost.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />

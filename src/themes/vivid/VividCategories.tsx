@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useHomepageData } from '../../hooks/useHomepageData';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 
 export function VividCategories() {
   const { data, isLoading } = useHomepageData();

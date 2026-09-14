@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { getBrandHeritageImageUrl } from '../../lib/supabase/storage';
+import { getBrandHeritageImageUrl } from '../../lib/images/urls';
 import { useSectionConfig } from '../../hooks/data/useContent';
 
 export function BrandHeritage() {

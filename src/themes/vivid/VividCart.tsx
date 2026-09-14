@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useCatalogProduct } from '../../hooks/data/useCatalog';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewItemOnce } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { ProductReviews } from '../../components/products/ProductReviews';

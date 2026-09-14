@@ -3,7 +3,7 @@ import { useWishlist } from '../../hooks/useWishlist';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { Product as CartProduct } from '../../hooks/useCart';
 import { Product as DBProduct, ProductVariant } from '../../types/product';

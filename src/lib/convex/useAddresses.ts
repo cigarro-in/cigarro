@@ -3,9 +3,8 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from './useOrg';
 
-// Phase 1 complete: address store is Convex-only. All callers require a
-// signed-in user; pincode_lookup reads stay on Supabase (founder decision:
-// GPS replaces that table; it is not migrated).
+// Phase 1 complete: address store is Convex-only. Pincode lookup uses the
+// India Post public API (no key); the old Supabase pincode_lookup table is gone.
 export interface FlatAddress {
   id?: string;
   full_name: string;

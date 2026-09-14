@@ -65,7 +65,6 @@ npm install
 npx convex dev
 
 # 3. In a second shell, set env vars on the Convex deployment
-npx convex env set SUPABASE_URL https://<project-ref>.supabase.co
 npx convex env set EMAIL_WEBHOOK_SECRET <generate a random string>
 
 # 4. Copy your Convex URL into .env
@@ -77,28 +76,25 @@ npx convex run organizations:seedOrg '{
   "name":"Cigarro",
   "upiVpa":"cigarro@ybl",
   "bankEmailAlias":"cigarro",
-  "ownerUserId":"<your-supabase-auth.users.id>"
+  "ownerUserId":"<your-users.id>"
 }'
 ```
 
-### Supabase JWT prerequisite
+### Own JWT prerequisite
 
-Convex verifies Supabase JWTs using RS256. Enable asymmetric JWT signing in the Supabase dashboard:
-
-> Project Settings → Auth → JWT Signing Keys → migrate to RS256
-
-The public JWKS endpoint `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` must be reachable; Convex fetches it on startup.
+Convex verifies our ES256 JWTs. The public JWKS endpoint
+`https://cigarro.in/.well-known/jwks.json` must be reachable; Convex fetches it on startup.
 
 ### React wiring
 
-Wrap the app root with `ConvexSupabaseProvider` (once — above your router but below the Supabase session initialiser):
+Wrap the app root with `ConvexAuthProvider` (once — above your router):
 
 ```tsx
-import { ConvexSupabaseProvider } from '@/lib/convex/ConvexSupabaseProvider';
+import { ConvexAuthProvider } from '@/lib/convex/ConvexAuthProvider';
 
-<ConvexSupabaseProvider>
+<ConvexAuthProvider>
   <App />
-</ConvexSupabaseProvider>
+</ConvexAuthProvider>
 ```
 
 Then use Convex hooks as usual:

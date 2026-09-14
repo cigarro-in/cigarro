@@ -4,7 +4,7 @@ import { convex } from './client';
 import { getAccessToken } from '../auth/session';
 
 /**
- * Auth bridge (cutover complete — own JWT only).
+ * Auth bridge (own ES256 JWT only).
  *
  * Convex calls `fetchAccessToken({ forceRefreshToken })` whenever it needs
  * to authenticate a query/mutation. Our JWT lives in localStorage (30d,
@@ -59,7 +59,7 @@ function useOwnAuthForConvex() {
   );
 }
 
-export function ConvexSupabaseProvider({ children }: { children: ReactNode }) {
+export function ConvexAuthProvider({ children }: { children: ReactNode }) {
   return (
     <ConvexProviderWithAuth client={convex} useAuth={useOwnAuthForConvex}>
       {children}

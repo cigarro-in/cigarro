@@ -8,7 +8,7 @@ import { useWishlist } from '../../hooks/useWishlist';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {

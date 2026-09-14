@@ -23,7 +23,7 @@ import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../.
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 import QRCode from 'qrcode';
 

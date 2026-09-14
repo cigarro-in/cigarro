@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getBlogImageUrl } from '../../lib/supabase/storage';
+import { getBlogImageUrl } from '../../lib/images/urls';
 import { BlogPost, BlogSectionConfig } from '../../types/home';
 
 
@@ -131,7 +131,7 @@ export function BlogSection({ posts = [], config, isLoading = false }: BlogSecti
                     {/* Article Image */}
                     <div className="relative aspect-[4/3] overflow-hidden">
                       <img
-                        src={post.featured_image || getBlogImageUrl('placeholder.webp')}
+                        src={post.featured_image || getBlogImageUrl()}
                         alt={post.title}
                         className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                       />
@@ -220,7 +220,7 @@ export function BlogSection({ posts = [], config, isLoading = false }: BlogSecti
                       {/* Featured Image */}
                       <div className="relative aspect-[16/9] overflow-hidden">
                         <img
-                          src={featuredPost.featured_image || getBlogImageUrl('placeholder.webp')}
+                          src={featuredPost.featured_image || getBlogImageUrl()}
                           alt={featuredPost.title}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
@@ -309,7 +309,7 @@ export function BlogSection({ posts = [], config, isLoading = false }: BlogSecti
                         {/* Article Image */}
                         <div className="relative aspect-[16/10] overflow-hidden">
                           <img
-                            src={post.featured_image || getBlogImageUrl('placeholder.webp')}
+                            src={post.featured_image || getBlogImageUrl()}
                             alt={post.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />

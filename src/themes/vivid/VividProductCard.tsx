@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { useCart } from '../../hooks/useCart';
 import type { HomepageProduct } from '../../types/home';

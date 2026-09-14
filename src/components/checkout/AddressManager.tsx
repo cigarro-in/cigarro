@@ -7,7 +7,6 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { supabase } from '../../lib/supabase/client';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { toast } from 'sonner';
 
@@ -121,39 +120,35 @@ export function AddressManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeAddresses, useConvexPath]);
 
-  // Pincode lookup functionality
+  // Pincode lookup via India Post public API (no key, no Supabase).
   const fetchLocationFromPincode = async (pincode: string) => {
     if (pincode.length === 6) {
       try {
-        const { data, error } = await supabase
-          .from('pincode_lookup')
-          .select('*')
-          .eq('pincode', pincode)
-          .single();
-        
-        if (error) {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const body = await res.json().catch(() => null);
+        const office = Array.isArray(body) ? body[0]?.PostOffice?.[0] : null;
+
+        if (!office) {
           setAddressErrors(prev => ({
             ...prev,
             pincode: 'This PIN code is not serviceable'
           }));
           return;
         }
-        
-        if (data) {
-          setAddressForm(prev => ({
-            ...prev,
-            city: data.city,
-            state: data.state,
-            country: data.country
-          }));
-          
-          setAddressErrors(prev => ({
-            ...prev,
-            city: '',
-            state: '',
-            pincode: ''
-          }));
-        }
+
+        setAddressForm(prev => ({
+          ...prev,
+          city: office.District || prev.city,
+          state: office.State || prev.state,
+          country: office.Country || prev.country
+        }));
+
+        setAddressErrors(prev => ({
+          ...prev,
+          city: '',
+          state: '',
+          pincode: ''
+        }));
       } catch (error) {
         console.error('Pincode lookup error:', error);
       }

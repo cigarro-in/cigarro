@@ -1,13 +1,13 @@
 # Project guide for Codex sessions
 
-This is a multi-tenant cigarette e-commerce storefront (React + Vite) with payments on Convex and auth on Supabase.
+This is a multi-tenant cigarette e-commerce storefront (React + Vite) with payments on Convex and own ES256 JWT auth (no Supabase).
 
 ## Architecture at a glance
 
 - **Frontend**: React + Vite. Customer routes in `src/pages/`, admin in `src/adminnew/`, themes in `src/themes/`.
-- **Auth**: Supabase (RS256 JWT). Bridged into Convex via `ConvexSupabaseProvider` (`src/lib/convex/`).
+- **Auth**: own ES256 JWT (`phone-verify` mints `cigarro_token`, `auth.config.ts` trusts only `https://cigarro.in/auth`). Bridged into Convex via `ConvexAuthProvider` (`src/lib/convex/`).
 - **Payments + orders + wallet**: Convex at `proper-coyote-383.convex.cloud`. All code under `convex/`.
-- **Legacy data (products, profiles, wishlist, referrals, search)**: still on Supabase. Do not migrate these without being asked.
+- **Images**: Cloudflare R2 (`cigarro-assets` bucket, `https://cdn.cigarro.in`, keys under `asset_images/`). URL helpers in `src/lib/images/urls.ts`. No Supabase anywhere.
 - **Org scoping**: `useOrg()` returns the active organization (default slug `smokeshop`, set via `VITE_ORG_SLUG`). Every Convex payment/order/wallet call is scoped by `orgId`.
 - **Money**: integers in paise at the DB/Convex boundary, rupees in UI. Use `rupeesToPaise` / `paiseToRupees` from `src/lib/convex/money.ts`. Never multiply by 100 inline.
 
@@ -15,8 +15,8 @@ This is a multi-tenant cigarette e-commerce storefront (React + Vite) with payme
 
 Theme files under `src/themes/<theme>/` are **pure views**. They MUST NOT import from:
 - `convex/react`, `convex/_generated/*`
-- `src/lib/supabase/*`
-- `@supabase/*`
+
+Image URLs go through `src/lib/images/urls.ts` (pure CDN helpers — allowed).
 
 All data access goes through hooks in `src/hooks/data/`:
 - `useMyOrders({ kind?, limit? })` — normalized orders (paise→rupees, unified `uiStatus` that overlays payment + shipping)
@@ -25,7 +25,7 @@ All data access goes through hooks in `src/hooks/data/`:
 When adding a new data surface for themes (addresses, wishlist, product list, cart, …), create a matching hook in `src/hooks/data/` that returns a normalized plain-object shape. **Never duplicate Convex fetch or status-mapping logic inside a theme component.** If you're about to `import { useQuery } from 'convex/react'` inside a `Vivid*.tsx` or `Classic*.tsx` file, stop and extract a hook instead.
 
 Hooks owned by data layer:
-- own the data source (Convex / Supabase) and all API specifics
+- own the data source (Convex) and all API specifics
 - own unit conversions (paise→rupees, timestamps→Date)
 - own status derivation (combining multi-field states into one `uiStatus`)
 - return types themes can trust: `NormalizedOrder`, `WalletLedgerEntry`, etc.

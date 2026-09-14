@@ -10,7 +10,7 @@ import { PageTransition } from './components/layout/PageTransition';
 import Footer from './components/layout/Footer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { PhoneAuthDialog } from './components/auth/PhoneAuthDialog';
-import { ConvexSupabaseProvider } from './lib/convex/ConvexSupabaseProvider';
+import { ConvexAuthProvider } from './lib/convex/ConvexAuthProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
 import { useSiteSettings } from './hooks/data/useContent';
@@ -273,7 +273,7 @@ export default function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <ConvexSupabaseProvider>
+          <ConvexAuthProvider>
             <WishlistProvider>
               <CartProvider>
                 <ThemeProvider>
@@ -281,7 +281,7 @@ export default function App() {
                 </ThemeProvider>
               </CartProvider>
             </WishlistProvider>
-          </ConvexSupabaseProvider>
+          </ConvexAuthProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>

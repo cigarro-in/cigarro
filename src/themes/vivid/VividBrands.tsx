@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 
 interface Brand {
   id: string;

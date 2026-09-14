@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Award, Users, Globe, Heart, Shield, Star, Leaf, Sparkles, Trophy, Target, Crown } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { getTeamImageUrl } from '../../lib/supabase/storage';
+import { getTeamImageUrl } from '../../lib/images/urls';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function AboutPage() {

@@ -1,5 +1,5 @@
-// Auth Phase 2 session: our own JWT (30d, OTP-renewed), Supabase fallback
-// during the dual-issuer soak. Storage is local only — never committed.
+// Own-JWT session: our ES256 token (30d, OTP-renewed).
+// Storage is local only — never committed.
 
 const KEY = 'cigarro.session.v1';
 

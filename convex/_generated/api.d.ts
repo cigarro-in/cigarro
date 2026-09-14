@@ -24,6 +24,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_email from "../lib/email.js";
 import type * as lib_ids from "../lib/ids.js";
 import type * as lib_money from "../lib/money.js";
+import type * as lib_phone from "../lib/phone.js";
 import type * as lib_upi from "../lib/upi.js";
 import type * as orders from "../orders.js";
 import type * as organizations from "../organizations.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "lib/email": typeof lib_email;
   "lib/ids": typeof lib_ids;
   "lib/money": typeof lib_money;
+  "lib/phone": typeof lib_phone;
   "lib/upi": typeof lib_upi;
   orders: typeof orders;
   organizations: typeof organizations;

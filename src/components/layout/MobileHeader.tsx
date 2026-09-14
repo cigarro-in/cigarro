@@ -5,7 +5,7 @@ import { Product } from '../../hooks/useCart';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SearchResult } from '../../types/variants';
 import { formatINR } from '../../utils/currency';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import Fuse from 'fuse.js';
 
 interface MobileHeaderProps {

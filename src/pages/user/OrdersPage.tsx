@@ -10,7 +10,6 @@ import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-import { supabase } from '../../lib/supabase/client';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { useMutation, useQuery } from 'convex/react';

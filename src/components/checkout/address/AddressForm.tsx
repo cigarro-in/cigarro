@@ -3,7 +3,6 @@ import { MapPin, Loader2, Navigation, Home, Building2, GraduationCap, Hotel, Che
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { Address } from './AddressCard';
 import { cn } from '../../ui/utils';
@@ -102,27 +101,22 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     }
   };
 
-  // Location Logic
+  // Pincode lookup via India Post public API (no key, no Supabase).
   const fetchLocationFromPincode = async (pincode: string) => {
     if (pincode.length === 6) {
       try {
-        const { data, error } = await supabase
-          .from('pincode_lookup')
-          .select('*')
-          .eq('pincode', pincode)
-          .single();
-        
-        if (error) throw error;
-        
-        if (data) {
-          setFormData(prev => ({
-            ...prev,
-            city: data.city,
-            state: data.state,
-            country: data.country
-          }));
-          setErrors(prev => ({ ...prev, pincode: '', city: '', state: '' }));
-        }
+        const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const body = await res.json().catch(() => null);
+        const office = Array.isArray(body) ? body[0]?.PostOffice?.[0] : null;
+        if (!office) return;
+
+        setFormData(prev => ({
+          ...prev,
+          city: office.District || prev.city,
+          state: office.State || prev.state,
+          country: office.Country || prev.country
+        }));
+        setErrors(prev => ({ ...prev, pincode: '', city: '', state: '' }));
       } catch (error) {
         console.error('Pincode lookup error:', error);
       }

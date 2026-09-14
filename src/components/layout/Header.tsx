@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { formatINR } from '../../utils/currency';
 import { SearchResult } from '../../types/variants';
 import Fuse from 'fuse.js';
-import { getProductImageUrl } from '../../lib/supabase/storage';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { InstallPWA } from '../pwa/InstallPWA';
 
 const Header = () => {

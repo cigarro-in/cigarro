@@ -1,8 +1,10 @@
 /**
- * Audit logging utility for security and compliance
+ * Audit logging utility for security and compliance.
+ *
+ * Supabase removed: the audit_logs table never existed in production, so
+ * events are logged via the app logger only (never crash the app).
  */
 
-import { supabase } from '../lib/supabase/client';
 import { logger } from './logger';
 
 interface AuditEvent {
@@ -21,25 +23,12 @@ interface SecurityEvent extends AuditEvent {
   action: 'admin_login' | 'admin_logout' | 'admin_login_failed' | 'admin_access' | 'admin_access_changed' | 'unauthorized_access' | 'suspicious_activity';
 }
 
-// PostgREST surfaces a missing table as 404/Missing-table signatures.
-// The insert itself is fire-and-forget; only the read-back/noise matters.
-function isMissingTableError(error: any): boolean {
-  const parts = [error?.code, error?.message, error?.details, error?.hint]
-    .filter((p) => typeof p === 'string') as string[];
-  const text = parts.join(' | ');
-  return /could not find|not find the table|relation .* does not exist|PGRST205|42P01|404/i.test(text);
-}
-
 class AuditLogger {
   private isProduction = import.meta.env?.PROD || false;
   private batchSize = 10;
   private batchTimeout = 5000; // 5 seconds
   private eventQueue: AuditEvent[] = [];
   private batchTimer: NodeJS.Timeout | null = null;
-  // Circuit breaker: production currently has no audit_logs table (verified
-  // 2026-09-11 — writes 404). Stop spamming the endpoint until the migration
-  // lands; events are dropped, never crash the app.
-  private sinkMissing = false;
 
   /**
    * Log a security-related event
@@ -144,50 +133,19 @@ class AuditLogger {
    * Flush queued events to database
    */
   private async flushEvents(): Promise<void> {
-    if (this.eventQueue.length === 0 || this.sinkMissing) {
-      if (this.sinkMissing) this.eventQueue = [];
-      return;
-    }
+    if (this.eventQueue.length === 0) return;
 
     const events = [...this.eventQueue];
     this.eventQueue = [];
-    
+
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
       this.batchTimer = null;
     }
 
-    try {
-      // Insert events into audit_logs table
-      const { error } = await supabase
-        .from('audit_logs')
-        .insert(events.map(event => ({
-          action: event.action,
-          resource: event.resource,
-          resource_id: event.resource_id,
-          user_id: event.user_id,
-          metadata: event.metadata,
-          details: event.details,
-          ip_address: event.ip_address,
-          user_agent: event.user_agent,
-          severity: event.severity,
-          created_at: new Date().toISOString()
-        })));
-
-      if (error) {
-        if (isMissingTableError(error)) {
-          // One warning, then stop hitting a table that isn't there.
-          this.sinkMissing = true;
-          this.eventQueue = [];
-          logger.warn('audit_logs table missing in this environment — audit writes paused.');
-        } else {
-          logger.error('Failed to insert audit logs:', error);
-        }
-        // In case of failure, we could implement a fallback mechanism
-        // such as storing in localStorage or sending to an external service
-      }
-    } catch (error) {
-      logger.error('Error flushing audit events:', error);
+    // No remote sink — log locally only.
+    for (const event of events) {
+      logger.info('Audit Event:', event);
     }
   }
 

@@ -5,7 +5,7 @@
  * - POST /api/images/upload (multipart: file, folder?) → { url, key, alt, size }
  * - DELETE /api/images/upload?key=asset_images/... → { success: true }
  *
- * Admin-gated: Authorization Bearer <Supabase session JWT>, verified against
+ * Admin-gated: Authorization Bearer <own ES256 JWT (cigarro_token)>, verified against
  * Convex memberships (same check as invalidate-cache). Files are expected
  * pre-converted to WebP by the client (canvas redraw strips EXIF/GPS and
  * applies lightweight compression); the server validates type + size.
