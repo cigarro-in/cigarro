@@ -37,9 +37,14 @@ function useOwnAuthForConvex() {
     };
   }, []);
 
+  // NOTE: `tick` must stay in these deps. Convex re-runs `setAuth` only
+  // when `fetchAccessToken` identity changes — a stable reference here
+  // means the client never picks up a new token without a full refresh
+  // (the login-then-refresh dance). Notify bumps tick -> new reference.
   const fetchAccessToken = useCallback(
     async (_: { forceRefreshToken: boolean }) => getAccessToken(),
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tick],
   );
 
   return useMemo(
