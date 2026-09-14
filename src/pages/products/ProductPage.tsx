@@ -20,7 +20,7 @@ import { slugify } from '../../utils/slugify';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
-import { trackViewItem } from '../../lib/analytics/ga';
+import { trackViewItemOnce } from '../../lib/analytics/ga';
 import {
   getDefaultVariant,
   getVariantAvailability,
@@ -84,13 +84,12 @@ function ProductPage() {
   // NOTE: this hook must live here with the other hooks — never after the
   // `if (!product) return <Loading/>` early return (React #310 crash). It
   // only uses bindings declared above (product/selectedVariant/variants).
-  const viewedSlugRef = useRef<string | null>(null);
+  // trackViewItemOnce dedups across remounts (module scope), so no local ref.
   useEffect(() => {
     if (!product) return;
     const ov = selectedVariant ?? getDefaultVariant(variants);
-    if (!ov || viewedSlugRef.current === product.slug) return;
-    viewedSlugRef.current = product.slug;
-    trackViewItem({
+    if (!ov) return;
+    trackViewItemOnce(product.slug, {
       id: String(product.slug),
       name: String(product.name),
       price: Number(ov.price ?? 0) || 0,

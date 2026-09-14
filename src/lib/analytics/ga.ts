@@ -181,6 +181,17 @@ export function trackViewItem(item: GAItem): void {
   });
 }
 
+// Once-per-product-slug view_item for PDPs. Component-level ref guards reset
+// on remount (Suspense/lazy re-renders) and double-fire; this module-level
+// set survives remounts for the whole SPA session.
+const sentViewItems = new Set<string>();
+
+export function trackViewItemOnce(slug: string, item: GAItem): void {
+  if (sentViewItems.has(slug)) return;
+  sentViewItems.add(slug);
+  trackViewItem(item);
+}
+
 export function trackAddToCart(item: GAItem): void {
   trackEvent('add_to_cart', {
     currency: 'INR',
