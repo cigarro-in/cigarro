@@ -91,11 +91,15 @@ settings managers). Deployed DEV, build green.
   `discounts` (Lucky 2FW3A5FI) + `referrals` (GJ3DQP/XEVLUS/VM4JXU) — verified
   over HTTPS (`validateReferralCode` → valid, referrer "Customer").
 - PROD gates green: `200` home, `200` sitemap, `200` `?format=json` search.
-- ⚠️ PROD Pages edge still OLD: `?format=json` images are `supabase.co` URLs
-  while PROD `fullCatalog` is 100% `cdn.cigarro.in` (64/64) — proves the
-  deployed Function predates this push. Founder: check Workers & Pages →
-  project → Deployments (build failed / queued / paused?). New code is live
-  the moment Pages deploys `f41b2216`. Re-run the feed gate after.
+- ⚠️ PROD Pages Function publish FAILS deterministically (twice, same step):
+  `Success: Assets published!` → ~5s later `Failed to publish your Function.
+  Unknown internal error`. SPA assets deploy; Functions stay on the old bundle
+  (hence old `?format=` output). Prime suspect: `ASSETS` R2 binding was filled
+  in the form but never SAVED (screenshot showed the ADD form). Founder:
+  Pages → Settings → Bindings → confirm `ASSETS` → `cigarro-assets` entry
+  exists for Production → Deployments → Retry. Duplicate-key esbuild warning
+  fixed (`69f261b4`). If retry still fails with the binding saved, escalate to
+  Cloudflare (error is theirs, no detail).
 - Next: R2 `ASSETS` binding save confirmation → smoke-test upload/list/delete
   on PROD admin → auth Phase 2 (after soak) → reviews + retire.
 - Verify after Pages deploys: PROD admin login → discounts/dashboard/customers
