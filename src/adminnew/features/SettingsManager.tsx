@@ -4,7 +4,6 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
 import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -138,7 +137,7 @@ export function SettingsManager() {
     const isProduction = window.location.hostname === 'cigarro.in';
 
     if (!isProduction) {
-      toast.info('⚠️ Cloudflare cache purge only works in production.\n\nIn development, there is no CDN cache - all data loads fresh from Supabase.', { duration: 5000 });
+      toast.info('⚠️ Cloudflare cache purge only works in production.\n\nIn development, there is no CDN cache - all data loads fresh from Convex.', { duration: 5000 });
       return;
     }
 
@@ -146,13 +145,12 @@ export function SettingsManager() {
     const loading = toast.loading('Purging Cloudflare cache...');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const own = getAccessToken();
       const response = await fetch('https://cigarro.in/api/invalidate-cache', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...((own || session?.access_token) ? { Authorization: `Bearer ${own || session?.access_token}` } : {}),
+          ...(own ? { Authorization: `Bearer ${own}` } : {}),
         },
       });
       const data = await response.json();

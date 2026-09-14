@@ -3,18 +3,14 @@
 // metadata by construction, caps dimensions, and applies lightweight WebP
 // compression. The edge endpoint stores bytes as-is (it can't convert).
 
-import { supabase } from '../supabase/client';
 import { getAccessToken } from '../auth/session';
 
 const MAX_DIM = 1600;
 const WEBP_QUALITY = 0.82;
 
 async function sessionToken(): Promise<string | null> {
-  // Ours first (Phase 2); Supabase fallback during the soak.
-  const ours = getAccessToken();
-  if (ours) return ours;
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  // Own JWT (auth cutover complete).
+  return getAccessToken();
 }
 
 /** Decode any image → resize → WebP blob (metadata-free by redraw). */

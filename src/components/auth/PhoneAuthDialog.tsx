@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '../ui/dialog';
-import { supabase } from '../../lib/supabase/client';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useOTPWidget } from '../../hooks/useOTPWidget';
@@ -170,11 +169,8 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
     if (!trimmed || !user?.id) return;
     setSubmitting(true);
       try {
-      // Phase 1: display name lives in Convex users; auth metadata stays
-      // on Supabase Auth until the Phase 2 cutover.
+      // Display name lives in Convex users (cutover complete).
       await updateDisplayName(trimmed).catch(() => {});
-      // Legacy mirror, best-effort: no-ops for Phase-2 (ours-only) sessions.
-      await supabase.auth.updateUser({ data: { name: trimmed } }).catch(() => {});
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (err) {

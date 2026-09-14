@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, Lock, Bell, Save, Shield } from 'lucide-react';
+import { User, Mail, Phone, Bell, Save, Shield } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Switch } from '../../components/ui/switch';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase/client';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -42,24 +41,13 @@ export function ProfileSettingsPage() {
   const handleUpdateProfile = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: formData.fullName,
-          phone: formData.phone
-        }
+      // Display name/phone live in Convex users (cutover complete).
+      if (!org) throw new Error('Store not ready — try again');
+      await convexUpsertUser({
+        orgId: org._id,
+        name: formData.fullName,
+        phone: formData.phone || undefined,
       });
-
-      if (error) throw error;
-
-      // Phase 1: mirror display name/phone into Convex users (best-effort;
-      // auth metadata remains the source until the Phase 2 cutover).
-      if (org) {
-        convexUpsertUser({
-          orgId: org._id,
-          name: formData.fullName,
-          phone: formData.phone || undefined,
-        }).catch((e) => console.warn('Convex profile mirror warning:', e));
-      }
 
       toast.success('Profile updated successfully');
     } catch (error: any) {
@@ -67,19 +55,6 @@ export function ProfileSettingsPage() {
       toast.error(error.message || 'Failed to update profile');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    if (!user?.email) return;
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-      toast.success('Password reset email sent');
-    } catch (error: any) {
-      toast.error('Failed to send reset email');
     }
   };
 
@@ -169,13 +144,9 @@ export function ProfileSettingsPage() {
               <div className="border-t border-border/20 pt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium">Password</h4>
-                    <p className="text-sm text-muted-foreground">Protect your account with a strong password.</p>
+                    <h4 className="font-medium">Login method</h4>
+                    <p className="text-sm text-muted-foreground">You sign in with a one-time code sent to your phone. No password to manage.</p>
                   </div>
-                  <Button variant="outline" onClick={handlePasswordReset}>
-                    <Lock className="w-4 h-4 mr-2" />
-                    Change Password
-                  </Button>
                 </div>
               </div>
             </CardContent>
