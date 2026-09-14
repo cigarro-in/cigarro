@@ -167,9 +167,11 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
   }, [isConfigured]);
 
   const sendOTP = useCallback(
-    (phoneNumber: string) => {
+    (phoneNumber: string, cbs?: { onSent?: () => void; onFailed?: (message: string) => void }) => {
       if (!isLoaded || !window.sendOtp) {
-        setError('OTP service not ready');
+        const msg = 'OTP service not ready';
+        setError(msg);
+        cbs?.onFailed?.(msg);
         return;
       }
 
@@ -185,10 +187,13 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
         () => {
           setStep('otp');
           setIsLoading(false);
+          cbs?.onSent?.();
         },
         (err) => {
-          setError(err.message || 'Failed to send OTP');
+          const msg = err.message || 'Failed to send OTP';
+          setError(msg);
           setIsLoading(false);
+          cbs?.onFailed?.(msg);
         }
       );
     },

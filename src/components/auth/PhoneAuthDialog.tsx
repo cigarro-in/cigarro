@@ -109,11 +109,17 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
     e.preventDefault();
     const cleaned = phoneInput.replace(/\D/g, '');
     if (cleaned.length !== 10) return;
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setOtpError(false);
-    setStep('otp');
-    otp.sendOTP(cleaned);
-    setResendIn(30);
+    // Advance to the code step only after MSG91 confirms the send —
+    // failures (IP block, bad key, throttling) stay here with the reason.
+    otp.sendOTP(cleaned, {
+      onSent: () => {
+        setOtpDigits(Array(OTP_LENGTH).fill(''));
+        setOtpError(false);
+        setStep('otp');
+        setResendIn(30);
+      },
+      onFailed: (msg) => toast.error(msg),
+    });
   };
 
   const submitOtpIfComplete = (digits: string[]) => {
@@ -190,11 +196,15 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
   const handleResend = () => {
     if (resendIn > 0 || submitting) return;
     const cleaned = phoneInput.replace(/\D/g, '');
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setOtpError(false);
-    setTimeout(() => otpRefs.current[0]?.focus(), 50);
-    otp.sendOTP(cleaned);
-    setResendIn(30);
+    otp.sendOTP(cleaned, {
+      onSent: () => {
+        setOtpDigits(Array(OTP_LENGTH).fill(''));
+        setOtpError(false);
+        setTimeout(() => otpRefs.current[0]?.focus(), 50);
+        setResendIn(30);
+      },
+      onFailed: (msg) => toast.error(msg),
+    });
   };
 
   // ---- Body ----
