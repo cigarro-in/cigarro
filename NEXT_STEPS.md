@@ -1,7 +1,7 @@
-# Handoff — Convex Migration (2026-09-14, post-session)
+# Handoff — Convex Migration (2026-09-14, post-push)
 
-Remote = `30ff2d48` (push AFTER R2 uploads wired + verification — see bottom).
-Local main = ahead (NOT pushed per founder instruction).
+Remote = `f41b2216` (all pushed). PROD Convex live + seeded.
+⚠️ OPEN: PROD Pages still serving OLD edge functions (see bottom).
 Start: read `LEARNINGS.md` + this file + `git log --oneline -8` + `git status`.
 
 ## Shipped earlier (pushed `30ff2d48`)
@@ -85,14 +85,22 @@ settings managers). Deployed DEV, build green.
 4. **Wave 10/11 after push**: Convex-native reviews (`ReviewsPage` broken —
    `product_reviews` dropped in 076); retire (drop anon key, cold backup).
 
-## Post-push checklist (PROD `prestigious-bass-64`, code via push, DATA never syncs)
-- Recreate "Lucky" coupon via `/admin/discounts` (PROD table empty; backfill fn removed).
-- Seed PROD `referrals` (3 codes: GJ3DQP, XEVLUS, VM4JXU + userIds) — needs a
-  push-then-remove temp mutation OR recreate via UI flow (codes would change;
-  prefer temp-mutation backfill immediately post-push, then remove + push again).
-- Verify: PROD admin login → discounts/dashboard/customers load; `?format=json`
-  on a product; `invalidate-cache` with admin JWT; coupon validates at checkout.
-- PROD backfill NOT needed for users/orders (already live); catalog/content done earlier.
+## Post-push status (2026-09-14 ~18:00 IST)
+- Pushed `c0a8bd27` (all waves) → `addba173` (TEMP seed) → `f41b2216` (seed removed).
+- PROD Convex (`prestigious-bass-64`) LIVE: new functions resolve; seeded
+  `discounts` (Lucky 2FW3A5FI) + `referrals` (GJ3DQP/XEVLUS/VM4JXU) — verified
+  over HTTPS (`validateReferralCode` → valid, referrer "Customer").
+- PROD gates green: `200` home, `200` sitemap, `200` `?format=json` search.
+- ⚠️ PROD Pages edge still OLD: `?format=json` images are `supabase.co` URLs
+  while PROD `fullCatalog` is 100% `cdn.cigarro.in` (64/64) — proves the
+  deployed Function predates this push. Founder: check Workers & Pages →
+  project → Deployments (build failed / queued / paused?). New code is live
+  the moment Pages deploys `f41b2216`. Re-run the feed gate after.
+- Next: R2 `ASSETS` binding save confirmation → smoke-test upload/list/delete
+  on PROD admin → auth Phase 2 (after soak) → reviews + retire.
+- Verify after Pages deploys: PROD admin login → discounts/dashboard/customers
+  load; `?format=json` images are `cdn.cigarro.in`; `invalidate-cache` with
+  admin JWT; coupon validates at checkout.
 
 ## Standing rules
 - Commit-only, no push until decoupled + verified (founder instruction 2026-09-14).
