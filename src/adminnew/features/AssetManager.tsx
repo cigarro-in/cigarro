@@ -136,6 +136,7 @@ export function AssetManager() {
       
       toast.success(`Successfully uploaded ${files.length} file(s)`);
       await loadAssets();
+      await loadFolders();
     } catch (error) {
       console.error('Error uploading files:', error);
       toast.error('Failed to upload files');
@@ -224,7 +225,7 @@ export function AssetManager() {
   });
 
   const navigateToFolder = (folder: AssetFolder) => {
-    setCurrentFolder(folder.path + '/');
+    setCurrentFolder(folder.path);
   };
 
   const navigateBack = () => {
