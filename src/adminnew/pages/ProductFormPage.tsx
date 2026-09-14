@@ -128,6 +128,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         units_contained: v.unitsContained || 20,
         unit: v.unit || 'sticks',
         images: v.images || [],
+        image_alt_text: v.imageAltText || '',
         price: v.priceRupees,
         compare_at_price: v.compareAtPriceRupees,
         cost_price: v.costPriceRupees,
@@ -349,6 +350,9 @@ export function ProductFormPage({ }: ProductFormPageProps) {
           unitsContained: variant.units_contained,
           unit: variant.unit,
           images: variant.images,
+          // Rich alt by default ("Camel Yellow Packet"); explicit text wins.
+          imageAltText: variant.image_alt_text?.trim() ||
+            `${formData.name.trim()} ${variant.variant_name}`.trim() || undefined,
           priceRupees: variant.price,
           compareAtPriceRupees: variant.compare_at_price,
           costPriceRupees: variant.cost_price,
@@ -841,6 +845,12 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                           onChange={(imageUrls: string[]) => updateVariant(index, { images: imageUrls })}
                           maxImages={10}
                           searchHint={`${formData.name} cigarette pack`}
+                        />
+                        <Input
+                          value={variant.image_alt_text || ''}
+                          onChange={(e) => updateVariant(index, { image_alt_text: e.target.value })}
+                          placeholder={`${formData.name} ${variant.variant_name}`.trim() || 'Image alt text (auto-filled on save)'}
+                          className="bg-[var(--color-creme)] border-[var(--color-coyote)] text-sm"
                         />
                       </div>
                     </AdminCardContent>

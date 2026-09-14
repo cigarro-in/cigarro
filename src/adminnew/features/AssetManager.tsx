@@ -36,7 +36,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '../../components/ui/select';
-import { supabase } from '../../lib/supabase/client';
+import { listR2Images, deleteR2Image, uploadImageToR2, uploadRawToR2 } from '../../lib/images/upload';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -79,40 +79,21 @@ export function AssetManager() {
   const loadAssets = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .storage
-        .from('asset_images')
-        .list(currentFolder || '', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (error) throw error;
-
-      // Transform data to include public URLs
-      const assetsWithUrls = await Promise.all(
-        (data || []).map(async (item) => {
-          const { data: { publicUrl } } = supabase
-            .storage
-            .from('asset_images')
-            .getPublicUrl(`${currentFolder || ''}${item.name}`);
-
-          return {
-            id: item.id,
-            name: item.name,
-            path: `${currentFolder || ''}${item.name}`,
-            size: item.metadata?.size || 0,
-            content_type: item.metadata?.mimetype || 'unknown',
-            created_at: item.created_at,
-            updated_at: item.updated_at || item.created_at,
-            metadata: item.metadata,
-            public_url: publicUrl
-          } as Asset;
-        })
+      // R2 library under asset_images/ (admin-gated edge endpoint).
+      const { images } = await listR2Images(`asset_images/${currentFolder || ''}`);
+      setAssets(
+        images.map((item) => ({
+          id: item.id,
+          name: item.name,
+          path: item.path,
+          size: item.size || 0,
+          content_type: item.contentType || 'unknown',
+          created_at: item.createdAt,
+          updated_at: item.createdAt,
+          metadata: null,
+          public_url: item.url
+        }) as Asset)
       );
-
-      setAssets(assetsWithUrls);
     } catch (error) {
       console.error('Error loading assets:', error);
       toast.error('Failed to load assets');
@@ -123,25 +104,8 @@ export function AssetManager() {
 
   const loadFolders = async () => {
     try {
-      const { data, error } = await supabase
-        .storage
-        .from('asset_images')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'name', order: 'asc' }
-        });
-
-      if (error) throw error;
-
-      const folderList = (data || [])
-        .filter(item => item.id === null) // Folders have id: null
-        .map(item => ({
-          name: item.name,
-          path: item.name
-        }));
-
-      setFolders(folderList);
+      const { folders: r2folders } = await listR2Images(`asset_images/${currentFolder || ''}`);
+      setFolders(r2folders.map((f) => ({ name: f.name, path: `${currentFolder || ''}${f.name}/` })));
     } catch (error) {
       console.error('Error loading folders:', error);
     }
@@ -155,18 +119,14 @@ export function AssetManager() {
     setUploadProgress(0);
 
     try {
+      const folder = (currentFolder || '').replace(/\/$/, '');
       const uploadPromises = Array.from(files).map(async (file, index) => {
-        const filePath = `${currentFolder || ''}${file.name}`;
-        
-        const { error } = await supabase
-          .storage
-          .from('asset_images')
-          .upload(filePath, file, {
-            upsert: true,
-            contentType: file.type
-          });
-
-        if (error) throw error;
+        // Images: WebP + metadata stripped + compressed. Other assets raw.
+        if (file.type.startsWith('image/')) {
+          await uploadImageToR2(file, { folder: folder || undefined });
+        } else {
+          await uploadRawToR2(file, { folder: folder || undefined });
+        }
 
         // Update progress
         setUploadProgress(((index + 1) / files.length) * 100);
@@ -191,12 +151,7 @@ export function AssetManager() {
     if (!confirm(`Are you sure you want to delete "${asset.name}"?`)) return;
 
     try {
-      const { error } = await supabase
-        .storage
-        .from('asset_images')
-        .remove([asset.path]);
-
-      if (error) throw error;
+      await deleteR2Image(asset.path);
 
       toast.success('Asset deleted successfully');
       await loadAssets();

@@ -246,7 +246,19 @@ export const getReferralStats = query({
       .query("referrals")
       .withIndex("by_user", (q: any) => q.eq("userId", identity.subject))
       .unique();
-    if (!mine) return null;
+    // No row yet (pre-migration signup): zero stats with no code yet — the
+    // row mints on first record/attach, same lazy pattern as users spine.
+    // (Old trigger minted at signup; codes only matter once shared.)
+    if (!mine)
+      return {
+        referral_code: "",
+        total_referrals: 0,
+        successful_referrals: 0,
+        pending_referrals: 0,
+        total_rewards_earned: 0,
+        referral_link: "",
+        own_reward_pending: 0,
+      };
     return {
       referral_code: mine.referralCode,
       total_referrals: mine.totalReferrals,

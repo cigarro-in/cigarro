@@ -1,12 +1,17 @@
 /**
  * Image Processing API - Cloudflare Pages Function
- * 
- * Downloads external images, converts to WebP (if supported), compresses,
- * and uploads to Supabase Storage.
- * 
+ *
+ * Downloads external images and stores them in R2 (bucket `cigarro-assets`,
+ * binding `ASSETS`), returning CDN URLs.
+ *
+ * NOTE: no server-side conversion — the browser pipeline (canvas → WebP,
+ * metadata stripped, q0.82) handles optimization for direct uploads. Remote
+ * imports are stored as-is (CORS prevents client-side fetch); prefer the
+ * upload endpoint for new assets.
+ *
  * POST /api/images/process
  * Body: { urls: string[], folder?: string }
- * 
+ *
  * Returns: { success: true, images: [{ original: string, uploaded: string }] }
  */
 
@@ -49,14 +54,17 @@ export async function onRequest(context) {
             });
         }
 
-        // Supabase config - use service role key to bypass RLS
-        const SUPABASE_URL = env.SUPABASE_URL || 'https://emecdqvsvskzzncmltna.supabase.co';
-        // Service role key bypasses RLS - required for server-side uploads
-        const SUPABASE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-        const BUCKET = 'asset_images';
+        // R2 config (binding ASSETS). Public reads via CDN base.
+        const cdnBase = (env.CDN_BASE_URL || 'https://cdn.cigarro.in').replace(/\/$/, '');
+        const BUCKET_PREFIX = 'asset_images/';
+        const cleanFolder = String(folder).replace(/^\/+|\/+$/g, '').replace(/\.\./g, '').slice(0, 100);
 
-        console.log('[process] Using Supabase URL:', SUPABASE_URL);
-        console.log('[process] Using bucket:', BUCKET);
+        if (!env.ASSETS) {
+            return new Response(JSON.stringify({ error: 'R2 binding ASSETS missing' }), {
+                status: 500,
+                headers: corsHeaders,
+            });
+        }
 
         const results = [];
 
@@ -84,44 +92,32 @@ export async function onRequest(context) {
                 // don't have native image processing. Consider using Cloudflare Images
                 // or a library like @cloudflare/worker-sentry for WebP conversion.
 
-                // Generate unique filename with webp extension (assuming most are already optimized)
+                // Generate unique filename (stored as-is; see header note)
                 const timestamp = Date.now();
                 const random = Math.random().toString(36).substring(2, 8);
                 const extension = getExtensionFromUrl(originalUrl) || 'jpg';
                 const filename = `${timestamp}-${random}.${extension}`;
-                const path = folder ? `${folder}/${filename}` : filename;
+                const key = `${BUCKET_PREFIX}${cleanFolder ? cleanFolder + '/' : ''}${filename}`;
 
-                console.log('[process] Uploading to:', `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`);
+                console.log('[process] Storing to R2 key:', key);
                 console.log('[process] Blob size:', imageBlob.size, 'type:', imageBlob.type);
 
-                // Upload to Supabase Storage
-                const uploadResponse = await fetch(
-                    `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${SUPABASE_KEY}`,
-                            'Content-Type': imageBlob.type || 'image/jpeg',
-                            'x-upsert': 'true',
+                // Upload to R2
+                try {
+                    await env.ASSETS.put(key, imageBlob, {
+                        httpMetadata: {
+                            contentType: imageBlob.type || 'image/jpeg',
+                            cacheControl: 'public, max-age=31536000, immutable',
                         },
-                        body: imageBlob,
-                    }
-                );
-
-                console.log('[process] Upload response status:', uploadResponse.status, uploadResponse.statusText);
-
-                if (!uploadResponse.ok) {
-                    const errorText = await uploadResponse.text();
-                    console.error(`[process] Upload failed for ${originalUrl}:`, uploadResponse.status, errorText);
-                    results.push({
-                        original: originalUrl,
-                        error: `Upload failed (${uploadResponse.status}): ${errorText}`
                     });
+                } catch (putErr) {
+                    console.error(`[process] R2 put failed for ${originalUrl}:`, putErr.message);
+                    results.push({ original: originalUrl, error: `Upload failed: ${putErr.message}` });
                     continue;
                 }
 
-                // Construct public URL
-                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+                // Construct CDN URL
+                const publicUrl = `${cdnBase}/${key}`;
 
                 results.push({
                     original: originalUrl,

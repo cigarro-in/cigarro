@@ -16,9 +16,9 @@ import { Input } from '../../../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { supabase } from '../../../lib/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '../../../components/ui/utils';
+import { uploadImageToR2, listR2Images, deleteR2Image } from '../../../lib/images/upload';
 
 // ============================================================================
 // TYPES
@@ -91,13 +91,6 @@ function formatFileSize(bytes: number): string {
 
 function getFileExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() || '';
-}
-
-function generateUniqueFilename(originalName: string): string {
-  const ext = getFileExtension(originalName);
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `${timestamp}-${random}.${ext}`;
 }
 
 // ============================================================================
@@ -180,42 +173,20 @@ export function ImagePicker({
   const loadImages = async () => {
     setLoading(true);
     try {
-      const folderPath = folder ? `${folder}/` : '';
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .list(folder || '', {
-          limit: 200,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
-      if (error) throw error;
-
-      // Filter out folders and transform to our format
-      const imageFiles = (data || [])
-        .filter(item => item.id !== null) // Folders have id: null
-        .filter(item => {
-          const ext = getFileExtension(item.name);
-          return ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
-        })
-        .map(item => {
-          const path = folder ? `${folder}/${item.name}` : item.name;
-          const { data: { publicUrl } } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(path);
-
-          return {
-            id: item.id || item.name,
-            name: item.name,
-            path,
-            url: publicUrl,
-            size: item.metadata?.size || 0,
-            contentType: item.metadata?.mimetype || `image/${getFileExtension(item.name)}`,
-            createdAt: item.created_at || new Date().toISOString()
-          } as StorageImage;
-        });
-
-      setImages(imageFiles);
+      // R2 library (admin-gated edge endpoint). `folder` maps under asset_images/.
+      const prefix = `asset_images/${folder ? `${folder}/` : ''}`;
+      const { images: r2images } = await listR2Images(prefix);
+      setImages(
+        r2images.map((item) => ({
+          id: item.id || item.name,
+          name: item.name,
+          path: item.path,
+          url: item.url,
+          size: item.size || 0,
+          contentType: item.contentType || `image/${getFileExtension(item.name)}`,
+          createdAt: item.createdAt || new Date().toISOString()
+        }) as StorageImage)
+      );
     } catch (error) {
       console.error('Error loading images:', error);
       toast.error('Failed to load images');
@@ -272,26 +243,14 @@ export function ImagePicker({
     try {
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
-        const filename = generateUniqueFilename(file.name);
-        const path = folder ? `${folder}/${filename}` : filename;
-
-        const { error } = await supabase.storage
-          .from(bucket)
-          .upload(path, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (error) {
+        try {
+          // Browser pipeline: WebP + metadata stripped + compressed, then R2.
+          const uploaded = await uploadImageToR2(file, { folder: folder || undefined });
+          uploadedUrls.push(uploaded.url);
+        } catch {
           toast.error(`Failed to upload ${file.name}`);
           continue;
         }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(path);
-
-        uploadedUrls.push(publicUrl);
         setUploadProgress(((i + 1) / validFiles.length) * 100);
       }
 
@@ -371,11 +330,7 @@ export function ImagePicker({
     if (!confirm('Delete this image? This cannot be undone.')) return;
 
     try {
-      const { error } = await supabase.storage
-        .from(bucket)
-        .remove([image.path]);
-
-      if (error) throw error;
+      await deleteR2Image(image.path);
 
       // Remove from selection if selected
       if (selectedUrls.includes(image.url)) {
@@ -391,10 +346,9 @@ export function ImagePicker({
   };
 
   const handleConfirmSelection = async () => {
-    // Check if any selected URLs are external (web search results)
+    // Check if any selected URLs are external (not on our CDN)
     const isExternalUrl = (url: string) => {
-      // Local Supabase URLs contain our storage bucket domain
-      return !url.includes('supabase.co') && !url.startsWith('blob:');
+      return !url.includes('cdn.cigarro.in') && !url.startsWith('blob:');
     };
 
     const externalUrls = selectedUrls.filter(isExternalUrl);

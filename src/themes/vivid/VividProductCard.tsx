@@ -48,7 +48,7 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
       <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-[var(--color-surface-2)] flex-shrink-0">
         <img
           src={getProductImageUrl(image)}
-          alt={product.name}
+          alt={(defaultVariant as any)?.image_alt_text || product.name}
           className="w-full h-full object-cover"
           loading="lazy"
         />

@@ -129,7 +129,7 @@ export default function VividProduct() {
             <div className="aspect-square rounded-xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)]">
               <img
                 src={getProductImageUrl(images[activeImage])}
-                alt={product.name}
+                alt={(selected as any)?.image_alt_text || product.name}
                 className="w-full h-full object-cover"
               />
             </div>

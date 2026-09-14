@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../../components/ui/utils';
-import { supabase } from '../../../lib/supabase/client';
+import { uploadImageToR2 } from '../../../lib/images/upload';
 
 // ============================================================================
 // TYPES
@@ -95,40 +95,21 @@ async function fetchImageResults(query: string): Promise<ImageResult[]> {
 
 async function uploadImageFromUrl(
     imageUrl: string,
-    productId: string,
-    supabaseClient: typeof supabase
+    productName: string,
 ): Promise<string | null> {
     try {
         // Fetch the image directly (most CDNs allow CORS for images)
         const response = await fetch(imageUrl, { mode: 'cors' });
         const blob = await response.blob();
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substring(2, 8);
-        const extension = imageUrl.match(/\.(jpg|jpeg|png|webp|gif)/i)?.[1] || 'jpg';
-        const filename = `${timestamp}-${random}.${extension}`;
-        const path = `product_images/${productId}/${filename}`;
-
-        // Upload to Supabase
-        const { error } = await supabaseClient.storage
-            .from('asset_images')
-            .upload(path, blob, {
-                contentType: blob.type || 'image/jpeg',
-                cacheControl: '31536000',
-            });
-
-        if (error) {
-            console.error('Upload error:', error);
-            return null;
-        }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabaseClient.storage
-            .from('asset_images')
-            .getPublicUrl(path);
-
-        return publicUrl;
+        // Browser pipeline: WebP + metadata stripped + compressed → R2.
+        // Folder keeps product images together under the library root.
+        const uploaded = await uploadImageToR2(blob, {
+            folder: 'product_images',
+            alt: productName,
+            filename: imageUrl.split('/').pop() || 'image.jpg',
+        });
+        return uploaded.url;
     } catch (error) {
         console.error('Failed to upload image:', error);
         return null;
@@ -250,7 +231,7 @@ export function ProductImageSearchModal({
             const uploadedUrls: string[] = [];
 
             for (const imageUrl of selectedImages) {
-                const uploadedUrl = await uploadImageFromUrl(imageUrl, currentProduct.id, supabase);
+                const uploadedUrl = await uploadImageFromUrl(imageUrl, currentProduct.name);
                 if (uploadedUrl) {
                     uploadedUrls.push(uploadedUrl);
                 }

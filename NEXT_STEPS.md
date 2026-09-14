@@ -9,6 +9,17 @@ Content admin on Convex (blogs/heroes lists, blog/hero forms, homepage +
 settings managers). Deployed DEV, build green.
 
 ## Done this session (committed, NOT pushed — one big push at the end)
+- **R2 uploads** (needs `ASSETS` binding live on Pages — founder confirmed):
+  new `functions/api/images/upload.js` (GET list / POST store / DELETE, admin-gated
+  via `checkMyAdmin`, bucket `cigarro-assets`, CDN `https://cdn.cigarro.in`, keys
+  under `asset_images/`); `process.js` repointed Supabase→R2 (same contract).
+  New `src/lib/images/upload.ts`: canvas → WebP q0.82 ≤1600px (redraw strips
+  EXIF/GPS), `humanizeAlt`, session-token authed calls; `uploadRawToR2` for
+  video/pdf/zip. `ImagePicker`/`AssetManager`/`ProductImageSearchModal` fully off
+  Supabase Storage (only `supabase.auth.getSession` for the token remains —
+  moves in auth Phase 2). Alt tags: variant `image_alt_text` input added,
+  auto-default "{Product} {Variant}" on save, PDP + card prefer it.
+  Live DB URLs all under `asset_images/` (71 sampled) — `images/` is legacy.
 - **Referrals minimal on Convex** (DEV deployed): new `referrals` table (GLOBAL,
   snake_case, rupees, ms dates) + `convex/referrals.ts` — `ensureMyReferral`
   (lazy row creation, replaces the auth trigger), subject-scoped reads
@@ -18,7 +29,8 @@ settings managers). Deployed DEV, build green.
   Backfilled DEV (3 rows, zero activity); temp backfill removed after.
   `referralService.ts` same signatures via shared client; `MobileCheckoutPage`
   eligibility + late-attach on Convex. Reward payout never existed server-side —
-  flags carried, nothing invented.
+  flags carried, nothing invented. `getReferralStats` returns zero-stats (not
+  null) for row-less users.
 - **`ad85f9c6` Discounts on Convex** (DEV `proper-coyote-383` deployed):
   new `discounts` table (GLOBAL, rupees, ms dates, snake_case) + `convex/discounts.ts`
   (admin CRUD gated `NOT_DISCOUNT_ADMIN`, public `listActiveDiscounts`,
@@ -63,13 +75,9 @@ settings managers). Deployed DEV, build green.
   search now lives in Convex).
 
 ## What's LEFT (needs founder — blocks the big push)
-1. **R2 uploads**: images already on `cigarro-assets` + CDN (reads fine). Still
-   uploading to Supabase Storage: `AssetManager`, `ImagePicker` (list+upload),
-   `ProductImageSearchModal` uploader, `images/process.js`. Plan: new Pages
-   Function `api/images/upload.js` with R2 bucket binding (needs founder to bind
-   bucket in Pages dashboard — no token needed for Functions) + admin gate via
-   `checkMyAdmin`, returning CDN URLs; point the three UI upload paths at it.
-   Needed from founder: bucket name + public base (cdn.cigarro.in?) + binding done.
+1. **R2 uploads**: confirm the `ASSETS` → `cigarro-assets` binding is SAVED for
+   Production (+ Preview) in the Pages dashboard. Code is committed; first R2
+   upload/list/delete must be smoke-tested against PROD after the push.
 2. **Auth Phase 2 go-ahead** (founder: AFTER push soaks — do not start yet):
    `useAuth`, `phone-verify`, `ConvexSupabaseProvider`, `SettingsManager`
    session stamp, `PhoneAuthDialog.updateUser` stay till cutover. Forces re-login.
