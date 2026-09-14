@@ -160,14 +160,15 @@ const preflight = httpAction(async () => {
   return new Response(null, {
     status: 204,
     headers: {
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "POST, OPTIONS",
-      "access-control-allow-headers": "content-type, authorization",
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'content-type, authorization',
     },
   });
 });
 http.route({ path: "/receiveBankEmail", method: "OPTIONS", handler: preflight });
 http.route({ path: "/resolvePhoneIdentity", method: "OPTIONS", handler: preflight });
+http.route({ path: "/debugIdentity", method: "OPTIONS", handler: preflight });
 http.route({ path: "/wakeOrder", method: "OPTIONS", handler: preflight });
 
 function jsonResponse(payload: unknown, status = 200) {
