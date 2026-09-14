@@ -8,7 +8,29 @@ Start: read `LEARNINGS.md` + this file + `git log --oneline -8` + `git status`.
 Content admin on Convex (blogs/heroes lists, blog/hero forms, homepage +
 settings managers). Deployed DEV, build green.
 
-## Done this session (committed, NOT pushed — one big push at the end)
+## Done this session (committed locally, HELD — no push until green deploy)
+- **Wave 10 reviews** (`d77802f3`): `productReviews` table + `convex/reviews.ts`
+  (public list+aggregate, subject submit-upsert, admin approve/delete) +
+  `useProductReviews` hook + `ProductReviews` block on both PDPs +
+  account `ReviewsPage` fixed (was reading dropped table) + admin
+  `/admin/reviews` moderation (route+sidebar). New reviews start unapproved.
+- **Auth Phase 2** (`46a77aa4`): own ES256 issuer — keypair generated (keys with
+  founder), `/.well-known/jwks.json.js`, `phone-verify` mints `cigarro_token`
+  (sub = stable userId, 30d) alongside legacy flow; `auth.config.ts` dual trust;
+  `getMyProfile`/`ensureMyProfile` (identity-only, fixes silent spine);
+  `useAuth` + provider dual (ours-first, Supabase fallback); edge callers
+  (upload, purge) send ours-first. NEEDS founder: set Pages env
+  JWT_PRIVATE_JWK + JWT_PUBLIC_JWK, else server omits the token (safe fallback).
+- **Money path** (`e308e401`): catalog re-price before `createOrder` (snapshot
+  fallback, never blocks); ONE Convex address book (killed dual
+  `saved_addresses`/`addresses` writes); GPS lat/lng/userProvidedAddress added
+  to `addressV`; pincode lookup via India Post API (pincode_lookup unread).
+- **Gmail OAuth poller** (`af115e47`): `convex/gmail.ts` (history poll, reseed,
+  per-message ingest, dark without env) + 5-min cron + admin status/test card.
+  NEEDS founder OAuth dance (below). GAS + Email Worker stay as fallbacks.
+- **SEO/speed audits**: findings banked (age-gate blocks all crawling, bot-only
+  links, no ItemList/reviews corpus, 1600px images to phones, dead cache rule,
+  framer/fuse in critical path). Fixes NOT started — needs founder prioritization.
 - **R2 uploads** (needs `ASSETS` binding live on Pages — founder confirmed):
   new `functions/api/images/upload.js` (GET list / POST store / DELETE, admin-gated
   via `checkMyAdmin`, bucket `cigarro-assets`, CDN `https://cdn.cigarro.in`, keys
