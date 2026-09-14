@@ -64,3 +64,13 @@ export function clearSession() {
     // ignore
   }
 }
+
+// Same-tab writes don't fire `storage` events (cross-tab only), so tell the
+// Convex auth bridge to re-fetch the token after store/clear.
+export function notifyAuthChanged() {
+  try {
+    window.dispatchEvent(new Event('cigarro:auth-changed'));
+  } catch {
+    // non-browser (SSR/edge) — no listeners to notify.
+  }
+}

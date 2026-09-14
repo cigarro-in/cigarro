@@ -34,8 +34,13 @@ function useDualAuthForConvex() {
 
   useEffect(() => {
     const onStorage = () => setTick((t) => t + 1);
+    const onAuthChanged = () => setTick((t) => t + 1);
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('cigarro:auth-changed', onAuthChanged);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('cigarro:auth-changed', onAuthChanged);
+    };
   }, []);
 
   const fetchAccessToken = useCallback(

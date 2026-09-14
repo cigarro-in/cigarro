@@ -1,8 +1,9 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { ConvexHttpClient } from 'convex/browser';
 import { supabase } from '../lib/supabase/client';
-import { convex } from '../lib/convex/client';
+import { convex, convexUrl } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
-import { getSession, getAccessToken, storeSession, clearSession } from '../lib/auth/session';
+import { getSession, getAccessToken, storeSession, clearSession, notifyAuthChanged } from '../lib/auth/session';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 
@@ -34,9 +35,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function loadConvexUser(): Promise<User | null> {
+async function loadConvexUser(client: any = convex): Promise<User | null> {
   try {
-    const profile = await convex.query(api.userState.getMyProfile, {});
+    const profile = await client.query(api.userState.getMyProfile, {});
     if (!profile) return null;
     return {
       id: profile.userId,
@@ -141,15 +142,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.cigarro_token && data.user_id) {
       const phone = data.user_id && args.phone ? args.phone : '';
       storeSession(data.cigarro_token, data.user_id, phone);
+      // Wake the reactive client so hooks use the new token from here on.
+      notifyAuthChanged();
+      // Handshake over a directly-authed client: the shared reactive client
+      // still holds the pre-login (empty) auth on its live socket, so these
+      // calls would go out unauthenticated until it re-auths (hence the
+      // login-then-refresh dance).
+      const handshake = new ConvexHttpClient(convexUrl);
+      handshake.setAuth(data.cigarro_token);
       try {
-        await convex.mutation(api.userState.ensureMyProfile, {
+        await handshake.mutation(api.userState.ensureMyProfile, {
           phone: phone || undefined,
           name: args.name || undefined,
         });
       } catch (e) {
         logger.error('Profile spine error', e);
       }
-      const u = await loadConvexUser();
+      const u = await loadConvexUser(handshake);
       if (u) {
         setUser(u);
         try {
@@ -201,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       clearSession();
+      notifyAuthChanged();
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
