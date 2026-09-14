@@ -29,6 +29,7 @@ import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
 import type * as referrals from "../referrals.js";
 import type * as scheduler from "../scheduler.js";
+import type * as seed from "../seed.js";
 import type * as userState from "../userState.js";
 import type * as wallet from "../wallet.js";
 
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   payments: typeof payments;
   referrals: typeof referrals;
   scheduler: typeof scheduler;
+  seed: typeof seed;
   userState: typeof userState;
   wallet: typeof wallet;
 }>;
