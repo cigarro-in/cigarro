@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { requireIdentity, requireMember } from "./lib/auth";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
 // ---------- Phase 1: user state (cart, wishlist, profiles, addresses) ----------
@@ -65,6 +65,40 @@ export const ensureMyProfile = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+// Pre-login identity resolution for the phone-verify edge endpoint (auth
+// cutover: no Supabase). Looks up users.by_phone; mints a row with a fresh
+// stable UUID for new phones. Legacy rows keep their existing userId strings
+// because lookup is by phone, never by id — zero data migration.
+export const resolvePhoneIdentity = internalMutation({
+  args: {
+    phone: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .first();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        ...(args.name !== undefined ? { name: args.name } : {}),
+        updatedAt: now,
+      });
+      return { userId: existing.userId, isNewUser: false };
+    }
+    const userId = crypto.randomUUID();
+    await ctx.db.insert("users", {
+      userId,
+      phone: args.phone,
+      name: args.name ?? "Customer",
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { userId, isNewUser: true };
   },
 });
 

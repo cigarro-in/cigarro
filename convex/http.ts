@@ -52,6 +52,44 @@ http.route({
   }),
 });
 
+// ---------- Pre-login phone identity (auth cutover) ----------
+//
+// Called by the phone-verify edge endpoint after MSG91 confirms the OTP.
+// Resolves phone -> stable userId (creating the users row for new phones)
+// so the edge can mint our own JWT without touching Supabase.
+// Auth via Bearer token matching the EDGE_SHARED_SECRET env var in Convex.
+http.route({
+  path: "/resolvePhoneIdentity",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const expected = process.env.EDGE_SHARED_SECRET;
+    if (!expected) {
+      return jsonResponse({ ok: false, error: "misconfigured" }, 500);
+    }
+    if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+      return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    }
+
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ ok: false, error: "bad json" }, 400);
+    }
+    const phone = String(body.phone ?? "").trim();
+    if (!phone) return jsonResponse({ ok: false, error: "missing phone" }, 400);
+
+    const result = await ctx.runMutation(
+      internal.userState.resolvePhoneIdentity,
+      {
+        phone,
+        name: body.name ? String(body.name).slice(0, 100) : undefined,
+      },
+    );
+    return jsonResponse({ ok: true, ...result });
+  }),
+});
+
 // ---------- Poke from the client: wake / refresh an order ----------
 //
 // The Transaction page calls this the moment the customer returns from
@@ -91,6 +129,7 @@ const preflight = httpAction(async () => {
   });
 });
 http.route({ path: "/receiveBankEmail", method: "OPTIONS", handler: preflight });
+http.route({ path: "/resolvePhoneIdentity", method: "OPTIONS", handler: preflight });
 http.route({ path: "/wakeOrder", method: "OPTIONS", handler: preflight });
 
 function jsonResponse(payload: unknown, status = 200) {
