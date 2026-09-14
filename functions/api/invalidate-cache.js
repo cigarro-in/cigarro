@@ -7,11 +7,11 @@
 //  2. Warm fallback: otherwise re-fetches key endpoints with cache-busting
 //     headers so the next visitor triggers a fresh edge fetch.
 //
-// Auth: requires a Supabase session JWT for an admin user
-// (Authorization: Bearer <access_token>), verified against the profiles
-// table. Set PURGE_REQUIRE_ADMIN=false to disable (not recommended).
-
-import { createClient } from '@supabase/supabase-js';
+// Auth: requires a Supabase session JWT for an admin/owner user
+// (Authorization: Bearer <access_token>), verified against Convex
+// memberships via adminStats:checkMyAdmin. The customJwt bridge yields the
+// same subject the SPA uses. Set PURGE_REQUIRE_ADMIN=false to disable
+// (not recommended).
 
 const DEFAULT_PURGE_URLS = [
   'https://cigarro.in/',
@@ -35,26 +35,29 @@ function json(payload, status, cors) {
 
 async function requireAdmin(request, env) {
   if (env.PURGE_REQUIRE_ADMIN === 'false') return { ok: true };
-  const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const anonKey =
-    env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_KEY;
-  if (!supabaseUrl || !anonKey) return { ok: false, error: 'Auth not configured' };
+  const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
   const header = request.headers.get('Authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return { ok: false, error: 'Missing session' };
-  const sb = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data, error } = await sb.auth.getUser(token);
-  const userId = data?.user?.id;
-  if (error || !userId) return { ok: false, error: 'Invalid session' };
-  const { data: profile } = await sb
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', userId)
-    .maybeSingle();
-  if (!profile?.is_admin) return { ok: false, error: 'Admin only' };
-  return { ok: true };
+  try {
+    const res = await fetch(`${convexUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        path: 'adminStats:checkMyAdmin',
+        args: { orgSlug: env.VITE_ORG_SLUG || 'smokeshop' },
+        format: 'json',
+      }),
+    });
+    const body = await res.json().catch(() => null);
+    if (body?.status === 'success' && body.value?.ok) return { ok: true };
+    return { ok: false, error: 'Admin only' };
+  } catch (err) {
+    return { ok: false, error: 'Auth check failed' };
+  }
 }
 
 async function realPurge(urls, env) {

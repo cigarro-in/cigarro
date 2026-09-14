@@ -2,7 +2,6 @@
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
 
-import { createClient } from '@supabase/supabase-js';
 
 // List of bot user agents that should receive pre-rendered HTML
 // Keep in sync with functions/_middleware.js
@@ -102,7 +101,7 @@ async function cxQuery(baseUrl, path, args) {
 }
 
 // Generate HTML for product pages
-async function generateProductHTML(slug, supabase, faviconUrl, convexUrl) {
+async function generateProductHTML(slug, faviconUrl, convexUrl) {
   try {
     const detail = await cxQuery(convexUrl, 'catalog:getProductBySlug', { slug });
     if (!detail || !detail.product || detail.product.isActive === false) {
@@ -427,53 +426,60 @@ function normalizeVariant(v) {
   };
 }
 
+// Convex camelCase rows → the exact normalized shape above, so feed
+// serializers stay byte-identical regardless of data source.
+function normalizeConvexVariant(x) {
+  return normalizeVariant({
+    variant_name: x.variantName,
+    variant_type: x.variantType,
+    price: x.priceRupees,
+    compare_at_price: x.compareAtPriceRupees,
+    units_contained: x.unitsContained,
+    unit: x.unit,
+    stock: x.stock,
+    track_inventory: x.trackInventory,
+    is_default: x.isDefault,
+  });
+}
+
 // Full product fetch for agent formats (includes stock/unit columns the
-// SEO HTML intentionally omits). Read-only, anon key, same rows Google sees.
-async function fetchProductData(slug, supabase) {
-  const { data: product, error } = await supabase
-    .from('products')
-    .select('id, name, slug, description, short_description, meta_title, meta_description, canonical_url, specifications, rating_value, review_count, brand:brands(id, name, slug), product_variants(id, variant_name, variant_slug, variant_type, units_contained, unit, images, price, compare_at_price, stock, track_inventory, is_default, is_active)')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .single();
-  if (error || !product) return null;
-  const brand = Array.isArray(product.brand) ? product.brand[0] : product.brand;
-  const variants = (product.product_variants || [])
-    .filter(v => v.is_active !== false)
-    .map(normalizeVariant);
+// SEO HTML intentionally omits). Convex-backed; output shape unchanged.
+async function fetchProductData(slug, convexUrl) {
+  const detail = await cxQuery(convexUrl, 'catalog:getProductBySlug', { slug }).catch(() => null);
+  if (!detail || !detail.product || detail.product.isActive === false) return null;
+  const p = detail.product;
+  const brand = detail.brand || null;
+  const variants = (detail.variants || [])
+    .filter(x => x.isActive !== false)
+    .map(normalizeConvexVariant);
   // Same default-variant rule as bot HTML: is_default, else deterministic
   // name order (never database return order).
   const def = variants.find(v => v.is_default)
     || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
     || null;
-  const images = (product.product_variants || []).flatMap(v => v.images || []);
+  const images = (detail.variants || []).flatMap(x => x.images || []);
   let related = [];
   try {
-    const { data } = await supabase
-      .from('products')
-      .select('slug, name')
-      .eq('is_active', true)
-      .neq('slug', slug)
-      .limit(8);
-    related = (data || []).map(p => ({ name: p.name, url: `https://cigarro.in/product/${p.slug}` }));
+    const links = await cxQuery(convexUrl, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 8 });
+    related = (links || []).map(l => ({ name: l.name, url: `https://cigarro.in/product/${l.slug}` }));
   } catch { /* related links are best-effort */ }
   return {
     kind: 'product',
-    name: product.name,
-    slug: product.slug,
-    url: product.canonical_url || `https://cigarro.in/product/${product.slug}`,
+    name: p.name,
+    slug: p.slug,
+    url: p.canonicalUrl || `https://cigarro.in/product/${p.slug}`,
     brand: brand ? { name: brand.name, url: brand.slug ? `https://cigarro.in/brand/${brand.slug}` : null } : null,
-    description: product.short_description || (product.description || '').slice(0, 300) || null,
+    description: p.shortDescription || (p.description || '').slice(0, 300) || null,
     image: images[0] || null,
     currency: 'INR',
     price_inr: def ? def.price_inr : null,
     in_stock: def ? def.in_stock : false,
     stock_status: def ? def.stock_status : 'out_of_stock',
-    rating: product.review_count > 0 && product.rating_value != null
-      ? { value: Number(product.rating_value), count: Number(product.review_count) } : null,
+    rating: p.reviewCount > 0 && p.ratingValue != null
+      ? { value: Number(p.ratingValue), count: Number(p.reviewCount) } : null,
     age_restricted: true,
     health_warning: 'Smoking is injurious to health.',
-    specifications: product.specifications && typeof product.specifications === 'object' ? product.specifications : {},
+    specifications: p.specifications && typeof p.specifications === 'object' ? p.specifications : {},
     variants,
     related,
   };
@@ -509,109 +515,66 @@ function serializeProductMarkdown(norm) {
   return lines.join('\n');
 }
 
-// Search via the public RPC, enriched with one batched variants query so
-// agents get real per-variant price + stock (the RPC rows lack stock).
-// Falls back to direct table queries if the RPC is ever broken — search must
-// never hard-fail for agents.
-async function fetchSearchResults(query, supabase) {
-  const q = (query || '').trim().slice(0, 100);
-  let rows = null;
+// Search over the Convex fullCatalog bundle (in-memory substring match =
+// the old RPC's ILIKE semantics; empty query lists the active catalog).
+// Output shape matches the old RPC path exactly; search never hard-fails.
+async function fetchSearchResults(query, convexUrl) {
+  const q = (query || '').trim().toLowerCase().slice(0, 100);
+  let full = null;
   try {
-    const { data, error } = await supabase
-      .rpc('get_searchable_products', { search_query: q })
-      .limit(20);
-    if (error) throw error;
-    rows = data || [];
+    full = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
   } catch (e) {
-    console.error('search RPC failed, using direct fallback:', e.message);
-    rows = await fallbackSearchRows(q, supabase);
+    console.error('convex fullCatalog failed:', e.message);
+    return [];
   }
-  const productIds = [...new Set(rows.filter(r => r.item_type === 'product').map(r => r.id))];
+  const brandBySupabaseId = new Map((full.brands || []).map(b => [b.supabaseId, b]));
   const variantsByProduct = {};
-  if (productIds.length > 0) {
-    const { data: vars } = await supabase
-      .from('product_variants')
-      .select('product_id,variant_name,variant_type,price,compare_at_price,stock,track_inventory,units_contained,unit,is_default,is_active')
-      .in('product_id', productIds)
-      .eq('is_active', true);
-    (vars || []).forEach(v => {
-      (variantsByProduct[v.product_id] = variantsByProduct[v.product_id] || []).push(normalizeVariant(v));
-    });
-  }
-  return rows.map(r => {
-    if (r.item_type === 'combo') {
-      return {
-        kind: 'combo',
-        name: r.name,
-        url: `https://cigarro.in/products?search=${encodeURIComponent(r.slug || r.name)}`,
-        brand: null,
-        price_inr: r.base_price != null ? Number(r.base_price) : null,
-        image: (r.gallery_images || [])[0] || null,
-        in_stock: true,
-        note: 'Combo — contents and availability confirmed on page.',
-      };
-    }
-    const variants = variantsByProduct[r.id] || [];
+  (full.variants || []).filter(x => x.isActive !== false).forEach(x => {
+    (variantsByProduct[x.productSupabaseId] = variantsByProduct[x.productSupabaseId] || []).push(x);
+  });
+  const match = (...texts) => !q || texts.some(t => String(t || '').toLowerCase().includes(q));
+  const results = [];
+
+  for (const p of (full.products || []).filter(p => p.isActive !== false)) {
+    const brand = p.brandSupabaseId ? brandBySupabaseId.get(p.brandSupabaseId) : null;
+    const cxVars = variantsByProduct[p.supabaseId] || [];
+    const variants = cxVars.map(normalizeConvexVariant);
+    if (!match(p.name, p.description, brand ? brand.name : null, ...cxVars.map(x => x.variantName))) continue;
     const def = variants.find(v => v.is_default)
       || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
       || null;
-    return {
+    const images = cxVars.flatMap(x => x.images || []);
+    results.push({
       kind: 'product',
-      name: r.name,
-      slug: r.slug,
-      url: `https://cigarro.in/product/${r.slug}`,
-      brand: r.brand || null,
-      price_inr: def ? def.price_inr : (r.base_price != null ? Number(r.base_price) : null),
-      image: (r.gallery_images || [])[0] || null,
+      name: p.name,
+      slug: p.slug,
+      url: `https://cigarro.in/product/${p.slug}`,
+      brand: brand ? brand.name : null,
+      price_inr: def ? def.price_inr : null,
+      image: images[0] || null,
       in_stock: def ? def.in_stock : true,
       stock_status: def ? def.stock_status : 'unknown',
-      variant: r.variant_name || (def ? def.name : null),
+      variant: def ? def.name : null,
       variants: variants.length > 1 ? variants : undefined,
-    };
-  });
-}
-
-// Direct-table fallback when the search RPC is unavailable. Shapes rows exactly
-// like RPC rows so the enrichment step below is shared. Read-only, anon key.
-async function fallbackSearchRows(q, supabase) {
-  const safe = q.replace(/[,()%"\\]/g, ' ').trim().slice(0, 100);
-  if (!safe) return [];
-  const like = `%${safe}%`;
-  const rows = [];
-  try {
-    const { data: products } = await supabase
-      .from('products')
-      .select('id,name,slug,description,brand:brands(name),product_variants(id,variant_name,price,images,is_default,is_active)')
-      .eq('is_active', true)
-      .or(`name.ilike.${like},description.ilike.${like}`)
-      .limit(20);
-    (products || []).forEach(p => {
-      const brand = Array.isArray(p.brand) ? p.brand[0] : p.brand;
-      const active = (p.product_variants || []).filter(v => v.is_active !== false);
-      const def = active.find(v => v.is_default) || active[0] || null;
-      rows.push({
-        id: p.id, name: p.name, slug: p.slug, brand: brand ? brand.name : null,
-        description: p.description, base_price: def ? def.price : null,
-        gallery_images: def ? (def.images || []) : [], is_active: true,
-        item_type: 'product', variant_name: def ? def.variant_name : null,
-        variant_id: def ? def.id : null,
-      });
     });
-  } catch { /* products fallback failed — still try combos */ }
-  try {
-    const { data: combos } = await supabase
-      .from('combos')
-      .select('id,name,slug,description,combo_price,gallery_images')
-      .eq('is_active', true)
-      .or(`name.ilike.${like},description.ilike.${like}`)
-      .limit(10);
-    (combos || []).forEach(c => rows.push({
-      id: c.id, name: c.name, slug: c.slug, brand: null, description: c.description,
-      base_price: c.combo_price, gallery_images: c.gallery_images || [], is_active: true,
-      item_type: 'combo', variant_name: null, variant_id: null,
-    }));
-  } catch { /* combos fallback failed */ }
-  return rows;
+    if (results.length >= 20) break;
+  }
+
+  for (const c of (full.combos || []).filter(c => c.isActive !== false)) {
+    if (!match(c.name, c.description)) continue;
+    results.push({
+      kind: 'combo',
+      name: c.name,
+      url: `https://cigarro.in/products?search=${encodeURIComponent(c.slug || c.name)}`,
+      brand: null,
+      price_inr: c.comboPriceRupees != null ? Number(c.comboPriceRupees) : null,
+      image: (c.galleryImages || [])[0] || null,
+      in_stock: true,
+      note: 'Combo — contents and availability confirmed on page.',
+    });
+    if (results.length >= 30) break;
+  }
+  return results;
 }
 
 function serializeSearchJson(query, results) {
@@ -641,7 +604,7 @@ function agentFormatResponse(body, format) {
 }
 
 // Generate HTML for category pages
-async function generateCategoryHTML(slug, supabase, faviconUrl, convexUrl) {
+async function generateCategoryHTML(slug, faviconUrl, convexUrl) {
   try {
     const detail = await cxQuery(convexUrl, 'catalog:getCategoryDetail', { slug });
     if (!detail || !detail.category) {
@@ -734,7 +697,7 @@ async function generateCategoryHTML(slug, supabase, faviconUrl, convexUrl) {
 }
 
 // Generate HTML for brand pages — queried from DB, never guessed from slug
-async function generateBrandHTML(slug, supabase, faviconUrl, convexUrl) {
+async function generateBrandHTML(slug, faviconUrl, convexUrl) {
   try {
     const detail = await cxQuery(convexUrl, 'catalog:getBrandDetail', { slug });
     if (!detail || !detail.brand) {
@@ -1021,7 +984,7 @@ function generateStaticPageHTML(pathname, faviconUrl) {
 }
 
 // Generate HTML for blog posts
-async function generateBlogHTML(slug, supabase, faviconUrl, convexUrl) {
+async function generateBlogHTML(slug, faviconUrl, convexUrl) {
   try {
     const row = await cxQuery(convexUrl, 'content:getBlogPostBySlug', { slug });
     if (!row) {
@@ -1380,12 +1343,8 @@ export async function onRequest(context) {
   }
 
   try {
-    // Initialize Supabase (search + ?format= agent feeds stay Supabase until
-    // the Wave 3 search redesign; bot HTML catalog reads use Convex).
-    const supabase = createClient(
-      env.VITE_SUPABASE_URL,
-      env.VITE_SUPABASE_ANON_KEY
-    );
+    // Wave 8: all catalog reads (bot HTML + search + ?format= feeds) come
+    // from Convex. Supabase is fully decoupled from this middleware.
     const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
 
     // Use static favicon path (no database fetch needed)
@@ -1402,7 +1361,7 @@ export async function onRequest(context) {
         }
         if (url.pathname === '/products') {
           const q = url.searchParams.get('search') || '';
-          const results = await fetchSearchResults(q, supabase);
+          const results = await fetchSearchResults(q, convexUrl);
           return agentFormatResponse(
             formatParam === 'json' ? serializeSearchJson(q, results) : serializeSearchMarkdown(q, results),
             formatParam
@@ -1410,7 +1369,7 @@ export async function onRequest(context) {
         }
         if (url.pathname.startsWith('/product/')) {
           const slug = url.pathname.replace('/product/', '').split('?')[0];
-          const norm = await fetchProductData(slug, supabase);
+          const norm = await fetchProductData(slug, convexUrl);
           if (!norm) {
             return new Response(
               formatParam === 'json' ? JSON.stringify({ error: 'Product not found', slug }) : '# Not found\n\nNo active product for this URL.',
@@ -1458,25 +1417,25 @@ export async function onRequest(context) {
     } else if (url.pathname.startsWith('/product/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateProductHTML(slug, supabase, faviconUrl, convexUrl);
+        html = await generateProductHTML(slug, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/category/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateCategoryHTML(slug, supabase, faviconUrl, convexUrl);
+        html = await generateCategoryHTML(slug, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/brand/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBrandHTML(slug, supabase, faviconUrl, convexUrl);
+        html = await generateBrandHTML(slug, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/blog/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBlogHTML(slug, supabase, faviconUrl, convexUrl);
+        html = await generateBlogHTML(slug, faviconUrl, convexUrl);
         if (!html) catalogMiss = true;
       }
     }

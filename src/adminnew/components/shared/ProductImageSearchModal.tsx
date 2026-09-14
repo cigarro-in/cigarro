@@ -257,20 +257,10 @@ export function ProductImageSearchModal({
             }
 
             if (uploadedUrls.length > 0) {
-                // Update product in database
-                const existingImages = currentProduct.gallery_images || [];
-                const newImages = [...existingImages, ...uploadedUrls];
-
-                const { error: updateError } = await supabase
-                    .from('products')
-                    .update({
-                        image_url: newImages[0],
-                        gallery_images: newImages,
-                    })
-                    .eq('id', currentProduct.id);
-
-                if (updateError) throw updateError;
-
+                // Ownership stays with the caller (Convex-bound form state via
+                // onImagesAdded). The old direct Supabase `products` write is
+                // gone: catalog lives in Convex and those columns were dropped
+                // in migration 076 anyway.
                 // Update saved status
                 setSavedProducts((prev) =>
                     prev.map((p) =>

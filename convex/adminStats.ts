@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireOrgAdmin } from "./lib/auth";
+import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -8,6 +8,29 @@ import { requireOrgAdmin } from "./lib/auth";
 // Money leaves here in RUPEES (paise/100); UI never divides inline.
 
 const PAID = ["paid", "late_paid"];
+
+// Edge (invalidate-cache) admin gate: the caller forwards the admin's
+// Supabase session JWT as Bearer; the customJwt bridge yields the same
+// subject the SPA uses, so memberships resolve identically.
+export const checkMyAdmin = query({
+  args: { orgSlug: v.optional(v.string()) },
+  handler: async (ctx, { orgSlug }) => {
+    const identity = await requireIdentity(ctx);
+    const orgs = await ctx.db.query("organizations").collect();
+    const org = orgSlug
+      ? orgs.find((o) => o.slug === orgSlug)
+      : orgs.find((o) => o.slug === "smokeshop") ?? orgs[0];
+    if (!org) return { ok: false };
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("orgId", org._id).eq("userId", identity.subject),
+      )
+      .unique();
+    const role = membership?.role;
+    return { ok: role === "admin" || role === "owner" };
+  },
+});
 
 function rupees(paise: number) {
   return paise / 100;
