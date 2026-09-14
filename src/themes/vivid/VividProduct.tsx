@@ -8,6 +8,7 @@ import { useWishlist } from '../../hooks/useWishlist';
 import { getProductImageUrl } from '../../lib/supabase/storage';
 import { trackViewItemOnce } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { ProductReviews } from '../../components/products/ProductReviews';
 import type { ProductVariant } from '../../types/product';
 
 interface Details {
@@ -240,6 +241,10 @@ export default function VividProduct() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="max-w-[1080px] mx-auto px-4">
+        <ProductReviews productSupabaseId={product.id} productName={product.name} />
       </div>
 
       <div className="h-10" />

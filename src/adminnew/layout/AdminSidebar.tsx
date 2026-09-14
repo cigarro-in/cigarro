@@ -15,6 +15,7 @@ import {
   LogOut,
   CreditCard,
   Clock,
+  Star,
   MailQuestion,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -64,6 +65,7 @@ const NAVIGATION_CONFIG: NavItem[] = [
   { id: 'discounts', label: 'Discounts', path: '/admin/discounts', icon: Percent, section: 'platform' },
   { id: 'homepage', label: 'Homepage', path: '/admin/homepage', icon: Home, section: 'platform' },
   { id: 'blogs', label: 'Blogs', path: '/admin/blogs', icon: FileText, section: 'platform' },
+  { id: 'reviews', label: 'Reviews', path: '/admin/reviews', icon: Star, section: 'platform' },
   { id: 'assets', label: 'Assets', path: '/admin/assets', icon: ImageIcon, section: 'platform' },
   { id: 'settings', label: 'Settings', path: '/admin/settings', icon: Settings, section: 'platform' },
 ];

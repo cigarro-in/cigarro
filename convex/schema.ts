@@ -663,4 +663,22 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_code", ["referralCode"])
     .index("by_referrer", ["referredByUserId"]),
+
+  // ---------- Wave 10: product reviews, Convex-native ----------
+  // Never existed in Supabase in usable form (product_reviews dropped by
+  // migration 076), so no backfill: rows start here. GLOBAL, like catalog.
+  // userId = stable identity. Only approved rows are public.
+  productReviews: defineTable({
+    productSupabaseId: v.string(),
+    userId: v.string(),
+    userName: v.optional(v.string()),
+    rating: v.number(), // 1..5
+    title: v.optional(v.string()),
+    comment: v.optional(v.string()),
+    isApproved: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_product", ["productSupabaseId"])
+    .index("by_user_product", ["userId", "productSupabaseId"]),
 });

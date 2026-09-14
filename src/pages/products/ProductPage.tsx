@@ -18,6 +18,7 @@ import { ProductVariant } from '../../types/product';
 import { formatINR } from '../../utils/currency';
 import { slugify } from '../../utils/slugify';
 import { ProductCard } from '../../components/products/ProductCard';
+import { ProductReviews } from '../../components/products/ProductReviews';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import { trackViewItemOnce } from '../../lib/analytics/ga';
@@ -1251,6 +1252,9 @@ function ProductPage() {
 
               </div>
             </div>
+
+            {/* Customer reviews (Convex-native) */}
+            <ProductReviews productSupabaseId={product.id} productName={product.name} />
 
             {/* Enhanced Combo Packs Section */}
             {combos.length > 0 && (

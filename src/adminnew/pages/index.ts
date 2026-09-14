@@ -12,6 +12,7 @@ export { OrdersPage } from './OrdersPage';
 export { CustomersPage } from './CustomersPage';
 export { DiscountsPage } from './DiscountsPage';
 export { BlogsPage } from './BlogsPage';
+export { ReviewsPage } from './ReviewsPage';
 export { HomepagePage } from './HomepagePage';
 export { AssetsPage } from './AssetsPage';
 export { SettingsPage } from './SettingsPage';
