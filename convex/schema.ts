@@ -633,4 +633,34 @@ export default defineSchema({
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   }).index("by_code", ["code"]),
+
+  // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
+  // GLOBAL (no orgId). userId = stable identity (Supabase sub, same as users
+  // table). Codes are shareable by design; validation stays public, personal
+  // reads enforce subject match. Money in RUPEES; dates as ms timestamps.
+  // Field names stay snake_case to match the shape the app already speaks.
+  referrals: defineTable({
+    userId: v.string(),
+    referralCode: v.string(),
+    totalReferrals: v.number(),
+    successfulReferrals: v.number(),
+    totalRewardsEarned: v.number(),
+    referredByUserId: v.optional(v.string()),
+    referredByCode: v.optional(v.string()),
+    referralRewardAmount: v.number(),
+    firstOrderCompleted: v.boolean(),
+    firstOrderId: v.optional(v.string()),
+    firstOrderDate: v.optional(v.number()),
+    ownRewardPaid: v.boolean(),
+    ownRewardPaidAt: v.optional(v.number()),
+    signupSource: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_code", ["referralCode"])
+    .index("by_referrer", ["referredByUserId"]),
 });

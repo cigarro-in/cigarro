@@ -1,7 +1,7 @@
 # Handoff — Convex Migration (2026-09-14, post-session)
 
-Remote = `30ff2d48` (push AFTER founder calls answered + verification — see bottom).
-Local main = `9485b0f1` (4 commits ahead, NOT pushed per founder instruction).
+Remote = `30ff2d48` (push AFTER R2 uploads wired + verification — see bottom).
+Local main = ahead (NOT pushed per founder instruction).
 Start: read `LEARNINGS.md` + this file + `git log --oneline -8` + `git status`.
 
 ## Shipped earlier (pushed `30ff2d48`)
@@ -9,6 +9,16 @@ Content admin on Convex (blogs/heroes lists, blog/hero forms, homepage +
 settings managers). Deployed DEV, build green.
 
 ## Done this session (committed, NOT pushed — one big push at the end)
+- **Referrals minimal on Convex** (DEV deployed): new `referrals` table (GLOBAL,
+  snake_case, rupees, ms dates) + `convex/referrals.ts` — `ensureMyReferral`
+  (lazy row creation, replaces the auth trigger), subject-scoped reads
+  (`getMyReferral`, `checkEligibility`, `checkIfReferred`, stats, referred list,
+  leaderboard), public `validateReferralCode`, `recordReferral`/`attachReferralLate`
+  with 040 RPC semantics (self-check, already-referred check, referrer counter).
+  Backfilled DEV (3 rows, zero activity); temp backfill removed after.
+  `referralService.ts` same signatures via shared client; `MobileCheckoutPage`
+  eligibility + late-attach on Convex. Reward payout never existed server-side —
+  flags carried, nothing invented.
 - **`ad85f9c6` Discounts on Convex** (DEV `proper-coyote-383` deployed):
   new `discounts` table (GLOBAL, rupees, ms dates, snake_case) + `convex/discounts.ts`
   (admin CRUD gated `NOT_DISCOUNT_ADMIN`, public `listActiveDiscounts`,
@@ -53,18 +63,25 @@ settings managers). Deployed DEV, build green.
   search now lives in Convex).
 
 ## What's LEFT (needs founder — blocks the big push)
-1. **Referrals call**: `MobileCheckoutPage` reads `referrals` + `attach_referral_code_late`
-   RPC + `referralService`. Migrate minimal (Convex table + 2 queries) or defer?
-2. **R2 upload token** (bucket-scoped Read+Write, single-use): `AssetManager`,
-   `ImagePicker`, `ProductImageSearchModal` upload + `images/process.js` still
-   Supabase Storage. Reads are URL pass-throughs (all CDN now) — fine.
-3. **Auth Phase 2 go-ahead** (forces re-login): `useAuth`, `phone-verify`,
-   `ConvexSupabaseProvider`, `SettingsManager` session stamp stay till cutover.
-4. **Standing deferral**: Checkout `saved_addresses`/money-path (GPS, untestable).
-5. **Wave 10/11 after push**: Convex-native reviews; retire (drop anon key, cold backup).
+1. **R2 uploads**: images already on `cigarro-assets` + CDN (reads fine). Still
+   uploading to Supabase Storage: `AssetManager`, `ImagePicker` (list+upload),
+   `ProductImageSearchModal` uploader, `images/process.js`. Plan: new Pages
+   Function `api/images/upload.js` with R2 bucket binding (needs founder to bind
+   bucket in Pages dashboard — no token needed for Functions) + admin gate via
+   `checkMyAdmin`, returning CDN URLs; point the three UI upload paths at it.
+   Needed from founder: bucket name + public base (cdn.cigarro.in?) + binding done.
+2. **Auth Phase 2 go-ahead** (founder: AFTER push soaks — do not start yet):
+   `useAuth`, `phone-verify`, `ConvexSupabaseProvider`, `SettingsManager`
+   session stamp, `PhoneAuthDialog.updateUser` stay till cutover. Forces re-login.
+3. **Standing deferral**: Checkout `saved_addresses`/money-path (GPS, untestable).
+4. **Wave 10/11 after push**: Convex-native reviews (`ReviewsPage` broken —
+   `product_reviews` dropped in 076); retire (drop anon key, cold backup).
 
 ## Post-push checklist (PROD `prestigious-bass-64`, code via push, DATA never syncs)
 - Recreate "Lucky" coupon via `/admin/discounts` (PROD table empty; backfill fn removed).
+- Seed PROD `referrals` (3 codes: GJ3DQP, XEVLUS, VM4JXU + userIds) — needs a
+  push-then-remove temp mutation OR recreate via UI flow (codes would change;
+  prefer temp-mutation backfill immediately post-push, then remove + push again).
 - Verify: PROD admin login → discounts/dashboard/customers load; `?format=json`
   on a product; `invalidate-cache` with admin JWT; coupon validates at checkout.
 - PROD backfill NOT needed for users/orders (already live); catalog/content done earlier.

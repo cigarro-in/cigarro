@@ -1,8 +1,9 @@
 // =====================================================
-// REFERRAL SERVICE - CLIENT-SIDE OPERATIONS
+// REFERRAL SERVICE - CLIENT-SIDE OPERATIONS (Convex-backed)
 // =====================================================
 
-import { supabase } from '../../lib/supabase/client';
+import { convex } from '../../lib/convex/client';
+import { api } from '../../../convex/_generated/api';
 import type {
   Referral,
   ReferralStats,
@@ -15,16 +16,9 @@ import type {
 // =====================================================
 // GET USER'S REFERRAL DATA
 // =====================================================
-export async function getUserReferral(userId: string): Promise<Referral | null> {
+export async function getUserReferral(_userId: string): Promise<Referral | null> {
   try {
-    const { data, error } = await supabase
-      .from('referrals')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error) throw error;
-    return data;
+    return await convex.query(api.referrals.getMyReferral, {});
   } catch (error) {
     console.error('Error fetching user referral:', error);
     return null;
@@ -34,19 +28,14 @@ export async function getUserReferral(userId: string): Promise<Referral | null> 
 // =====================================================
 // GET USER'S REFERRAL STATS
 // =====================================================
-export async function getUserReferralStats(userId: string): Promise<ReferralStats | null> {
+export async function getUserReferralStats(_userId: string): Promise<ReferralStats | null> {
   try {
-    const { data, error } = await supabase
-      .rpc('get_user_referral_stats', { p_user_id: userId })
-      .single();
-
-    if (error) {
-      console.error('RPC Error - get_user_referral_stats:', error);
-      throw error;
+    const stats = await convex.query(api.referrals.getReferralStats, {});
+    if (!stats) return null;
+    if (!stats.referral_link && stats.referral_code) {
+      stats.referral_link = generateReferralLink(stats.referral_code);
     }
-
-    // The RPC returns JSONB data directly
-    return data as ReferralStats;
+    return stats as ReferralStats;
   } catch (error) {
     console.error('Error fetching referral stats:', error);
     return null;
@@ -56,13 +45,9 @@ export async function getUserReferralStats(userId: string): Promise<ReferralStat
 // =====================================================
 // GET LIST OF USERS REFERRED BY THIS USER
 // =====================================================
-export async function getUserReferrals(userId: string): Promise<ReferredUser[]> {
+export async function getUserReferrals(_userId: string): Promise<ReferredUser[]> {
   try {
-    const { data, error } = await supabase
-      .rpc('get_user_referrals', { p_user_id: userId });
-
-    if (error) throw error;
-    return data || [];
+    return await convex.query(api.referrals.getReferredUsers, {});
   } catch (error) {
     console.error('Error fetching user referrals:', error);
     return [];
@@ -76,16 +61,13 @@ export async function recordReferral(
   params: RecordReferralParams
 ): Promise<RecordReferralResponse> {
   try {
-    const { data, error } = await supabase
-      .rpc('record_referral', {
-        p_referred_user_id: params.referred_user_id,
-        p_referral_code: params.referral_code.toUpperCase(),
-        p_signup_source: params.signup_source || 'web',
-        p_ip_address: params.ip_address || null,
-        p_user_agent: params.user_agent || navigator.userAgent
-      });
-
-    if (error) throw error;
+    const data = await convex.mutation(api.referrals.recordReferral, {
+      referredUserId: params.referred_user_id,
+      referralCode: params.referral_code.toUpperCase(),
+      signupSource: params.signup_source || 'web',
+      ipAddress: params.ip_address || undefined,
+      userAgent: params.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : undefined),
+    });
     return data;
   } catch (error) {
     console.error('Error recording referral:', error);
@@ -105,17 +87,9 @@ export async function validateReferralCode(code: string): Promise<{
   error?: string;
 }> {
   try {
-    const { data, error } = await supabase
-      .rpc('validate_referral_code', { p_referral_code: code.toUpperCase() });
-
-    if (error) {
-      console.error('RPC Error - validate_referral_code:', error);
-      return {
-        valid: false,
-        error: 'Failed to validate code'
-      };
-    }
-
+    const data = await convex.query(api.referrals.validateReferralCode, {
+      code: code.toUpperCase(),
+    });
     return data || {
       valid: false,
       error: 'Invalid referral code'
@@ -134,13 +108,7 @@ export async function validateReferralCode(code: string): Promise<{
 // =====================================================
 export async function getReferralLeaderboard(limit: number = 10): Promise<ReferralLeaderboard[]> {
   try {
-    const { data, error } = await supabase
-      .from('referral_leaderboard')
-      .select('*')
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    return await convex.query(api.referrals.getLeaderboard, { limit });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
     return [];
@@ -150,41 +118,13 @@ export async function getReferralLeaderboard(limit: number = 10): Promise<Referr
 // =====================================================
 // CHECK IF USER WAS REFERRED
 // =====================================================
-export async function checkIfUserWasReferred(userId: string): Promise<{
+export async function checkIfUserWasReferred(_userId: string): Promise<{
   was_referred: boolean;
   referrer_name?: string;
   reward_pending?: number;
 }> {
   try {
-    const { data, error } = await supabase
-      .from('referrals')
-      .select(`
-        referred_by_user_id,
-        first_order_completed,
-        own_reward_paid,
-        referral_reward_amount
-      `)
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !data || !data.referred_by_user_id) {
-      return { was_referred: false };
-    }
-
-    // Get referrer's name
-    const { data: referrerData } = await supabase
-      .from('profiles')
-      .select('name')
-      .eq('id', data.referred_by_user_id)
-      .single();
-
-    return {
-      was_referred: true,
-      referrer_name: referrerData?.name || 'A friend',
-      reward_pending: data.first_order_completed && !data.own_reward_paid
-        ? data.referral_reward_amount
-        : 0
-    };
+    return await convex.query(api.referrals.checkIfReferred, {});
   } catch (error) {
     console.error('Error checking referral status:', error);
     return { was_referred: false };

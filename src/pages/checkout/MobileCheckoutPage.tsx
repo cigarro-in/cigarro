@@ -18,6 +18,7 @@ import { getProductImageUrl } from '../../lib/supabase/storage';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { convex } from '../../lib/convex/client';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
@@ -221,35 +222,18 @@ export function MobileCheckoutPage() {
   const [showReferralInput, setShowReferralInput] = useState(false);
   const [referralApplied, setReferralApplied] = useState(false);
 
-  // Check referral eligibility on mount
+  // Check referral eligibility on mount (Convex; subject-scoped)
   useEffect(() => {
     const checkEligibility = async () => {
       if (!user?.id) return;
       try {
-        const { data, error } = await supabase
-          .from('referrals')
-          .select('referred_by_user_id, first_order_completed')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking referral status:', error);
-          return;
-        }
-
-        // Only show referral input if:
-        // 1. No referral record exists (new user) OR
-        // 2. Record exists but first_order_completed is false AND no referrer attached
-        if (!data) {
+        const gate = await convex.query(api.referrals.checkEligibility, {});
+        if (gate.eligible) {
           // New user - eligible
           setIsReferralEligible(true);
-        } else if (data.first_order_completed === false && !data.referred_by_user_id) {
-          // Existing user who hasn't completed first order and has no referrer
-          setIsReferralEligible(true);
         } else {
-          // User has completed first order or already has a referrer
           setIsReferralEligible(false);
-          if (data.referred_by_user_id && !data.first_order_completed) {
+          if (gate.applied) {
             // Show that referral is already applied
             setReferralApplied(true);
           }
@@ -270,12 +254,10 @@ export function MobileCheckoutPage() {
 
     setIsApplyingReferral(true);
     try {
-      const { data, error } = await supabase.rpc('attach_referral_code_late', {
-        p_user_id: user!.id,
-        p_referral_code: referralCode.trim()
+      const data = await convex.mutation(api.referrals.attachReferralLate, {
+        referredUserId: user!.id,
+        referralCode: referralCode.trim()
       });
-
-      if (error) throw error;
 
       if (data.success) {
         toast.success('Referral code applied successfully!');
@@ -283,10 +265,10 @@ export function MobileCheckoutPage() {
         setShowReferralInput(false);
         setReferralCode('');
       } else {
-        if (data.error === 'already_has_referrer_or_first_order') {
+        if (data.error === 'User already referred') {
           toast.error('Not eligible for referral code');
           setIsReferralEligible(false);
-        } else if (data.error === 'invalid_or_self') {
+        } else if (data.error === 'Invalid referral code' || data.error === 'Cannot refer yourself') {
           toast.error('Invalid referral code');
         } else {
           toast.error('Failed to apply referral code');

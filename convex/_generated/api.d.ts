@@ -27,6 +27,7 @@ import type * as lib_upi from "../lib/upi.js";
 import type * as orders from "../orders.js";
 import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
+import type * as referrals from "../referrals.js";
 import type * as scheduler from "../scheduler.js";
 import type * as userState from "../userState.js";
 import type * as wallet from "../wallet.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   orders: typeof orders;
   organizations: typeof organizations;
   payments: typeof payments;
+  referrals: typeof referrals;
   scheduler: typeof scheduler;
   userState: typeof userState;
   wallet: typeof wallet;
