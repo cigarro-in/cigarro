@@ -1,28 +1,80 @@
-# Handoff — Convex Migration (2026-09-14, late IST)
+# Handoff — Convex Migration (2026-09-14, post-session)
 
-Remote = `f9838004` (main in sync). Start: read `LEARNINGS.md` + this file + `git log --oneline -8` + `git status`.
+Remote = `30ff2d48` (push AFTER founder calls answered + verification — see bottom).
+Local main = `9485b0f1` (4 commits ahead, NOT pushed per founder instruction).
+Start: read `LEARNINGS.md` + this file + `git log --oneline -8` + `git status`.
 
-## Done this session (pushed `01a616ec`, −15.9k/+582 lines)
-- **Wave 4 dead-code harvest**: deleted `src/admin/` (68 files, unrouted), `src/utils/search.ts` (Supabase RPC, zero callers), `src/lib/supabase/homepage.ts` (orphan), `src/hooks/useAdminAuth.tsx` (email+password, zero callers after sidebar moved to phone `useAuth`). Header search is local Fuse.js.
-- **Wave 5 `convex/adminCatalog.ts`** (deployed DEV `proper-coyote-383`): owner/admin-gated mutations for brands, categories, collections (+product links), products (+variants+joins in one `saveProduct`), combos (+items), blogs, heroes, sections, components, site settings. Slug-uniqueness enforced. Content rows key on Convex `_id` (no supabaseId on those tables); catalog rows key on supabaseId (UUIDs flow through forms unchanged).
-- **Wave 6 catalog admin on Convex**: ProductsPage (joined list + bulk), ProductFormPage (load/save/delete), ProductImportExport (export from props, import via `saveProduct`/group), Brands/Categories/Collections pages + forms, ProductSelector (one query). Dashboard stat tiles NOT yet moved (still Supabase `orders` mirror).
-- **Admin subdomain split** (pushed earlier `8afc5ed7`, verify live): `admin.cigarro.in` = phone-gated admin-only app; `cigarro.in/admin*` → homepage; non-admin numbers get deny message. Edge stamps noindex + skips prerender on admin host.
+## Shipped earlier (pushed `30ff2d48`)
+Content admin on Convex (blogs/heroes lists, blog/hero forms, homepage +
+settings managers). Deployed DEV, build green.
 
-## UNCOMMITTED (content admin — commit + push to ship to PROD)
-`convex/adminCatalog.ts` (blog/hero admin lists, bulk status), `BlogsPage`, `BlogFormPage`, `HeroSlideFormPage`, `HomepageManager`, `SettingsManager`, deleted empty `HeroSlidesManager.tsx`. Deployed to DEV only. Build green, dist restored.
-- Content admin fully Convex: blog list/form (categories slug-keyed, `_id` routes), heroes (reorder via sort patch), settings (server `updatedBy`), homepage toggles. Dropped dev-only Supabase perf branch + Refresh buttons (reactive queries).
-- **Behavior changes (admin-only, intended)**: old Supabase-UUID blog/hero edit URLs 404 → list; brand delete now blocked with message when products exist (`BRAND_IN_USE`); `catalogCategories.isActive` added to schema (absent = active).
+## Done this session (committed, NOT pushed — one big push at the end)
+- **`ad85f9c6` Discounts on Convex** (DEV `proper-coyote-383` deployed):
+  new `discounts` table (GLOBAL, rupees, ms dates, snake_case) + `convex/discounts.ts`
+  (admin CRUD gated `NOT_DISCOUNT_ADMIN`, public `listActiveDiscounts`,
+  case-insensitive `getDiscountByCode`, `registerUse`). Backfilled DEV from
+  Supabase (1 row: "Lucky" 10% code 2FW3A5FI, scheduled Dec 2026).
+  `DiscountsPage`/`DiscountFormPage` Convex (`_id` routes, `CODE_TAKEN` surfacing);
+  `utils/discounts.ts` via shared `convex` client (same signatures).
+  Behavior fix: coupons actually validate now (Supabase compared lower-vs-UPPER
+  and never matched; RPC likewise). Checkout money-path untouched (display only).
+- **`ad85f9c6` Dashboard + Customers on Convex**: new `convex/adminStats.ts`
+  (`getDashboardStats`, `listCustomersForAdmin`, `getCustomerForAdmin` —
+  org-gated, bounded take(1000), rupees out). Dashboard tiles read Convex orders
+  (fixes stale 0s) + catalog counts + users. Customers = Convex users + order
+  aggregates; route ids unchanged (userId = auth UUID).
+  Behavior change (admin-only, intended): block/activate toggle DROPPED —
+  Supabase `profiles` never had a `status` column (verified: all migrations
+  read — effective cols are id/email/phone/phone_verified_at/name/is_admin),
+  so the toggle always failed. Role badge now from memberships.
+  Also fixes: old dashboard used `profiles.full_name` (column never existed).
+- **`9a710997` Edge on Convex**: `fetchProductData`/`fetchSearchResults` in
+  `ssr-middleware.js` via `catalog:getProductBySlug`/`relatedProductLinks`/
+  `fullCatalog` (extended with combos); `fallbackSearchRows` + RPC deleted;
+  Supabase import/init removed. `invalidate-cache` admin check via
+  `adminStats:checkMyAdmin` (forwards Supabase JWT through customJwt bridge).
+  Verified: real edge file executed in Node vs DEV — search json/md, product
+  md, 404, bot HTML all correct. `ProductImageSearchModal` dead Supabase
+  `products` write removed (parent owns Convex state via onImagesAdded).
+  Deleted zero-caller `useDashboardData.ts`.
+- **`9485b0f1`**: removed temporary public `backfillDiscounts` (was DEV-only use).
 
-## What's NEXT (in order)
-1. **Admin**: Discounts, Customers, Dashboard (move stat tiles to Convex orders — fixes stale 0s), Orders pages. Asset/Image pickers still upload to Supabase Storage (reads are URL pass-throughs — fine).
-2. **Wave 7 commercial**: new Convex `discounts` table + rewrite `utils/discounts.ts` (both checkouts consume it). **Referrals: founder call** — migrate minimal vs defer. Checkout/address money-path stays Supabase (GPS, untestable — standing deferral).
-3. **Wave 8 edge**: `?format=` feeds + search → Convex `fullCatalog`; `invalidate-cache` admin check → memberships; `images/process.js` → R2 (**needs founder R2 upload token**, old one deleted).
-4. **Wave 9 auth Phase 2**: own JWT, dual-issuer soak. Forces re-login — tell founder first.
-5. **Wave 10/11**: Reviews (Convex-native) + retire (delete backfills, zero Supabase refs, drop anon key, cold backup 90d).
+## Schema findings (all 17 Supabase migrations + convex/schema.ts read)
+- `products` final cols (076): id/name/slug/brand_id/description/short_description/
+  origin/specifications/is_active/meta_*/canonical_url/created+updated. Price/stock/
+  brand/gallery/rating/image_url all dropped → old feed image slot now uses
+  default-variant images (feed-only delta, noindex alternates).
+- `product_reviews` DROPPED (076) + `products.image_url` dropped → `ReviewsPage`
+  doubly broken (Wave 10: Convex-native reviews still to build).
+- `create_order` RPC compares `code = lower(trim(...))` while admin stored UPPER —
+  coupons never worked; usage_count never moved (`supabase.raw` doesn't exist).
+- `combos` renamed from `product_combos` (076); `searchable_products` matview
+  dropped by 076 then 082 re-adds only the function (fragile — another reason
+  search now lives in Convex).
+
+## What's LEFT (needs founder — blocks the big push)
+1. **Referrals call**: `MobileCheckoutPage` reads `referrals` + `attach_referral_code_late`
+   RPC + `referralService`. Migrate minimal (Convex table + 2 queries) or defer?
+2. **R2 upload token** (bucket-scoped Read+Write, single-use): `AssetManager`,
+   `ImagePicker`, `ProductImageSearchModal` upload + `images/process.js` still
+   Supabase Storage. Reads are URL pass-throughs (all CDN now) — fine.
+3. **Auth Phase 2 go-ahead** (forces re-login): `useAuth`, `phone-verify`,
+   `ConvexSupabaseProvider`, `SettingsManager` session stamp stay till cutover.
+4. **Standing deferral**: Checkout `saved_addresses`/money-path (GPS, untestable).
+5. **Wave 10/11 after push**: Convex-native reviews; retire (drop anon key, cold backup).
+
+## Post-push checklist (PROD `prestigious-bass-64`, code via push, DATA never syncs)
+- Recreate "Lucky" coupon via `/admin/discounts` (PROD table empty; backfill fn removed).
+- Verify: PROD admin login → discounts/dashboard/customers load; `?format=json`
+  on a product; `invalidate-cache` with admin JWT; coupon validates at checkout.
+- PROD backfill NOT needed for users/orders (already live); catalog/content done earlier.
 
 ## Standing rules
-- One plan-paragraph BEFORE any tools, every prompt. External `curl` verification only (browser UA; bot UA for prerender); never unit tests. `npx convex deploy` → DEV; PROD (`prestigious-bass-64`) via git push only; DATA never syncs.
-- Finance freeze (`orders/payments/wallet`); no partial `schema.ts` hand-edits; theme decoupling (`src/themes/*` pure views via `src/hooks/data/`); paise-only-at-boundary; never commit env/`dist`/`opencode.json` (theirs, untracked — leave it).
-- Only commit/push when asked. `git checkout -- dist` after builds.
-- Convex `patch` + wire format drop `undefined` object values — spreads with optionals are safe (verified pattern, don't "fix").
-- `useQuery(..., 'skip')` not used; edit-forms populate once via `populatedRef` + list queries (lists are tiny). Counts use bounded `take(1000)` — materialize counters past ~1k products.
+- Commit-only, no push until decoupled + verified (founder instruction 2026-09-14).
+- `npx convex deploy` → DEV; PROD via git push only; DATA never syncs.
+- Finance freeze (`orders/payments/wallet`); no partial `schema.ts` hand-edits;
+  theme decoupling; paise-only-at-boundary; never commit env/`dist`/`opencode.json`.
+- `git checkout -- dist` after builds. External `curl` verification only.
+- Convex `patch` drops `undefined` — spreads with optionals are safe.
+- `useQuery(..., 'skip')` pattern; edit-forms populate once via `populatedRef`;
+  counts bounded `take(1000)`.
