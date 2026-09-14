@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { requireMember } from "./lib/auth";
+import { requireIdentity, requireMember } from "./lib/auth";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -8,6 +8,65 @@ import { Doc, Id } from "./_generated/dataModel";
 // across the Phase 2 issuer change). All reads/writes org-scoped.
 
 // ----- Users (profile spine) -----
+
+// Auth Phase 2 profile read: identity-scoped (no membership needed —
+// customers may have none yet). isAdmin resolves via memberships, replacing
+// the Supabase profiles read in useAuth.
+export const getMyProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await requireIdentity(ctx);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .filter((q: any) =>
+        q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
+      )
+      .first();
+    return {
+      userId: identity.subject,
+      phone: user?.phone ?? null,
+      name: user?.name ?? null,
+      isAdmin: !!membership,
+    };
+  },
+});
+
+// Lazy spine that works for everyone (upsertUser requires org membership
+// and silently no-ops for unenrolled customers — this one doesn't).
+export const ensureMyProfile = mutation({
+  args: {
+    phone: v.optional(v.string()),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx);
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        ...(args.phone !== undefined ? { phone: args.phone } : {}),
+        ...(args.name !== undefined ? { name: args.name } : {}),
+        updatedAt: now,
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("users", {
+      userId: identity.subject,
+      phone: args.phone,
+      name: args.name,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
 
 export const upsertUser = mutation({
   args: {

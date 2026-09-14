@@ -1,32 +1,30 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { ConvexProviderWithAuth } from 'convex/react';
-import { Session } from '@supabase/supabase-js';
 import { convex } from './client';
 import { supabase } from '../supabase/client';
+import { getAccessToken } from '../auth/session';
 
 /**
- * Bridges the existing Supabase session into Convex.
+ * Auth Phase 2 bridge (dual-client soak).
  *
  * Convex calls `fetchAccessToken({ forceRefreshToken })` whenever it needs
- * to authenticate a query/mutation. We read the current Supabase session
- * and return its access_token (refreshing when asked).
- *
- * Requires Supabase to be configured with asymmetric JWT signing keys (RS256)
- * and the issuer/jwks wired into convex/auth.config.ts.
+ * to authenticate a query/mutation. Our own JWT (localStorage, 30d,
+ * OTP-renewed) goes first; the legacy Supabase session is the fallback
+ * while the dual-issuer soak runs. After the soak, delete the Supabase
+ * branch below and this comment.
  */
-function useSupabaseAuthForConvex() {
-  const [session, setSession] = useState<Session | null>(null);
+function useDualAuthForConvex() {
   const [isLoading, setIsLoading] = useState(true);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      setSession(data.session);
-      setIsLoading(false);
+    Promise.resolve().then(() => {
+      if (!cancelled) setIsLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+    // Re-resolve auth state when the legacy session changes (soak only).
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      setTick((t) => t + 1);
     });
     return () => {
       cancelled = true;
@@ -34,8 +32,16 @@ function useSupabaseAuthForConvex() {
     };
   }, []);
 
+  useEffect(() => {
+    const onStorage = () => setTick((t) => t + 1);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      const ours = getAccessToken();
+      if (ours) return ours;
       if (forceRefreshToken) {
         const { data } = await supabase.auth.refreshSession();
         return data.session?.access_token ?? null;
@@ -49,16 +55,18 @@ function useSupabaseAuthForConvex() {
   return useMemo(
     () => ({
       isLoading,
-      isAuthenticated: !!session,
+      isAuthenticated: true,
       fetchAccessToken,
     }),
-    [isLoading, session, fetchAccessToken],
+    // tick re-resolves auth state on session/storage changes (soak only).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isLoading, fetchAccessToken, tick],
   );
 }
 
 export function ConvexSupabaseProvider({ children }: { children: ReactNode }) {
   return (
-    <ConvexProviderWithAuth client={convex} useAuth={useSupabaseAuthForConvex}>
+    <ConvexProviderWithAuth client={convex} useAuth={useDualAuthForConvex}>
       {children}
     </ConvexProviderWithAuth>
   );

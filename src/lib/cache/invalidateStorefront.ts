@@ -1,4 +1,5 @@
 import { invalidatePrefix, invalidate } from './swrCache';
+import { getAccessToken } from '../auth/session';
 
 /**
  * Invalidate storefront caches after admin edits.
@@ -19,9 +20,13 @@ export async function invalidateStorefront() {
   if (!isProduction) return;
 
   try {
+    const token = getAccessToken();
     await fetch('/api/invalidate-cache', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
   } catch (err) {
     console.warn('[invalidateStorefront] Cloudflare purge failed:', err);

@@ -173,7 +173,8 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
       // Phase 1: display name lives in Convex users; auth metadata stays
       // on Supabase Auth until the Phase 2 cutover.
       await updateDisplayName(trimmed).catch(() => {});
-      await supabase.auth.updateUser({ data: { name: trimmed } });
+      // Legacy mirror, best-effort: no-ops for Phase-2 (ours-only) sessions.
+      await supabase.auth.updateUser({ data: { name: trimmed } }).catch(() => {});
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (err) {

@@ -23,6 +23,59 @@ import { createClient } from '@supabase/supabase-js';
 
 const SYNTHETIC_EMAIL_DOMAIN = 'phone.cigarro.in';
 
+// ---------- Auth Phase 2: our own JWT issuer ----------
+// iss/aud must match convex/auth.config.ts. sub = stable userId (the
+// Supabase UUID for existing phones), so zero data rows change at cutover.
+const OWN_ISSUER = 'https://cigarro.in/auth';
+const OWN_AUDIENCE = 'cigarro-storefront';
+const OWN_TTL_S = 30 * 24 * 60 * 60; // 30 days; re-login is one OTP tap.
+
+function b64url(bytes) {
+  let s = '';
+  const arr = new Uint8Array(bytes);
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function b64urlJson(obj) {
+  return b64url(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+// Returns { token } or null when JWT env is not configured (legacy
+// Supabase flow keeps working — the client falls back).
+async function mintOwnJwt(env, userId, phone) {
+  try {
+    const jwk = JSON.parse(env.JWT_PRIVATE_JWK || 'null');
+    if (!jwk || !jwk.d) return null;
+    const key = await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['sign'],
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const head = b64urlJson({ alg: 'ES256', typ: 'JWT', kid: jwk.kid || 'cigarro-1' });
+    const body = b64urlJson({
+      iss: OWN_ISSUER,
+      aud: OWN_AUDIENCE,
+      sub: userId,
+      phone,
+      iat: now,
+      exp: now + OWN_TTL_S,
+    });
+    const sig = await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      new TextEncoder().encode(`${head}.${body}`),
+    );
+    return `${head}.${body}.${b64url(sig)}`;
+  } catch (err) {
+    console.error('[phone-verify] own-JWT mint failed:', err.message);
+    return null;
+  }
+}
+
 function normalizePhone(phone, countryCode) {
   let p = String(phone || '').replace(/[^\d]/g, '');
   if (p.length === 10) p = `${countryCode || '91'}${p}`;
@@ -174,12 +227,16 @@ export async function onRequest(context) {
       throw new Error('Supabase did not return a token_hash');
     }
 
+    // Phase 2 token (null until JWT_PRIVATE_JWK is set — client falls back).
+    const cigarroToken = await mintOwnJwt(env, userId, normalizedPhone);
+
     return jsonResponse(
       {
         email: userEmail,
         token_hash: tokenHash,
         user_id: userId,
         is_new_user: isNewUser,
+        cigarro_token: cigarroToken,
       },
       200,
       corsHeaders,

@@ -1,5 +1,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '../lib/supabase/client';
+import { convex } from '../lib/convex/client';
+import { api } from '../../convex/_generated/api';
+import { getSession, getAccessToken, storeSession, clearSession } from '../lib/auth/session';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 
@@ -31,16 +34,63 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function loadConvexUser(): Promise<User | null> {
+  try {
+    const profile = await convex.query(api.userState.getMyProfile, {});
+    if (!profile) return null;
+    return {
+      id: profile.userId,
+      email: null,
+      phone: profile.phone,
+      name: profile.name || 'Customer',
+      isAdmin: profile.isAdmin,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function refreshLegacyUserData(authUser: any, setUser: (u: User | null) => void) {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profile) {
+      setUser({
+        id: profile.id,
+        email: profile.email || null,
+        phone: profile.phone || authUser.phone || null,
+        name: profile.name || authUser.user_metadata?.name || 'Customer',
+        isAdmin: !!profile.is_admin,
+      });
+    } else {
+      setUser({
+        id: authUser.id,
+        email: authUser.email || null,
+        phone: authUser.phone || null,
+        name: authUser.user_metadata?.name || 'Customer',
+        isAdmin: !!authUser.user_metadata?.isAdmin,
+      });
+    }
+  } catch (error) {
+    logger.error('User data refresh error:', error);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkSession();
+    void checkSession();
+    // Legacy Supabase listener stays during the soak (dual-client).
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        void refreshUserData(session.user);
-      } else {
+      if (session?.user && !getAccessToken()) {
+        void refreshLegacyUserData(session.user, setUser).finally(() => setIsLoading(false));
+      } else if (!session && !getAccessToken()) {
         setUser(null);
       }
     });
@@ -50,48 +100,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refreshUserData = async (authUser: any) => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (profile) {
-        setUser({
-          id: profile.id,
-          email: profile.email || null,
-          phone: profile.phone || authUser.phone || null,
-          name: profile.name || authUser.user_metadata?.name || 'Customer',
-          isAdmin: !!profile.is_admin,
-        });
-      } else {
-        setUser({
-          id: authUser.id,
-          email: authUser.email || null,
-          phone: authUser.phone || null,
-          name: authUser.user_metadata?.name || 'Customer',
-          isAdmin: !!authUser.user_metadata?.isAdmin,
-        });
-      }
-    } catch (error) {
-      logger.error('User data refresh error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const checkSession = async () => {
     try {
+      // Ours first (Phase 2); Supabase fallback during the soak.
+      if (getAccessToken()) {
+        const u = await loadConvexUser();
+        setUser(u);
+        setIsLoading(false);
+        return;
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (session?.user) {
-        await refreshUserData(session.user);
-      } else {
-        setIsLoading(false);
+        await refreshLegacyUserData(session.user, setUser);
       }
+      setIsLoading(false);
     } catch (error) {
       logger.error('Session check error:', error);
       setIsLoading(false);
@@ -109,14 +133,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.error || 'Phone verification failed');
     }
 
-    // Exchange the server-generated token_hash for a real Supabase session.
-    // This causes Supabase to issue a native ES256-signed JWT that Convex
-    // can verify via the published JWKS.
+    // Phase 2 path: server minted our JWT (sub = stable userId).
+    if (data.cigarro_token && data.user_id) {
+      const phone = data.user_id && args.phone ? args.phone : '';
+      storeSession(data.cigarro_token, data.user_id, phone);
+      try {
+        await convex.mutation(api.userState.ensureMyProfile, {
+          phone: phone || undefined,
+          name: args.name || undefined,
+        });
+      } catch (e) {
+        logger.error('Profile spine error', e);
+      }
+      const u = await loadConvexUser();
+      if (u) setUser(u);
+      try {
+        if (await shouldTransferGuestData(data.user_id)) {
+          await transferGuestDataToUser(data.user_id);
+        }
+      } catch (e) {
+        logger.error('Guest data transfer error', e);
+      }
+      return { isNewUser: !!data.is_new_user };
+    }
+
+    // Legacy fallback (dual-issuer soak / JWT env not set).
     if (!data.token_hash || !data.email) {
       throw new Error('Invalid server response — missing token_hash/email');
     }
-    // `admin.generateLink(type: 'magiclink')` returns a token_hash verifiable
-    // via the `magiclink` type. The `email` type is for 6-digit email OTPs.
     const { error: verifyErr } = await supabase.auth.verifyOtp({
       token_hash: data.token_hash,
       type: 'magiclink',
@@ -127,12 +171,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw verifyErr;
     }
 
-    // Force a profile refresh so consumers see the fresh user state
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (session?.user) {
-      await refreshUserData(session.user);
+      await refreshLegacyUserData(session.user, setUser);
 
       try {
         if (await shouldTransferGuestData(session.user.id)) {
@@ -148,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      clearSession();
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {

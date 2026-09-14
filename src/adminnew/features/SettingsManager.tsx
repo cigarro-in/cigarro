@@ -5,6 +5,7 @@ import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase/client';
+import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check } from 'lucide-react';
@@ -146,11 +147,12 @@ export function SettingsManager() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const own = getAccessToken();
       const response = await fetch('https://cigarro.in/api/invalidate-cache', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          ...((own || session?.access_token) ? { Authorization: `Bearer ${own || session?.access_token}` } : {}),
         },
       });
       const data = await response.json();
