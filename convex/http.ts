@@ -90,6 +90,44 @@ http.route({
   }),
 });
 
+// ---------- Self-debug: whose identity is this? ----------
+//
+// GET with the caller's own JWT as Bearer. Returns only rows belonging to
+// the caller (user row, memberships + orgs). No secret — you can only ever
+// see yourself. Used once to diagnose a missing-membership lockout.
+http.route({
+  path: "/debugIdentity",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return jsonResponse({ ok: false, error: "no identity" }, 401);
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+    const orgs = await ctx.db.query("organizations").collect();
+    return jsonResponse({
+      ok: true,
+      subject: identity.subject,
+      issuer: identity.issuer,
+      user: user
+        ? { userId: user.userId, phone: user.phone, name: user.name }
+        : null,
+      memberships: memberships.map((m) => ({
+        orgId: m.orgId,
+        role: m.role,
+      })),
+      orgSlugs: orgs.map((o) => ({ id: o._id, slug: o.slug })),
+    });
+  }),
+});
+
 // ---------- Poke from the client: wake / refresh an order ----------
 //
 // The Transaction page calls this the moment the customer returns from
