@@ -1,6 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { requireIdentity, requireMember } from "./lib/auth";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 
 // ---------- Phase 1: user state (cart, wishlist, profiles, addresses) ----------
@@ -32,6 +37,39 @@ export const getMyProfile = query({
       phone: user?.phone ?? null,
       name: user?.name ?? null,
       isAdmin: !!membership,
+    };
+  },
+});
+
+// Self-debug for the /debugIdentity HTTP route (which can't touch ctx.db
+// directly — HTTP actions only get runQuery/runMutation). Returns only rows
+// belonging to the caller.
+export const debugMyIdentity = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { ok: false as const, error: "no identity" };
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+    const orgs = await ctx.db.query("organizations").collect();
+    return {
+      ok: true as const,
+      subject: identity.subject,
+      issuer: identity.issuer,
+      user: user
+        ? { userId: user.userId, phone: user.phone, name: user.name }
+        : null,
+      memberships: memberships.map((m) => ({
+        orgId: m.orgId,
+        role: m.role,
+      })),
+      orgSlugs: orgs.map((o) => ({ id: o._id, slug: o.slug })),
     };
   },
 });
