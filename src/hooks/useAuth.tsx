@@ -105,9 +105,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ours first (Phase 2); Supabase fallback during the soak.
       if (getAccessToken()) {
         const u = await loadConvexUser();
-        setUser(u);
-        setIsLoading(false);
-        return;
+        if (u) {
+          setUser(u);
+          setIsLoading(false);
+          return;
+        }
+        // Token Convex won't accept yet (config deploy lag) — fall through
+        // to the Supabase session instead of signing the user out.
       }
       const {
         data: { session },
@@ -146,15 +150,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logger.error('Profile spine error', e);
       }
       const u = await loadConvexUser();
-      if (u) setUser(u);
-      try {
-        if (await shouldTransferGuestData(data.user_id)) {
-          await transferGuestDataToUser(data.user_id);
+      if (u) {
+        setUser(u);
+        try {
+          if (await shouldTransferGuestData(data.user_id)) {
+            await transferGuestDataToUser(data.user_id);
+          }
+        } catch (e) {
+          logger.error('Guest data transfer error', e);
         }
-      } catch (e) {
-        logger.error('Guest data transfer error', e);
+        return { isNewUser: !!data.is_new_user };
       }
-      return { isNewUser: !!data.is_new_user };
+      // Convex rejected our token (trust config not deployed yet) — drop it
+      // and fall through to the legacy Supabase session so login still works.
+      clearSession();
     }
 
     // Legacy fallback (dual-issuer soak / JWT env not set).
