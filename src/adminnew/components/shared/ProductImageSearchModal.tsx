@@ -106,6 +106,7 @@ async function uploadImageFromUrl(
         // Folder keeps product images together under the library root.
         const uploaded = await uploadImageToR2(blob, {
             folder: 'product_images',
+            slug: productName,
             alt: productName,
             filename: imageUrl.split('/').pop() || 'image.jpg',
         });

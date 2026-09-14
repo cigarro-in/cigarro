@@ -92,7 +92,7 @@ export const saveDiscount = mutation({
         .query("discounts")
         .withIndex("by_code", (q) => q.eq("code", code))
         .unique();
-      if (clash && clash._id !== id) throw new ConvexError({ code: "CODE_TAKEN", code });
+      if (clash && clash._id !== id) throw new ConvexError({ code: "CODE_TAKEN", value: code });
     }
     const now = Date.now();
     // ponytail: patch drops undefined values on the wire, so spreads are safe.

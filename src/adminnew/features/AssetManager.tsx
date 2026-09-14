@@ -123,7 +123,7 @@ export function AssetManager() {
       const uploadPromises = Array.from(files).map(async (file, index) => {
         // Images: WebP + metadata stripped + compressed. Other assets raw.
         if (file.type.startsWith('image/')) {
-          await uploadImageToR2(file, { folder: folder || undefined });
+          await uploadImageToR2(file, { folder: folder || undefined, slug: file.name });
         } else {
           await uploadRawToR2(file, { folder: folder || undefined });
         }

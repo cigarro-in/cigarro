@@ -245,7 +245,11 @@ export function ImagePicker({
         const file = validFiles[i];
         try {
           // Browser pipeline: WebP + metadata stripped + compressed, then R2.
-          const uploaded = await uploadImageToR2(file, { folder: folder || undefined });
+          // searchHint (e.g. product name) becomes the SEO filename when set.
+          const uploaded = await uploadImageToR2(file, {
+            folder: folder || undefined,
+            slug: searchHint || undefined,
+          });
           uploadedUrls.push(uploaded.url);
         } catch {
           toast.error(`Failed to upload ${file.name}`);

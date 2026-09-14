@@ -65,6 +65,17 @@ function cleanFolder(folder) {
     .slice(0, 100);
 }
 
+// "Camel Yellow Packet!" → "camel-yellow-packet" (SEO-friendly R2 keys).
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+    .slice(0, 60)
+    .replace(/-+$/, '');
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return json({}, 200);
@@ -120,12 +131,14 @@ export async function onRequest(context) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length === 0 || bytes.length > MAX_BYTES)
       return json({ error: 'File empty or over 10MB' }, 400);
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).substring(2, 8);
     const ext = raw
       ? (String(file.name || 'bin').split('.').pop() || 'bin').toLowerCase().slice(0, 10)
       : 'webp';
-    const key = `${LIB_PREFIX}${folder ? folder + '/' : ''}${stamp}-${rand}.${ext}`;
+    const rand = Math.random().toString(36).substring(2, 8);
+    // SEO filename: item slug when the caller knows it, random suffix keeps
+    // keys unique (`camel-yellow-packet-a1b2c3.webp`).
+    const stem = slugify(form?.get('slug')) || `${Date.now()}`;
+    const key = `${LIB_PREFIX}${folder ? folder + '/' : ''}${stem}-${rand}.${ext}`;
     await bucket.put(key, bytes, {
       httpMetadata: {
         contentType: raw ? mime : 'image/webp',

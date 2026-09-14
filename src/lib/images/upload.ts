@@ -59,14 +59,17 @@ export interface R2UploadResult {
 /** Convert + upload one image to R2 via the admin-gated edge endpoint. */
 export async function uploadImageToR2(
   input: File | Blob,
-  opts: { folder?: string; alt?: string; filename?: string } = {},
+  opts: { folder?: string; alt?: string; filename?: string; slug?: string } = {},
 ): Promise<R2UploadResult> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
   const webp = await convertToWebp(input);
+  const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');
   if (opts.folder) form.append('folder', opts.folder);
+  // SEO filename: item slug → `camel-yellow-packet-a1b2c3.webp`.
+  if (opts.slug || fallbackName) form.append('slug', opts.slug || fallbackName);
   const res = await fetch('/api/images/upload', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -74,7 +77,6 @@ export async function uploadImageToR2(
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.url) throw new Error(body.error || 'Upload failed');
-  const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   return {
     url: body.url,
     key: body.key,
