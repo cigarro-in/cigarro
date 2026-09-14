@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { requireIdentity, requireMember } from "./lib/auth";
+import { normalizePhoneE164 } from "./lib/phone";
 import {
   internalMutation,
   internalQuery,
@@ -74,6 +75,46 @@ export const debugMyIdentity = internalQuery({
   },
 });
 
+// One-off PROD repair (cutover lockout): normalize a user's phone to E.164
+// and ensure an owner membership on the org. Only reachable via the
+// secret-guarded HTTP route; delete both after the repair.
+export const repairAccess = internalMutation({
+  args: { userId: v.string(), orgSlug: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (!user) throw new ConvexError({ code: "NO_USER" });
+    const phone = normalizePhoneE164(user.phone) ?? user.phone;
+    await ctx.db.patch(user._id, { phone, updatedAt: Date.now() });
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", args.orgSlug ?? "smokeshop"))
+      .unique();
+    if (!org) throw new ConvexError({ code: "NO_ORG" });
+    const existing = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("orgId", org._id).eq("userId", args.userId),
+      )
+      .unique();
+    if (existing) {
+      if (existing.role !== "owner") {
+        await ctx.db.patch(existing._id, { role: "owner" });
+      }
+    } else {
+      await ctx.db.insert("memberships", {
+        orgId: org._id,
+        userId: args.userId,
+        role: "owner",
+        createdAt: Date.now(),
+      });
+    }
+    return { userId: args.userId, phone, orgId: org._id, role: "owner" };
+  },
+});
+
 // Lazy spine that works for everyone (upsertUser requires org membership
 // and silently no-ops for unenrolled customers — this one doesn't).
 export const ensureMyProfile = mutation({
@@ -88,9 +129,12 @@ export const ensureMyProfile = mutation({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
     const now = Date.now();
+    // Normalize on write: a raw client phone must never overwrite the E.164
+    // form, or the next by_phone lookup forks a second users row.
+    const profilePhone = normalizePhoneE164(args.phone);
     if (existing) {
       await ctx.db.patch(existing._id, {
-        ...(args.phone !== undefined ? { phone: args.phone } : {}),
+        ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
         ...(args.name !== undefined ? { name: args.name } : {}),
         updatedAt: now,
       });
@@ -98,7 +142,7 @@ export const ensureMyProfile = mutation({
     }
     return await ctx.db.insert("users", {
       userId: identity.subject,
-      phone: args.phone,
+      phone: profilePhone,
       name: args.name,
       createdAt: now,
       updatedAt: now,
@@ -116,9 +160,10 @@ export const resolvePhoneIdentity = internalMutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const phone = normalizePhoneE164(args.phone) ?? args.phone;
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .withIndex("by_phone", (q) => q.eq("phone", phone))
       .first();
     const now = Date.now();
     if (existing) {
@@ -131,7 +176,7 @@ export const resolvePhoneIdentity = internalMutation({
     const userId = crypto.randomUUID();
     await ctx.db.insert("users", {
       userId,
-      phone: args.phone,
+      phone,
       name: args.name ?? "Customer",
       createdAt: now,
       updatedAt: now,
@@ -153,9 +198,10 @@ export const upsertUser = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     const now = Date.now();
+    const profilePhone = normalizePhoneE164(args.phone);
     if (existing) {
       await ctx.db.patch(existing._id, {
-        ...(args.phone !== undefined ? { phone: args.phone } : {}),
+        ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
         ...(args.name !== undefined ? { name: args.name } : {}),
         updatedAt: now,
       });
@@ -163,7 +209,7 @@ export const upsertUser = mutation({
     }
     return await ctx.db.insert("users", {
       userId,
-      phone: args.phone,
+      phone: profilePhone,
       name: args.name,
       createdAt: now,
       updatedAt: now,

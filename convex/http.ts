@@ -111,6 +111,37 @@ http.route({
   }),
 });
 
+// ---------- One-off access repair (delete after use) ----------
+//
+// Secret-guarded (EDGE_SHARED_SECRET). Normalizes the user's phone and
+// ensures an owner membership. Called once from a console snippet.
+http.route({
+  path: "/repairMyAccess",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const expected = process.env.EDGE_SHARED_SECRET;
+    if (!expected) {
+      return jsonResponse({ ok: false, error: "misconfigured" }, 500);
+    }
+    if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+      return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    }
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ ok: false, error: "bad json" }, 400);
+    }
+    const userId = String(body.userId ?? "").trim();
+    if (!userId) return jsonResponse({ ok: false, error: "missing userId" }, 400);
+    const result = await ctx.runMutation(internal.userState.repairAccess, {
+      userId,
+      orgSlug: body.orgSlug ? String(body.orgSlug) : undefined,
+    });
+    return jsonResponse({ ok: true, ...result });
+  }),
+});
+
 // ---------- Poke from the client: wake / refresh an order ----------
 //
 // The Transaction page calls this the moment the customer returns from
@@ -152,6 +183,7 @@ const preflight = httpAction(async () => {
 http.route({ path: "/receiveBankEmail", method: "OPTIONS", handler: preflight });
 http.route({ path: "/resolvePhoneIdentity", method: "OPTIONS", handler: preflight });
 http.route({ path: "/debugIdentity", method: "OPTIONS", handler: preflight });
+http.route({ path: "/repairMyAccess", method: "OPTIONS", handler: preflight });
 http.route({ path: "/wakeOrder", method: "OPTIONS", handler: preflight });
 
 function jsonResponse(payload: unknown, status = 200) {
