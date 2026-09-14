@@ -2,7 +2,7 @@
  * Image Processing API - Cloudflare Pages Function
  *
  * Downloads external images and stores them in R2 (bucket `cigarro-assets`,
- * binding `ASSETS`), returning CDN URLs.
+ * binding `R2_ASSETS`), returning CDN URLs.
  *
  * NOTE: no server-side conversion — the browser pipeline (canvas → WebP,
  * metadata stripped, q0.82) handles optimization for direct uploads. Remote
@@ -54,13 +54,13 @@ export async function onRequest(context) {
             });
         }
 
-        // R2 config (binding ASSETS). Public reads via CDN base.
+        // R2 config (binding R2_ASSETS). Public reads via CDN base.
         const cdnBase = (env.CDN_BASE_URL || 'https://cdn.cigarro.in').replace(/\/$/, '');
         const BUCKET_PREFIX = 'asset_images/';
         const cleanFolder = String(folder).replace(/^\/+|\/+$/g, '').replace(/\.\./g, '').slice(0, 100);
 
-        if (!env.ASSETS) {
-            return new Response(JSON.stringify({ error: 'R2 binding ASSETS missing' }), {
+        if (!env.R2_ASSETS) {
+            return new Response(JSON.stringify({ error: 'R2 binding R2_ASSETS missing' }), {
                 status: 500,
                 headers: corsHeaders,
             });
@@ -104,7 +104,7 @@ export async function onRequest(context) {
 
                 // Upload to R2
                 try {
-                    await env.ASSETS.put(key, imageBlob, {
+                    await env.R2_ASSETS.put(key, imageBlob, {
                         httpMetadata: {
                             contentType: imageBlob.type || 'image/jpeg',
                             cacheControl: 'public, max-age=31536000, immutable',

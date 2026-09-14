@@ -1,5 +1,5 @@
 /**
- * R2 image library API (bucket `cigarro-assets`, binding `ASSETS`).
+ * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
  * - GET  /api/images/upload?prefix=asset_images/  → { images: [{name,key,url,size,uploaded}], folders: [..] }
  * - POST /api/images/upload (multipart: file, folder?) → { url, key, alt, size }
@@ -31,7 +31,7 @@ function json(payload, status = 200) {
 
 async function requireAdmin(request, env) {
   if (env.UPLOAD_REQUIRE_ADMIN === 'false') return { ok: true };
-  if (!env.ASSETS) return { ok: false, error: 'R2 binding ASSETS missing' };
+  if (!env.R2_ASSETS) return { ok: false, error: 'R2 binding R2_ASSETS missing' };
   const convexUrl =
     env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
   const header = request.headers.get('Authorization') || '';
@@ -82,7 +82,7 @@ export async function onRequest(context) {
 
   const gate = await requireAdmin(request, env);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
-  const bucket = env.ASSETS;
+  const bucket = env.R2_ASSETS;
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
 
