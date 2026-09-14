@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, User, Mail, Phone, Calendar, DollarSign, ShoppingBag, MapPin, Clock } from 'lucide-react';
+import { Loader2, User, Mail, Calendar, ShoppingBag, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { formatINR } from '../../utils/currency';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface Customer {
@@ -20,7 +21,6 @@ interface Customer {
   averageOrderValue: number;
   lastOrderDate?: string;
   firstOrderDate?: string;
-  status: 'active' | 'inactive' | 'blocked';
   created_at: string;
   updated_at: string;
 }
@@ -37,122 +37,41 @@ interface CustomerOrder {
 export function CustomerFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = !!id;
+  const org = useOrg();
 
-  const [loading, setLoading] = useState(false);
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  // Route id is the stable userId (Supabase auth UUID, unchanged by migration).
+  const data = useQuery(
+    api.adminStats.getCustomerForAdmin,
+    org && id ? { orgId: org._id, userId: id } : 'skip'
+  );
 
-  useEffect(() => {
-    if (isEditMode) {
-      loadCustomer();
-    }
-  }, [id]);
-
-  const loadCustomer = async () => {
-    setLoading(true);
-    try {
-      // Fetch customer profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Fetch order statistics
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('user_id, total, created_at');
-
-      if (ordersError) throw ordersError;
-
-      // Calculate customer statistics
-      const customerOrders = ordersData?.filter(order => order.user_id === id) || [];
-      const orderCount = customerOrders.length;
-      const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-      const averageOrderValue = orderCount > 0 ? totalSpent / orderCount : 0;
-      
-      const orderDates = customerOrders.map(order => new Date(order.created_at));
-      const lastOrderDate = orderDates.length > 0 ? new Date(Math.max(...orderDates.map(d => d.getTime()))).toISOString() : undefined;
-      const firstOrderDate = orderDates.length > 0 ? new Date(Math.min(...orderDates.map(d => d.getTime()))).toISOString() : undefined;
-
-      const customerData: Customer = {
-        id: profileData.id,
-        name: profileData.name || 'Unknown',
-        email: profileData.email || '',
-        phone: profileData.phone,
-        is_admin: profileData.is_admin || false,
-        orderCount,
-        totalSpent,
-        averageOrderValue,
-        lastOrderDate,
-        firstOrderDate,
-        status: profileData.status || 'active',
-        created_at: profileData.created_at,
-        updated_at: profileData.updated_at
-      };
-
-      setCustomer(customerData);
-      await fetchCustomerOrders();
-    } catch (error) {
-      console.error('Error loading customer:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCustomerOrders = async () => {
-    if (!id) return;
-    
-    try {
-      // Fetch customer orders
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          display_order_id,
-          total,
-          status,
-          created_at
-        `)
-        .eq('user_id', id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (ordersError) throw ordersError;
-
-      // Fetch order items count for each order
-      const orderIds = ordersData?.map(order => order.id) || [];
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_items')
-        .select('order_id, quantity')
-        .in('order_id', orderIds);
-
-      if (itemsError) throw itemsError;
-
-      // Combine orders with item counts
-      const ordersWithItems = ordersData?.map(order => ({
-        ...order,
-        items_count: itemsData?.filter(item => item.order_id === order.id)
-          .reduce((sum, item) => sum + item.quantity, 0) || 0
-      })) || [];
-
-      setOrders(ordersWithItems);
-    } catch (error) {
-      console.error('Error fetching customer orders:', error);
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'active': return 'default';
-      case 'inactive': return 'secondary';
-      case 'blocked': return 'destructive';
-      default: return 'outline';
-    }
-  };
+  // Boundary: Convex ms dates → ISO strings the page already renders.
+  const toISO = (ms?: number | null) => (ms ? new Date(ms).toISOString() : undefined);
+  const loading = data === undefined;
+  const customer: Customer | null = data
+    ? {
+        id: data.id,
+        name: data.name,
+        email: data.phone || '',
+        phone: data.phone || undefined,
+        is_admin: data.is_admin,
+        orderCount: data.orderCount,
+        totalSpent: data.totalSpent,
+        averageOrderValue: data.averageOrderValue,
+        lastOrderDate: toISO(data.lastOrderDate),
+        firstOrderDate: toISO(data.firstOrderDate),
+        created_at: new Date(data.created_at).toISOString(),
+        updated_at: new Date(data.updated_at).toISOString()
+      }
+    : null;
+  const orders: CustomerOrder[] = (data?.orders || []).map((o: any) => ({
+    id: String(o.id),
+    display_order_id: o.display_order_id,
+    total: o.total,
+    status: o.status,
+    created_at: new Date(o.created_at).toISOString(),
+    items_count: o.items_count
+  }));
 
   const getOrderStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -195,9 +114,6 @@ export function CustomerFormPage() {
         description={`Customer since ${new Date(customer.created_at).toLocaleDateString()}`}
         backUrl="/admin/customers"
       >
-        <Badge variant={getStatusBadgeVariant(customer.status)}>
-          {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
-        </Badge>
         {customer.is_admin && (
           <Badge variant="outline">Admin</Badge>
         )}
@@ -224,19 +140,10 @@ export function CustomerFormPage() {
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-500">
                     <Mail className="w-4 h-4 mr-2" />
-                    Email
+                    Contact
                   </div>
-                  <div className="font-medium">{customer.email}</div>
+                  <div className="font-medium">{customer.phone || customer.email || '—'}</div>
                 </div>
-                {customer.phone && (
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Phone className="w-4 h-4 mr-2" />
-                      Phone
-                    </div>
-                    <div className="font-medium">{customer.phone}</div>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-500">
                     <Calendar className="w-4 h-4 mr-2" />

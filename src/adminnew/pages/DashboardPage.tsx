@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Package, 
@@ -20,7 +19,9 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle, AdminCard
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
 import { formatINR } from '../../utils/currency';
 import { PageHeader } from '../components/shared/PageHeader';
 
@@ -56,96 +57,49 @@ interface RecentCustomer {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
-    activeProducts: 0,
-    totalOrders: 0,
-    pendingOrders: 0,
-    processingOrders: 0,
-    shippedOrders: 0,
-    totalCustomers: 0,
-    totalRevenue: 0,
-    todayOrders: 0,
-    todayRevenue: 0,
-    lowStockCount: 0
-  });
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [recentCustomers, setRecentCustomers] = useState<RecentCustomer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const org = useOrg();
+  const data = useQuery(
+    api.adminStats.getDashboardStats,
+    org ? { orgId: org._id } : 'skip'
+  );
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Parallel fetch all data
-      const [
-        productsRes,
-        ordersRes,
-        customersRes,
-        variantsRes,
-        recentOrdersRes,
-        recentCustomersRes
-      ] = await Promise.all([
-        supabase.from('products').select('id, is_active'),
-        supabase.from('orders').select('id, status, total, created_at'),
-        supabase.from('profiles').select('id'),
-        supabase.from('product_variants').select('id, stock'),
-        supabase.from('orders')
-          .select('id, display_order_id, shipping_name, total, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        supabase.from('profiles')
-          .select('id, full_name, email, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5)
-      ]);
-
-      const products = productsRes.data || [];
-      const orders = ordersRes.data || [];
-      const customers = customersRes.data || [];
-      const variants = variantsRes.data || [];
-
-      // Calculate stats
-      const todayOrders = orders.filter(o => new Date(o.created_at) >= today);
-      const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'placed');
-      const processingOrders = orders.filter(o => o.status === 'processing');
-      const shippedOrders = orders.filter(o => o.status === 'shipped');
-      const lowStockVariants = variants.filter(v => v.stock < 10);
-
-      setStats({
-        totalProducts: products.length,
-        activeProducts: products.filter(p => p.is_active).length,
-        totalOrders: orders.length,
-        pendingOrders: pendingOrders.length,
-        processingOrders: processingOrders.length,
-        shippedOrders: shippedOrders.length,
-        totalCustomers: customers.length,
-        totalRevenue: orders.reduce((sum, o) => sum + (o.total || 0), 0),
-        todayOrders: todayOrders.length,
-        todayRevenue: todayOrders.reduce((sum, o) => sum + (o.total || 0), 0),
-        lowStockCount: lowStockVariants.length
-      });
-
-      setRecentOrders(recentOrdersRes.data || []);
-      setRecentCustomers(recentCustomersRes.data || []);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
+  const stats: DashboardStats = {
+    totalProducts: data?.totalProducts ?? 0,
+    activeProducts: data?.activeProducts ?? 0,
+    totalOrders: data?.totalOrders ?? 0,
+    pendingOrders: data?.pendingOrders ?? 0,
+    processingOrders: data?.processingOrders ?? 0,
+    shippedOrders: data?.shippedOrders ?? 0,
+    totalCustomers: data?.totalCustomers ?? 0,
+    totalRevenue: data?.totalRevenue ?? 0,
+    todayOrders: data?.todayOrders ?? 0,
+    todayRevenue: data?.todayRevenue ?? 0,
+    lowStockCount: data?.lowStockCount ?? 0
   };
+  const recentOrders: RecentOrder[] = (data?.recentOrders || []).map((o: any) => ({
+    id: String(o.id),
+    display_order_id: o.display_order_id,
+    shipping_name: o.shipping_name,
+    total: o.total,
+    status: o.status,
+    created_at: new Date(o.created_at).toISOString()
+  }));
+  const recentCustomers: RecentCustomer[] = (data?.recentCustomers || []).map((c: any) => ({
+    id: c.id,
+    full_name: c.name,
+    email: c.phone || '',
+    created_at: new Date(c.created_at).toISOString()
+  }));
+  const loading = data === undefined;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-      case 'placed':
         return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'paid':
+      case 'late_paid':
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'awaiting':
       case 'processing':
         return <Activity className="h-4 w-4 text-blue-500" />;
       case 'shipped':
@@ -160,8 +114,11 @@ export function DashboardPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-      case 'placed':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'paid':
+      case 'late_paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'awaiting':
       case 'processing':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'shipped':
@@ -179,10 +136,6 @@ export function DashboardPage() {
         title="Dashboard" 
         description="Welcome back! Here's what's happening today."
       >
-        <Button variant="outline" size="sm" onClick={loadDashboardData} disabled={loading}>
-          {loading ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Activity className="mr-2 h-4 w-4" />}
-          Refresh
-        </Button>
         <Button size="sm" className="gap-2" onClick={() => navigate('/admin/products')}>
           <Plus className="h-4 w-4" />
           Add Product

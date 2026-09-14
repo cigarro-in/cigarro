@@ -1,6 +1,30 @@
-// Discount Calculation System
-import { supabase } from '../lib/supabase/client';
+// Discount Calculation System (Convex-backed; display-side only —
+// order totals are always recomputed from catalog prices at createOrder).
+import { convex } from '../lib/convex/client';
+import { api } from '../../convex/_generated/api';
 import { Discount, DiscountResult, CartItemWithVariant } from '../types/variants';
+
+// Boundary: Convex ms timestamps → ISO strings the Discount type speaks.
+const toDiscount = (d: any): Discount => ({
+  id: d._id,
+  name: d.name,
+  code: d.code,
+  type: d.type,
+  value: d.value,
+  min_cart_value: d.min_cart_value,
+  max_discount_amount: d.max_discount_amount,
+  applicable_to: d.applicable_to,
+  product_ids: d.product_ids,
+  combo_ids: d.combo_ids,
+  variant_ids: d.variant_ids,
+  start_date: d.start_date ? new Date(d.start_date).toISOString() : undefined,
+  end_date: d.end_date ? new Date(d.end_date).toISOString() : undefined,
+  usage_limit: d.usage_limit,
+  usage_count: d.usage_count ?? 0,
+  is_active: d.is_active,
+  created_at: d.createdAt ? new Date(d.createdAt).toISOString() : '',
+  updated_at: d.updatedAt ? new Date(d.updatedAt).toISOString() : '',
+});
 
 // Calculate discount for cart items
 export const calculateDiscount = async (
@@ -10,16 +34,9 @@ export const calculateDiscount = async (
   if (!cartItems.length) return null;
 
   try {
-    // Get all active discounts
-    const { data: discounts, error } = await supabase
-      .from('discounts')
-      .select('*')
-      .eq('is_active', true)
-      .lte('start_date', new Date().toISOString())
-      .gte('end_date', new Date().toISOString())
-      .or('start_date.is.null,end_date.is.null');
-
-    if (error) throw error;
+    // Active + in-window only (server-filtered, mirrors old RLS policy).
+    const rows = await convex.query(api.discounts.listActiveDiscounts, {});
+    const discounts: Discount[] = (rows || []).map(toDiscount);
 
     // Calculate cart totals
     const cartTotal = cartItems.reduce((sum, item) => {
@@ -31,7 +48,7 @@ export const calculateDiscount = async (
     let applicableDiscount: Discount | null = null;
 
     if (couponCode) {
-      // Look for coupon code discount first
+      // Look for coupon code discount first (case-insensitive)
       applicableDiscount = discounts?.find(d => 
         d.code?.toLowerCase() === couponCode.toLowerCase() &&
         isDiscountApplicable(d, cartItems, cartTotal)
@@ -193,14 +210,13 @@ export const validateCouponCode = async (code: string): Promise<{
   }
 
   try {
-    const { data: discount, error } = await supabase
-      .from('discounts')
-      .select('*')
-      .eq('code', code.toLowerCase())
-      .eq('is_active', true)
-      .single();
+    const row = await convex.query(api.discounts.getDiscountByCode, { code });
+    if (!row) {
+      return { isValid: false, message: 'Invalid coupon code' };
+    }
+    const discount = toDiscount(row);
 
-    if (error || !discount) {
+    if (!discount.is_active) {
       return { isValid: false, message: 'Invalid coupon code' };
     }
 
@@ -228,16 +244,10 @@ export const validateCouponCode = async (code: string): Promise<{
   }
 };
 
-// Increment discount usage count
+// Increment discount usage count (best-effort; failures are silent by design).
 export const incrementDiscountUsage = async (discountId: string): Promise<void> => {
   try {
-    const { error } = await supabase
-      .from('discounts')
-      .update({ usage_count: supabase.raw('usage_count + 1') })
-      .eq('id', discountId);
-
-    if (error) throw error;
-
+    await convex.mutation(api.discounts.registerUse, { id: discountId as any });
   } catch (error) {
     console.error('Discount usage increment error:', error);
   }
@@ -246,19 +256,8 @@ export const incrementDiscountUsage = async (discountId: string): Promise<void> 
 // Get available discounts for display
 export const getAvailableDiscounts = async (): Promise<Discount[]> => {
   try {
-    const { data: discounts, error } = await supabase
-      .from('discounts')
-      .select('*')
-      .eq('is_active', true)
-      .lte('start_date', new Date().toISOString())
-      .gte('end_date', new Date().toISOString())
-      .or('start_date.is.null,end_date.is.null')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return discounts || [];
-
+    const rows = await convex.query(api.discounts.listActiveDiscounts, {});
+    return (rows || []).map(toDiscount);
   } catch (error) {
     console.error('Get available discounts error:', error);
     return [];
@@ -297,5 +296,3 @@ export const getDiscountEligibilityMessage = (
   
   return 'Discount available';
 };
-
-

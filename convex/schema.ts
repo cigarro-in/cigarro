@@ -607,4 +607,30 @@ export default defineSchema({
     quantity: v.number(),
     sortOrder: v.optional(v.number()),
   }).index("by_combo", ["comboSupabaseId"]),
+
+  // ---------- Wave 7: commercial discounts (Supabase -> Convex) ----------
+  // GLOBAL (no orgId), like catalog. Money in RUPEES (cart totals are
+  // rupees); paise only at the order boundary. Dates as ms timestamps.
+  // Field names stay snake_case to match the Supabase shape the admin
+  // UI and checkout already speak.
+  discounts: defineTable({
+    name: v.string(),
+    code: v.optional(v.string()),
+    description: v.optional(v.string()),
+    type: v.string(),
+    value: v.number(),
+    min_cart_value: v.optional(v.number()),
+    max_discount_amount: v.optional(v.number()),
+    applicable_to: v.string(),
+    product_ids: v.optional(v.array(v.string())),
+    combo_ids: v.optional(v.array(v.string())),
+    variant_ids: v.optional(v.array(v.string())),
+    start_date: v.optional(v.number()),
+    end_date: v.optional(v.number()),
+    usage_limit: v.optional(v.number()),
+    usage_count: v.number(),
+    is_active: v.boolean(),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+  }).index("by_code", ["code"]),
 });

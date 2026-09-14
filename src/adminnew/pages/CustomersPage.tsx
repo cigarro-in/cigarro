@@ -1,16 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Ban, CheckCircle, Mail, Phone, Calendar, DollarSign, Users, ChevronDown } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import { toast } from 'sonner';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
 import { formatINR } from '../../utils/currency';
 import { DataTable } from '../components/shared/DataTable';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -26,107 +20,41 @@ interface Customer {
   averageOrderValue: number;
   lastOrderDate?: string;
   firstOrderDate?: string;
-  status: 'active' | 'inactive' | 'blocked';
   created_at: string;
   updated_at: string;
 }
 
 export function CustomersPage() {
   const navigate = useNavigate();
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const org = useOrg();
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  const rows = useQuery(
+    api.adminStats.listCustomersForAdmin,
+    org ? { orgId: org._id } : 'skip'
+  );
 
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch customer profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) throw profilesError;
-
-      // Fetch order statistics for each customer
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('user_id, total, created_at');
-
-      if (ordersError) throw ordersError;
-
-      // Calculate customer statistics
-      const customersWithStats = profilesData?.map(profile => {
-        const customerOrders = ordersData?.filter(order => order.user_id === profile.id) || [];
-        const orderCount = customerOrders.length;
-        const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-        const averageOrderValue = orderCount > 0 ? totalSpent / orderCount : 0;
-        
-        const orderDates = customerOrders.map(order => new Date(order.created_at));
-        const lastOrderDate = orderDates.length > 0 ? new Date(Math.max(...orderDates.map(d => d.getTime()))).toISOString() : undefined;
-        const firstOrderDate = orderDates.length > 0 ? new Date(Math.min(...orderDates.map(d => d.getTime()))).toISOString() : undefined;
-
-        return {
-          id: profile.id,
-          name: profile.name || 'Unknown',
-          email: profile.email || '',
-          phone: profile.phone,
-          is_admin: profile.is_admin || false,
-          orderCount,
-          totalSpent,
-          averageOrderValue,
-          lastOrderDate,
-          firstOrderDate,
-          status: profile.status || 'active',
-          created_at: profile.created_at,
-          updated_at: profile.updated_at
-        };
-      }) || [];
-
-      setCustomers(customersWithStats);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast.error('Failed to fetch customers');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Boundary: Convex ms dates → ISO strings the table already renders.
+  const toISO = (ms?: number | null) => (ms ? new Date(ms).toISOString() : undefined);
+  const customers: Customer[] = (rows || []).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    email: c.phone || '',
+    phone: c.phone || undefined,
+    is_admin: c.is_admin,
+    orderCount: c.orderCount,
+    totalSpent: c.totalSpent,
+    averageOrderValue: c.averageOrderValue,
+    lastOrderDate: toISO(c.lastOrderDate),
+    firstOrderDate: toISO(c.firstOrderDate),
+    created_at: new Date(c.created_at).toISOString(),
+    updated_at: new Date(c.updated_at).toISOString()
+  }));
+  const loading = rows === undefined;
 
   const handleViewCustomer = (customer: Customer) => {
     navigate(`/admin/customers/${customer.id}`);
-  };
-
-  const handleStatusUpdate = async (customerIds: string[], status: 'active' | 'blocked') => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status })
-        .in('id', customerIds);
-
-      if (error) throw error;
-      
-      toast.success(`${customerIds.length} customers ${status === 'blocked' ? 'blocked' : 'activated'} successfully`);
-      setSelectedCustomers([]);
-      fetchCustomers();
-    } catch (error) {
-      console.error('Error updating customer status:', error);
-      toast.error('Failed to update customer status');
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'active': return 'default';
-      case 'inactive': return 'secondary';
-      case 'blocked': return 'destructive';
-      default: return 'outline';
-    }
   };
 
   const columns = [
@@ -137,9 +65,8 @@ export function CustomersPage() {
       render: (name: string, customer: Customer) => (
         <div>
           <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{customer.email}</div>
           {customer.phone && (
-            <div className="text-xs text-gray-400 flex items-center">
+            <div className="text-sm text-gray-500 flex items-center">
               <Phone className="w-3 h-3 mr-1" />
               {customer.phone}
             </div>
@@ -185,17 +112,16 @@ export function CustomersPage() {
       )
     },
     {
-      key: 'status',
-      label: 'Status',
-      render: (status: string, customer: Customer) => (
+      key: 'is_admin',
+      label: 'Role',
+      render: (_: any, customer: Customer) => (
         <div className="space-y-1">
-          <Badge variant={getStatusBadgeVariant(status)}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
-          {customer.is_admin && (
+          {customer.is_admin ? (
             <Badge variant="outline" className="text-xs">
               Admin
             </Badge>
+          ) : (
+            <span className="text-sm text-gray-500">Customer</span>
           )}
         </div>
       )
@@ -210,19 +136,9 @@ export function CustomersPage() {
     }
   ];
 
-  const bulkActions = [
-    {
-      label: 'Activate Selected',
-      icon: CheckCircle,
-      onClick: (customerIds: string[]) => handleStatusUpdate(customerIds, 'active')
-    },
-    {
-      label: 'Block Selected',
-      icon: Ban,
-      onClick: (customerIds: string[]) => handleStatusUpdate(customerIds, 'blocked'),
-      variant: 'destructive' as const
-    }
-  ];
+  // No bulk status actions: profiles never had a status column, so the old
+  // block/activate toggle always failed. Selection stays for future actions.
+  const bulkActions: { label: string; onClick: (ids: string[]) => void }[] = [];
 
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
@@ -235,28 +151,6 @@ export function CustomersPage() {
           placeholder: "Search customers..."
         }}
       >
-        {selectedCustomers.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions ({selectedCustomers.length})
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {bulkActions.map((action, idx) => (
-                <DropdownMenuItem
-                  key={idx}
-                  onClick={() => action.onClick(selectedCustomers)}
-                  className={action.variant === 'destructive' ? 'text-red-600' : ''}
-                >
-                  {action.icon && <action.icon className="mr-2 h-4 w-4" />}
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Percent, Tag, Calendar, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -8,7 +8,8 @@ import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -55,9 +56,16 @@ export function DiscountFormPage() {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+
+  const row = useQuery(
+    api.discounts.getDiscountForEdit,
+    isEditMode ? { id: id as any } : 'skip'
+  );
+  const saveDiscount = useMutation(api.discounts.saveDiscount);
+  const removeDiscount = useMutation(api.discounts.deleteDiscount);
+  const populatedRef = useRef(false);
 
   const [formData, setFormData] = useState<DiscountFormData>({
     name: '',
@@ -75,10 +83,26 @@ export function DiscountFormPage() {
   });
 
   useEffect(() => {
-    if (isEditMode) {
-      loadDiscount();
+    if (isEditMode && row && !populatedRef.current) {
+      populatedRef.current = true;
+      const toDate = (ms?: number | null) =>
+        ms ? new Date(ms).toISOString().split('T')[0] : '';
+      setFormData({
+        name: row.name || '',
+        code: row.code || '',
+        description: row.description || '',
+        type: (row.type as DiscountFormData['type']) || 'percentage',
+        value: row.value || 0,
+        min_cart_value: row.min_cart_value || 0,
+        max_discount_amount: row.max_discount_amount || 0,
+        applicable_to: (row.applicable_to as DiscountFormData['applicable_to']) || 'all',
+        start_date: toDate(row.start_date),
+        end_date: toDate(row.end_date),
+        usage_limit: row.usage_limit || 0,
+        is_active: row.is_active !== false
+      });
     }
-  }, [id]);
+  }, [isEditMode, row]);
 
   useEffect(() => {
     setIsDirty(true);
@@ -87,39 +111,6 @@ export function DiscountFormPage() {
   useEffect(() => {
     setIsDirty(false);
   }, []);
-
-  const loadDiscount = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('discounts')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-
-      setFormData({
-        name: data.name || '',
-        code: data.code || '',
-        description: data.description || '',
-        type: data.type || 'percentage',
-        value: data.value || 0,
-        min_cart_value: data.min_cart_value || 0,
-        max_discount_amount: data.max_discount_amount || 0,
-        applicable_to: data.applicable_to || 'all',
-        start_date: data.start_date ? new Date(data.start_date).toISOString().split('T')[0] : '',
-        end_date: data.end_date ? new Date(data.end_date).toISOString().split('T')[0] : '',
-        usage_limit: data.usage_limit || 0,
-        is_active: data.is_active !== false
-      });
-    } catch (error) {
-      console.error('Error loading discount:', error);
-      toast.error('Failed to load discount');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const generateCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -147,45 +138,40 @@ export function DiscountFormPage() {
 
     setSaving(true);
     try {
-      const discountData = {
+      const toMs = (day: string) => (day ? new Date(day + 'T00:00:00').getTime() : undefined);
+      const payload = {
         name: formData.name.trim(),
-        code: formData.code.trim() || null,
-        description: formData.description.trim() || null,
+        code: formData.code.trim() || undefined,
+        description: formData.description.trim() || undefined,
         type: formData.type,
         value: formData.value,
-        min_cart_value: formData.min_cart_value || null,
-        max_discount_amount: formData.max_discount_amount || null,
+        min_cart_value: formData.min_cart_value || undefined,
+        max_discount_amount: formData.max_discount_amount || undefined,
         applicable_to: formData.applicable_to,
-        product_ids: null,
-        combo_ids: null,
-        variant_ids: null,
-        start_date: formData.start_date || null,
-        end_date: formData.end_date || null,
-        usage_limit: formData.usage_limit || null,
+        start_date: toMs(formData.start_date),
+        end_date: toMs(formData.end_date),
+        usage_limit: formData.usage_limit || undefined,
         is_active: formData.is_active
       };
 
       if (isEditMode) {
-        const { error } = await supabase
-          .from('discounts')
-          .update(discountData)
-          .eq('id', id);
-
-        if (error) throw error;
+        await saveDiscount({ id: id as any, ...payload });
         toast.success('Discount updated successfully');
       } else {
-        const { error } = await supabase
-          .from('discounts')
-          .insert([discountData]);
-
-        if (error) throw error;
+        await saveDiscount(payload);
         toast.success('Discount created successfully');
       }
 
       navigate('/admin/discounts');
     } catch (error: any) {
       console.error('Error saving discount:', error);
-      toast.error(error.message || 'Failed to save discount');
+      toast.error(
+        error?.data?.code === 'CODE_TAKEN'
+          ? 'That coupon code is already in use'
+          : error?.data?.code === 'NOT_DISCOUNT_ADMIN'
+            ? 'Admin access required'
+            : error.message || 'Failed to save discount'
+      );
     } finally {
       setSaving(false);
     }
@@ -195,17 +181,16 @@ export function DiscountFormPage() {
     if (!confirm('Are you sure you want to delete this discount?')) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('discounts')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await removeDiscount({ id: id as any });
       toast.success('Discount deleted successfully');
       navigate('/admin/discounts');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting discount:', error);
-      toast.error('Failed to delete discount');
+      toast.error(
+        error?.data?.code === 'NOT_DISCOUNT_ADMIN'
+          ? 'Admin access required'
+          : 'Failed to delete discount'
+      );
     } finally {
       setSaving(false);
     }
@@ -224,10 +209,22 @@ export function DiscountFormPage() {
     }
   };
 
-  if (loading) {
+  if (isEditMode && row === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (isEditMode && row === null) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <p className="text-gray-500">Discount not found. It may have been deleted.</p>
+        <Button variant="outline" onClick={() => navigate('/admin/discounts')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Discounts
+        </Button>
       </div>
     );
   }

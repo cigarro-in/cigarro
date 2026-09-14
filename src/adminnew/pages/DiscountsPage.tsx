@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Trash2, Percent, Tag, Calendar, Plus, ChevronDown } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { supabase } from '../../lib/supabase/client';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { DataTable } from '../components/shared/DataTable';
@@ -40,32 +41,37 @@ interface Discount {
 
 export function DiscountsPage() {
   const navigate = useNavigate();
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadDiscounts();
-  }, []);
+  const rows = useQuery(api.discounts.listDiscountsForAdmin, {});
+  const removeDiscount = useMutation(api.discounts.deleteDiscount);
+  const setStatus = useMutation(api.discounts.setDiscountsStatus);
 
-  const loadDiscounts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('discounts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setDiscounts(data || []);
-    } catch (error) {
-      console.error('Error loading discounts:', error);
-      toast.error('Failed to load discounts');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Boundary: Convex ms dates → ISO strings the table already renders.
+  const toISO = (ms?: number | null) => (ms ? new Date(ms).toISOString() : null);
+  const discounts: Discount[] = (rows || []).map((d: any) => ({
+    id: d._id,
+    name: d.name,
+    code: d.code ?? null,
+    description: d.description ?? null,
+    type: d.type,
+    value: d.value,
+    min_cart_value: d.min_cart_value ?? null,
+    max_discount_amount: d.max_discount_amount ?? null,
+    applicable_to: d.applicable_to,
+    product_ids: d.product_ids ?? null,
+    combo_ids: d.combo_ids ?? null,
+    variant_ids: d.variant_ids ?? null,
+    start_date: toISO(d.start_date),
+    end_date: toISO(d.end_date),
+    usage_limit: d.usage_limit ?? null,
+    usage_count: d.usage_count ?? 0,
+    is_active: d.is_active,
+    created_at: d.createdAt ? new Date(d.createdAt).toISOString() : '',
+    updated_at: d.updatedAt ? new Date(d.updatedAt).toISOString() : '',
+  }));
+  const loading = rows === undefined;
 
   const handleAddDiscount = () => {
     navigate('/admin/discounts/new');
@@ -78,33 +84,31 @@ export function DiscountsPage() {
   const handleBulkDelete = async (discountIds: string[]) => {
     if (!confirm(`Delete ${discountIds.length} discounts?`)) return;
     try {
-      const { error } = await supabase
-        .from('discounts')
-        .delete()
-        .in('id', discountIds);
-
-      if (error) throw error;
+      for (const id of discountIds) {
+        await removeDiscount({ id: id as any });
+      }
       toast.success(`${discountIds.length} discounts deleted`);
       setSelectedDiscounts([]);
-      loadDiscounts();
-    } catch (error) {
-      toast.error('Failed to delete discounts');
+    } catch (error: any) {
+      toast.error(
+        error?.data?.code === 'NOT_DISCOUNT_ADMIN'
+          ? 'Admin access required'
+          : 'Failed to delete discounts'
+      );
     }
   };
 
   const handleBulkStatusChange = async (discountIds: string[], isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('discounts')
-        .update({ is_active: isActive })
-        .in('id', discountIds);
-
-      if (error) throw error;
+      await setStatus({ ids: discountIds as any, isActive });
       toast.success(`${discountIds.length} discounts ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedDiscounts([]);
-      loadDiscounts();
-    } catch (error) {
-      toast.error('Failed to update status');
+    } catch (error: any) {
+      toast.error(
+        error?.data?.code === 'NOT_DISCOUNT_ADMIN'
+          ? 'Admin access required'
+          : 'Failed to update status'
+      );
     }
   };
 
