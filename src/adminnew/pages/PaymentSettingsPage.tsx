@@ -35,6 +35,9 @@ export function PaymentSettingsPage() {
   const update = useMutation(api.organizations.updateSettings);
   const setAppConfig = useMutation(api.appConfig.set);
   const testConnection = useAction(api.scheduler.testGasConnection);
+  const gmailStatus = useQuery(api.gmail.getGmailStatus, {});
+  const setGmailConfig = useMutation(api.gmail.setGmailConfig);
+  const triggerGmailPoll = useAction(api.gmail.triggerPoll);
 
   const [upiVpa, setUpiVpa] = useState('');
   const [walletEnabled, setWalletEnabled] = useState(true);
@@ -135,6 +138,33 @@ export function PaymentSettingsPage() {
                 if (!confirm('Disconnect the Apps Script? Payments will stop auto-confirming.'))
                   return;
                 await handleSaveGas('', '');
+              }}
+            />
+
+            <GmailOAuthCard
+              status={gmailStatus}
+              orgId={org?._id}
+              onToggle={async (enabled) => {
+                try {
+                  await setGmailConfig({
+                    enabled,
+                    ...(enabled && org ? { orgId: org._id } : {}),
+                  });
+                  toast.success(enabled ? 'Gmail polling enabled' : 'Gmail polling disabled');
+                } catch (e: any) {
+                  toast.error(e?.data?.code || 'Failed to save');
+                }
+              }}
+              onTest={async () => {
+                try {
+                  const r: any = await triggerGmailPoll({ maxMessages: 5 });
+                  if (r?.error) toast.error(r.error);
+                  else if (r?.skipped) toast.message(`Skipped: ${r.skipped}`);
+                  else if (r?.seeded) toast.success('History seeded — next poll processes new mail');
+                  else toast.success(`Processed ${r?.processed ?? 0} message(s)`);
+                } catch (e: any) {
+                  toast.error(e?.data?.message || e?.message || 'Test failed');
+                }
               }}
             />
 
@@ -331,6 +361,57 @@ function GmailConnectionCard(props: {
             </Button>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function GmailOAuthCard(props: {
+  status: any;
+  orgId?: string;
+  onToggle: (enabled: boolean) => void;
+  onTest: () => void;
+}) {
+  const s = props.status;
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Gmail OAuth polling (new)</CardTitle>
+        {s === undefined ? (
+          <Badge variant="outline">Loading…</Badge>
+        ) : s.enabled ? (
+          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Polling</Badge>
+        ) : (
+          <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Off</Badge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-gray-600">
+          Reads bank alerts straight from Gmail every 5 minutes — no Apps Script.
+          Needs the one-time OAuth setup (refresh token in Convex env), then flip the switch.
+        </p>
+        {s && !s.configured && (
+          <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+            Server keys missing (GMAIL_CLIENT_ID / REFRESH_TOKEN). Add them in Convex env first.
+          </p>
+        )}
+        {s && s.lastError && (
+          <p className="text-xs text-red-700">Last error: {s.lastError}</p>
+        )}
+        {s && s.lastPollAt && (
+          <p className="text-xs text-gray-500">
+            Last poll: {new Date(s.lastPollAt).toLocaleString()}
+            {s.hasHistory ? ' · history seeded' : ''}
+          </p>
+        )}
+        <div className="flex items-center gap-2">
+          <Switch checked={!!s?.enabled} onCheckedChange={props.onToggle} />
+          <Label>Poll every 5 min{props.orgId ? '' : ' (store org unavailable)'}</Label>
+          <span className="flex-1" />
+          <Button size="sm" variant="outline" onClick={props.onTest}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Test
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

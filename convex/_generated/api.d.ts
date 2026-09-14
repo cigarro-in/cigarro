@@ -17,6 +17,7 @@ import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as discounts from "../discounts.js";
 import type * as email from "../email.js";
+import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   discounts: typeof discounts;
   email: typeof email;
+  gmail: typeof gmail;
   http: typeof http;
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;

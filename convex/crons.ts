@@ -11,4 +11,9 @@ crons.daily(
   internal.scheduler.dailySweepAll,
 );
 
+// Gmail OAuth poller (replaces GAS as the primary feed). No-ops until the
+// founder completes the OAuth dance (env secrets) and enables polling in
+// Payment Settings — safe to ship dark.
+crons.interval("gmail inbox poll", { minutes: 5 }, internal.gmail.pollInbox, {});
+
 export default crons;

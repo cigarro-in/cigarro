@@ -298,6 +298,14 @@ export default defineSchema({
     key: v.string(),
     gasTemplateUrl: v.optional(v.string()),
     bankSenders: v.optional(v.array(v.string())), // e.g. ["@hdfcbank.bank.in", "@icicibank.com"]
+    // Gmail OAuth poller (replaces GAS per-org polling). Secrets live in
+    // Convex env (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN), never here.
+    gmailPollEnabled: v.optional(v.boolean()),
+    gmailHistoryId: v.optional(v.string()),
+    gmailQuery: v.optional(v.string()),
+    gmailOrgId: v.optional(v.id("organizations")),
+    gmailLastPollAt: v.optional(v.number()),
+    gmailLastError: v.optional(v.string()),
     updatedAt: v.number(),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
