@@ -24,6 +24,9 @@ import {
   BlogFormPage,
   HeroSlideFormPage,
   PaymentsPage,
+  InventoryPage,
+  InvoicesPage,
+  InvoiceFormPage,
 } from './pages';
 
 /**
@@ -38,6 +41,8 @@ export const ADMIN_ROUTES = [
   { path: '/admin/brands', element: BrandsPage, label: 'Brands', section: 'platform' },
   { path: '/admin/collections', element: CollectionsPage, label: 'Collections', section: 'platform' },
   { path: '/admin/orders', element: OrdersPage, label: 'Orders', section: 'platform' },
+  { path: '/admin/inventory', element: InventoryPage, label: 'Inventory', section: 'commerce' },
+  { path: '/admin/invoices', element: InvoicesPage, label: 'Invoices', section: 'commerce' },
   { path: '/admin/customers', element: CustomersPage, label: 'Customers', section: 'platform' },
   { path: '/admin/discounts', element: DiscountsPage, label: 'Discounts', section: 'platform' },
   { path: '/admin/homepage', element: HomepagePage, label: 'Homepage', section: 'platform' },
@@ -65,6 +70,8 @@ export function AdminRouter() {
         <Route path="/admin/collections/new" element={<CollectionFormPage />} />
         <Route path="/admin/collections/:id" element={<CollectionFormPage />} />
         <Route path="/admin/orders/:id" element={<OrderFormPage />} />
+        <Route path="/admin/invoices/new" element={<InvoiceFormPage />} />
+        <Route path="/admin/invoices/:id" element={<InvoiceFormPage />} />
         <Route path="/admin/customers/:id" element={<CustomerFormPage />} />
         <Route path="/admin/discounts/new" element={<DiscountFormPage />} />
         <Route path="/admin/discounts/:id" element={<DiscountFormPage />} />

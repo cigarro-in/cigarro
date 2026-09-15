@@ -5,6 +5,7 @@ import { MutationCtx, internalMutation } from "./_generated/server";
 import { parseWithTemplates, parseBankEmail } from "./lib/email";
 import { freeSlot } from "./orders";
 import { creditWallet } from "./wallet";
+import { commitOrderInventory, releaseOrderInventory } from "./lib/inventory";
 
 // ---------- Scheduled cleanups ----------
 
@@ -19,6 +20,7 @@ export const expireHeldSlot = internalMutation({
       status: "expired",
       terminalAt: Date.now(),
     });
+    await releaseOrderInventory(ctx, order, "system");
 
     if (order.walletDebitPaise > 0 && !order.walletRefundedAt) {
       await creditWallet(ctx, {
@@ -366,6 +368,7 @@ async function markOrderPaid(
     payerVpa: extras.payerVpa,
     payerName: extras.payerName,
   });
+  await commitOrderInventory(ctx, order, "system");
 
   if (order.kind === "wallet_load") {
     await creditWallet(ctx, {

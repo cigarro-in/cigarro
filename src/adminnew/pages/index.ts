@@ -17,6 +17,8 @@ export { HomepagePage } from './HomepagePage';
 export { AssetsPage } from './AssetsPage';
 export { SettingsPage } from './SettingsPage';
 export { PaymentsPage } from './PaymentsPage';
+export { InventoryPage } from './InventoryPage';
+export { InvoicesPage } from './InvoicesPage';
 
 // Form pages
 export { ProductFormPage } from './ProductFormPage';
@@ -28,3 +30,4 @@ export { CustomerFormPage } from './CustomerFormPage';
 export { DiscountFormPage } from './DiscountFormPage';
 export { BlogFormPage } from './BlogFormPage';
 export { HeroSlideFormPage } from './HeroSlideFormPage';
+export { InvoiceFormPage } from './InvoiceFormPage';

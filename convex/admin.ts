@@ -5,6 +5,7 @@ import { audit } from "./lib/audit";
 import { freeSlot } from "./orders";
 import { orderStatus, shippingStatus } from "./schema";
 import { creditWallet } from "./wallet";
+import { commitOrderInventory, releaseOrderInventory, returnOrderInventory } from "./lib/inventory";
 
 // ---------- Mark a pending order as paid manually ----------
 
@@ -25,6 +26,7 @@ export const markPaid = mutation({
       paidAt: Date.now(),
       verificationMethod: "admin_manual",
     });
+    await commitOrderInventory(ctx, order, `admin:${identity.subject}`);
 
     if (order.slotId) await freeSlot(ctx, order.slotId);
 
@@ -57,9 +59,10 @@ export const refundOrder = mutation({
   args: {
     orderId: v.id("orders"),
     toWallet: v.boolean(),
+    restock: v.optional(v.boolean()),
     note: v.optional(v.string()),
   },
-  handler: async (ctx, { orderId, toWallet, note }) => {
+  handler: async (ctx, { orderId, toWallet, restock, note }) => {
     const order = await ctx.db.get(orderId);
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
     const { identity } = await requireOrgAdmin(ctx, order.orgId);
@@ -70,6 +73,7 @@ export const refundOrder = mutation({
       status: "refunded",
       terminalAt: Date.now(),
     });
+    if (restock) await returnOrderInventory(ctx, order, `admin:${identity.subject}`);
 
     if (toWallet) {
       await creditWallet(ctx, {
@@ -90,7 +94,7 @@ export const refundOrder = mutation({
       action: "order.refund",
       targetType: "order",
       targetId: orderId,
-      payload: { toWallet, note },
+      payload: { toWallet, restock: restock ?? false, note },
     });
   },
 });
@@ -114,6 +118,7 @@ export const voidOrder = mutation({
       status: "voided",
       terminalAt: Date.now(),
     });
+    await releaseOrderInventory(ctx, order, `admin:${identity.subject}`);
 
     if (order.walletDebitPaise > 0 && !order.walletRefundedAt) {
       await creditWallet(ctx, {

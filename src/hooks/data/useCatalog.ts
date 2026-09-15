@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { useOrg } from '../../lib/convex/useOrg';
 
 // Theme-safe catalog reads (Wave 3: Convex). Shapes mirror the legacy
 // Supabase rows — snake_case, Supabase UUID ids, ISO timestamps, explicit
@@ -121,13 +122,13 @@ function toLegacyProduct(
 }
 
 function buildMaps(bundle: any) {
-  const brandById = new Map((bundle.brands || []).map((b: any) => [b.supabaseId, b]));
+  const brandById = new Map<string, any>((bundle.brands || []).map((b: any) => [b.supabaseId, b] as [string, any]));
   const variantsByProduct = new Map<string, any[]>();
   for (const x of bundle.variants || []) {
     if (!variantsByProduct.has(x.productSupabaseId)) variantsByProduct.set(x.productSupabaseId, []);
     variantsByProduct.get(x.productSupabaseId)!.push(x);
   }
-  const catById = new Map((bundle.categories || []).map((c: any) => [c.supabaseId, c]));
+  const catById = new Map<string, any>((bundle.categories || []).map((c: any) => [c.supabaseId, c] as [string, any]));
   const catsByProduct = new Map<string, Array<{ id: string; name: string; slug: string }>>();
   for (const j of bundle.productCategories || []) {
     const c = catById.get(j.categorySupabaseId);
@@ -142,7 +143,8 @@ function buildMaps(bundle: any) {
 // Memoized: consumers feed these identities into setState-in-effect syncs,
 // so a fresh object per render would retrigger them infinitely.
 export function useFullCatalog() {
-  const bundle = useQuery(api.catalog.fullCatalog, {});
+  const org = useOrg();
+  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgId: org._id } : 'skip');
   return useMemo(() => {
     if (!bundle) {
       return {
@@ -172,15 +174,16 @@ export function useFullCatalog() {
 
 // PDP: single product with variants + brand (legacy shapes).
 export function useCatalogProduct(slug: string | undefined) {
+  const org = useOrg();
   const detail = useQuery(
     api.catalog.getProductBySlug,
-    slug ? { slug } : 'skip',
+    slug && org ? { slug, orgId: org._id } : 'skip',
   );
   return useMemo(() => {
     if (detail === undefined) return { product: null, loading: true as boolean };
     if (!detail) return { product: null, loading: false as boolean };
-    const brandById = new Map(
-      detail.brand ? [[detail.brand.supabaseId, detail.brand]] : [],
+    const brandById = new Map<string, any>(
+      detail.brand ? [[detail.brand.supabaseId, detail.brand] as [string, any]] : [],
     );
     const variantsByProduct = new Map([
       [detail.product.supabaseId, detail.variants || []],

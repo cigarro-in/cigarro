@@ -139,9 +139,12 @@ export function OrderFormPage() {
       ? 'Refund to the customer wallet?'
       : 'Flag for manual bank refund? (no wallet credit)';
     if (!confirm(msg)) return;
+    const restock = order.kind === 'purchase'
+      ? confirm('Have the physical items been returned and inspected? Choose OK to add them back to stock, or Cancel to refund without restocking.')
+      : false;
     setSaving(true);
     try {
-      await refund({ orderId: order._id, toWallet });
+      await refund({ orderId: order._id, toWallet, restock });
       toast.success('Refund recorded');
     } catch (e: any) {
       toast.error(e?.data?.code || 'Failed');

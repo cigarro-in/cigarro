@@ -77,6 +77,32 @@ export const shippingStatus = v.union(
   v.literal("returned"),
 );
 
+export const inventoryMovementType = v.union(
+  v.literal("opening_balance"),
+  v.literal("manual_adjustment"),
+  v.literal("stock_received"),
+  v.literal("online_reservation"),
+  v.literal("reservation_release"),
+  v.literal("online_sale"),
+  v.literal("offline_sale"),
+  v.literal("sale_reversal"),
+  v.literal("return"),
+);
+
+export const invoiceStatus = v.union(
+  v.literal("paid"),
+  v.literal("due"),
+  v.literal("voided"),
+);
+
+export const invoicePaymentMethod = v.union(
+  v.literal("cash"),
+  v.literal("upi"),
+  v.literal("card"),
+  v.literal("bank_transfer"),
+  v.literal("other"),
+);
+
 export const addressV = v.object({
   line1: v.string(),
   line2: v.optional(v.string()),
@@ -187,6 +213,14 @@ export default defineSchema({
     idempotencyKey: v.optional(v.string()),  // client-provided; prevents double-create on retry
     extraCreditsPaise: v.optional(v.number()), // sum of duplicate/over-payments credited beyond this order
     lastWakeAt: v.optional(v.number()),      // throttle for customer wake/refresh polls
+    // Inventory is reserved while payment is pending, committed when paid,
+    // and released when an unpaid order terminates. Optional for legacy rows.
+    inventoryState: v.optional(v.union(
+      v.literal("reserved"),
+      v.literal("committed"),
+      v.literal("released"),
+      v.literal("returned"),
+    )),
   })
     .index("by_org_user", ["orgId", "userId", "createdAt"])
     .index("by_org_final_status", ["orgId", "finalAmountPaise", "status"])
@@ -348,6 +382,98 @@ export default defineSchema({
     payload: v.any(),
     createdAt: v.number(),
   }).index("by_org_time", ["orgId", "createdAt"]),
+
+  inventoryBalances: defineTable({
+    orgId: v.id("organizations"),
+    variantSupabaseId: v.string(),
+    onHand: v.number(),
+    reserved: v.number(),
+    reorderPoint: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org_variant", ["orgId", "variantSupabaseId"])
+    .index("by_org", ["orgId"]),
+
+  inventoryMovements: defineTable({
+    orgId: v.id("organizations"),
+    variantSupabaseId: v.string(),
+    productSupabaseId: v.string(),
+    type: inventoryMovementType,
+    quantityDelta: v.number(),
+    reservedDelta: v.number(),
+    onHandBefore: v.number(),
+    onHandAfter: v.number(),
+    reservedBefore: v.number(),
+    reservedAfter: v.number(),
+    referenceType: v.optional(v.string()),
+    referenceId: v.optional(v.string()),
+    note: v.optional(v.string()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_org_time", ["orgId", "createdAt"])
+    .index("by_org_variant_time", ["orgId", "variantSupabaseId", "createdAt"])
+    .index("by_reference", ["referenceType", "referenceId"]),
+
+  invoiceSettings: defineTable({
+    orgId: v.id("organizations"),
+    prefix: v.string(),
+    nextNumber: v.number(),
+    businessName: v.string(),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    gstin: v.optional(v.string()),
+    terms: v.optional(v.string()),
+    accentColor: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  }).index("by_org", ["orgId"]),
+
+  invoices: defineTable({
+    orgId: v.id("organizations"),
+    invoiceNumber: v.string(),
+    status: invoiceStatus,
+    paymentMethod: invoicePaymentMethod,
+    paymentReference: v.optional(v.string()),
+    customerName: v.string(),
+    customerPhone: v.optional(v.string()),
+    customerEmail: v.optional(v.string()),
+    customerAddress: v.optional(v.string()),
+    seller: v.object({
+      businessName: v.string(),
+      address: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      email: v.optional(v.string()),
+      gstin: v.optional(v.string()),
+      terms: v.optional(v.string()),
+      accentColor: v.optional(v.string()),
+    }),
+    items: v.array(v.object({
+      productSupabaseId: v.string(),
+      variantSupabaseId: v.string(),
+      productName: v.string(),
+      variantName: v.string(),
+      quantity: v.number(),
+      unitPricePaise: v.number(),
+      lineTotalPaise: v.number(),
+    })),
+    subtotalPaise: v.number(),
+    discountPaise: v.number(),
+    taxRateBps: v.number(),
+    taxPaise: v.number(),
+    totalPaise: v.number(),
+    notes: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+    createdAt: v.number(),
+    createdBy: v.string(),
+    voidedAt: v.optional(v.number()),
+    voidedBy: v.optional(v.string()),
+    voidReason: v.optional(v.string()),
+  })
+    .index("by_org_created", ["orgId", "createdAt"])
+    .index("by_org_number", ["orgId", "invoiceNumber"])
+    .index("by_org_idempotency", ["orgId", "idempotencyKey"]),
 
   // ---- Phase 1: user state (migrated off Supabase) ----
   // userId = Supabase auth.users.id during Phase 1 (bridge unchanged).

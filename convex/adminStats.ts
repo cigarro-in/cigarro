@@ -75,6 +75,11 @@ export const getDashboardStats = query({
 
     const products = await ctx.db.query("catalogProducts").collect();
     const variants = await ctx.db.query("catalogVariants").collect();
+    const inventory = await ctx.db
+      .query("inventoryBalances")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const inventoryByVariant = new Map(inventory.map((row) => [row.variantSupabaseId, row]));
     const users = await ctx.db.query("users").collect();
 
     const recentOrders = orders.slice(0, 5).map((o) => ({
@@ -109,7 +114,12 @@ export const getDashboardStats = query({
       totalRevenue: revenue,
       todayOrders,
       todayRevenue,
-      lowStockCount: variants.filter((vv) => vv.stock != null && vv.stock < 10).length,
+      lowStockCount: variants.filter((vv) => {
+        if (vv.trackInventory === false) return false;
+        const balance = inventoryByVariant.get(vv.supabaseId);
+        const available = balance ? balance.onHand - balance.reserved : Number(vv.stock ?? 0);
+        return available <= (balance?.reorderPoint ?? 10);
+      }).length,
       recentOrders,
       recentCustomers,
     };

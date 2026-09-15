@@ -820,13 +820,19 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Stock</Label>
+                          <Label>{variant.id ? 'Opening stock (managed in Inventory)' : 'Opening stock'}</Label>
                           <Input
                             type="number"
                             value={variant.stock}
                             onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) || 0 })}
+                            disabled={Boolean(variant.id)}
                             className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
                           />
+                          {variant.id && (
+                            <button type="button" onClick={() => navigate('/admin/inventory')} className="text-xs font-medium text-[var(--color-canyon)] hover:underline">
+                              Adjust live stock in Inventory
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <Switch

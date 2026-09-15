@@ -15,6 +15,8 @@ import {
   LogOut,
   CreditCard,
   Star,
+  Boxes,
+  ReceiptIndianRupee,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -55,6 +57,8 @@ const NAVIGATION_CONFIG: NavItem[] = [
   { id: 'brands', label: 'Brands', path: '/admin/brands', icon: Building2, section: 'platform' },
   { id: 'collections', label: 'Collections', path: '/admin/collections', icon: FolderOpen, section: 'platform' },
   { id: 'orders', label: 'Orders', path: '/admin/orders', icon: ShoppingCart, section: 'platform' },
+  { id: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, section: 'commerce' },
+  { id: 'invoices', label: 'Invoices', path: '/admin/invoices', icon: ReceiptIndianRupee, section: 'commerce' },
   { id: 'payments', label: 'Payments', path: '/admin/payments', icon: CreditCard, section: 'payments' },
   { id: 'customers', label: 'Customers', path: '/admin/customers', icon: Users, section: 'platform' },
   { id: 'discounts', label: 'Discounts', path: '/admin/discounts', icon: Percent, section: 'platform' },
@@ -71,6 +75,7 @@ const NAVIGATION_CONFIG: NavItem[] = [
 const SECTION_LABELS: Record<string, string> = {
   platform: 'Platform',
   payments: 'Payments',
+  commerce: 'Offline sales',
 };
 
 /**

@@ -37,6 +37,24 @@ async function assertSlugUnique(
   }
 }
 
+async function findVariantInventoryBalance(ctx: any, variantSupabaseId: string) {
+  return await ctx.db
+    .query("inventoryBalances")
+    .filter((q: any) => q.eq(q.field("variantSupabaseId"), variantSupabaseId))
+    .first();
+}
+
+async function assertVariantHasNoInventoryHistory(ctx: any, variantSupabaseId: string) {
+  const balance = await findVariantInventoryBalance(ctx, variantSupabaseId);
+  if (balance) {
+    throw new ConvexError({
+      code: "VARIANT_HAS_INVENTORY_HISTORY",
+      variantSupabaseId,
+      message: "Deactivate this product instead. Variants with sales or stock history cannot be deleted.",
+    });
+  }
+}
+
 // Admin list view: products + variants + brand in one round trip.
 // Public read like the rest of the catalog; writes above stay gated.
 export const listProductsForAdmin = query({
@@ -456,7 +474,10 @@ export const saveProduct = mutation({
         .query("catalogVariants")
         .withIndex("by_supabase", (q) => q.eq("supabaseId", delId))
         .unique();
-      if (vrow) await ctx.db.delete(vrow._id);
+      if (vrow) {
+        await assertVariantHasNoInventoryHistory(ctx, vrow.supabaseId);
+        await ctx.db.delete(vrow._id);
+      }
     }
     for (const variant of variants) {
       const doc = {
@@ -470,7 +491,13 @@ export const saveProduct = mutation({
           .query("catalogVariants")
           .withIndex("by_supabase", (q) => q.eq("supabaseId", variant.supabaseId!))
           .unique();
-        if (vrow) await ctx.db.patch(vrow._id, doc);
+        if (vrow) {
+          // Once the inventory ledger has initialized this variant, stock is
+          // managed only by inventory mutations. Product edits/imports must
+          // not silently overwrite an audited balance.
+          const balance = await findVariantInventoryBalance(ctx, vrow.supabaseId);
+          await ctx.db.patch(vrow._id, balance ? { ...doc, stock: vrow.stock } : doc);
+        }
         else
           await ctx.db.insert("catalogVariants", {
             ...doc,
@@ -526,6 +553,7 @@ export const deleteProduct = mutation({
       .query("catalogVariants")
       .withIndex("by_product", (q) => q.eq("productSupabaseId", supabaseId))
       .collect();
+    for (const r of variants) await assertVariantHasNoInventoryHistory(ctx, r.supabaseId);
     for (const r of variants) await ctx.db.delete(r._id);
     for (const table of ["catalogProductCategories", "catalogCollectionProducts"] as const) {
       const rows = await ctx.db

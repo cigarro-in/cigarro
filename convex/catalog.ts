@@ -58,7 +58,9 @@ const productShape = (p: any) => ({
   updatedAt: p.updatedAt,
 });
 
-const variantShape = (x: any) => ({
+// Public catalog intentionally exposes availability only, never exact stock.
+// Admin inventory queries are the sole source for quantities.
+const variantShape = (x: any, available?: number) => ({
   _id: x._id,
   supabaseId: x.supabaseId,
   productSupabaseId: x.productSupabaseId,
@@ -72,11 +74,33 @@ const variantShape = (x: any) => ({
   priceRupees: x.priceRupees,
   compareAtPriceRupees: x.compareAtPriceRupees,
   costPriceRupees: x.costPriceRupees,
-  stock: x.stock,
+  stock: x.trackInventory === false ? undefined : (available ?? Number(x.stock ?? 0)) > 0 ? 1 : 0,
   trackInventory: x.trackInventory,
   isDefault: x.isDefault,
   isActive: x.isActive,
 });
+
+async function publicVariantShapes(ctx: any, variants: any[], orgId?: any) {
+  let scopedOrgId = orgId;
+  if (!scopedOrgId) {
+    const defaultOrg = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q: any) => q.eq("slug", "smokeshop"))
+      .unique();
+    scopedOrgId = defaultOrg?._id;
+  }
+  if (!scopedOrgId) return variants.map((x) => variantShape(x));
+  const balances = await ctx.db
+    .query("inventoryBalances")
+    .withIndex("by_org", (q: any) => q.eq("orgId", scopedOrgId))
+    .collect();
+  const byVariant = new Map(balances.map((b: any) => [b.variantSupabaseId, b]));
+  return variants.map((x) => {
+    const balance: any = byVariant.get(x.supabaseId);
+    const available = balance ? balance.onHand - balance.reserved : Number(x.stock ?? 0);
+    return variantShape(x, available);
+  });
+}
 
 export const listBrands = query({
   args: { activeOnly: v.optional(v.boolean()) },
@@ -129,7 +153,7 @@ export const listProducts = query({
 });
 
 export const getProductBySlug = query({
-  args: { slug: v.string() },
+  args: { slug: v.string(), orgId: v.optional(v.id("organizations")) },
   handler: async (ctx, args) => {
     const product = await ctx.db
       .query("catalogProducts")
@@ -154,14 +178,14 @@ export const getProductBySlug = query({
     }
     return {
       product: productShape(product),
-      variants: variants.map(variantShape),
+      variants: await publicVariantShapes(ctx, variants, args.orgId),
       brand,
     };
   },
 });
 
 export const listVariantsByProduct = query({
-  args: { productSupabaseId: v.string() },
+  args: { productSupabaseId: v.string(), orgId: v.optional(v.id("organizations")) },
   handler: async (ctx, args) => {
     const rows = await ctx.db
       .query("catalogVariants")
@@ -169,7 +193,7 @@ export const listVariantsByProduct = query({
         q.eq("productSupabaseId", args.productSupabaseId),
       )
       .collect();
-    return rows.map(variantShape);
+    return await publicVariantShapes(ctx, rows, args.orgId);
   },
 });
 
@@ -570,8 +594,8 @@ export const getBrandDetail = query({
 // edge layer maps them to the exact legacy Supabase shapes (snake_case,
 // UUID ids, ISO timestamps, explicit nulls) so API JSON stays identical.
 export const fullCatalog = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgId: v.optional(v.id("organizations")) },
+  handler: async (ctx, args) => {
     const [products, variants, brands, categories, productCategories, combos, collections, collectionProducts] =
       await Promise.all([
         ctx.db.query("catalogProducts").collect(),
@@ -585,7 +609,7 @@ export const fullCatalog = query({
       ]);
     return {
       products: products.map(productShape),
-      variants: variants.map(variantShape),
+      variants: await publicVariantShapes(ctx, variants, args.orgId),
       brands: brands.map(brandShape),
       categories: categories.map(categoryShape),
       collections: collections.map((c) => ({

@@ -4,10 +4,11 @@ import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
 import { requireIdentity, requireMember } from "./lib/auth";
 import { genDisplayOrderId } from "./lib/ids";
-import { assertPositiveInt } from "./lib/money";
+import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
 import { addressV, orderItemV, orderKind } from "./schema";
 import { creditWallet, debitWallet } from "./wallet";
+import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -17,6 +18,55 @@ function computeCartTotal(items: Doc<"orders">["items"]): number {
     }
     return sum + it.unitPricePaise * it.qty;
   }, 0);
+}
+
+async function pricePurchaseItems(
+  ctx: MutationCtx,
+  items: Doc<"orders">["items"],
+): Promise<Doc<"orders">["items"]> {
+  const priced = [];
+  for (const item of items) {
+    if (!Number.isInteger(item.qty) || item.qty <= 0)
+      throw new ConvexError({ code: "INVALID_QTY" });
+    let product = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_supabase", (q) => q.eq("supabaseId", item.productId))
+      .unique();
+    if (product?.isActive) {
+      let variant = item.variantId
+        ? await ctx.db.query("catalogVariants").withIndex("by_supabase", (q) => q.eq("supabaseId", item.variantId!)).unique()
+        : null;
+      if (!variant) {
+        const variants = await ctx.db
+          .query("catalogVariants")
+          .withIndex("by_product", (q) => q.eq("productSupabaseId", product!.supabaseId))
+          .collect();
+        variant = variants.find((row) => row.isDefault) ?? variants[0] ?? null;
+      }
+      if (!variant || !variant.isActive || variant.productSupabaseId !== product.supabaseId)
+        throw new ConvexError({ code: "INVALID_PRODUCT_VARIANT" });
+      priced.push({
+        productId: product.supabaseId,
+        variantId: variant.supabaseId,
+        name: `${product.name} · ${variant.variantName}`,
+        qty: item.qty,
+        unitPricePaise: rupeesToPaise(variant.priceRupees),
+      });
+      continue;
+    }
+    const combo = await ctx.db
+      .query("catalogCombos")
+      .withIndex("by_supabase", (q) => q.eq("supabaseId", item.productId))
+      .unique();
+    if (!combo?.isActive) throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
+    priced.push({
+      productId: combo.supabaseId,
+      name: combo.name,
+      qty: item.qty,
+      unitPricePaise: rupeesToPaise(combo.comboPriceRupees),
+    });
+  }
+  return priced;
 }
 
 // Race-free thanks to Convex serializable mutations.
@@ -146,19 +196,22 @@ export const createOrder = mutation({
       }
     }
 
-    // Input validation
+    // Input validation and server-side repricing. Client snapshots are never
+    // trusted for product identity, names, or money.
+    let orderItems = args.items;
     if (args.kind === "purchase") {
       if (args.items.length === 0)
         throw new ConvexError({ code: "EMPTY_CART" });
       if (!args.address)
         throw new ConvexError({ code: "ADDRESS_REQUIRED" });
+      orderItems = await pricePurchaseItems(ctx, args.items);
     } else if (args.kind === "wallet_load") {
       if (args.items.length !== 1 || args.items[0].qty !== 1) {
         throw new ConvexError({ code: "INVALID_WALLET_LOAD" });
       }
     }
 
-    const cartTotal = computeCartTotal(args.items);
+    const cartTotal = computeCartTotal(orderItems);
     if (cartTotal <= 0)
       throw new ConvexError({ code: "ZERO_AMOUNT" });
 
@@ -214,7 +267,7 @@ export const createOrder = mutation({
         displayOrderId,
         kind: args.kind,
         retryOfOrderId: args.retryOfOrderId,
-        items: args.items,
+        items: orderItems,
         address: args.address,
         cartTotalPaise: cartTotal,
         walletDebitPaise: walletDebit,
@@ -229,6 +282,8 @@ export const createOrder = mutation({
         createdAt: Date.now(),
         paidAt: Date.now(),
       });
+      const paidOrder = await ctx.db.get(orderId);
+      if (paidOrder) await commitOrderInventory(ctx, paidOrder, `user:${userId}`);
       // Link ledger debit to order
       await linkLatestDebitToOrder(ctx, args.orgId, userId, orderId);
       return {
@@ -267,7 +322,7 @@ export const createOrder = mutation({
       displayOrderId,
       kind: args.kind,
       retryOfOrderId: args.retryOfOrderId,
-      items: args.items,
+      items: orderItems,
       address: args.address,
       cartTotalPaise: cartTotal,
       walletDebitPaise: walletDebit,
@@ -287,6 +342,11 @@ export const createOrder = mutation({
       payingVpa,
       idempotencyKey: args.idempotencyKey,
     });
+
+    if (args.kind === "purchase") {
+      await reserveOrderInventory(ctx, args.orgId, orderItems, orderId, `user:${userId}`);
+      await ctx.db.patch(orderId, { inventoryState: "reserved" });
+    }
 
     if (activeVpa) {
       await ctx.db.patch(activeVpa._id, { lastUsedAt: Date.now() });
@@ -363,6 +423,7 @@ export const cancelOrder = mutation({
       status: "cancelled",
       terminalAt: Date.now(),
     });
+    await releaseOrderInventory(ctx, order, "system");
 
     // Refund wallet debit if any
     if (order.walletDebitPaise > 0 && !order.walletRefundedAt) {
@@ -401,7 +462,7 @@ export const cancelOrder = mutation({
 
 export const retryOrder = mutation({
   args: { oldOrderId: v.id("orders") },
-  handler: async (ctx, { oldOrderId }) => {
+  handler: async (ctx, { oldOrderId }): Promise<any> => {
     const old = await ctx.db.get(oldOrderId);
     if (!old) throw new ConvexError({ code: "NOT_FOUND" });
     const { userId } = await requireMember(ctx, old.orgId);
@@ -463,4 +524,3 @@ export const listMyOrders = query({
       .take(limit ?? 25);
   },
 });
-

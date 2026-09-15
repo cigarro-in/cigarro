@@ -13,6 +13,7 @@ import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ProductImportExport } from '../features/ProductImportExport';
+import { useOrg } from '../../lib/convex/useOrg';
 
 interface Product {
   id: string;
@@ -33,6 +34,7 @@ interface Product {
 
 export function ProductsPage() {
   const navigate = useNavigate();
+  const org = useOrg();
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [importOpen, setImportOpen] = useState(false);
@@ -40,6 +42,8 @@ export function ProductsPage() {
   // Convex is the catalog source of truth; the list is reactive so imports
   // and edits refresh it with no manual refetch.
   const rows = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const inventoryRows = useQuery(api.inventory.list, org ? { orgId: org._id } : 'skip');
+  const inventoryByVariant = new Map((inventoryRows || []).map((row: any) => [row.variantSupabaseId, row]));
   const deleteProduct = useMutation(api.adminCatalog.deleteProduct);
   const setActive = useMutation(api.adminCatalog.setProductsActive);
 
@@ -55,7 +59,7 @@ export function ProductsPage() {
       id: v.supabaseId,
       variant_name: v.variantName,
       price: v.priceRupees,
-      stock: v.stock ?? 0,
+      stock: inventoryByVariant.get(v.supabaseId)?.available ?? v.stock ?? 0,
       is_default: v.isDefault,
       images: v.images || [],
     })),
