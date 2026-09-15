@@ -107,7 +107,7 @@ export function CustomerFormPage() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
       {/* Header */}
       <PageHeader
         title={customer.name}

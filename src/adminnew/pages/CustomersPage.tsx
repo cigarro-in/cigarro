@@ -27,7 +27,6 @@ interface Customer {
 export function CustomersPage() {
   const navigate = useNavigate();
   const org = useOrg();
-  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   const rows = useQuery(
@@ -61,7 +60,6 @@ export function CustomersPage() {
     {
       key: 'name',
       label: 'Customer',
-      sortable: true,
       render: (name: string, customer: Customer) => (
         <div>
           <div className="font-medium text-gray-900">{name}</div>
@@ -77,7 +75,6 @@ export function CustomersPage() {
     {
       key: 'orderCount',
       label: 'Orders',
-      sortable: true,
       render: (count: number) => (
         <div className="text-center">
           <div className="font-medium">{count}</div>
@@ -88,7 +85,6 @@ export function CustomersPage() {
     {
       key: 'totalSpent',
       label: 'Total Spent',
-      sortable: true,
       render: (amount: number) => (
         <div className="font-medium">{formatINR(amount)}</div>
       )
@@ -96,7 +92,6 @@ export function CustomersPage() {
     {
       key: 'averageOrderValue',
       label: 'Avg. Order',
-      sortable: true,
       render: (amount: number) => (
         <div className="text-sm">{formatINR(amount)}</div>
       )
@@ -104,7 +99,6 @@ export function CustomersPage() {
     {
       key: 'lastOrderDate',
       label: 'Last Order',
-      sortable: true,
       render: (date?: string) => (
         <div className="text-sm">
           {date ? new Date(date).toLocaleDateString() : 'Never'}
@@ -129,41 +123,31 @@ export function CustomersPage() {
     {
       key: 'created_at',
       label: 'Joined',
-      sortable: true,
       render: (date: string) => (
         <div className="text-sm">{new Date(date).toLocaleDateString()}</div>
       )
     }
   ];
 
-  // No bulk status actions: profiles never had a status column, so the old
-  // block/activate toggle always failed. Selection stays for future actions.
-  const bulkActions: { label: string; onClick: (ids: string[]) => void }[] = [];
-
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
-      <PageHeader 
-        title="Customers" 
+      <PageHeader
+        title="Customers"
         description="Manage customer accounts"
         search={{
           value: searchTerm,
           onChange: setSearchTerm,
           placeholder: "Search customers..."
         }}
-      >
-      </PageHeader>
+      />
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         <DataTable
           data={customers}
           columns={columns}
           loading={loading}
-          selectedItems={selectedCustomers}
-          onSelectionChange={setSelectedCustomers}
-          bulkActions={bulkActions}
           onRowClick={handleViewCustomer}
           searchTerm={searchTerm}
-          hideToolbar={true}
         />
       </div>
     </div>

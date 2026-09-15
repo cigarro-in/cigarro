@@ -1,18 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Trash2, Building2, Plus, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Building2, Plus } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
+import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
 
@@ -109,7 +104,6 @@ export function BrandsPage() {
     {
       key: 'name',
       label: 'Brand Name',
-      sortable: true,
       render: (name: string, brand: Brand) => (
         <div>
           <div className="font-medium text-gray-900">{name}</div>
@@ -129,7 +123,6 @@ export function BrandsPage() {
     {
       key: 'product_count',
       label: 'Products',
-      sortable: true,
       render: (count: number) => (
         <Badge variant="outline" className="bg-gray-50">
           {count} products
@@ -148,7 +141,6 @@ export function BrandsPage() {
     {
       key: 'created_at',
       label: 'Created',
-      sortable: true,
       render: (date: string) => new Date(date).toLocaleDateString()
     }
   ];
@@ -183,28 +175,7 @@ export function BrandsPage() {
           placeholder: "Search brands..."
         }}
       >
-        {selectedBrands.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions ({selectedBrands.length})
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {bulkActions.map((action, idx) => (
-                <DropdownMenuItem
-                  key={idx}
-                  onClick={() => action.onClick(selectedBrands)}
-                  className={action.variant === 'destructive' ? 'text-red-600' : ''}
-                >
-                  {action.icon && <action.icon className="mr-2 h-4 w-4" />}
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <BulkActionsMenu selectedIds={selectedBrands} actions={bulkActions} />
         <Button onClick={handleAddBrand} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
           <Plus className="mr-2 h-4 w-4" />
           Add Brand
@@ -218,10 +189,8 @@ export function BrandsPage() {
           loading={loading}
           selectedItems={selectedBrands}
           onSelectionChange={setSelectedBrands}
-          bulkActions={bulkActions}
           onRowClick={handleEditBrand}
           searchTerm={searchTerm}
-          hideToolbar={true}
         />
       </div>
     </div>

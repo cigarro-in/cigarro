@@ -62,21 +62,10 @@ function AdminCardContent({ className, ...props }: React.ComponentProps<"div">) 
   );
 }
 
-function AdminCardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="admin-card-footer"
-      className={cn("flex items-center px-4 py-3 border-t border-[var(--color-coyote)]/20", className)}
-      {...props}
-    />
-  );
-}
-
 export {
   AdminCard,
   AdminCardHeader,
   AdminCardTitle,
   AdminCardDescription,
   AdminCardContent,
-  AdminCardFooter,
 };

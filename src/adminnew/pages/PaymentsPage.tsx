@@ -8,7 +8,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -105,15 +105,15 @@ export function PaymentsPage() {
           </Button>
         </div>
       </PageHeader>
-      <div className="p-6 max-w-[1200px] mx-auto space-y-6">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tiles.map((t) => (
-            <Card
+            <AdminCard
               key={t.path}
               className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => navigate(t.path)}
             >
-              <CardContent className="p-5 flex items-center gap-4">
+              <AdminCardContent className="p-5 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-[var(--color-dark)] text-[var(--color-creme)] flex items-center justify-center shrink-0">
                   <t.icon className="w-5 h-5" />
                 </div>
@@ -127,8 +127,8 @@ export function PaymentsPage() {
                   <p className="text-sm text-gray-600 mt-1 truncate">{t.description}</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
-              </CardContent>
-            </Card>
+              </AdminCardContent>
+            </AdminCard>
           ))}
         </div>
 
@@ -137,8 +137,8 @@ export function PaymentsPage() {
           navigate={navigate}
         />
 
-        <Card>
-          <CardContent className="p-5">
+        <AdminCard>
+          <AdminCardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Pending Orders</h3>
               <button
@@ -172,10 +172,10 @@ export function PaymentsPage() {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
             )}
-          </CardContent>
-        </Card>
+          </AdminCardContent>
+        </AdminCard>
       </div>
     </div>
   );
@@ -189,19 +189,19 @@ function RecentBankEmailsCard({
   navigate: (path: string) => void;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base flex items-center gap-2">
+    <AdminCard>
+      <AdminCardHeader className="flex flex-row items-center justify-between">
+        <AdminCardTitle className="text-base flex items-center gap-2">
           <Mail className="w-4 h-4" /> Recent bank emails
-        </CardTitle>
+        </AdminCardTitle>
         <button
           onClick={() => navigate('/admin/payments/unmatched')}
           className="text-sm text-blue-600 hover:underline"
         >
           View unmatched
         </button>
-      </CardHeader>
-      <CardContent>
+      </AdminCardHeader>
+      <AdminCardContent>
         {emails === undefined ? (
           <p className="text-sm text-gray-500">Loading…</p>
         ) : emails.length === 0 ? (
@@ -215,8 +215,8 @@ function RecentBankEmailsCard({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </AdminCardContent>
+    </AdminCard>
   );
 }
 

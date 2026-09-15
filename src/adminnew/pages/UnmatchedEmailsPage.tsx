@@ -1,4 +1,4 @@
-import { Card, CardContent } from '../../components/ui/card';
+import { AdminCard, AdminCardContent } from '../components/shared/AdminCard';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -16,14 +16,14 @@ export function UnmatchedEmailsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
       <PageHeader title="Unmatched Bank Emails" description="Payments that did not match any open order" />
-      <div className="p-6 max-w-[1200px] mx-auto space-y-3">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         {emails === undefined && <p>Loading...</p>}
         {emails && emails.length === 0 && (
-          <Card><CardContent className="p-6 text-center text-gray-600">No unmatched emails</CardContent></Card>
+          <AdminCard><AdminCardContent className="p-6 text-center text-gray-600">No unmatched emails</AdminCardContent></AdminCard>
         )}
         {emails?.map((em: any) => (
-          <Card key={em._id}>
-            <CardContent className="p-4 space-y-2">
+          <AdminCard key={em._id}>
+            <AdminCardContent className="p-4 space-y-2">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-semibold">{formatINR(paiseToRupees(em.amountPaise))}</p>
@@ -39,8 +39,8 @@ export function UnmatchedEmailsPage() {
               {em.subject && (
                 <p className="text-xs text-gray-700 italic">{em.subject}</p>
               )}
-            </CardContent>
-          </Card>
+            </AdminCardContent>
+          </AdminCard>
         ))}
       </div>
     </div>

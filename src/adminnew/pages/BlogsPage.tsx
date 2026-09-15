@@ -217,7 +217,7 @@ export function BlogsPage() {
         </Button>
       </PageHeader>
 
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         {/* Filters */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
@@ -289,7 +289,6 @@ export function BlogsPage() {
           onRowClick={handleEditPost}
           selectedItems={selectedPosts}
           onSelectionChange={setSelectedPosts}
-          hideToolbar
         />
       </div>
     </div>

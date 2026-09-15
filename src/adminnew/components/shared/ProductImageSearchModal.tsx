@@ -559,5 +559,3 @@ export function ProductImageSearchModal({
         </Dialog>
     );
 }
-
-export default ProductImageSearchModal;

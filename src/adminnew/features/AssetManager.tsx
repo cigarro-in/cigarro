@@ -6,7 +6,6 @@ import {
   Download, 
   Trash2, 
   Search, 
-  Filter, 
   Grid3X3, 
   List, 
   Eye, 
@@ -21,7 +20,6 @@ import {
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { 
   DropdownMenu, 
@@ -36,11 +34,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '../../components/ui/select';
+import { Checkbox } from '../../components/ui/checkbox';
+import { api } from '../../../convex/_generated/api';
 import { listR2Images, deleteR2Image, uploadImageToR2, uploadRawToR2 } from '../../lib/images/upload';
 import { confirmImageDelete } from '../../lib/images/guard';
 import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
+import { formatFileSize } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface Asset {
@@ -72,6 +73,8 @@ export function AssetManager() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     loadAssets();
@@ -96,6 +99,9 @@ export function AssetManager() {
           public_url: item.url
         }) as Asset)
       );
+      // Prune selections that no longer exist (folder change / delete).
+      const live = new Set(images.map((item) => item.id));
+      setSelectedIds((prev) => prev.filter((id) => live.has(id)));
     } catch (error) {
       console.error('Error loading assets:', error);
       toast.error('Failed to load assets');
@@ -152,6 +158,90 @@ export function AssetManager() {
 
   const convex = useConvex();
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    const targets = assets.filter((a) => selectedIds.includes(a.id));
+    if (targets.length === 0 || isBulkDeleting) return;
+    // One usage check per asset, then a single confirm. Assets still
+    // referenced by variants are skipped, never force-deleted in bulk.
+    setIsBulkDeleting(true);
+    try {
+      const usage = await Promise.all(
+        targets.map(async (a) => {
+          try {
+            const u = await convex.query(api.adminCatalog.imageUsage, {
+              key: a.path,
+              url: a.public_url,
+            });
+            return { asset: a, total: u.total as number };
+          } catch {
+            return { asset: a, total: -1 };
+          }
+        })
+      );
+      const blocked = usage.filter((u) => u.total !== 0);
+      const deletable = usage.filter((u) => u.total === 0).map((u) => u.asset);
+      if (deletable.length === 0) {
+        toast.error('All selected assets are still used by product variants — nothing to delete');
+        return;
+      }
+      if (blocked.length > 0) {
+        const names = blocked
+          .slice(0, 5)
+          .map((u) => `• ${u.asset.name}`)
+          .join('\n');
+        const more = blocked.length > 5 ? `\n…+${blocked.length - 5} more` : '';
+        const proceed = window.confirm(
+          `${blocked.length} of ${targets.length} asset(s) are still used by product variants and will be skipped:\n${names}${more}\n\nDelete the other ${deletable.length}?`
+        );
+        if (!proceed) return;
+      } else if (
+        !window.confirm(
+          `Delete ${deletable.length} asset(s)? This cannot be undone.`
+        )
+      ) {
+        return;
+      }
+      let failed = 0;
+      for (const a of deletable) {
+        try {
+          await deleteR2Image(a.path);
+        } catch {
+          failed += 1;
+        }
+      }
+      setSelectedIds([]);
+      await loadAssets();
+      if (failed > 0) toast.error(`Deleted ${deletable.length - failed} of ${deletable.length} assets`);
+      else if (blocked.length > 0)
+        toast.success(`Deleted ${deletable.length} assets, skipped ${blocked.length} in use`);
+      else toast.success(`Deleted ${deletable.length} assets`);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleBulkCopyUrls = async () => {
+    const urls = assets
+      .filter((a) => selectedIds.includes(a.id) && a.public_url)
+      .map((a) => a.public_url as string);
+    if (urls.length === 0) {
+      toast.error('No URLs to copy');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(urls.join('\n'));
+      toast.success(`Copied ${urls.length} URL(s)`);
+    } catch {
+      toast.error('Failed to copy URLs');
+    }
+  };
+
   const handleDeleteAsset = async (asset: Asset) => {
     // Block-or-warn when a variant still references this key (orphaned
     // cards render the "No Image" placeholder).
@@ -207,14 +297,6 @@ export function AssetManager() {
     if (contentType.includes('pdf') || contentType.includes('document')) return <FileText className="h-5 w-5" />;
     if (contentType.includes('zip') || contentType.includes('rar')) return <Archive className="h-5 w-5" />;
     return <File className="h-5 w-5" />;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const filteredAssets = assets.filter(asset => {
@@ -355,6 +437,49 @@ export function AssetManager() {
         </AdminCardContent>
       </AdminCard>
 
+      {/* Bulk selection bar */}
+      {selectedIds.length > 0 && (
+        <AdminCard>
+          <AdminCardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium">
+                {selectedIds.length} selected
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setSelectedIds(filteredAssets.map((a) => a.id))
+                }
+              >
+                Select all ({filteredAssets.length})
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds([])}
+              >
+                Clear
+              </Button>
+              <div className="flex-1" />
+              <Button variant="outline" size="sm" onClick={handleBulkCopyUrls}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy URLs
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isBulkDeleting ? 'Deleting...' : `Delete (${selectedIds.length})`}
+              </Button>
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+      )}
+
       {/* Folders */}
       {folders.length > 0 && (
         <AdminCard>
@@ -391,7 +516,9 @@ export function AssetManager() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {filteredAssets.map((asset) => (
                 <div key={asset.id} className="group relative">
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                  <div
+                    className={`aspect-square bg-gray-100 rounded-lg overflow-hidden border ${selectedIds.includes(asset.id) ? 'ring-2 ring-canyon' : ''}`}
+                  >
                     {asset.content_type.startsWith('image/') ? (
                       <ImageWithFallback
                         src={asset.public_url}
@@ -412,6 +539,19 @@ export function AssetManager() {
                   <div className="mt-2">
                     <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
                     <p className="text-xs text-gray-500">{formatFileSize(asset.size)}</p>
+                  </div>
+
+                  {/* Select */}
+                  <div
+                    className={`absolute top-2 left-2 ${selectedIds.includes(asset.id) ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={selectedIds.includes(asset.id)}
+                      onCheckedChange={() => toggleSelect(asset.id)}
+                      className="bg-white"
+                      aria-label={`Select ${asset.name}`}
+                    />
                   </div>
 
                   {/* Actions */}
@@ -454,8 +594,13 @@ export function AssetManager() {
           ) : (
             <div className="space-y-2">
               {filteredAssets.map((asset) => (
-                <div key={asset.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div key={asset.id} className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 ${selectedIds.includes(asset.id) ? 'border-canyon bg-canyon/5' : ''}`}>
                   <div className="flex items-center space-x-3">
+                    <Checkbox
+                      checked={selectedIds.includes(asset.id)}
+                      onCheckedChange={() => toggleSelect(asset.id)}
+                      aria-label={`Select ${asset.name}`}
+                    />
                     <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded">
                       {getFileIcon(asset.content_type)}
                     </div>

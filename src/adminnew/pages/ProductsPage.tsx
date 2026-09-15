@@ -9,6 +9,7 @@ import { api } from '../../../convex/_generated/api';
 import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
+import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ProductImportExport } from '../features/ProductImportExport';
@@ -119,7 +120,6 @@ export function ProductsPage() {
     {
       key: 'name',
       label: 'Product Name',
-      sortable: true,
       render: (name: string, product: Product) => (
         <div>
           <div className="font-medium text-gray-900">{name}</div>
@@ -174,7 +174,6 @@ export function ProductsPage() {
     {
       key: 'created_at',
       label: 'Created',
-      sortable: true,
       render: (date: string) => new Date(date).toLocaleDateString()
     }
   ];
@@ -209,6 +208,7 @@ export function ProductsPage() {
           placeholder: "Search products..."
         }}
       >
+        <BulkActionsMenu selectedIds={selectedProducts} actions={bulkActions} />
         <Button variant="outline" onClick={() => setImportOpen(true)}>
           <FileSpreadsheet className="mr-2 h-4 w-4" />
           Import / Export
@@ -235,10 +235,8 @@ export function ProductsPage() {
           loading={loading}
           selectedItems={selectedProducts}
           onSelectionChange={setSelectedProducts}
-          bulkActions={bulkActions}
           onRowClick={handleEditProduct}
           searchTerm={searchTerm}
-          hideToolbar={true}
         />
       </div>
     </div>

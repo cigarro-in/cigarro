@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminShell } from './layout/AdminShell';
 import {
   DashboardPage,
@@ -52,12 +52,7 @@ export const ADMIN_ROUTES = [
   { path: '/admin/payments/settings', element: PaymentSettingsPage, label: 'Payment Settings', section: 'payments' },
 ] as const;
 
-interface AdminRouterProps {
-  onStatsUpdate?: () => void;
-}
-
-export function AdminRouter(_props: AdminRouterProps) {
-  const location = useLocation();
+export function AdminRouter() {
   return (
     <AdminShell>
       <Routes>

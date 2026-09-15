@@ -57,14 +57,13 @@ const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 interface AppRoutesProps {
   isAdminRoute?: boolean;
-  onStatsUpdate?: () => void;
   location?: any; // Used for frozen routing animations
 }
 
-export const AppRoutes = ({ isAdminRoute = false, onStatsUpdate, location }: AppRoutesProps) => {
+export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) => {
   if (isAdminRoute) {
     // AdminRouter has its own Routes component, so we render it directly
-    return <AdminRouter onStatsUpdate={onStatsUpdate || (() => { })} />;
+    return <AdminRouter />;
   }
 
   return (

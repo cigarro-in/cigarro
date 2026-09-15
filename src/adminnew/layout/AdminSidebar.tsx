@@ -14,7 +14,6 @@ import {
   FileText,
   LogOut,
   CreditCard,
-  Clock,
   Star,
   MailQuestion,
   SlidersHorizontal,

@@ -1,17 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, ChevronDown } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
 import { formatINR } from '../../utils/currency';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
+import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -163,7 +157,6 @@ export function OrdersPage() {
     {
       key: 'display_order_id',
       label: 'Order ID',
-      sortable: true,
       render: (displayId: string) => (
         <div className="font-mono text-sm font-medium text-gray-900">
           #{displayId}
@@ -173,7 +166,6 @@ export function OrdersPage() {
     {
       key: 'shipping_name',
       label: 'Customer',
-      sortable: true,
       render: (name: string, order: Order) => (
         <div>
           <div className="font-medium text-gray-900">{name || 'Unknown'}</div>
@@ -208,7 +200,6 @@ export function OrdersPage() {
     {
       key: 'total',
       label: 'Total',
-      sortable: true,
       render: (total: number) => (
         <div className="font-medium text-gray-900">
           {formatINR(total)}
@@ -236,7 +227,6 @@ export function OrdersPage() {
     {
       key: 'created_at',
       label: 'Date',
-      sortable: true,
       render: (date: string) => (
         <div className="text-sm text-gray-600">
           {new Date(date).toLocaleDateString()}
@@ -271,27 +261,7 @@ export function OrdersPage() {
           placeholder: "Search orders..."
         }}
       >
-        {selectedOrders.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions ({selectedOrders.length})
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {bulkActions.map((action, idx) => (
-                <DropdownMenuItem
-                  key={idx}
-                  onClick={() => action.onClick(selectedOrders)}
-                  className={action.variant === 'destructive' ? 'text-red-600' : ''}
-                >
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <BulkActionsMenu selectedIds={selectedOrders} actions={bulkActions} />
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -301,10 +271,8 @@ export function OrdersPage() {
           loading={loading}
           selectedItems={selectedOrders}
           onSelectionChange={setSelectedOrders}
-          bulkActions={bulkActions}
           onRowClick={handleEditOrder}
           searchTerm={searchTerm}
-          hideToolbar={true}
         />
       </div>
     </div>

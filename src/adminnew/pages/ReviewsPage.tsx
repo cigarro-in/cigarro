@@ -9,6 +9,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
+import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { Req, ReqError } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 
@@ -72,6 +73,32 @@ export function ReviewsPage() {
     }
   };
 
+  const bulkActions = [
+    {
+      label: 'Approve Selected',
+      icon: Check,
+      onClick: (ids: string[]) =>
+        act(
+          () => Promise.all(ids.map((id) => setApproved({ id: id as any, isApproved: true }))).then(() => {}),
+          `${ids.length} reviews approved`,
+          'Failed to approve'
+        )
+    },
+    {
+      label: 'Delete Selected',
+      icon: Trash2,
+      variant: 'destructive' as const,
+      onClick: (ids: string[]) => {
+        if (!confirm(`Delete ${ids.length} reviews?`)) return Promise.resolve();
+        return act(
+          () => Promise.all(ids.map((id) => removeReview({ id: id as any }))).then(() => {}),
+          `${ids.length} reviews deleted`,
+          'Failed to delete'
+        );
+      }
+    }
+  ];
+
   const columns = [
     {
       key: 'productName',
@@ -88,7 +115,6 @@ export function ReviewsPage() {
     {
       key: 'rating',
       label: 'Rating',
-      sortable: true,
       render: (rating: number) => (
         <span className="inline-flex items-center gap-1">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
@@ -125,6 +151,7 @@ export function ReviewsPage() {
         search={{ value: searchTerm, onChange: setSearchTerm, placeholder: 'Search reviews...' }}
       >
         <div className="flex gap-2">
+          <BulkActionsMenu selectedIds={selected} actions={bulkActions} />
           {(['pending', 'approved', 'all'] as const).map((f) => (
             <Button
               key={f}
@@ -185,33 +212,7 @@ export function ReviewsPage() {
           loading={loading}
           selectedItems={selected}
           onSelectionChange={setSelected}
-          bulkActions={[
-            {
-              label: 'Approve Selected',
-              icon: Check,
-              onClick: (ids: string[]) =>
-                act(
-                  () => Promise.all(ids.map((id) => setApproved({ id: id as any, isApproved: true }))).then(() => {}),
-                  `${ids.length} reviews approved`,
-                  'Failed to approve'
-                )
-            },
-            {
-              label: 'Delete Selected',
-              icon: Trash2,
-              variant: 'destructive' as const,
-              onClick: (ids: string[]) => {
-                if (!confirm(`Delete ${ids.length} reviews?`)) return Promise.resolve();
-                return act(
-                  () => Promise.all(ids.map((id) => removeReview({ id: id as any }))).then(() => {}),
-                  `${ids.length} reviews deleted`,
-                  'Failed to delete'
-                );
-              }
-            }
-          ]}
           searchTerm={searchTerm}
-          hideToolbar={true}
         />
       </div>
     </div>
