@@ -103,6 +103,8 @@ export const createOrder = mutation({
     items: v.array(orderItemV),
     address: v.optional(addressV),
     walletAmountPaise: v.optional(v.number()),
+    discountPaise: v.optional(v.number()),
+    discountLabel: v.optional(v.string()),
     retryOfOrderId: v.optional(v.id("orders")),
     idempotencyKey: v.optional(v.string()),
     shippingMethod: v.optional(v.string()),
@@ -154,12 +156,22 @@ export const createOrder = mutation({
     if (cartTotal <= 0)
       throw new ConvexError({ code: "ZERO_AMOUNT" });
 
+    // Discounts (lucky + coupon) are computed + displayed client-side from
+    // the discounts table. Clamp so a stale/tampered client can't drive the
+    // payable negative — and subtract BEFORE wallet/slot math so the UPI
+    // deeplink, /transaction timer amount, and bank-email match all see the
+    // same discounted total the customer approved at checkout.
+    const discountPaise = Math.max(
+      0,
+      Math.min(Math.floor(args.discountPaise ?? 0), cartTotal),
+    );
+
     // Wallet debit (purchase only; wallet_load cannot use wallet)
     let walletDebit = 0;
     if (args.kind === "purchase" && (args.walletAmountPaise ?? 0) > 0) {
       if (!org.walletEnabled)
         throw new ConvexError({ code: "WALLET_DISABLED" });
-      walletDebit = Math.min(args.walletAmountPaise!, cartTotal);
+      walletDebit = Math.min(args.walletAmountPaise!, cartTotal - discountPaise);
       await debitWallet(ctx, {
         orgId: args.orgId,
         userId,
@@ -169,7 +181,7 @@ export const createOrder = mutation({
       });
     }
 
-    const baseAmount = cartTotal - walletDebit;
+    const baseAmount = cartTotal - discountPaise - walletDebit;
     const displayOrderId = genDisplayOrderId();
 
     // Fully-paid-by-wallet: no slot, no UPI, immediately paid.
@@ -184,6 +196,8 @@ export const createOrder = mutation({
         address: args.address,
         cartTotalPaise: cartTotal,
         walletDebitPaise: walletDebit,
+        discountPaise,
+        discountLabel: args.discountLabel,
         baseAmountPaise: 0,
         slotOffsetPaise: 0,
         finalAmountPaise: 0,
@@ -239,6 +253,8 @@ export const createOrder = mutation({
       address: args.address,
       cartTotalPaise: cartTotal,
       walletDebitPaise: walletDebit,
+      discountPaise,
+      discountLabel: args.discountLabel,
       shippingMethod: args.shippingMethod,
       shippingPricePaise: args.shippingPricePaise,
       baseAmountPaise: effectiveBasePaise,
@@ -386,6 +402,8 @@ export const retryOrder = mutation({
       items: old.items,
       address: old.address,
       walletAmountPaise: 0,
+      discountPaise: old.discountPaise,
+      discountLabel: old.discountLabel,
       retryOfOrderId: oldOrderId,
     });
   },

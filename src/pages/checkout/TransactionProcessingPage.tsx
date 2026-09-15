@@ -127,7 +127,9 @@ export function TransactionProcessingPage() {
 
   const isWalletOnly = order.verificationMethod === 'wallet_only';
   const amountPaise = order.finalAmountPaise > 0 ? order.finalAmountPaise : order.cartTotalPaise;
-  const timeoutAt = order.createdAt + org.slotTimeoutMs!;
+  // Fall back to the 10-min server default so the countdown never NaNs when
+  // the org row hasn't loaded or predates the slotTimeoutMs field.
+  const timeoutAt = order.createdAt + (org.slotTimeoutMs ?? 10 * 60 * 1000);
   const timeLeft = Math.max(0, Math.floor((timeoutAt - now) / 1000));
 
   // --- SUCCESS ---

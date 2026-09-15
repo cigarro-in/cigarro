@@ -17,8 +17,6 @@ export { HomepagePage } from './HomepagePage';
 export { AssetsPage } from './AssetsPage';
 export { SettingsPage } from './SettingsPage';
 export { PaymentsPage } from './PaymentsPage';
-export { UnmatchedEmailsPage } from './UnmatchedEmailsPage';
-export { PaymentSettingsPage } from './PaymentSettingsPage';
 
 // Form pages
 export { ProductFormPage } from './ProductFormPage';

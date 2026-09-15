@@ -80,10 +80,10 @@ export function OrderSummary({
         </div>
       )}
       
-      {appliedDiscount && (
+      {appliedDiscount && (appliedDiscount.discount_amount ?? appliedDiscount.discount_value ?? 0) > 0 && (
         <div className="flex justify-between text-sm text-green-600">
           <span>{appliedDiscount.discount_name || 'Coupon Discount'}</span>
-          <span>-{formatINR(appliedDiscount.discount_amount)}</span>
+          <span>-{formatINR(appliedDiscount.discount_amount ?? appliedDiscount.discount_value ?? 0)}</span>
         </div>
       )}
       

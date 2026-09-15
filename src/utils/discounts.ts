@@ -244,6 +244,16 @@ export const validateCouponCode = async (code: string): Promise<{
   }
 };
 
+// Register one coupon redemption against the discount row (best-effort).
+export const registerDiscountUse = async (discount: {
+  discount_id?: string;
+  id?: string;
+} | null | undefined): Promise<void> => {
+  const id = discount?.discount_id ?? discount?.id;
+  if (!id) return;
+  await incrementDiscountUsage(String(id));
+};
+
 // Increment discount usage count (best-effort; failures are silent by design).
 export const incrementDiscountUsage = async (discountId: string): Promise<void> => {
   try {

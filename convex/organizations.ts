@@ -25,6 +25,9 @@ export const getBySlug = query({
       name: org.name,
       upiVpa: org.upiVpa,
       walletEnabled: org.walletEnabled,
+      // Timer + scheduler need the same timeout the server uses
+      // (TransactionProcessingPage countdown; missing = NaN timer).
+      slotTimeoutMs: org.slotTimeoutMs,
     };
   },
 });

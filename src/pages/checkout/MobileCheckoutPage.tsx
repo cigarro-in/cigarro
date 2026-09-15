@@ -12,7 +12,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
-import { validateCouponCode } from '../../utils/discounts';
+import { validateCouponCode, registerDiscountUse } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMutation, useQuery } from 'convex/react';
@@ -321,7 +321,8 @@ export function MobileCheckoutPage() {
   // Final total calculation
   const getFinalTotal = () => {
     const shipping = getShippingCost();
-    const discount = randomDiscount + (appliedDiscount?.discount_value || 0);
+    const coupon = appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0;
+    const discount = randomDiscount + coupon;
     return Math.max(0, totalPrice + shipping - discount);
   };
 
@@ -445,7 +446,7 @@ export function MobileCheckoutPage() {
 
       if (result.isValid && result.discount) {
         setAppliedDiscount(result.discount);
-        toast.success(`Coupon applied! You saved ₹${result.discount.discount_value || 0}`);
+        toast.success(`Coupon applied! You saved ₹${result.discount.discount_amount ?? result.discount.discount_value ?? 0}`);
       } else {
         toast.error(result.message || 'Invalid coupon code');
       }
@@ -503,17 +504,28 @@ export function MobileCheckoutPage() {
 
       const walletAmountPaise = walletAmountToUse > 0 ? rupeesToPaise(walletAmountToUse) : 0;
 
+      const luckyPaise = rupeesToPaise(randomDiscount);
+      const couponPaise = rupeesToPaise(appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0);
+      const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
+
       const result = await createConvexOrder({
         orgId: org._id,
         kind: 'purchase',
         items: buildConvexItems(),
         address,
         walletAmountPaise,
+        discountPaise: luckyPaise + couponPaise,
+        discountLabel: couponName ?? (randomDiscount > 0 ? 'Lucky Discount' : undefined),
         shippingMethod: activeShippingId,
         shippingPricePaise: rupeesToPaise(getShippingCost()),
       });
 
       isNavigatingRef.current = true;
+
+      // Count one coupon redemption per created order (fire-and-forget).
+      if (result.status === 'pending' || result.status === 'paid') {
+        void registerDiscountUse(appliedDiscount);
+      }
 
       // GA4: order created in Convex = purchase (UPI capture follows async).
       trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);

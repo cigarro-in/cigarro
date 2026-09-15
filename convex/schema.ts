@@ -134,6 +134,11 @@ export default defineSchema({
     address: v.optional(addressV),
 
     cartTotalPaise: v.number(),
+    // Discounts the customer approved at checkout (lucky + coupon).
+    // Subtracted BEFORE wallet/slot math, so base/final (UPI deeplink,
+    // /transaction amount, bank-email match) all see the discounted total.
+    discountPaise: v.optional(v.number()),
+    discountLabel: v.optional(v.string()),
     walletDebitPaise: v.number(),
     // Customer-chosen delivery option (informational: not part of the UPI
     // fingerprint amount). shippingPricePaise is a paise integer like the rest.

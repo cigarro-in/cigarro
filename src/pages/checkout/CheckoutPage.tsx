@@ -20,7 +20,7 @@ import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
-import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
+import { calculateDiscount, applyDiscountToCart, validateCouponCode, registerDiscountUse } from '../../utils/discounts';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
@@ -280,7 +280,8 @@ export function CheckoutPage() {
   
   // Calculate totals with discounts
   const subtotalWithShipping = totalPrice + shippingCost;
-  const couponDiscountAmount = appliedDiscount?.discount_amount || 0;
+  const couponDiscountAmount =
+    appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0;
   const totalDiscountAmount = randomDiscount + couponDiscountAmount;
   const finalTotal = subtotalWithShipping - totalDiscountAmount;
 
@@ -306,7 +307,7 @@ export function CheckoutPage() {
       
       if (discount && discount.is_applicable) {
         setAppliedDiscount(discount);
-        toast.success(`Coupon applied! You saved ${formatINR(discount.discount_amount)}`);
+        toast.success(`Coupon applied! You saved ${formatINR(discount.discount_amount ?? discount.discount_value ?? 0)}`);
       } else {
         setDiscountError(discount?.reason || 'Coupon not applicable');
       }
@@ -944,11 +945,18 @@ export function CheckoutPage() {
         kind: 'purchase',
         items: convexItems,
         address,
+        discountPaise: rupeesToPaise(totalDiscountAmount),
+        discountLabel: appliedDiscount?.discount_name ?? (randomDiscount > 0 ? 'Lucky Discount' : undefined),
         shippingMethod: activeShippingId,
         shippingPricePaise: rupeesToPaise(shippingCost),
       });
 
       if (user) await saveAddressOnOrderSuccess();
+
+      // Count one coupon redemption per created order (fire-and-forget).
+      if (result.status === 'pending' || result.status === 'paid') {
+        void registerDiscountUse(appliedDiscount);
+      }
 
       // GA4: order created in Convex = purchase (UPI capture follows async).
       trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
@@ -1808,7 +1816,7 @@ export function CheckoutPage() {
                           {appliedDiscount.discount_name} applied
                         </span>
                         <span className="text-xs text-green-600">
-                          -{formatINR(appliedDiscount.discount_amount)}
+                          -{formatINR(appliedDiscount.discount_amount ?? appliedDiscount.discount_value ?? 0)}
                         </span>
                       </div>
                       <Button 
@@ -1845,7 +1853,7 @@ export function CheckoutPage() {
                   {appliedDiscount && (
                     <div className="flex justify-between text-sm">
                       <span className="font-sans-premium text-muted-foreground">Coupon Discount</span>
-                      <span className="font-sans-premium text-green-600">-{formatINR(appliedDiscount.discount_amount)}</span>
+                      <span className="font-sans-premium text-green-600">-{formatINR(appliedDiscount.discount_amount ?? appliedDiscount.discount_value ?? 0)}</span>
                     </div>
                   )}
                 </div>
