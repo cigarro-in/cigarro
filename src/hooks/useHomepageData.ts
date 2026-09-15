@@ -74,7 +74,10 @@ export function useHomepageData() {
     const comp = (homepageComponents || []).find((c: any) => c.componentName === componentName);
     const id = comp?.sectionId;
     if (!id) return null;
-    return ((catalogCollections as any[]) || []).find((c: any) => c.supabaseId === id) ?? null;
+    const found = ((catalogCollections as any[]) || []).find((c: any) => c.supabaseId === id) ?? null;
+    // Deactivated collections stop driving the section (fall back to latest).
+    if (found && found.isActive === false) return null;
+    return found;
   };
 
   const newestFirst = [...active]

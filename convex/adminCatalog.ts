@@ -678,10 +678,14 @@ export const saveCollection = mutation({
         .withIndex("by_collection", (q) => q.eq("collectionSupabaseId", cid!))
         .collect();
       for (const j of old) await ctx.db.delete(j._id);
+      // Insert order = admin picker order (selection click order); the
+      // storefront sorts by sortOrder, so persist the index.
+      let order = 0;
       for (const productSupabaseId of productSupabaseIds) {
         await ctx.db.insert("catalogCollectionProducts", {
           collectionSupabaseId: cid!,
           productSupabaseId,
+          sortOrder: order++,
         });
       }
     }
@@ -703,6 +707,14 @@ export const deleteCollection = mutation({
       .withIndex("by_collection", (q) => q.eq("collectionSupabaseId", supabaseId))
       .collect();
     for (const j of joins) await ctx.db.delete(j._id);
+    // Clear homepage links pointing at the deleted collection so sections
+    // fall back to latest products instead of a stale id.
+    const linked = await ctx.db
+      .query("homepageComponentConfig")
+      .collect();
+    for (const c of linked) {
+      if (c.sectionId === supabaseId) await ctx.db.patch(c._id, { sectionId: undefined });
+    }
     await ctx.db.delete(row._id);
     return { deleted: true };
   },
@@ -1055,7 +1067,9 @@ export const saveHomepageComponent = mutation({
       config: v.optional(v.any()),
       isEnabled: v.optional(v.boolean()),
       displayOrder: v.optional(v.number()),
-      sectionId: v.optional(v.string()),
+      // null clears the link (undefined keys are stripped by the client
+      // transport, so unlink must send an explicit null).
+      sectionId: v.optional(v.union(v.string(), v.null())),
     }),
   },
   handler: async (ctx, { componentName, patch }) => {
@@ -1064,18 +1078,26 @@ export const saveHomepageComponent = mutation({
       .query("homepageComponentConfig")
       .withIndex("by_component", (q) => q.eq("componentName", componentName))
       .unique();
+    // Normalize: null/"" = unlink (unset), undefined = leave untouched.
+    const { sectionId, ...rest } = patch;
+    const dbPatch: any = {
+      ...rest,
+      displayOrder: patch.displayOrder ?? row?.displayOrder ?? 0,
+    };
+    if (sectionId === null || sectionId === "") dbPatch.sectionId = undefined;
+    else if (sectionId !== undefined) dbPatch.sectionId = sectionId;
     if (row) {
-      await ctx.db.patch(row._id, {
-        ...patch,
-        displayOrder: patch.displayOrder ?? row.displayOrder,
-      });
+      await ctx.db.patch(row._id, dbPatch);
     } else {
       await ctx.db.insert("homepageComponentConfig", {
         componentName,
         config: patch.config,
         isEnabled: patch.isEnabled ?? true,
         displayOrder: patch.displayOrder ?? 0,
-        sectionId: patch.sectionId,
+        sectionId:
+          sectionId === null || sectionId === "" || sectionId === undefined
+            ? undefined
+            : sectionId,
       });
     }
     return { ok: true };

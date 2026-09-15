@@ -142,7 +142,7 @@ export function CollectionsPage() {
     },
     {
       key: 'actions',
-      label: 'Actions',
+      label: 'Homepage',
       render: (_: any, collection: Collection) => (
         <div className="flex items-center space-x-2">
           <Button
@@ -150,8 +150,9 @@ export function CollectionsPage() {
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              window.open(`/collections/${collection.slug}`, '_blank');
+              navigate('/admin/homepage');
             }}
+            title="Link this collection to a homepage section"
             className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
           >
             <ArrowUpRight className="w-4 h-4" />

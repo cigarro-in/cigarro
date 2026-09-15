@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Image, 
-  Layout, 
-  Plus, 
+import {
+  Image,
+  Layout,
+  Plus,
   ArrowUp,
   ArrowDown,
   Eye,
-  EyeOff,
   Trash2,
-  Package, 
-  BookOpen, 
+  Package,
+  BookOpen,
   Grid3X3,
   Settings
 } from 'lucide-react';
@@ -55,6 +54,23 @@ const SECTION_TITLE_ROWS = [
   'blog_section',
 ];
 
+// Canonical row order on the card. categories_grid is a legacy component
+// name for the same categories section — aliased so it never renders twice.
+const SECTION_ORDER = [
+  'hero_section',
+  'featured_products',
+  'product_showcase',
+  'categories_section',
+  'brands_section',
+  'blog_section',
+];
+const SECTION_ALIAS: Record<string, string> = { categories_grid: 'categories_section' };
+const canon = (name: string) => SECTION_ALIAS[name] ?? name;
+const orderOf = (name: string) => {
+  const i = SECTION_ORDER.indexOf(canon(name));
+  return i === -1 ? 99 : i;
+};
+
 const SECTION_FALLBACK_TITLES: Record<string, string> = {
   featured_products: 'Top Products',
   product_showcase: 'Discover Our Most Celebrated Collections',
@@ -63,62 +79,145 @@ const SECTION_FALLBACK_TITLES: Record<string, string> = {
   blog_section: 'Blogs',
 };
 
-const SECTION_LABELS: Record<string, string> = {
-  featured_products: 'Featured products',
-  product_showcase: 'Product showcase',
-  brands_section: 'Brands',
-  categories_section: 'Categories',
-  blog_section: 'Blog',
-};
+const LINKABLE_SECTIONS = new Set(['featured_products', 'product_showcase']);
 
-function SectionTitleRow({
-  sectionName,
-  onSave,
+function sectionIcon(name: string) {
+  switch (name) {
+    case 'hero_section': return <Image className="h-5 w-5" />;
+    case 'featured_products': return <Package className="h-5 w-5" />;
+    case 'product_showcase': return <Grid3X3 className="h-5 w-5" />;
+    case 'categories_grid':
+    case 'categories_section': return <Layout className="h-5 w-5" />;
+    case 'blog_section': return <BookOpen className="h-5 w-5" />;
+    default: return <Settings className="h-5 w-5" />;
+  }
+}
+
+function sectionLabel(name: string) {
+  switch (name) {
+    case 'hero_section': return 'Hero Section';
+    case 'featured_products': return 'Featured Products';
+    case 'product_showcase': return 'Product Showcase';
+    case 'categories_grid':
+    case 'categories_section': return 'Categories';
+    case 'blog_section': return 'Blog Section';
+    default: return name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+}
+
+// One row: toggle + heading edit + (for product sections) collection link.
+// Linked sections use the collection's name, so the title field hides while
+// linked. hero_section has no editable title (slides carry their own copy).
+function SectionRow({
+  component,
+  collectionRows,
+  onToggle,
+  onLink,
+  onTitle,
+  onManage,
 }: {
-  sectionName: string;
-  onSave: (name: string, title: string) => Promise<void>;
+  component: HomepageComponent;
+  collectionRows: any[];
+  onToggle: (name: string, enabled: boolean) => Promise<void>;
+  onLink: (name: string, supabaseId: string) => Promise<void>;
+  onTitle: (name: string, title: string) => Promise<void>;
+  onManage: () => void;
 }) {
-  const row = useQuery(api.content.getSectionConfig, { name: sectionName });
+  // Display name stays canonical; toggle/link callbacks always write the
+  // canonical name the storefront reads.
+  const name = canon(component.component_name);
+  const row = useQuery(
+    api.content.getSectionConfig,
+    SECTION_TITLE_ROWS.includes(name) ? { name } : 'skip',
+  );
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [attempted, setAttempted] = useState(false);
-  if (row === undefined) {
-    return <div className="h-10 animate-pulse bg-[var(--color-creme-light)] rounded" />;
+  const linked = LINKABLE_SECTIONS.has(name) && !!component.section_id;
+  const showTitle = SECTION_TITLE_ROWS.includes(name) && name !== 'hero_section' && !linked;
+  if (row === undefined && showTitle) {
+    return <div className="h-16 animate-pulse bg-[var(--color-creme)] border border-[var(--color-coyote)]/30 rounded-lg" />;
   }
   const current = draft ?? (row?.title || '');
   const dirty = draft !== null && draft.trim() !== (row?.title || '');
-  const empty = attempted && !current.trim();
+  const saveTitle = async () => {
+    if (!current.trim()) {
+      toast.error('Title cannot be empty');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onTitle(name, current.trim());
+      setDraft(null);
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm text-[var(--color-dark)]/70 w-40 shrink-0 truncate" title={sectionName}>
-        {SECTION_LABELS[sectionName] || sectionName} <span className="text-red-500">*</span>
-      </label>
-      <input
-        value={current}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder={SECTION_FALLBACK_TITLES[sectionName] || sectionName}
-        aria-invalid={empty}
-        className={`flex-1 text-sm border rounded-md px-2 py-1.5 bg-white ${empty ? 'border-red-500' : 'border-[var(--color-coyote)]/30'}`}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!dirty || saving}
-        onClick={async () => {
-          setAttempted(true);
-          if (!current.trim()) return;
-          setSaving(true);
-          try {
-            await onSave(sectionName, draft ?? '');
-            setDraft(null);
-            setAttempted(false);
-          } finally {
-            setSaving(false);
-          }
-        }}
-      >
-        {saving ? 'Saving…' : 'Save'}
-      </Button>
+    <div className="p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {sectionIcon(name)}
+          <div>
+            <h3 className="font-medium text-[var(--color-dark)]">{sectionLabel(name)}</h3>
+            {linked && component.section && (
+              <p className="text-sm text-[var(--color-dark)]/60">
+                Collection: {component.section.title}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant={component.is_enabled ? 'default' : 'secondary'}>
+            {component.is_enabled ? 'Enabled' : 'Disabled'}
+          </Badge>
+          <Switch
+            checked={component.is_enabled}
+            onCheckedChange={(checked) => onToggle(name, checked)}
+          />
+        </div>
+      </div>
+
+      {showTitle && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
+            Heading:
+          </label>
+          <input
+            value={current}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void saveTitle(); }}
+            placeholder={SECTION_FALLBACK_TITLES[name] || name}
+            className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
+          />
+          <Button variant="outline" size="sm" disabled={!dirty || saving} onClick={() => void saveTitle()}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      )}
+
+      {LINKABLE_SECTIONS.has(name) && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
+            Collection:
+          </label>
+          <select
+            value={component.section_id || ''}
+            onChange={(e) => onLink(name, e.target.value)}
+            className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
+          >
+            <option value="">— Latest products (default) —</option>
+            {collectionRows.map((c: any) => (
+              <option key={c.supabaseId} value={c.supabaseId}>
+                {c.title}{c.isActive === false ? ' (inactive)' : ''}
+              </option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" onClick={onManage}>
+            <Eye className="h-3 w-3 mr-1" />
+            Manage
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -160,6 +259,32 @@ export function HomepageManager() {
   }));
   const isLoading = componentRows === undefined || slideRows === undefined;
 
+  // One list drives the sections card, in canonical display order. Names
+  // are canonicalized (categories_grid → categories_section) so the legacy
+  // row never renders a duplicate card; toggles/links always write the
+  // canonical name the storefront reads (absent = enabled; the first toggle
+  // or title save creates the row via the upsert mutations below).
+  const sectionNames = Array.from(
+    new Set([
+      ...SECTION_ORDER,
+      ...components.map((c) => canon(c.component_name)),
+      ...SECTION_TITLE_ROWS,
+    ]),
+  ).sort((a, b) => orderOf(a) - orderOf(b));
+  const sectionFor = (name: string): HomepageComponent =>
+    components.find((c) => c.component_name === name)
+    // Alias fallback for display: a legacy categories_grid row drives the
+    // card until the canonical row is created by the first toggle/save.
+    ?? components.find((c) => canon(c.component_name) === name)
+    ?? {
+      id: name,
+      component_name: name,
+      section_id: '',
+      is_enabled: true,
+      display_order: 999,
+      config: null,
+    };
+
   const handleComponentToggle = async (componentName: string, enabled: boolean) => {
     try {
       await setComponent({ componentName, patch: { isEnabled: enabled } });
@@ -173,11 +298,13 @@ export function HomepageManager() {
 
   // Link a product section to a Collection: title + products follow the
   // collection (rename once in Collections, every linked section follows).
+  // Unlink sends explicit null — undefined keys are stripped by the Convex
+  // client transport, so { sectionId: undefined } would silently keep the link.
   const handleCollectionLink = async (componentName: string, supabaseId: string) => {
     try {
       await setComponent({
         componentName,
-        patch: supabaseId ? { sectionId: supabaseId } : { sectionId: undefined },
+        patch: supabaseId ? { sectionId: supabaseId } : { sectionId: null },
       });
       toast.success(supabaseId ? 'Collection linked' : 'Collection unlinked');
       await invalidateStorefront();
@@ -246,28 +373,6 @@ export function HomepageManager() {
     } catch (error: any) {
       console.error('Error reordering slides:', error);
       toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to reorder slides');
-    }
-  };
-
-  const getComponentIcon = (componentName: string) => {
-    switch (componentName) {
-      case 'hero_section': return <Image className="h-5 w-5" />;
-      case 'featured_products': return <Package className="h-5 w-5" />;
-      case 'product_showcase': return <Grid3X3 className="h-5 w-5" />;
-      case 'categories_grid': return <Layout className="h-5 w-5" />;
-      case 'blog_section': return <BookOpen className="h-5 w-5" />;
-      default: return <Settings className="h-5 w-5" />;
-    }
-  };
-
-  const getComponentTitle = (componentName: string) => {
-    switch (componentName) {
-      case 'hero_section': return 'Hero Section';
-      case 'featured_products': return 'Featured Products';
-      case 'product_showcase': return 'Product Showcase';
-      case 'categories_grid': return 'Categories Grid';
-      case 'blog_section': return 'Blog Section';
-      default: return componentName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
   };
 
@@ -405,28 +510,7 @@ export function HomepageManager() {
           </AdminCardContent>
         </AdminCard>
 
-        {/* Section Titles */}
-        <AdminCard>
-          <AdminCardHeader>
-            <AdminCardTitle className="flex items-center">
-              <Layout className="mr-2 h-5 w-5" />
-              Section Titles
-            </AdminCardTitle>
-          </AdminCardHeader>
-          <AdminCardContent>
-            <p className="text-sm text-[var(--color-dark)]/60 mb-4">
-              Headings shown on the storefront for sections that aren&apos;t linked
-              to a collection. Linked sections use the collection&apos;s name.
-            </p>
-            <div className="space-y-3">
-              {SECTION_TITLE_ROWS.map((name) => (
-                <SectionTitleRow key={name} sectionName={name} onSave={handleSectionTitle} />
-              ))}
-            </div>
-          </AdminCardContent>
-        </AdminCard>
-
-        {/* Homepage Components Section */}
+        {/* Homepage Sections — toggle + title + collection link in one row */}
         <AdminCard>
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
@@ -436,77 +520,27 @@ export function HomepageManager() {
           </AdminCardHeader>
           <AdminCardContent>
             <p className="text-sm text-[var(--color-dark)]/60 mb-4">
-              Toggle sections on/off. Link product sections to a Collection to drive
-              their title + products from it — rename the collection once, the
-              storefront follows. Titles for the rest are edited below.
+              Toggle sections on/off and edit their headings. Link a product
+              section to a Collection to drive its title + products from it —
+              linked sections use the collection&apos;s name, so the title field
+              is hidden while linked.
             </p>
-            {components.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Layout className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                <p>No homepage sections configured</p>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-canyon)]" />
               </div>
             ) : (
               <div className="space-y-3">
-                {components.map((component) => (
-                  <div
-                    key={component.id}
-                    className="p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {getComponentIcon(component.component_name)}
-                        <div>
-                          <h3 className="font-medium text-[var(--color-dark)]">
-                            {getComponentTitle(component.component_name)}
-                          </h3>
-                          {component.section && (
-                            <p className="text-sm text-[var(--color-dark)]/60">
-                              Collection: {component.section.title}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Badge variant={component.is_enabled ? 'default' : 'secondary'}>
-                          {component.is_enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                        <Switch
-                          checked={component.is_enabled}
-                          onCheckedChange={(checked) => handleComponentToggle(component.id, checked)}
-                        />
-                      </div>
-                    </div>
-
-                    {(component.component_name === 'featured_products' ||
-                      component.component_name === 'product_showcase') && (
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
-                          Collection:
-                        </label>
-                        <select
-                          value={component.section_id || ''}
-                          onChange={(e) => handleCollectionLink(component.id, e.target.value)}
-                          className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
-                        >
-                          <option value="">— Latest products (default) —</option>
-                          {(collectionRows || []).map((c: any) => (
-                            <option key={c.supabaseId} value={c.supabaseId}>
-                              {c.title}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate('/admin/collections')}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          Manage
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                {sectionNames.map((name) => (
+                  <SectionRow
+                    key={name}
+                    component={sectionFor(name)}
+                    collectionRows={collectionRows || []}
+                    onToggle={handleComponentToggle}
+                    onLink={handleCollectionLink}
+                    onTitle={handleSectionTitle}
+                    onManage={() => navigate('/admin/collections')}
+                  />
                 ))}
               </div>
             )}
