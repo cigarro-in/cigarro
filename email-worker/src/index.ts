@@ -58,6 +58,9 @@ export default {
     }
 
     const payload = {
+      // `to` (full address) lets Convex match bankInboxes rows; `alias`
+      // (slug) falls back to the legacy organizations.bankEmailAlias.
+      to: message.to,
       alias,
       from: parsed.from?.address ?? message.from,
       subject: parsed.subject ?? "",

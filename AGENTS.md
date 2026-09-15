@@ -61,6 +61,6 @@ Themes own:
 
 ## Known deferred items
 
-- Admin dashboard / customers pages still read Supabase `orders` for stat tiles (shows 0 / stale, not breaking).
-- Cloudflare Email Routing → Convex HTTP action for bank-email ingestion is not wired. Manual `markPaid` is the interim path.
-- Supabase RPCs related to the old payment flow (`verify_order_payment`, `create_order`, `admin_verify_payment`, `get_wallet_balance`) are orphaned — safe to drop from Supabase.
+- Dashboard + customers read Convex (`adminStats.getDashboardStats`) — no Supabase stat tiles remain.
+- Bank-email ingestion is code-complete both ends (`email-worker` → `POST /receiveBankEmail` → `ingestBankEmail`, org resolved via `bankInboxes` full address or legacy `bankEmailAlias` slug). Remaining is operator wiring: `wrangler deploy` + secrets in `email-worker/`, Email Routing rule per `bank-<slug>` alias, Gmail forward filter. Manual `markPaid` is the interim path.
+- Old payment-flow RPCs (`verify_order_payment`, `create_order`, `admin_verify_payment`, `get_wallet_balance`) have zero callers in `src/` and `functions/`; drop file is `supabase/migrations/084_drop_orphaned_payment_rpcs.sql` (apply with `supabase db push`).
