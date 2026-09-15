@@ -104,6 +104,11 @@ export default defineSchema({
     slotsPerBase: v.number(),
     active: v.boolean(),
     createdAt: v.number(),
+
+    // Dormant: pre-Gmail-poller Apps Script config. Nothing reads these;
+    // kept optional so existing org rows still validate. Do not reuse.
+    gasWebhookUrl: v.optional(v.string()),
+    gasWebhookSecret: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
