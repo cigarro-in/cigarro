@@ -316,6 +316,7 @@ export default defineSchema({
     pendingOAuthState: v.optional(v.string()),
     pendingOAuthBy: v.optional(v.string()),
     pendingOAuthUri: v.optional(v.string()),
+    pendingOAuthReturnTo: v.optional(v.string()),
     pendingOAuthAt: v.optional(v.number()),
     updatedAt: v.number(),
     updatedBy: v.optional(v.string()),

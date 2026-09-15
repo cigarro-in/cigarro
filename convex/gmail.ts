@@ -100,7 +100,10 @@ async function gmail(
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`gmail ${path}: ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`gmail ${path}: ${res.status} ${detail.slice(0, 200)}`);
+  }
   return res.json();
 }
 
@@ -217,7 +220,14 @@ export const triggerPoll = action({
   },
 });
 
-// ---------- One-click Google connect ----------
+// Only allow relative admin paths or https URLs — never javascript:/data:.
+function isSafeReturnTo(url: string | undefined): url is string {
+  if (!url) return false;
+  if (url.startsWith("/admin/")) return true;
+  if (/^https:\/\/[A-Za-z0-9.-]+(\/.*)?$/.test(url)) return true;
+  if (/^http:\/\/localhost(:\d+)?(\/.*)?$/.test(url)) return true;
+  return false;
+}
 //
 // Admin clicks "Connect with Google" → this returns the Google consent URL
 // (offline access, so Google issues a refresh token). Google redirects back
@@ -244,8 +254,8 @@ export const assertPaymentsAdmin = internalQuery({
 });
 
 export const getOAuthUrl = action({
-  args: { redirectUri: v.string() },
-  handler: async (ctx, { redirectUri }): Promise<{ url: string }> => {
+  args: { redirectUri: v.string(), returnTo: v.optional(v.string()) },
+  handler: async (ctx, { redirectUri, returnTo }): Promise<{ url: string }> => {
     const adminUserId: string = await ctx.runQuery(
       internal.gmail.assertPaymentsAdmin,
       {},
@@ -259,6 +269,7 @@ export const getOAuthUrl = action({
     await ctx.runMutation(internal.gmail.saveOAuthState, {
       state,
       redirectUri,
+      returnTo: isSafeReturnTo(returnTo) ? returnTo : undefined,
       adminUserId,
     });
 
@@ -281,6 +292,7 @@ export const saveOAuthState = internalMutation({
   args: {
     state: v.string(),
     redirectUri: v.string(),
+    returnTo: v.optional(v.string()),
     adminUserId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -290,6 +302,7 @@ export const saveOAuthState = internalMutation({
       pendingOAuthState: args.state,
       pendingOAuthBy: args.adminUserId,
       pendingOAuthUri: args.redirectUri,
+      pendingOAuthReturnTo: args.returnTo,
       pendingOAuthAt: now,
       updatedAt: now,
     };
@@ -308,6 +321,7 @@ export const getOAuthState = internalQuery({
     if (!cfg || cfg.pendingOAuthState !== state) return null;
     return {
       redirectUri: cfg.pendingOAuthUri ?? null,
+      returnTo: (cfg as any).pendingOAuthReturnTo ?? null,
       adminUserId: cfg.pendingOAuthBy ?? null,
       createdAt: cfg.pendingOAuthAt ?? 0,
     };
@@ -332,6 +346,7 @@ export const finishOAuthConnect = internalMutation({
       pendingOAuthState: undefined,
       pendingOAuthBy: undefined,
       pendingOAuthUri: undefined,
+      pendingOAuthReturnTo: undefined,
       pendingOAuthAt: undefined,
       gmailLastError: undefined,
       updatedAt: Date.now(),
