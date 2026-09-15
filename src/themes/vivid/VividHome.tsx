@@ -11,9 +11,13 @@ export function VividHome() {
   const { data, isLoading } = useHomepageData();
   const [activeSlug, setActiveSlug] = useState<string | undefined>();
 
+  // Same admin sources as classic: collection-linked titles/products,
+  // section titles, and on/off toggles (absent = enabled).
+  const on = (name: string) => data?.sectionsEnabled?.[name] !== false;
+
   const sections = useMemo(() => {
     const list = [] as { id: string; slug: string; title: string; products: any[] }[];
-    if (data?.featuredProducts?.length) {
+    if (on('featured_products') && data?.featuredProducts?.length) {
       list.push({
         id: 'featured',
         slug: 'featured',
@@ -21,10 +25,21 @@ export function VividHome() {
         products: data.featuredProducts,
       });
     }
-    (data?.categoriesWithProducts || []).forEach((c) => {
-      list.push({ id: c.id, slug: c.slug, title: c.name, products: c.products });
-    });
+    if (on('product_showcase') && data?.showcaseProducts?.length) {
+      list.push({
+        id: 'showcase',
+        slug: 'showcase',
+        title: data.showcaseConfig?.title || data.showcaseCollection?.title || 'Showcase',
+        products: data.showcaseProducts,
+      });
+    }
+    if (on('categories_section')) {
+      (data?.categoriesWithProducts || []).forEach((c) => {
+        list.push({ id: c.id, slug: c.slug, title: c.name, products: c.products });
+      });
+    }
     return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   const onSelect = (slug: string) => {
@@ -42,9 +57,11 @@ export function VividHome() {
         type="website"
       />
 
-      <div className="max-w-[1280px] mx-auto px-4 pt-5">
-        <VividHeroBanners slides={data?.heroSlides} isLoading={isLoading} />
-      </div>
+      {on('hero_section') && (
+        <div className="max-w-[1280px] mx-auto px-4 pt-5">
+          <VividHeroBanners slides={data?.heroSlides} isLoading={isLoading} />
+        </div>
+      )}
 
       {/* Mobile: horizontal category chips */}
       <div className="md:hidden max-w-[1280px] mx-auto px-4 pt-5">
@@ -75,6 +92,47 @@ export function VividHome() {
               anchorId={`section-${s.slug}`}
             />
           ))}
+
+          {/* Brands strip (admin title via Homepage > Section Titles) */}
+          {on('brands_section') && !isLoading && (data?.brands?.length || 0) > 0 && (
+            <section>
+              <h2 className="vv-section-title">{data?.brandsSectionConfig?.title || 'Brands'}</h2>
+              <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-4 md:overflow-visible">
+                {(data?.brands || []).slice(0, 8).map((b) => (
+                  <a
+                    key={b.id}
+                    href={`/brand/${b.slug}`}
+                    className="vv-card shrink-0 snap-start w-[140px] md:w-auto p-3 text-center"
+                  >
+                    {b.logo_url ? (
+                      <img src={b.logo_url} alt={b.name} className="w-12 h-12 mx-auto object-contain mb-2" />
+                    ) : (
+                      <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center font-serif font-bold">
+                        {b.name.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="text-sm font-medium line-clamp-2">{b.name}</div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Blog strip */}
+          {on('blog_section') && !isLoading && (data?.blogPosts?.length || 0) > 0 && (
+            <section>
+              <h2 className="vv-section-title">{data?.blogSectionConfig?.title || 'Blogs'}</h2>
+              <div className="grid gap-3 md:grid-cols-2">
+                {(data?.blogPosts || []).slice(0, 4).map((p) => (
+                  <a key={p.id} href={`/blog/${p.slug}`} className="vv-card p-4 block">
+                    <div className="text-xs opacity-60 mb-1">{p.category?.name || ''}</div>
+                    <div className="font-medium leading-snug line-clamp-2">{p.title}</div>
+                    {p.excerpt && <div className="text-sm opacity-70 mt-1 line-clamp-2">{p.excerpt}</div>}
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Right cart panel — desktop only */}
