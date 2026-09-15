@@ -173,9 +173,14 @@ export const createOrder = mutation({
     );
 
     // Lucky discount doubles as the payment fingerprint (see arg docs):
-    // validate strictly, floor to >= 1 when wallet math would zero the base.
-    let luckyPaise = Math.floor(args.luckyPaise ?? 0);
-    if (!Number.isInteger(luckyPaise) || luckyPaise < 1 || luckyPaise > 99) {
+    // validated strictly only when org.luckyEnabled (absent = enabled, so
+    // existing installs keep working). Off (low traffic): any client lucky
+    // value is ignored, finals land on exact rupees.
+    // ponytail: no fingerprint when off — same-rupee concurrent pendings
+    // match first-pending-wins; re-enable lucky if traffic grows.
+    const luckyOn = org.luckyEnabled ?? true;
+    let luckyPaise = luckyOn ? Math.floor(args.luckyPaise ?? 0) : 0;
+    if (luckyOn && (!Number.isInteger(luckyPaise) || luckyPaise < 1 || luckyPaise > 99)) {
       throw new ConvexError({ code: "BAD_LUCKY_PAISE", value: args.luckyPaise });
     }
 
@@ -407,10 +412,14 @@ export const retryOrder = mutation({
 
     // Delegate to createOrder. Wallet not reapplied automatically — user
     // can choose to reapply on the checkout UI if they want. Lucky re-rolls
-    // per attempt so the new order gets a fresh fingerprint. Coupon vs lucky
-    // can't be told apart here (both live in discountPaise), so the retry
-    // keeps the whole discount: worst case the new order is up to 99p cheaper
-    // than the original — never more expensive, never a matching hazard.
+    // per attempt so the new order gets a fresh fingerprint — unless the org
+    // disabled it, in which case createOrder ignores the value (exact rupees).
+    // Coupon vs lucky can't be told apart here (both live in discountPaise),
+    // so the retry keeps the whole discount: worst case the new order is up
+    // to 99p cheaper than the original — never more expensive, never a
+    // matching hazard.
+    const org = await ctx.db.get(old.orgId);
+    const luckyOn = (org as any)?.luckyEnabled ?? true;
     return await ctx.runMutation(api.orders.createOrder, {
       orgId: old.orgId,
       kind: old.kind,
@@ -419,7 +428,7 @@ export const retryOrder = mutation({
       walletAmountPaise: 0,
       discountPaise: old.discountPaise,
       discountLabel: old.discountLabel,
-      luckyPaise: 1 + Math.floor(Math.random() * 99),
+      luckyPaise: luckyOn ? 1 + Math.floor(Math.random() * 99) : 0,
       retryOfOrderId: oldOrderId,
     });
   },

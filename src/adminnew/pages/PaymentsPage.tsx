@@ -348,6 +348,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 
   const [upiVpa, setUpiVpa] = useState('');
   const [walletEnabled, setWalletEnabled] = useState(true);
+  const [luckyEnabled, setLuckyEnabled] = useState(true);
   const [slotTimeoutMin, setSlotTimeoutMin] = useState('10');
   const [quarantineMin, setQuarantineMin] = useState('20');
   const [slotsPerBase, setSlotsPerBase] = useState('100');
@@ -361,6 +362,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
     if (!settings) return;
     setUpiVpa(settings.upiVpa);
     setWalletEnabled(settings.walletEnabled);
+    setLuckyEnabled(settings.luckyEnabled ?? true);
     setSlotTimeoutMin(String(Math.round(settings.slotTimeoutMs / 60000)));
     setQuarantineMin(String(Math.round(settings.quarantineMs / 60000)));
     setSlotsPerBase(String(settings.slotsPerBase));
@@ -390,6 +392,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
         orgId: org._id,
         upiVpa: upiVpa.trim(),
         walletEnabled,
+        luckyEnabled,
         slotTimeoutMs: Math.round(parseFloat(slotTimeoutMin) * 60000),
         quarantineMs: Math.round(parseFloat(quarantineMin) * 60000),
         slotsPerBase: parseInt(slotsPerBase, 10),
@@ -459,6 +462,15 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
           <div className="flex items-center justify-between">
             <Label>Wallet Enabled</Label>
             <Switch checked={walletEnabled} onCheckedChange={setWalletEnabled} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Lucky Discount</Label>
+              <p className="text-xs text-gray-500 mt-0.5">
+                1–99p fingerprint for exact-amount matching. Only needed at high traffic — off = exact rupee totals.
+              </p>
+            </div>
+            <Switch checked={luckyEnabled} onCheckedChange={setLuckyEnabled} />
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleSaveGeneral} disabled={saving}>

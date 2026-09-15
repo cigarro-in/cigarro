@@ -130,6 +130,9 @@ export function CheckoutPage() {
     shippingMethod: 'standard',
   });
 
+  // Lucky 1–99p, gated on org.luckyEnabled (absent = enabled). Off =
+  // no giveaway, finals land on exact rupees; server ignores any value.
+  const luckyOn = (org as any)?.luckyEnabled ?? true;
   // Generate random discount between 0.01 and 0.99 rupees
   const [randomDiscount] = useState(() => {
     // Generate random integer between 1 and 99 (representing paise)
@@ -139,6 +142,7 @@ export function CheckoutPage() {
     // Ensure it's exactly between 0.01 and 0.99
     return Math.max(0.01, Math.min(0.99, discount));
   });
+  const luckyDiscount = luckyOn ? randomDiscount : 0;
 
   // Handle successful authentication
   const handleAuthSuccess = () => {
@@ -282,7 +286,7 @@ export function CheckoutPage() {
   const subtotalWithShipping = totalPrice + shippingCost;
   const couponDiscountAmount =
     appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0;
-  const totalDiscountAmount = randomDiscount + couponDiscountAmount;
+  const totalDiscountAmount = luckyDiscount + couponDiscountAmount;
   const finalTotal = subtotalWithShipping - totalDiscountAmount;
 
   // Handle coupon code application
@@ -947,7 +951,8 @@ export function CheckoutPage() {
         // Lucky 1–99p: the customer-visible discount AND the server-side
         // payment fingerprint (orders.ts validates 1–99, strips it from the
         // payable before wallet/slot math — total only ever goes DOWN).
-        luckyPaise: rupeesToPaise(randomDiscount),
+        // 0 when the org disabled it (server ignores any value regardless).
+        luckyPaise: rupeesToPaise(luckyDiscount),
         shippingMethod: activeShippingId,
         shippingPricePaise: rupeesToPaise(shippingCost),
       });
@@ -1027,7 +1032,7 @@ export function CheckoutPage() {
       transactionId,
       amount: finalTotal,
       originalAmount: subtotalWithShipping,
-      discount: randomDiscount,
+      discount: luckyDiscount,
       items,
       shippingInfo: formData,
       preloadedQRCode: preloadedQRCode // Pass preloaded QR code
@@ -1849,10 +1854,12 @@ export function CheckoutPage() {
                     <span className="font-sans-premium text-muted-foreground">Shipping</span>
                     <span className="font-sans-premium text-foreground">{shippingCost === 0 ? 'Free' : formatINR(shippingCost)}</span>
                   </div>
+                  {luckyDiscount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="font-sans-premium text-muted-foreground">Lucky Discount</span>
-                    <span className="font-sans-premium text-green-600">-{formatINR(randomDiscount)}</span>
+                    <span className="font-sans-premium text-green-600">-{formatINR(luckyDiscount)}</span>
                   </div>
+                  )}
                   {appliedDiscount && (
                     <div className="flex justify-between text-sm">
                       <span className="font-sans-premium text-muted-foreground">Coupon Discount</span>

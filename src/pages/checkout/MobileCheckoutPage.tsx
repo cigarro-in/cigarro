@@ -282,7 +282,9 @@ export function MobileCheckoutPage() {
     }
   };
 
-  // Lucky discount - use original discount for retry orders
+  // Lucky discount - use original discount for retry orders. Gated on
+  // org.luckyEnabled (absent = enabled); off = exact rupees.
+  const luckyOn = (org as any)?.luckyEnabled ?? true;
   const [randomDiscount] = useState(() => {
     if (retryLuckyDiscount !== null) {
       return retryLuckyDiscount;
@@ -291,6 +293,7 @@ export function MobileCheckoutPage() {
     const discount = paise / 100;
     return Math.max(0.01, Math.min(0.99, discount));
   });
+  const luckyDiscount = isRetryPayment ? randomDiscount : luckyOn ? randomDiscount : 0;
 
   // QR code state
   const [qrCode, setQrCode] = useState<string>('');
@@ -322,7 +325,7 @@ export function MobileCheckoutPage() {
   const getFinalTotal = () => {
     const shipping = getShippingCost();
     const coupon = appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0;
-    const discount = randomDiscount + coupon;
+    const discount = luckyDiscount + coupon;
     return Math.max(0, totalPrice + shipping - discount);
   };
 
@@ -504,7 +507,7 @@ export function MobileCheckoutPage() {
 
       const walletAmountPaise = walletAmountToUse > 0 ? rupeesToPaise(walletAmountToUse) : 0;
 
-      const luckyPaise = rupeesToPaise(randomDiscount);
+      const luckyPaise = rupeesToPaise(luckyDiscount);
       const couponPaise = rupeesToPaise(appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0);
       const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
 
@@ -765,7 +768,7 @@ export function MobileCheckoutPage() {
             <OrderSummary
               items={items}
               totalPrice={totalPrice}
-              randomDiscount={randomDiscount}
+              randomDiscount={luckyDiscount}
               isRetryPayment={isRetryPayment}
               retryDisplayOrderId={retryDisplayOrderId}
               appliedDiscount={appliedDiscount}

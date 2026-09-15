@@ -25,6 +25,7 @@ export const getBySlug = query({
       name: org.name,
       upiVpa: org.upiVpa,
       walletEnabled: org.walletEnabled,
+      luckyEnabled: org.luckyEnabled ?? true,
       // Timer + scheduler need the same timeout the server uses
       // (TransactionProcessingPage countdown; missing = NaN timer).
       slotTimeoutMs: org.slotTimeoutMs,
@@ -111,6 +112,7 @@ export const updateSettings = mutation({
     orgId: v.id("organizations"),
     upiVpa: v.optional(v.string()),
     walletEnabled: v.optional(v.boolean()),
+    luckyEnabled: v.optional(v.boolean()),
     slotTimeoutMs: v.optional(v.number()),
     quarantineMs: v.optional(v.number()),
     slotsPerBase: v.optional(v.number()),
@@ -121,6 +123,8 @@ export const updateSettings = mutation({
     if (args.upiVpa !== undefined) patch.upiVpa = args.upiVpa;
     if (args.walletEnabled !== undefined)
       patch.walletEnabled = args.walletEnabled;
+    if (args.luckyEnabled !== undefined)
+      patch.luckyEnabled = args.luckyEnabled;
     if (args.slotTimeoutMs !== undefined) {
       if (args.slotTimeoutMs < 60_000 || args.slotTimeoutMs > 60 * 60_000)
         throw new ConvexError({ code: "TIMEOUT_OUT_OF_RANGE" });
@@ -149,6 +153,7 @@ export const getSettings = query({
     return {
       upiVpa: org.upiVpa,
       walletEnabled: org.walletEnabled,
+      luckyEnabled: org.luckyEnabled ?? true,
       slotTimeoutMs: org.slotTimeoutMs,
       quarantineMs: org.quarantineMs,
       slotsPerBase: org.slotsPerBase,

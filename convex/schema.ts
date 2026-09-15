@@ -106,6 +106,11 @@ export default defineSchema({
     upiVpa: v.string(),
     bankEmailAlias: v.string(),
     walletEnabled: v.boolean(),
+    // Lucky 1–99p discount doubles as the payment fingerprint (exact-amount
+    // email matching). Only needed at high traffic (pending orders sharing a
+    // rupee total); off = exact rupee totals, no per-order giveaway.
+    // Optional so existing org rows validate; absent = enabled.
+    luckyEnabled: v.optional(v.boolean()),
     slotTimeoutMs: v.number(),
     quarantineMs: v.number(),
     slotsPerBase: v.number(),
