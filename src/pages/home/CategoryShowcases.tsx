@@ -100,10 +100,10 @@ function CategoryProductRow({
           </div>
         </div>
 
-        {/* Horizontal Scrolling Products - 2.5 cards visible */}
-        <div 
-          className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2"
-          style={{ 
+        {/* Horizontal scroll on mobile, grid on desktop */}
+        <div
+          className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2 md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible max-w-6xl md:mx-auto"
+          style={{
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
@@ -112,8 +112,7 @@ function CategoryProductRow({
           {category.products.map((product, index) => (
             <div
               key={product.id}
-              className="flex-shrink-0 snap-start"
-              style={{ width: 'calc(40% - 6px)', minWidth: '150px', maxWidth: '180px' }}
+              className="flex-shrink-0 snap-start w-[calc(40%-6px)] min-w-[150px] max-w-[180px] md:w-auto md:min-w-0 md:max-w-none"
             >
               <ProductCard
                 product={product as any}

@@ -1090,6 +1090,7 @@ export const saveSiteSettings = mutation({
     faviconUrl: v.optional(v.string()),
     activeTheme: v.optional(v.string()),
     upiId: v.optional(v.string()),
+    shippingConfig: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const identity = await requireCatalogAdmin(ctx);

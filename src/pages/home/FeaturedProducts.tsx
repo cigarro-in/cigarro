@@ -178,9 +178,9 @@ export const FeaturedProducts = memo(function FeaturedProducts({
             </div>
           </div>
 
-          {/* Desktop Layout: Equal Height Cards */}
+          {/* Desktop Layout: Equal Height Cards (same products as mobile) */}
           <div className="hidden md:grid md:grid-cols-3 gap-8 w-full px-4">
-            {products.slice(0, 3).map((product, index) => (
+            {products.slice(0, 6).map((product, index) => (
               <div key={product.id}>
                 <ProductCard
                   product={product as any}

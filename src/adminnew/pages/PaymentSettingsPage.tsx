@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -37,6 +38,7 @@ export function PaymentSettingsPage() {
   const [slotsPerBase, setSlotsPerBase] = useState('100');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -47,8 +49,24 @@ export function PaymentSettingsPage() {
     setSlotsPerBase(String(settings.slotsPerBase));
   }, [settings]);
 
+  const slotMin = parseFloat(slotTimeoutMin);
+  const quarantine = parseFloat(quarantineMin);
+  const slots = parseInt(slotsPerBase, 10);
+  const slotMinBad = !(slotMin >= 1 && slotMin <= 60);
+  const quarantineBad = !(quarantine >= 0 && quarantine <= 1440);
+  const slotsBad = !(Number.isInteger(slots) && slots >= 10 && slots <= 1000);
+
   const handleSaveGeneral = async () => {
     if (!org) return;
+    setSaveAttempted(true);
+    if (isBlank(upiVpa)) {
+      toast.error('Primary UPI VPA is required');
+      return;
+    }
+    if (slotMinBad || quarantineBad || slotsBad) {
+      toast.error('Slot settings are out of range (see red fields)');
+      return;
+    }
     setSaving(true);
     try {
       await update({
@@ -85,7 +103,7 @@ export function PaymentSettingsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
       <PageHeader title="Payment Settings" description="UPI, slots, and Gmail verification" />
-      <div className="p-6 max-w-[720px] mx-auto space-y-4">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         {settings === undefined ? (
           <p>Loading...</p>
         ) : (
@@ -107,12 +125,18 @@ export function PaymentSettingsPage() {
               onCheckInbox={handleCheckInbox}
             />
 
-            <Card>
-              <CardHeader><CardTitle>UPI &amp; Slots</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
+            <AdminCard>
+              <AdminCardHeader><AdminCardTitle>UPI &amp; Slots</AdminCardTitle></AdminCardHeader>
+              <AdminCardContent className="space-y-4">
                 <div>
-                  <Label>Primary UPI VPA</Label>
-                  <Input value={upiVpa} onChange={(e) => setUpiVpa(e.target.value)} placeholder="store@ybl" />
+                  <Label>Primary UPI VPA <Req /></Label>
+                  <Input
+                    value={upiVpa}
+                    onChange={(e) => setUpiVpa(e.target.value)}
+                    placeholder="store@ybl"
+                    aria-invalid={saveAttempted && isBlank(upiVpa)}
+                  />
+                  <ReqError show={saveAttempted && isBlank(upiVpa)} />
                   <p className="text-xs text-gray-500 mt-1">
                     This is the VPA embedded in the UPI deep-link customers see.
                   </p>
@@ -124,11 +148,11 @@ export function PaymentSettingsPage() {
                 <Button onClick={handleSaveGeneral} disabled={saving}>
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
-              </CardContent>
-            </Card>
+              </AdminCardContent>
+            </AdminCard>
 
-            <Card>
-              <CardHeader>
+            <AdminCard>
+              <AdminCardHeader>
                 <button
                   onClick={() => setAdvancedOpen((v) => !v)}
                   className="flex items-center gap-2 text-sm font-semibold"
@@ -136,40 +160,52 @@ export function PaymentSettingsPage() {
                   {advancedOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   Advanced
                 </button>
-              </CardHeader>
+              </AdminCardHeader>
               {advancedOpen && (
-                <CardContent className="space-y-4">
+                <AdminCardContent className="space-y-4">
                   <div>
-                    <Label>Slot Timeout (minutes)</Label>
+                    <Label>Slot Timeout (minutes) <Req /></Label>
                     <Input
                       type="number"
                       value={slotTimeoutMin}
                       onChange={(e) => setSlotTimeoutMin(e.target.value)}
                       min="1"
                       max="60"
+                      aria-invalid={saveAttempted && slotMinBad}
                     />
+                    <ReqError show={saveAttempted && slotMinBad}>
+                      Must be between 1 and 60 minutes
+                    </ReqError>
                     <p className="text-xs text-gray-500 mt-1">How long a UPI slot is held (1–60 min).</p>
                   </div>
                   <div>
-                    <Label>Quarantine (minutes)</Label>
+                    <Label>Quarantine (minutes) <Req /></Label>
                     <Input
                       type="number"
                       value={quarantineMin}
                       onChange={(e) => setQuarantineMin(e.target.value)}
                       min="0"
                       max="1440"
+                      aria-invalid={saveAttempted && quarantineBad}
                     />
+                    <ReqError show={saveAttempted && quarantineBad}>
+                      Must be between 0 and 1440 minutes
+                    </ReqError>
                     <p className="text-xs text-gray-500 mt-1">Late-arrival grace window after expiry.</p>
                   </div>
                   <div>
-                    <Label>Slots Per Base Amount</Label>
+                    <Label>Slots Per Base Amount <Req /></Label>
                     <Input
                       type="number"
                       value={slotsPerBase}
                       onChange={(e) => setSlotsPerBase(e.target.value)}
                       min="10"
                       max="1000"
+                      aria-invalid={saveAttempted && slotsBad}
                     />
+                    <ReqError show={saveAttempted && slotsBad}>
+                      Must be a whole number between 10 and 1000
+                    </ReqError>
                     <p className="text-xs text-gray-500 mt-1">
                       Unique paise offsets. Higher = more concurrent orders at same base.
                     </p>
@@ -183,9 +219,9 @@ export function PaymentSettingsPage() {
                       Save slot settings
                     </Button>
                   </div>
-                </CardContent>
+                </AdminCardContent>
               )}
-            </Card>
+            </AdminCard>
           </>
         )}
 
@@ -249,9 +285,9 @@ function GmailConnectionCard(props: {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Bank-email connection</CardTitle>
+    <AdminCard>
+      <AdminCardHeader className="flex flex-row items-center justify-between">
+        <AdminCardTitle>Bank-email connection</AdminCardTitle>
         {s === undefined ? (
           <Badge variant="outline">Loading…</Badge>
         ) : s.enabled && s.connected ? (
@@ -261,8 +297,8 @@ function GmailConnectionCard(props: {
         ) : (
           <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Not connected</Badge>
         )}
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </AdminCardHeader>
+      <AdminCardContent className="space-y-3">
         {s?.connected ? (
           <p className="text-sm text-gray-600">
             Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null} every
@@ -310,8 +346,8 @@ function GmailConnectionCard(props: {
             <RefreshCw className="w-4 h-4 mr-2" /> Check inbox now
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </AdminCardContent>
+    </AdminCard>
   );
 }
 
@@ -339,8 +375,8 @@ function PlatformConfigCard(props: {
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <AdminCard>
+      <AdminCardHeader>
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 text-sm font-semibold"
@@ -348,9 +384,9 @@ function PlatformConfigCard(props: {
           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           Platform Config (owners only)
         </button>
-      </CardHeader>
+      </AdminCardHeader>
       {open && (
-        <CardContent className="space-y-4">
+        <AdminCardContent className="space-y-4">
           <p className="text-xs text-gray-500">
             These settings apply to every tenant. Only users with an <b>owner</b> role
             on any org can save.
@@ -388,9 +424,9 @@ function PlatformConfigCard(props: {
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save platform config'}
           </Button>
-        </CardContent>
+        </AdminCardContent>
       )}
-    </Card>
+    </AdminCard>
   );
 }
 

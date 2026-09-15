@@ -9,6 +9,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { DataTable } from '../components/shared/DataTable';
+import { Req, ReqError } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface ReviewRow {
@@ -40,10 +41,12 @@ export function ReviewsPage() {
   const products = useQuery(api.adminCatalog.listProductsForAdmin, {});
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ productId: '', rating: 5, userName: '', title: '', comment: '' });
+  const [saveAttempted, setSaveAttempted] = useState(false);
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   const submit = () =>
     act(async () => {
+      setSaveAttempted(true);
       if (!form.productId) throw new Error('Pick a product');
       await addReview({
         productSupabaseId: form.productId,
@@ -53,6 +56,7 @@ export function ReviewsPage() {
         comment: form.comment || undefined,
       });
       setForm({ productId: '', rating: 5, userName: '', title: '', comment: '' });
+      setSaveAttempted(false);
       setShowForm(false);
     }, 'Review added', 'Failed to add review');
 
@@ -137,19 +141,27 @@ export function ReviewsPage() {
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         <div>
-          <Button size="sm" onClick={() => setShowForm((s) => !s)}>
+          <Button size="sm" onClick={() => { setSaveAttempted(false); setShowForm((s) => !s); }}>
             <Plus className="w-4 h-4 mr-1" /> Add review
           </Button>
           {showForm && (
             <div className="mt-3 max-w-xl space-y-3 rounded-lg border border-[var(--color-coyote)]/30 bg-[var(--color-creme-light)] p-4">
-              <Select value={form.productId} onValueChange={(v) => set({ productId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                <SelectContent>
-                  {((products || []) as any[]).filter((p) => p.isActive).map((p) => (
-                    <SelectItem key={p.supabaseId} value={p.supabaseId}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <p className="text-xs font-medium mb-1">Product <Req /></p>
+                <Select value={form.productId} onValueChange={(v) => set({ productId: v })}>
+                  <SelectTrigger aria-invalid={saveAttempted && !form.productId}>
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {((products || []) as any[]).filter((p) => p.isActive).map((p) => (
+                      <SelectItem key={p.supabaseId} value={p.supabaseId}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <ReqError show={saveAttempted && !form.productId}>
+                  Pick a product for this review
+                </ReqError>
+              </div>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button key={n} type="button" onClick={() => set({ rating: n })} aria-label={`${n} stars`}>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { mergeShippingMethods } from '../../lib/shipping';
 
 // Theme-safe content reads (Wave 2: Convex; replaces Supabase blog / hero /
 // config / settings reads). Shapes are UI-shaped (camelCase); blog author is
@@ -50,7 +51,9 @@ function withCompat(row: any): any {
     id: row._id,
     featured_image: row.featuredImage ?? null,
     author: { name: row.authorName ?? 'Cigarro' },
-    category: row.categorySlug ? { name: row.categorySlug } : undefined,
+    category: row.categorySlug
+      ? { name: row.categoryName ?? row.categorySlug, color: row.categoryColor ?? undefined }
+      : undefined,
     published_at: row.publishedAt
       ? new Date(row.publishedAt).toISOString()
       : undefined,
@@ -194,8 +197,19 @@ export function useSiteSettings() {
         favicon_url: (row as any).faviconUrl,
         active_theme: (row as any).activeTheme,
         upi_id: (row as any).upiId,
+        shipping_config: (row as any).shippingConfig ?? null,
       },
       loading: false,
     };
   }, [row]);
+}
+
+// Shipping methods for checkout + admin: Convex config merged over defaults.
+// Only enabled methods are returned (in standard/express/priority order).
+export function useShippingMethods() {
+  const { settings, loading } = useSiteSettings();
+  return useMemo(() => {
+    const all = mergeShippingMethods((settings as any)?.shippingConfig ?? (settings as any)?.shipping_config);
+    return { methods: all.filter((m) => m.enabled), allMethods: all, loading };
+  }, [settings, loading]);
 }

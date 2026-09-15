@@ -572,7 +572,7 @@ export const getBrandDetail = query({
 export const fullCatalog = query({
   args: {},
   handler: async (ctx) => {
-    const [products, variants, brands, categories, productCategories, combos] =
+    const [products, variants, brands, categories, productCategories, combos, collections, collectionProducts] =
       await Promise.all([
         ctx.db.query("catalogProducts").collect(),
         ctx.db.query("catalogVariants").collect(),
@@ -580,12 +580,28 @@ export const fullCatalog = query({
         ctx.db.query("catalogCategories").collect(),
         ctx.db.query("catalogProductCategories").collect(),
         ctx.db.query("catalogCombos").collect(),
+        ctx.db.query("catalogCollections").collect(),
+        ctx.db.query("catalogCollectionProducts").collect(),
       ]);
     return {
       products: products.map(productShape),
       variants: variants.map(variantShape),
       brands: brands.map(brandShape),
       categories: categories.map(categoryShape),
+      collections: collections.map((c) => ({
+        supabaseId: c.supabaseId,
+        title: c.title,
+        slug: c.slug,
+        description: c.description,
+        imageUrl: c.imageUrl,
+        sortOrder: c.sortOrder,
+        isActive: c.isActive,
+      })),
+      collectionProducts: collectionProducts.map((j) => ({
+        collectionSupabaseId: j.collectionSupabaseId,
+        productSupabaseId: j.productSupabaseId,
+        sortOrder: j.sortOrder,
+      })),
       productCategories: productCategories.map((j) => ({
         productSupabaseId: j.productSupabaseId,
         categorySupabaseId: j.categorySupabaseId,

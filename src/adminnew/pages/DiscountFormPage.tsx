@@ -12,6 +12,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface Discount {
@@ -58,6 +59,7 @@ export function DiscountFormPage() {
 
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
 
   const row = useQuery(
     api.discounts.getDiscountForEdit,
@@ -126,6 +128,7 @@ export function DiscountFormPage() {
   };
 
   const handleSubmit = async () => {
+    setSaveAttempted(true);
     if (!formData.name.trim()) {
       toast.error('Discount name is required');
       return;
@@ -230,7 +233,7 @@ export function DiscountFormPage() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
       {/* Header */}
       <PageHeader
         title={formData.name || 'Untitled Discount'}
@@ -287,14 +290,16 @@ export function DiscountFormPage() {
               {/* Name */}
               <div className="space-y-2">
                 <Label className="text-[var(--color-dark)] font-medium">
-                  Name <span className="text-red-500">*</span>
+                  Name <Req />
                 </Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => handleChange({ name: e.target.value })}
                   placeholder="e.g. Summer Sale"
                   className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  aria-invalid={saveAttempted && isBlank(formData.name)}
                 />
+                <ReqError show={saveAttempted && isBlank(formData.name)} />
               </div>
 
               {/* Code */}
@@ -352,9 +357,10 @@ export function DiscountFormPage() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[var(--color-dark)] font-medium">
-                    {formData.type === 'percentage' ? 'Percentage (%)' : 
-                     formData.type === 'fixed_amount' ? 'Amount (₹)' : 
+                    {formData.type === 'percentage' ? 'Percentage (%)' :
+                     formData.type === 'fixed_amount' ? 'Amount (₹)' :
                      'Cart Value (₹)'}
+                    {formData.type !== 'cart_value' ? <Req /> : null}
                   </Label>
                   <Input
                     type="number"
@@ -362,7 +368,11 @@ export function DiscountFormPage() {
                     onChange={(e) => handleChange({ value: parseFloat(e.target.value) || 0 })}
                     placeholder={formData.type === 'percentage' ? '10' : '100'}
                     className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    aria-invalid={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}
                   />
+                  <ReqError show={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}>
+                    Discount value must be greater than 0
+                  </ReqError>
                 </div>
               </div>
 

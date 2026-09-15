@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Brand } from '../../types/home';
+import { Brand, BlogSectionConfig } from '../../types/home';
 
 interface BrandsScrollerProps {
   brands?: Brand[];
+  config?: BlogSectionConfig | null;
   isLoading?: boolean;
 }
 
-export function BrandsScroller({ brands = [], isLoading = false }: BrandsScrollerProps) {
+export function BrandsScroller({ brands = [], config, isLoading = false }: BrandsScrollerProps) {
   if (isLoading) {
     // Minimal height reservation without visual noise
     return <section className="py-6 bg-creme min-h-[240px]"></section>;
@@ -23,14 +24,17 @@ export function BrandsScroller({ brands = [], isLoading = false }: BrandsScrolle
         {/* Section Header */}
         <div className="text-center mb-[1.5rem]">
           <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
-            Brands We Serve
+            {config?.title || 'Brands We Serve'}
           </h2>
+          {config?.description && (
+            <p className="text-dark/70 text-sm mt-2 max-w-xl mx-auto">{config.description}</p>
+          )}
         </div>
 
-        {/* Horizontal Scroll Container */}
-        <div 
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2"
-          style={{ 
+        {/* Horizontal Scroll on mobile, grid on desktop */}
+        <div
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2 md:grid md:grid-cols-4 lg:grid-cols-5 md:overflow-visible"
+          style={{
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
@@ -40,7 +44,7 @@ export function BrandsScroller({ brands = [], isLoading = false }: BrandsScrolle
             <Link
               key={brand.id}
               to={`/brand/${brand.slug}`}
-              className="flex-shrink-0 snap-center w-[140px] group"
+              className="flex-shrink-0 snap-center w-[140px] md:w-auto group"
             >
               <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 hover:scale-105 h-full">
                 {/* Brand Logo */}

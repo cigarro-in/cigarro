@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from '../../components/ui/slider';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -19,12 +20,16 @@ import { toast } from 'sonner';
 interface HeroSlideFormData {
   title: string;
   subtitle: string;
+  suptitle: string;
   description: string;
   image_url: string;
   mobile_image_url: string;
   button_text: string;
   button_url: string;
   button_style: string;
+  product_name: string;
+  product_price: string;
+  product_image_url: string;
   text_position: 'left' | 'center' | 'right';
   text_color: 'light' | 'dark';
   overlay_opacity: number;
@@ -35,12 +40,16 @@ interface HeroSlideFormData {
 const initialFormData: HeroSlideFormData = {
   title: '',
   subtitle: '',
+  suptitle: '',
   description: '',
   image_url: '',
   mobile_image_url: '',
   button_text: '',
   button_url: '',
   button_style: 'primary',
+  product_name: '',
+  product_price: '',
+  product_image_url: '',
   text_position: 'left',
   text_color: 'light',
   overlay_opacity: 40,
@@ -56,6 +65,7 @@ export function HeroSlideFormPage() {
   const [form, setForm] = useState<HeroSlideFormData>(initialFormData);
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
   const populatedRef = useRef(false);
 
   const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
@@ -76,12 +86,16 @@ export function HeroSlideFormPage() {
       setForm({
         title: data.title || '',
         subtitle: data.subtitle || '',
+        suptitle: data.suptitle || '',
         description: data.description || '',
         image_url: data.imageUrl || '',
         mobile_image_url: data.mobileImageUrl || '',
         button_text: data.buttonText || '',
         button_url: data.buttonUrl || '',
         button_style: data.buttonStyle || 'primary',
+        product_name: data.productName || '',
+        product_price: data.productPrice != null ? String(data.productPrice) : '',
+        product_image_url: data.productImageUrl || '',
         text_position: data.textPosition || 'left',
         text_color: data.textColor || 'light',
         overlay_opacity: data.overlayOpacity ?? 40,
@@ -97,6 +111,7 @@ export function HeroSlideFormPage() {
   }, [slides]);
 
   const handleSave = async () => {
+    setSaveAttempted(true);
     if (!form.title.trim()) {
       toast.error('Title is required');
       return;
@@ -113,12 +128,16 @@ export function HeroSlideFormPage() {
         slide: {
           title: form.title.trim(),
           subtitle: form.subtitle.trim() || undefined,
+          suptitle: form.suptitle.trim() || undefined,
           description: form.description.trim() || undefined,
           imageUrl: form.image_url,
           mobileImageUrl: form.mobile_image_url || undefined,
           buttonText: form.button_text.trim() || undefined,
           buttonUrl: form.button_url.trim() || undefined,
           buttonStyle: form.button_style,
+          productName: form.product_name.trim() || undefined,
+          productPrice: form.product_price.trim() ? Number(form.product_price) : undefined,
+          productImageUrl: form.product_image_url || undefined,
           textPosition: form.text_position,
           textColor: form.text_color,
           overlayOpacity: form.overlay_opacity,
@@ -192,7 +211,7 @@ export function HeroSlideFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1400px] mx-auto px-6 grid grid-cols-[1fr_300px] gap-4 mt-4">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Basic Info */}
@@ -202,13 +221,25 @@ export function HeroSlideFormPage() {
             </AdminCardHeader>
             <AdminCardContent className="space-y-4">
               <div className="space-y-1">
-                <Label htmlFor="title">Title *</Label>
+                <Label htmlFor="suptitle">Eyebrow (small text above title)</Label>
+                <Input
+                  id="suptitle"
+                  value={form.suptitle}
+                  onChange={(e) => setForm(prev => ({ ...prev, suptitle: e.target.value }))}
+                  placeholder="e.g. NEW ARRIVAL"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="title">Title <Req /></Label>
                 <Input
                   id="title"
                   value={form.title}
                   onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter slide title"
+                  aria-invalid={saveAttempted && isBlank(form.title)}
                 />
+                <ReqError show={saveAttempted && isBlank(form.title)} />
               </div>
 
               <div className="space-y-1">
@@ -227,7 +258,7 @@ export function HeroSlideFormPage() {
                   id="description"
                   value={form.description}
                   onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter description (optional)"
+                  placeholder="Shown under the title on the storefront (optional)"
                   rows={3}
                 />
               </div>
@@ -276,6 +307,47 @@ export function HeroSlideFormPage() {
                     <SelectItem value="outline">Outline</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </AdminCardContent>
+          </AdminCard>
+
+          {/* Product Spotlight */}
+          <AdminCard>
+            <AdminCardHeader>
+              <AdminCardTitle>Product Spotlight (optional)</AdminCardTitle>
+            </AdminCardHeader>
+            <AdminCardContent className="space-y-4">
+              <p className="text-xs text-[var(--color-dark)]/60">
+                Shows the floating product card on the slide. Leave empty to hide it.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="product_name">Product Name</Label>
+                  <Input
+                    id="product_name"
+                    value={form.product_name}
+                    onChange={(e) => setForm(prev => ({ ...prev, product_name: e.target.value }))}
+                    placeholder="e.g. Esse Change"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="product_price">Product Price (₹)</Label>
+                  <Input
+                    id="product_price"
+                    type="number"
+                    min={0}
+                    value={form.product_price}
+                    onChange={(e) => setForm(prev => ({ ...prev, product_price: e.target.value }))}
+                    placeholder="e.g. 350"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Product Image</Label>
+                <SingleImagePicker
+                  value={form.product_image_url || null}
+                  onChange={(url) => setForm(prev => ({ ...prev, product_image_url: url || '' }))}
+                />
               </div>
             </AdminCardContent>
           </AdminCard>
@@ -374,15 +446,18 @@ export function HeroSlideFormPage() {
           </AdminCard>
 
           {/* Desktop Image */}
-          <AdminCard>
+          <AdminCard className={saveAttempted && !form.image_url ? 'border-red-500' : undefined}>
             <AdminCardHeader>
-              <AdminCardTitle>Desktop Image *</AdminCardTitle>
+              <AdminCardTitle>Desktop Image <Req /></AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
               <SingleImagePicker
                 value={form.image_url || null}
                 onChange={(url) => setForm(prev => ({ ...prev, image_url: url || '' }))}
               />
+              <ReqError show={saveAttempted && !form.image_url}>
+                A desktop image is required
+              </ReqError>
               <p className="text-xs text-[var(--color-dark)]/60 mt-2">
                 Recommended: 1920x800px
               </p>

@@ -31,57 +31,48 @@ export function HomePage() {
         image={data?.heroSlides?.[0]?.image_url}
       />
       <Hero slides={data?.heroSlides} isLoading={isLoading} />
-      
-      {/* Mobile: Categories Scroller, Desktop: Skip to Featured */}
-      <div className="md:hidden">
-        <CategoriesScroller categories={data?.categories} isLoading={isLoading} />
-      </div>
-      
+
+      {/* Same sections on mobile + desktop (each section is responsive) */}
+      <CategoriesScroller categories={data?.categories} config={data?.categoriesSectionConfig} isLoading={isLoading} />
+
       <div className="h-0 md:h-12"></div>
-      
+
       <Suspense fallback={<SectionFallback height="h-[500px]" />}>
-        <FeaturedProducts 
-          products={data?.featuredProducts} 
+        <FeaturedProducts
+          products={data?.featuredProducts}
           config={data?.featuredSectionConfig}
-          isLoading={isLoading} 
+          isLoading={isLoading}
         />
       </Suspense>
-      
-      {/* Mobile: Brands Scroller */}
-      <div className="md:hidden">
-        <Suspense fallback={<SectionFallback height="h-32" />}>
-          <BrandsScroller brands={data?.brands} isLoading={isLoading} />
-        </Suspense>
-      </div>
-      
-      {/* Mobile: Category Showcases with Products */}
-      <div className="md:hidden">
-        <Suspense fallback={<SectionFallback height="h-[800px]" />}>
-          <CategoryShowcases 
-            categoriesWithProducts={data?.categoriesWithProducts} 
-            isLoading={isLoading} 
-          />
-        </Suspense>
-      </div>
-      
+
+      <Suspense fallback={<SectionFallback height="h-32" />}>
+        <BrandsScroller brands={data?.brands} config={data?.brandsSectionConfig} isLoading={isLoading} />
+      </Suspense>
+
+      <Suspense fallback={<SectionFallback height="h-[800px]" />}>
+        <CategoryShowcases
+          categoriesWithProducts={data?.categoriesWithProducts}
+          isLoading={isLoading}
+        />
+      </Suspense>
+
       <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-        <ProductShowcase 
-          products={data?.showcaseProducts} 
+        <ProductShowcase
+          products={data?.showcaseProducts}
           config={data?.showcaseConfig}
-          isLoading={isLoading} 
+          collection={data?.showcaseCollection}
+          isLoading={isLoading}
         />
       </Suspense>
       <div className="h-8 md:h-12"></div>
-      
-      {/* Desktop: Full Categories Grid */}
-      <div className="hidden md:block">
-        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-          <CategoriesGrid 
-            categories={data?.categories} 
-            isLoading={isLoading} 
-          />
-        </Suspense>
-      </div>
+
+      <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+        <CategoriesGrid
+          categories={data?.categories}
+          config={data?.categoriesSectionConfig}
+          isLoading={isLoading}
+        />
+      </Suspense>
       
       <div className="h-8 md:h-12"></div>
       <Suspense fallback={<SectionFallback height="h-[400px]" />}>

@@ -53,17 +53,17 @@ export function BlogSection({ posts = [], config, isLoading = false }: BlogSecti
     });
   };
 
-  const featuredPost = posts[0];
-  const regularPosts = posts.slice(1);
-
   return (
-    <section className="py-[2rem] md:py-16 bg-creme md:min-h-screen md:flex md:items-center">
+    <section className="py-[2rem] md:py-16 bg-creme">
       <div className="main-container w-full">
         {/* Section Header */}
         <div className="text-center mb-[1.5rem] md:mb-12">
-          <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl md:main-title md:mb-6 md:max-w-4xl md:mx-auto">
+          <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl md:mb-6 md:max-w-4xl md:mx-auto">
             {sectionConfig.title}
           </h2>
+          {sectionConfig.description && (
+            <p className="hidden md:block text-dark/70 max-w-2xl mx-auto">{sectionConfig.description}</p>
+          )}
         </div>
 
         {isLoading ? (
@@ -201,173 +201,76 @@ export function BlogSection({ posts = [], config, isLoading = false }: BlogSecti
               </div>
             </div>
 
-            {/* Desktop: Grid Layout */}
-            <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-              {/* Featured Article - Large Left */}
-              {featuredPost && (
+            {/* Desktop: uniform 3-column grid, same posts as mobile */}
+            <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              {posts.slice(0, 6).map((post, index) => (
                 <motion.div
-                  initial={{ opacity: 0, x: -30 }}
-                  whileInView={{ opacity: 1, x: 0 }}
+                  key={post.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.8 }}
-                  className="lg:col-span-2"
+                  transition={{ delay: (index % 3) * 0.1, duration: 0.6 }}
+                  className="group h-full"
                 >
-                  <Link 
-                    to={`/blog/${featuredPost.slug}`}
-                    className="group block h-full"
+                  <Link
+                    to={`/blog/${post.slug}`}
+                    className="block h-full"
                   >
-                    <article className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 group-hover:scale-[1.01] h-full">
-                      {/* Featured Image */}
-                      <div className="relative aspect-[16/9] overflow-hidden">
+                    <article className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 group-hover:-translate-y-1 h-full flex flex-col">
+                      {/* Article Image */}
+                      <div className="relative aspect-[16/10] overflow-hidden shrink-0">
                         <img
-                          src={featuredPost.featured_image || getBlogImageUrl()}
-                          alt={featuredPost.title}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          src={post.featured_image || getBlogImageUrl()}
+                          alt={post.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
-                        
-                        {/* Featured Badge */}
-                        <div className="absolute top-6 left-6 bg-canyon text-creme-light px-4 py-2 rounded-full text-sm font-medium uppercase tracking-wider">
-                          Featured
-                        </div>
-
-                        {/* Category Badge */}
-                        <div className="absolute top-6 right-6 bg-white/95 backdrop-blur-sm text-dark px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1">
-                          <Tag className="w-3 h-3" />
-                          <span>{featuredPost.category?.name || 'Uncategorized'}</span>
-                        </div>
-
-                        {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        
-                        {/* Read More Button - Shows on Hover */}
-                        <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                          <div className="bg-white rounded-full p-3 shadow-lg">
-                            <ArrowRight className="w-5 h-5 text-canyon" />
+                        {index === 0 && (
+                          <div className="absolute top-3 left-3 bg-canyon text-creme-light px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider">
+                            Featured
                           </div>
+                        )}
+                        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-dark px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
+                          <Tag className="w-3 h-3" />
+                          <span>{post.category?.name || 'Uncategorized'}</span>
                         </div>
                       </div>
 
                       {/* Article Content */}
-                      <div className="p-8">
-                        {/* Meta Information */}
-                        <div className="flex items-center space-x-4 text-dark/60 text-sm mb-4">
+                      <div className="p-6 flex flex-col flex-1">
+                        <div className="flex items-center space-x-3 text-dark/60 text-xs mb-3">
                           <div className="flex items-center space-x-1">
-                            <User className="w-4 h-4" />
-                            <span>{featuredPost.author?.name || 'Unknown Author'}</span>
+                            <User className="w-3 h-3" />
+                            <span>{post.author?.name || 'Unknown Author'}</span>
                           </div>
                           <div className="flex items-center space-x-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{featuredPost.published_at ? new Date(featuredPost.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
+                            <Calendar className="w-3 h-3" />
+                            <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
                           </div>
                           <div className="flex items-center space-x-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{featuredPost.reading_time ? `${featuredPost.reading_time} min read` : 'Unknown'}</span>
+                            <Clock className="w-3 h-3" />
+                            <span>{post.reading_time ? `${post.reading_time} min read` : 'Unknown'}</span>
                           </div>
                         </div>
 
-                        {/* Title */}
-                        <h3 className="font-serif text-2xl lg:text-3xl text-dark group-hover:text-canyon transition-colors leading-tight mb-4">
-                          {featuredPost.title}
+                        <h3 className="font-serif text-xl text-dark group-hover:text-canyon transition-colors leading-snug mb-3 line-clamp-2">
+                          {post.title}
                         </h3>
 
-                        {/* Excerpt */}
-                        <p className="text text-dark/70 leading-relaxed line-clamp-3">
-                          {featuredPost.excerpt}
+                        <p className="text-dark/70 text-sm leading-relaxed line-clamp-3 mb-4 flex-1">
+                          {post.excerpt}
                         </p>
 
-                        {/* Read More Link */}
-                        <div className="mt-6 pt-6 border-t border-coyote/20">
-                          <div className="flex items-center justify-between">
-                            <span className="text-canyon font-medium group-hover:translate-x-1 transition-transform duration-300">
-                              Read Full Article
-                            </span>
-                            <ArrowRight className="w-5 h-5 text-canyon group-hover:translate-x-1 transition-transform duration-300" />
-                          </div>
+                        <div className="flex items-center justify-between pt-4 border-t border-coyote/20 mt-auto">
+                          <span className="text-canyon text-sm font-medium group-hover:translate-x-1 transition-transform duration-300">
+                            Read More
+                          </span>
+                          <ArrowRight className="w-4 h-4 text-canyon group-hover:translate-x-1 transition-transform duration-300" />
                         </div>
                       </div>
                     </article>
                   </Link>
                 </motion.div>
-              )}
-
-              {/* Regular Articles - Right Side */}
-              <div className="lg:col-span-1 space-y-8">
-                {regularPosts.map((post, index) => (
-                  <motion.div
-                    key={post.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1, duration: 0.6 }}
-                    className="group"
-                  >
-                    <Link 
-                      to={`/blog/${post.slug}`}
-                      className="block h-full"
-                    >
-                      <article className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 group-hover:scale-[1.02] h-full">
-                        {/* Article Image */}
-                        <div className="relative aspect-[16/10] overflow-hidden">
-                          <img
-                            src={post.featured_image || getBlogImageUrl()}
-                            alt={post.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                          />
-                          
-                          {/* Category Badge */}
-                          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm text-dark px-2 py-1 rounded-full text-xs font-medium">
-                            {post.category?.name || 'Uncategorized'}
-                          </div>
-
-                          {/* Hover Overlay */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <div className="bg-white rounded-full p-2 transform scale-75 group-hover:scale-100 transition-transform duration-300">
-                              <ArrowRight className="w-4 h-4 text-canyon" />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Article Content */}
-                        <div className="p-6">
-                          {/* Meta Information */}
-                          <div className="flex items-center space-x-3 text-dark/60 text-xs mb-3">
-                            <div className="flex items-center space-x-1">
-                              <User className="w-3 h-3" />
-                              <span>{post.author?.name || 'Unknown Author'}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not published'}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-3 h-3" />
-                              <span>{post.reading_time ? `${post.reading_time} min read` : 'Unknown'}</span>
-                            </div>
-                          </div>
-
-                          {/* Title */}
-                          <h3 className="font-medium text-dark group-hover:text-canyon transition-colors leading-tight mb-3 text-lg line-clamp-2">
-                            {post.title}
-                          </h3>
-
-                          {/* Excerpt */}
-                          <p className="text-dark/70 text-sm leading-relaxed line-clamp-3 mb-4">
-                            {post.excerpt}
-                          </p>
-
-                          {/* Read More */}
-                          <div className="flex items-center justify-between pt-3 border-t border-coyote/20">
-                            <span className="text-canyon text-sm font-medium group-hover:translate-x-1 transition-transform duration-300">
-                              Read More
-                            </span>
-                            <ArrowRight className="w-4 h-4 text-canyon group-hover:translate-x-1 transition-transform duration-300" />
-                          </div>
-                        </div>
-                      </article>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
+              ))}
             </div>
           </>
         ) : (

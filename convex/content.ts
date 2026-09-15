@@ -41,7 +41,13 @@ export const listBlogPosts = query({
       )
       .order("desc")
       .take(args.limit ?? 50);
-    return rows.map(postShape);
+    const cats = await ctx.db.query("blogCategories").collect();
+    const catBySlug = new Map(cats.map((c) => [c.slug, c]));
+    return rows.map((p) => ({
+      ...postShape(p),
+      categoryName: p.categorySlug ? (catBySlug.get(p.categorySlug)?.name ?? p.categorySlug) : null,
+      categoryColor: p.categorySlug ? (catBySlug.get(p.categorySlug)?.color ?? null) : null,
+    }));
   },
 });
 
@@ -194,6 +200,7 @@ export const getSiteSettings = query({
       faviconUrl: row.faviconUrl,
       activeTheme: row.activeTheme,
       upiId: row.upiId,
+      shippingConfig: row.shippingConfig ?? null,
       updatedAt: row.updatedAt,
     };
   },

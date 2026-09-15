@@ -16,6 +16,7 @@ import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { useMutation } from 'convex/react';
+import { useShippingMethods } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
@@ -258,13 +259,16 @@ export function CheckoutPage() {
     );
   }
 
-  const shipping = {
-    standard: { name: 'Standard Shipping', price: 0, time: '5-7 business days', icon: Truck },
-    express: { name: 'Express Shipping', price: 150, time: '2-3 business days', icon: Clock },
-    overnight: { name: 'Overnight Delivery', price: 300, time: 'Next business day', icon: Zap }
-  };
-
-  const shippingCost = shipping[formData.shippingMethod as keyof typeof shipping].price;
+  // Admin-configured shipping methods (Settings > Shipping). Falls back to
+  // defaults in src/lib/shipping.ts until the admin saves once.
+  const { methods: shippingMethods } = useShippingMethods();
+  const shippingIcons: Record<string, any> = { standard: Truck, express: Clock, priority: Zap };
+  const shipping: Record<string, { name: string; price: number; time: string; icon: any }> =
+    Object.fromEntries(
+      shippingMethods.map((m) => [m.id, { name: m.label, price: m.priceRupees, time: m.eta, icon: shippingIcons[m.id] ?? Truck }]),
+    );
+  const activeShippingId = shipping[formData.shippingMethod] ? formData.shippingMethod : (shippingMethods[0]?.id ?? 'standard');
+  const shippingCost = (shipping[activeShippingId]?.price ?? 0);
   
   // Calculate totals with discounts
   const subtotalWithShipping = totalPrice + shippingCost;
@@ -1449,7 +1453,7 @@ export function CheckoutPage() {
                             key={key}
                             onClick={() => handleInputChange('shippingMethod', key)}
                             className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                              formData.shippingMethod === key
+                              activeShippingId === key
                                 ? 'border-accent bg-accent/10'
                                 : 'border-border/20 hover:border-accent/50'
                             }`}
@@ -1549,7 +1553,7 @@ export function CheckoutPage() {
                       <p><strong>Phone:</strong> {formData.phone}</p>
                       <p><strong>Address:</strong> {formData.address}</p>
                       <p><strong>City:</strong> {formData.city}, {formData.state} - {formData.pincode}</p>
-                      <p><strong>Shipping Method:</strong> {shipping[formData.shippingMethod as keyof typeof shipping].name}</p>
+                      <p><strong>Shipping Method:</strong> {shipping[activeShippingId]?.name}</p>
                       </div>
                     </div>
 

@@ -47,6 +47,82 @@ interface HeroSlide {
   sort_order: number;
 }
 
+const SECTION_TITLE_ROWS = [
+  'featured_products',
+  'product_showcase',
+  'brands_section',
+  'categories_section',
+  'blog_section',
+];
+
+const SECTION_FALLBACK_TITLES: Record<string, string> = {
+  featured_products: 'Top Products',
+  product_showcase: 'Discover Our Most Celebrated Collections',
+  brands_section: 'Brands We Serve',
+  categories_section: 'Explore Premium Categories',
+  blog_section: 'Blogs',
+};
+
+const SECTION_LABELS: Record<string, string> = {
+  featured_products: 'Featured products',
+  product_showcase: 'Product showcase',
+  brands_section: 'Brands',
+  categories_section: 'Categories',
+  blog_section: 'Blog',
+};
+
+function SectionTitleRow({
+  sectionName,
+  onSave,
+}: {
+  sectionName: string;
+  onSave: (name: string, title: string) => Promise<void>;
+}) {
+  const row = useQuery(api.content.getSectionConfig, { name: sectionName });
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  if (row === undefined) {
+    return <div className="h-10 animate-pulse bg-[var(--color-creme-light)] rounded" />;
+  }
+  const current = draft ?? (row?.title || '');
+  const dirty = draft !== null && draft.trim() !== (row?.title || '');
+  const empty = attempted && !current.trim();
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-sm text-[var(--color-dark)]/70 w-40 shrink-0 truncate" title={sectionName}>
+        {SECTION_LABELS[sectionName] || sectionName} <span className="text-red-500">*</span>
+      </label>
+      <input
+        value={current}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={SECTION_FALLBACK_TITLES[sectionName] || sectionName}
+        aria-invalid={empty}
+        className={`flex-1 text-sm border rounded-md px-2 py-1.5 bg-white ${empty ? 'border-red-500' : 'border-[var(--color-coyote)]/30'}`}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!dirty || saving}
+        onClick={async () => {
+          setAttempted(true);
+          if (!current.trim()) return;
+          setSaving(true);
+          try {
+            await onSave(sectionName, draft ?? '');
+            setDraft(null);
+            setAttempted(false);
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </Button>
+    </div>
+  );
+}
+
 export function HomepageManager() {
   const navigate = useNavigate();
 
@@ -56,6 +132,7 @@ export function HomepageManager() {
   const slideRows = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
   const collectionRows = useQuery(api.catalog.listCollections, {});
   const setComponent = useMutation(api.adminCatalog.saveHomepageComponent);
+  const saveSection = useMutation(api.adminCatalog.saveSectionConfig);
   const patchSlide = useMutation(api.adminCatalog.saveHeroSlide);
   const removeSlide = useMutation(api.adminCatalog.deleteHeroSlide);
 
@@ -91,6 +168,37 @@ export function HomepageManager() {
     } catch (error: any) {
       console.error('Error toggling component:', error);
       toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle component');
+    }
+  };
+
+  // Link a product section to a Collection: title + products follow the
+  // collection (rename once in Collections, every linked section follows).
+  const handleCollectionLink = async (componentName: string, supabaseId: string) => {
+    try {
+      await setComponent({
+        componentName,
+        patch: supabaseId ? { sectionId: supabaseId } : { sectionId: undefined },
+      });
+      toast.success(supabaseId ? 'Collection linked' : 'Collection unlinked');
+      await invalidateStorefront();
+    } catch (error: any) {
+      console.error('Error linking collection:', error);
+      toast.error('Failed to link collection');
+    }
+  };
+
+  const handleSectionTitle = async (sectionName: string, title: string) => {
+    if (!title.trim()) {
+      toast.error('Title cannot be empty');
+      return;
+    }
+    try {
+      await saveSection({ sectionName, patch: { title: title.trim() } });
+      toast.success('Section title updated');
+      await invalidateStorefront();
+    } catch (error: any) {
+      console.error('Error saving section title:', error);
+      toast.error('Failed to update title');
     }
   };
 
@@ -297,6 +405,27 @@ export function HomepageManager() {
           </AdminCardContent>
         </AdminCard>
 
+        {/* Section Titles */}
+        <AdminCard>
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Layout className="mr-2 h-5 w-5" />
+              Section Titles
+            </AdminCardTitle>
+          </AdminCardHeader>
+          <AdminCardContent>
+            <p className="text-sm text-[var(--color-dark)]/60 mb-4">
+              Headings shown on the storefront for sections that aren&apos;t linked
+              to a collection. Linked sections use the collection&apos;s name.
+            </p>
+            <div className="space-y-3">
+              {SECTION_TITLE_ROWS.map((name) => (
+                <SectionTitleRow key={name} sectionName={name} onSave={handleSectionTitle} />
+              ))}
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
         {/* Homepage Components Section */}
         <AdminCard>
           <AdminCardHeader>
@@ -307,7 +436,9 @@ export function HomepageManager() {
           </AdminCardHeader>
           <AdminCardContent>
             <p className="text-sm text-[var(--color-dark)]/60 mb-4">
-              Toggle sections on/off. Product sections are managed via Collections.
+              Toggle sections on/off. Link product sections to a Collection to drive
+              their title + products from it — rename the collection once, the
+              storefront follows. Titles for the rest are edited below.
             </p>
             {components.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -317,33 +448,64 @@ export function HomepageManager() {
             ) : (
               <div className="space-y-3">
                 {components.map((component) => (
-                  <div 
-                    key={component.id} 
-                    className="flex items-center justify-between p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)]"
+                  <div
+                    key={component.id}
+                    className="p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] space-y-3"
                   >
-                    <div className="flex items-center gap-3">
-                      {getComponentIcon(component.component_name)}
-                      <div>
-                        <h3 className="font-medium text-[var(--color-dark)]">
-                          {getComponentTitle(component.component_name)}
-                        </h3>
-                        {component.section && (
-                          <p className="text-sm text-[var(--color-dark)]/60">
-                            Collection: {component.section.title}
-                          </p>
-                        )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {getComponentIcon(component.component_name)}
+                        <div>
+                          <h3 className="font-medium text-[var(--color-dark)]">
+                            {getComponentTitle(component.component_name)}
+                          </h3>
+                          {component.section && (
+                            <p className="text-sm text-[var(--color-dark)]/60">
+                              Collection: {component.section.title}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Badge variant={component.is_enabled ? 'default' : 'secondary'}>
+                          {component.is_enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                        <Switch
+                          checked={component.is_enabled}
+                          onCheckedChange={(checked) => handleComponentToggle(component.id, checked)}
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Badge variant={component.is_enabled ? 'default' : 'secondary'}>
-                        {component.is_enabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                      <Switch
-                        checked={component.is_enabled}
-                        onCheckedChange={(checked) => handleComponentToggle(component.id, checked)}
-                      />
-                    </div>
+                    {(component.component_name === 'featured_products' ||
+                      component.component_name === 'product_showcase') && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
+                          Collection:
+                        </label>
+                        <select
+                          value={component.section_id || ''}
+                          onChange={(e) => handleCollectionLink(component.id, e.target.value)}
+                          className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
+                        >
+                          <option value="">— Latest products (default) —</option>
+                          {(collectionRows || []).map((c: any) => (
+                            <option key={c.supabaseId} value={c.supabaseId}>
+                              {c.title}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate('/admin/collections')}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Manage
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

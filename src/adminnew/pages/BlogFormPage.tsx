@@ -18,6 +18,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import {
   AdminCard,
@@ -62,6 +63,7 @@ export function BlogFormPage() {
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [post, setPost] = useState<BlogPost | null>(null);
+  const [saveAttempted, setSaveAttempted] = useState(false);
   const populatedRef = useRef(false);
 
   // Public category list (slug-keyed now — Convex posts link by categorySlug).
@@ -158,6 +160,7 @@ export function BlogFormPage() {
   };
 
   const handleSave = async () => {
+    setSaveAttempted(true);
     if (!form.title.trim()) {
       toast.error('Post title is required');
       return;
@@ -245,7 +248,7 @@ export function BlogFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1400px] mx-auto px-6 grid grid-cols-[1fr_300px] gap-4 mt-4">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Post Content */}
@@ -255,13 +258,15 @@ export function BlogFormPage() {
             </AdminCardHeader>
             <AdminCardContent className="space-y-4">
               <div className="space-y-1">
-                <Label htmlFor="title">Title *</Label>
+                <Label htmlFor="title">Title <Req /></Label>
                 <Input
                   id="title"
                   value={form.title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Enter post title"
+                  aria-invalid={saveAttempted && isBlank(form.title)}
                 />
+                <ReqError show={saveAttempted && isBlank(form.title)} />
               </div>
 
               <div className="space-y-1">

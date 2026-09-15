@@ -111,6 +111,12 @@ export interface CategoryWithProducts extends Category {
   product_count?: number;
 }
 
+export interface CollectionInfo {
+  title: string;
+  description?: string;
+  imageUrl?: string;
+}
+
 export interface HomepageData {
   heroSlides: HeroSlide[];
   featuredProducts: HomepageProduct[];
@@ -119,6 +125,9 @@ export interface HomepageData {
   featuredSectionConfig: SectionConfig | null;
   showcaseConfig: ShowcaseConfig | null;
   showcaseProducts: HomepageProduct[];
+  showcaseCollection?: CollectionInfo | null;
+  brandsSectionConfig?: BlogSectionConfig | null;
+  categoriesSectionConfig?: BlogSectionConfig | null;
   blogPosts: BlogPost[];
   blogSectionConfig: BlogSectionConfig | null;
   categoriesWithProducts?: CategoryWithProducts[];

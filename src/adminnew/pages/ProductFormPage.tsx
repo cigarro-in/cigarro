@@ -13,6 +13,7 @@ import { ProductImageSearchModal } from '../components/shared/ProductImageSearch
 import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { PageHeader } from '../components/shared/PageHeader';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
@@ -29,6 +30,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
   const [imageSearchOpen, setImageSearchOpen] = useState(false);
   const [imageSearchVariantIndex, setImageSearchVariantIndex] = useState<number | null>(null);
@@ -283,6 +285,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   };
 
   const handleSubmit = async () => {
+    setSaveAttempted(true);
     if (!formData.name.trim()) {
       toast.error('Product name is required');
       return;
@@ -467,14 +470,16 @@ export function ProductFormPage({ }: ProductFormPageProps) {
               {/* Title */}
               <div className="space-y-2">
                 <Label className="text-[var(--color-dark)] font-medium">
-                  Title <span className="text-red-500">*</span>
+                  Title <Req />
                 </Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="e.g. Marlboro Red (Imported)"
                   className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  aria-invalid={saveAttempted && isBlank(formData.name)}
                 />
+                <ReqError show={saveAttempted && isBlank(formData.name)} />
               </div>
 
               {/* Short Description */}
@@ -489,7 +494,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
               </div>
 
               {/* Slug */}
-              <div className="grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30">
+              <div className={`grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
                 <span className="font-medium">store.cigarro.in/products/</span>
                 <input
                   value={formData.slug}
@@ -680,6 +685,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
               </div>
             </AdminCardHeader>
             <AdminCardContent>
+              <ReqError
+                show={saveAttempted && !formData.variants.some((v) => v.is_default)}
+              >
+                Mark one variant as Default — saving is blocked without it.
+              </ReqError>
               {[...formData.variants]
                 .map((variant, originalIndex) => ({ variant, originalIndex }))
                 .sort((a, b) => (b.variant.is_default ? 1 : 0) - (a.variant.is_default ? 1 : 0))
@@ -761,7 +771,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
                       <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label>Selling Price *</Label>
+                          <Label>Selling Price {variant.is_default ? <Req /> : null}</Label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
                             <Input
@@ -771,8 +781,12 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                               onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) || 0 })}
                               placeholder="0.00"
                               className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                              aria-invalid={saveAttempted && !!variant.is_default && !(variant.price > 0)}
                             />
                           </div>
+                          <ReqError show={saveAttempted && !!variant.is_default && !(variant.price > 0)}>
+                            Default variant price must be greater than 0
+                          </ReqError>
                         </div>
                         <div className="space-y-2">
                           <Label>Compare at Price</Label>

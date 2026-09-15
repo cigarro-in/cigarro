@@ -16,6 +16,7 @@ import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMutation, useQuery } from 'convex/react';
+import { useShippingMethods } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { convex } from '../../lib/convex/client';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -303,16 +304,18 @@ export function MobileCheckoutPage() {
   // Saved addresses state
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
 
-  // Shipping cost calculation
+  // Shipping cost from admin config (Settings > Shipping), merged over defaults.
+  const { methods: shippingMethods } = useShippingMethods();
+  // If the admin disabled the currently selected method, fall back to the
+  // first enabled one so totals never silently use a stale price.
+  const activeShippingId = shippingMethods.some((m) => m.id === selectedShipping)
+    ? selectedShipping
+    : (shippingMethods[0]?.id ?? 'standard');
   const getShippingCost = () => {
     if (retryShippingCost !== null) {
       return retryShippingCost;
     }
-    const option = selectedShipping;
-    if (option === 'standard') return 0;
-    if (option === 'express') return 99;
-    if (option === 'priority') return 199;
-    return 0;
+    return shippingMethods.find((m) => m.id === activeShippingId)?.priceRupees ?? 0;
   };
 
   // Final total calculation
@@ -658,7 +661,7 @@ export function MobileCheckoutPage() {
         <Card className="border-2 border-border/40 bg-card shadow-md">
           <CardContent className="p-4">
             <ShippingOptions
-              selectedShipping={selectedShipping}
+              selectedShipping={activeShippingId}
               onSelectShipping={setSelectedShipping}
             />
           </CardContent>

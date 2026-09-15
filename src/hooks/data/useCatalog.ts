@@ -149,6 +149,8 @@ export function useFullCatalog() {
         products: [] as LegacyProduct[],
         brands: [],
         categories: [],
+        collections: [],
+        collectionProducts: [],
         productCategories: [],
         loading: true,
       };
@@ -160,6 +162,8 @@ export function useFullCatalog() {
       ),
       brands: bundle.brands ?? [],
       categories: bundle.categories ?? [],
+      collections: (bundle as any).collections ?? [],
+      collectionProducts: (bundle as any).collectionProducts ?? [],
       productCategories: bundle.productCategories ?? [],
       loading: false,
     };

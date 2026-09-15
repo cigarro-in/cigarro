@@ -113,9 +113,14 @@ const Hero = memo(function Hero({
                           {currentSlideData.suptitle}
                         </p>
                       )}
-                      <h2 className="text-creme-light font-serif text-2xl leading-tight mb-[1rem] max-w-[85%]">
+                      <h2 className="text-creme-light font-serif text-2xl leading-tight mb-[0.5rem] max-w-[85%]">
                         {currentSlideData.title}
                       </h2>
+                      {currentSlideData.description && (
+                        <p className="text-creme-light/80 text-sm leading-snug mb-[1rem] max-w-[85%] line-clamp-2">
+                          {currentSlideData.description}
+                        </p>
+                      )}
                       {currentSlideData.button_text && currentSlideData.button_url && (
                         <a
                           href={currentSlideData.button_url}
@@ -187,6 +192,11 @@ const Hero = memo(function Hero({
                     )}
                     <div className="mb-[1.5rem]">
                       <h2 className="medium-title w-full leading-tight text-3xl lg:text-4xl xl:text-5xl">{currentSlideData.title}</h2>
+                      {currentSlideData.description && (
+                        <p className="mt-3 text-base lg:text-lg text-dark/70 leading-relaxed max-w-xl">
+                          {currentSlideData.description}
+                        </p>
+                      )}
                     </div>
                     {currentSlideData.button_text && currentSlideData.button_url && (
                       <a

@@ -57,13 +57,13 @@ export function BlogsPage() {
                       to={`/blog/${post.slug}`}
                       className="block h-full"
                     >
-                      <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 group-hover:scale-[1.02] h-full">
+                      <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-500 group-hover:-translate-y-1 h-full flex flex-col">
                         {/* Article Image */}
-                        <div className="relative aspect-[16/10] overflow-hidden">
+                        <div className="relative aspect-[16/10] overflow-hidden shrink-0">
                           <img
                             src={post.featured_image || getBlogImageUrl()}
                             alt={post.title}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
 
                           {/* Category Badge */}
@@ -81,9 +81,9 @@ export function BlogsPage() {
                         </div>
 
                         {/* Article Content */}
-                        <div className="p-6">
+                        <div className="p-6 flex flex-col flex-1">
                           {/* Meta Information */}
-                          <div className="flex items-center space-x-4 text-dark/60 text-sm mb-4">
+                          <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-dark/60 text-sm mb-4">
                             <div className="flex items-center space-x-1">
                               <User className="w-4 h-4" />
                               <span>{post.author?.name || 'Unknown Author'}</span>
@@ -104,7 +104,7 @@ export function BlogsPage() {
                           </h3>
 
                           {/* Excerpt */}
-                          <p className="text-dark/70 leading-relaxed line-clamp-3 mb-4">
+                          <p className="text-dark/70 leading-relaxed line-clamp-3 mb-4 flex-1">
                             {post.excerpt}
                           </p>
 
@@ -126,7 +126,7 @@ export function BlogsPage() {
                           </div>
 
                           {/* Read More */}
-                          <div className="flex items-center justify-between pt-4 border-t border-coyote/20">
+                          <div className="flex items-center justify-between pt-4 border-t border-coyote/20 mt-auto">
                             <span className="text-canyon font-medium group-hover:translate-x-1 transition-transform duration-300">
                               Read Article
                             </span>

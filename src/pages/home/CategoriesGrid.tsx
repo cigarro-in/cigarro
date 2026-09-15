@@ -6,7 +6,7 @@ import { useCart, Product } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { ProductCard } from '../../components/products/ProductCard';
 
-import { Category as HomeCategory } from '../../types/home';
+import { Category as HomeCategory, BlogSectionConfig } from '../../types/home';
 
 interface Category extends HomeCategory {
   product_count?: number;
@@ -23,14 +23,16 @@ interface CategoriesGridProps {
   categories?: Category[];
   collectionProducts?: Product[];
   isCollectionMode?: boolean;
+  config?: BlogSectionConfig | null;
   isLoading?: boolean;
 }
 
-export function CategoriesGrid({ 
-  categories = [], 
-  collectionProducts = [], 
-  isCollectionMode = false, 
-  isLoading = false 
+export function CategoriesGrid({
+  categories = [],
+  collectionProducts = [],
+  isCollectionMode = false,
+  config,
+  isLoading = false
 }: CategoriesGridProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
 
@@ -57,8 +59,11 @@ export function CategoriesGrid({
         {/* Section Header */}
         <div className="text-center mb-12">
           <h2 className="medium-title text-dark mb-4 w-full">
-            {isCollectionMode ? 'Curated Selection' : 'Explore Premium Categories'}
+            {config?.title || (isCollectionMode ? 'Curated Selection' : 'Explore Premium Categories')}
           </h2>
+          {config?.description && (
+            <p className="text-dark/70 mb-4 max-w-2xl mx-auto">{config.description}</p>
+          )}
           <div className="w-16 h-0.5 bg-canyon mx-auto"></div>
         </div>
 
@@ -80,7 +85,7 @@ export function CategoriesGrid({
           </div>
         ) : (
           /* Categories Grid Mode */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
             {categories.map((category, index) => {
               const IconComponent = categoryIcons[category.slug] || Package;
               

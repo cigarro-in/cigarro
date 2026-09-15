@@ -8,6 +8,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Switch } from '../../components/ui/switch';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -49,6 +50,7 @@ export function BrandFormPage() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
   const populatedRef = useRef(false);
 
   const [formData, setFormData] = useState<BrandFormData>({
@@ -123,6 +125,7 @@ export function BrandFormPage() {
   };
 
   const handleSubmit = async () => {
+    setSaveAttempted(true);
     if (!formData.name.trim()) {
       toast.error('Brand name is required');
       return;
@@ -237,7 +240,7 @@ export function BrandFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1400px] mx-auto px-6 grid grid-cols-[1fr_300px] gap-4 mt-4">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-4">
@@ -248,15 +251,17 @@ export function BrandFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div className="space-y-1">
-                <Label>Name <span className="text-red-500">*</span></Label>
+                <Label>Name <Req /></Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="e.g. Marlboro"
+                  aria-invalid={saveAttempted && isBlank(formData.name)}
                 />
+                <ReqError show={saveAttempted && isBlank(formData.name)} />
               </div>
 
-              <div className="flex items-center gap-1 text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)] px-3 py-2 rounded border border-[var(--color-coyote)]/30">
+              <div className={`flex items-center gap-1 text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)] px-3 py-2 rounded border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
                 <span>store.cigarro.in/brands/</span>
                 <input
                   value={formData.slug}

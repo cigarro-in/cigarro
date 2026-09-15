@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check } from 'lucide-react';
+import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check, Truck } from 'lucide-react';
+import { Switch } from '../../components/ui/switch';
+import { DEFAULT_SHIPPING_METHODS, mergeShippingMethods, toShippingConfig, type ShippingMethod } from '../../lib/shipping';
 import { useTheme } from '../../themes';
 import { PageHeader } from '../components/shared/PageHeader';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
@@ -74,6 +76,7 @@ export function SettingsManager() {
   const serverSettings = useQuery(api.content.getSiteSettings, {});
   const saveSettings = useMutation(api.adminCatalog.saveSiteSettings);
   const populatedRef = useRef(false);
+  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>(DEFAULT_SHIPPING_METHODS);
 
   // Populate once from Convex (singleton key "main" — no numeric id anymore).
   useEffect(() => {
@@ -92,6 +95,7 @@ export function SettingsManager() {
         : null,
       updated_by: null,
     });
+    setShippingMethods(mergeShippingMethods((serverSettings as any).shippingConfig));
     setIsLoading(false);
     setIsDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,6 +267,7 @@ export function SettingsManager() {
         metaTitle: settings.meta_title?.trim() || undefined,
         metaDescription: settings.meta_description?.trim() || undefined,
         upiId: settings.upi_id?.trim() || undefined,
+        shippingConfig: toShippingConfig(shippingMethods),
       });
 
       toast.success('Settings updated successfully');
@@ -290,9 +295,15 @@ export function SettingsManager() {
     }
   };
 
+  const updateShippingMethod = (id: string, patch: Partial<ShippingMethod>) => {
+    setShippingMethods((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    setIsDirty(true);
+  };
+
   // Reset = repopulate from the live Convex singleton (reactive, no fetch).
   const handleReset = () => {
     if (!serverSettings) return;
+    setShippingMethods(mergeShippingMethods((serverSettings as any).shippingConfig));
     populatedRef.current = false;
     setSettings({
       id: 1,
@@ -486,6 +497,66 @@ export function SettingsManager() {
                 </ul>
               </div>
             </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* Shipping Methods */}
+        <AdminCard>
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Truck className="mr-2 h-5 w-5" />
+              Shipping Methods
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Enable/disable each option and set its price, label and delivery estimate. Applies to desktop + mobile checkout immediately.
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-4">
+            {shippingMethods.map((m) => (
+              <div key={m.id} className="p-4 border border-[var(--color-coyote)]/20 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="capitalize">{m.id}</Label>
+                    <p className="text-xs text-[var(--color-dark)]/50">{m.enabled ? 'Shown at checkout' : 'Hidden from checkout'}</p>
+                  </div>
+                  <Switch
+                    checked={m.enabled}
+                    onCheckedChange={(checked) => updateShippingMethod(m.id, { enabled: checked })}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label>Label</Label>
+                    <Input
+                      value={m.label}
+                      onChange={(e) => updateShippingMethod(m.id, { label: e.target.value })}
+                      placeholder="Standard Delivery"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Price (₹)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={m.priceRupees}
+                      onChange={(e) => updateShippingMethod(m.id, { priceRupees: Math.max(0, Number(e.target.value) || 0) })}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Estimate</Label>
+                    <Input
+                      value={m.eta}
+                      onChange={(e) => updateShippingMethod(m.id, { eta: e.target.value })}
+                      placeholder="5-7 days"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-[var(--color-dark)]/50">
+              At least one method should stay enabled — checkout falls back to the first enabled one. ₹0 shows as “Free”.
+            </p>
           </AdminCardContent>
         </AdminCard>
 

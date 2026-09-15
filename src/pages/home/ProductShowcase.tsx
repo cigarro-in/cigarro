@@ -3,24 +3,29 @@ import { useCart } from '../../hooks/useCart';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../../components/products/ProductCard';
-import { ShowcaseConfig, HomepageProduct } from '../../types/home';
+import { ShowcaseConfig, HomepageProduct, CollectionInfo } from '../../types/home';
 
 interface ProductShowcaseProps {
   products?: HomepageProduct[];
   config?: ShowcaseConfig | null;
+  collection?: CollectionInfo | null;
   isLoading?: boolean;
 }
 
-export const ProductShowcase = memo(function ProductShowcase({ 
-  products = [], 
-  config, 
-  isLoading = false 
+export const ProductShowcase = memo(function ProductShowcase({
+  products = [],
+  config,
+  collection,
+  isLoading = false
 }: ProductShowcaseProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
 
+  // Collection (admin) wins: rename the collection once, this section follows.
   const sectionConfig = {
-    title: config?.title || 'Discover Our Most Celebrated Collections',
-    background_image: config?.background_image || '',
+    title: collection?.title || config?.title || 'Discover Our Most Celebrated Collections',
+    background_image: collection?.imageUrl || config?.background_image || '',
+    overlay_title: collection?.title || 'Premium Collections',
+    overlay_description: collection?.description || 'Handpicked selections from our finest tobacco products',
     button_text: config?.button_text || 'Explore Collection',
     button_url: config?.button_url || '/products',
     is_enabled: config?.is_enabled !== false
@@ -106,7 +111,7 @@ export const ProductShowcase = memo(function ProductShowcase({
                   <div className="w-full h-full bg-gradient-to-br from-canyon/20 to-dark/20 flex items-center justify-center">
                     <div className="text-center text-dark/60">
                       <div className="text-4xl mb-4">🏆</div>
-                      <p className="text-lg font-medium">Celebrated Collections</p>
+                      <p className="text-lg font-medium">{sectionConfig.overlay_title}</p>
                       <p className="text-sm">Premium Selection</p>
                     </div>
                   </div>
@@ -116,10 +121,10 @@ export const ProductShowcase = memo(function ProductShowcase({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-6">
                   <div className="text-white">
                     <h3 className="text-xl font-bold mb-2">
-                      Premium Collections
+                      {sectionConfig.overlay_title}
                     </h3>
                     <p className="text-sm opacity-90">
-                      Handpicked selections from our finest tobacco products
+                      {sectionConfig.overlay_description}
                     </p>
                   </div>
                 </div>

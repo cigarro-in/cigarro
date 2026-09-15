@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Leaf, Flame } from 'lucide-react';
-import { Category } from '../../types/home';
+import { Category, BlogSectionConfig } from '../../types/home';
 
 interface CategoriesScrollerProps {
   categories?: Category[];
+  config?: BlogSectionConfig | null;
   isLoading?: boolean;
 }
 
@@ -15,7 +16,7 @@ const categoryIcons: { [key: string]: React.ComponentType<any> } = {
   accessories: Package,
 };
 
-export function CategoriesScroller({ categories = [], isLoading = false }: CategoriesScrollerProps) {
+export function CategoriesScroller({ categories = [], config, isLoading = false }: CategoriesScrollerProps) {
   if (isLoading) {
     // Minimal height reservation without visual noise
     return <section className="py-6 bg-creme min-h-[240px]"></section>;
@@ -31,7 +32,7 @@ export function CategoriesScroller({ categories = [], isLoading = false }: Categ
         {/* Section Header */}
         <div className="text-center mb-[1.5rem]">
           <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
-            Product Categories
+            {config?.title || 'Product Categories'}
           </h2>
         </div>
 

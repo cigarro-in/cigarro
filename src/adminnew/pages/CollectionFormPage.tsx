@@ -9,6 +9,7 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { Switch } from '../../components/ui/switch';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { ProductSelector } from '../components/shared/ProductSelector';
+import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -48,6 +49,7 @@ export function CollectionFormPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [saveAttempted, setSaveAttempted] = useState(false);
 
   const [formData, setFormData] = useState<CollectionFormData>({
     title: '',
@@ -127,6 +129,7 @@ export function CollectionFormPage() {
   };
 
   const handleSubmit = async () => {
+    setSaveAttempted(true);
     if (!formData.title.trim()) {
       toast.error('Collection title is required');
       return;
@@ -191,7 +194,7 @@ export function CollectionFormPage() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
       {/* Header */}
       <PageHeader
         title={formData.title || 'Untitled Collection'}
@@ -248,18 +251,20 @@ export function CollectionFormPage() {
               {/* Title */}
               <div className="space-y-2">
                 <Label className="text-[var(--color-dark)] font-medium">
-                  Title <span className="text-red-500">*</span>
+                  Title <Req />
                 </Label>
                 <Input
                   value={formData.title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="e.g. Premium Selection"
                   className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  aria-invalid={saveAttempted && isBlank(formData.title)}
                 />
+                <ReqError show={saveAttempted && isBlank(formData.title)} />
               </div>
 
               {/* Slug */}
-              <div className="grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30">
+              <div className={`grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
                 <span className="font-medium">store.cigarro.in/collections/</span>
                 <input
                   value={formData.slug}
