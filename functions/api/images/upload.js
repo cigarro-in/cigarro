@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from '../../lib/env.js';
 /**
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
@@ -32,7 +33,6 @@ function json(payload, status = 200) {
 async function requireAdmin(request, env) {
   if (env.UPLOAD_REQUIRE_ADMIN === 'false') return { ok: true };
   if (!env.R2_ASSETS) return { ok: false, error: 'R2 binding R2_ASSETS missing' };
-import { requiredConvexUrl } from '../../lib/env.js';
   const convexUrl = requiredConvexUrl(env);
   const header = request.headers.get('Authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;

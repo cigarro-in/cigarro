@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from '../lib/env.js';
 // Cloudflare Worker for Products Listing with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -36,7 +37,6 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Products API request received');
 
-import { requiredConvexUrl } from '../lib/env.js';
     const convexUrl = requiredConvexUrl(env);
     const bundle = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
     const brandById = new Map((bundle.brands || []).map((b) => [b.supabaseId, b]));

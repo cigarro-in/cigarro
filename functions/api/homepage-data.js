@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from '../lib/env.js';
 // Cloudflare Worker for Homepage Data with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -38,7 +39,6 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Homepage data request received');
 
-import { requiredConvexUrl } from '../lib/env.js';
     const convexUrl = requiredConvexUrl(env);
     const [bundle, heroSlides, featuredCfg, showcaseCfg, blogSecCfg, blogRows, blogCats] = await Promise.all([
       cxQuery(convexUrl, 'catalog:fullCatalog', {}),

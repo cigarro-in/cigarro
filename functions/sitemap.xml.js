@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from './lib/env.js';
 // Dynamic sitemap.xml endpoint for Cloudflare Pages
 // Automatically serves fresh sitemap from database
 // URL: https://cigarro.in/sitemap.xml
@@ -31,7 +32,6 @@ export async function onRequest(context) {
   
   try {
     // Convex URL rides the same Pages env as the client bundle.
-import { requiredConvexUrl } from './lib/env.js';
     const convexUrl = requiredConvexUrl(env);
 
     // Generate sitemap XML

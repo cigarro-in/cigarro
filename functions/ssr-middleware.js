@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from './lib/env.js';
 // SSR Middleware for Cloudflare Pages
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
@@ -1345,7 +1346,6 @@ export async function onRequest(context) {
   try {
     // Wave 8: all catalog reads (bot HTML + search + ?format= feeds) come
     // from Convex. Supabase is fully decoupled from this middleware.
-import { requiredConvexUrl } from './lib/env.js';
     const convexUrl = requiredConvexUrl(env);
 
     // Use static favicon path (no database fetch needed)

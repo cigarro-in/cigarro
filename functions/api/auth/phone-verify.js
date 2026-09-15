@@ -1,3 +1,4 @@
+import { requiredConvexUrl } from '../../lib/env.js';
 /**
  * Phone OTP verification endpoint (MSG91 → own ES256 JWT).
  *
@@ -120,7 +121,6 @@ export async function onRequest(context) {
 
     const msg91AuthKey = env.MSG91_AUTH_KEY;
     const edgeSecret = env.EDGE_SHARED_SECRET;
-import { requiredConvexUrl } from '../../lib/env.js';
     const convexUrl = requiredConvexUrl(env);
     const convexSite = (env.CONVEX_SITE_URL || convexUrl).replace('.convex.cloud', '.convex.site');
 
