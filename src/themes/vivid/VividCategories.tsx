@@ -18,9 +18,9 @@ export function VividCategories() {
 
       <div className="max-w-[1280px] mx-auto px-4 py-6">
         <header className="vv-page-header">
-          <h1 className="vv-page-title">Categories</h1>
+          <h1 className="vv-page-title">{data?.categoriesSectionConfig?.title || 'Categories'}</h1>
           <p className="vv-page-subtitle">
-            Browse by category to find exactly what you're after.
+            {data?.categoriesSectionConfig?.description || "Browse by category to find exactly what you're after."}
           </p>
         </header>
 

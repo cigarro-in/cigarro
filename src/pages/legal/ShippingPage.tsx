@@ -3,10 +3,18 @@ import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Truck, Shield, CheckCircle, MapPin, Clock, Package, AlertTriangle, Globe, Users, Phone, Heart } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
+import { useShippingMethods } from '../../hooks/data/useContent';
+import { formatINR } from '../../utils/currency';
 
 export function ShippingPage() {
   const location = useLocation();
-  
+  // Live delivery options (same source as checkout) — the policy page can
+  // never drift from what customers actually pay.
+  const { methods } = useShippingMethods();
+  const deliveryItems = methods.map((m) =>
+    `${m.label}: ${m.eta}${m.priceRupees === 0 ? ', free' : `, ${formatINR(m.priceRupees)}`}`,
+  );
+
   return (
     <>
       <SEOHead
@@ -36,10 +44,15 @@ export function ShippingPage() {
               <CardContent className="p-6 flex items-start gap-4">
                 <Truck className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-sans text-lg font-bold text-foreground mb-2">Free Shipping on All Orders</h3>
+                  <h3 className="font-sans text-lg font-bold text-foreground mb-2">
+                    {methods.every((m) => m.priceRupees === 0)
+                      ? 'Free Shipping on All Orders'
+                      : 'Shipping Across India'}
+                  </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    We offer free shipping on all orders within India. Your premium tobacco products will be delivered 
-                    safely and securely to your doorstep with full tracking and insurance coverage.
+                    {methods.every((m) => m.priceRupees === 0)
+                      ? 'We offer free shipping on all orders within India. Your premium tobacco products will be delivered safely and securely to your doorstep with full tracking and insurance coverage.'
+                      : 'Your premium tobacco products will be delivered safely and securely to your doorstep with full tracking and insurance coverage. Pick standard or faster delivery at checkout.'}
                   </p>
                   <div className="flex items-center gap-6 mt-4 text-xs text-accent font-medium">
                     <div className="flex items-center gap-2">
@@ -73,10 +86,9 @@ export function ShippingPage() {
                 {
                   icon: Clock,
                   title: "2. Delivery Times",
-                  content: "We keep it simple — one standard shipping option, free on every order across India:",
+                  content: "Choose a delivery speed at checkout — same options, same prices as below:",
                   items: [
-                    "Standard shipping: 5-7 business days, anywhere in India",
-                    "Free on all orders — no minimums, no tiers",
+                    ...deliveryItems,
                     "Dispatched within 1-2 business days of ordering",
                     "Full tracking shared by email and SMS once your order ships"
                   ],

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useSectionConfig } from '../../hooks/data/useContent';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { getProductImageUrl } from '../../lib/images/urls';
 
@@ -17,6 +18,7 @@ export function VividBrands() {
   const [loading, setLoading] = useState(true);
   // Wave 3: brand list from the Convex catalog (same shape).
   const { brands: catalogBrands, loading: catalogLoading } = useFullCatalog();
+  const { config: sectionCfg } = useSectionConfig('brands_section');
 
   useEffect(() => {
     if (catalogLoading) return;
@@ -41,8 +43,8 @@ export function VividBrands() {
 
       <div className="max-w-[1280px] mx-auto px-4 py-6">
         <header className="vv-page-header">
-          <h1 className="vv-page-title">Brands</h1>
-          <p className="vv-page-subtitle">Curated collection of premium tobacco makers.</p>
+          <h1 className="vv-page-title">{(sectionCfg as any)?.title || 'Brands'}</h1>
+          <p className="vv-page-subtitle">{(sectionCfg as any)?.description || 'Curated collection of premium tobacco makers.'}</p>
         </header>
 
         {loading ? (

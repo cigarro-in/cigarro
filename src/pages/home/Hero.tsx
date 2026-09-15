@@ -164,18 +164,12 @@ const Hero = memo(function Hero({
                           </a>
                         </div>
                         <div className="hidden group-hover:flex flex-nowrap text-center border-t border-coyote text-sm lg:text-base">
-                          <a 
+                          <a
                             href={`/product/${slugify(currentSlideData.product_name || '')}`}
-                            className="flex-1 py-[1rem] px-[1.5rem] text-inherit text-sm leading-none w-1/2 cursor-pointer transition-all duration-500 hover:bg-creme-light"
+                            className="flex-1 py-[1rem] px-[1.5rem] text-inherit text-sm leading-none cursor-pointer transition-all duration-500 hover:bg-creme-light"
                           >
-                            Customize
+                            View Product
                           </a>
-                          <button 
-                            type="button"
-                            className="flex-1 py-[1rem] px-[1.5rem] text-inherit text-sm leading-none w-1/2 cursor-pointer transition-all duration-500 border-l border-coyote hover:bg-creme-light"
-                          >
-                            Add to cart
-                          </button>
                         </div>
                       </div>
                     </div>
