@@ -122,6 +122,38 @@ export const submitReview = mutation({
 
 // ---------- Admin moderation ----------
 
+// Owner-composed review (e.g. transcribing phone/WhatsApp feedback).
+// Goes live immediately — the author IS the moderator. userName defaults
+// to "Cigarro Team": attribute honestly, never as a fake customer.
+export const createReview = mutation({
+  args: {
+    productSupabaseId: v.string(),
+    rating: v.number(),
+    title: v.optional(v.string()),
+    comment: v.optional(v.string()),
+    userName: v.optional(v.string()),
+  },
+  handler: async (ctx, a) => {
+    const identity = await requireReviewsAdmin(ctx);
+    if (!Number.isFinite(a.rating) || a.rating < 1 || a.rating > 5)
+      throw new ConvexError({ code: "BAD_RATING" });
+    const now = Date.now();
+    const id = await ctx.db.insert("productReviews", {
+      productSupabaseId: a.productSupabaseId,
+      userId: identity.subject,
+      rating: Math.round(a.rating),
+      title: a.title?.trim() || undefined,
+      comment: a.comment?.trim() || undefined,
+      userName: a.userName?.trim() || "Cigarro Team",
+      isApproved: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await syncProductAggregate(ctx, a.productSupabaseId);
+    return { id };
+  },
+});
+
 export const listReviewsForAdmin = query({
   args: { approved: v.optional(v.boolean()) },
   handler: async (ctx, { approved }) => {
@@ -138,6 +170,30 @@ export const listReviewsForAdmin = query({
   },
 });
 
+// Bot prerender + GSC read ratingValue/reviewCount off the catalog row
+// (not the reviews table), so every moderation write re-syncs them.
+// Zero approved = count 0, and aggregateRating stays omitted.
+async function syncProductAggregate(ctx: any, productSupabaseId: string) {
+  const rows = await ctx.db
+    .query("productReviews")
+    .withIndex("by_product", (q: any) => q.eq("productSupabaseId", productSupabaseId))
+    .collect();
+  const approved = rows.filter((r: any) => r.isApproved);
+  const product = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_supabase", (q: any) => q.eq("supabaseId", productSupabaseId))
+    .first();
+  if (!product) return;
+  await ctx.db.patch(product._id, {
+    reviewCount: approved.length,
+    ratingValue:
+      approved.length > 0
+        ? Math.round((approved.reduce((s: number, r: any) => s + r.rating, 0) / approved.length) * 10) / 10
+        : undefined,
+    updatedAt: Date.now(),
+  });
+}
+
 export const setReviewApproved = mutation({
   args: { id: v.id("productReviews"), isApproved: v.boolean() },
   handler: async (ctx, { id, isApproved }) => {
@@ -145,6 +201,7 @@ export const setReviewApproved = mutation({
     const row = await ctx.db.get(id);
     if (!row) throw new ConvexError({ code: "NOT_FOUND" });
     await ctx.db.patch(id, { isApproved, updatedAt: Date.now() });
+    await syncProductAggregate(ctx, row.productSupabaseId);
     return { ok: true };
   },
 });
@@ -153,7 +210,10 @@ export const deleteReview = mutation({
   args: { id: v.id("productReviews") },
   handler: async (ctx, { id }) => {
     await requireReviewsAdmin(ctx);
+    const row = await ctx.db.get(id);
+    if (!row) throw new ConvexError({ code: "NOT_FOUND" });
     await ctx.db.delete(id);
-    return { deleted: true };
+    await syncProductAggregate(ctx, row.productSupabaseId);
+    return { ok: true };
   },
 });

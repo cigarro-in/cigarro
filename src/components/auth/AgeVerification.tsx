@@ -59,7 +59,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
               <h2 className="text-canyon font-serif text-2xl md:text-3xl leading-tight mb-2">
                   Smoking is injurious to health.
               </h2>
-              <p className="text-canyon/80 font-sans text-sm uppercase tracking-wider font-bold">
+              <p className="text-canyon font-sans text-sm uppercase tracking-wider font-bold">
                   Cigarro does not promote tobacco use.
               </p>
           </div>

@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Check, Trash2, Star } from 'lucide-react';
+import { Check, Trash2, Star, Plus } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Textarea } from '../../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { toast } from 'sonner';
@@ -31,7 +34,27 @@ export function ReviewsPage() {
   );
   const setApproved = useMutation(api.reviews.setReviewApproved);
   const removeReview = useMutation(api.reviews.deleteReview);
+  const addReview = useMutation(api.reviews.createReview);
   const loading = rows === undefined;
+
+  const products = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ productId: '', rating: 5, userName: '', title: '', comment: '' });
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  const submit = () =>
+    act(async () => {
+      if (!form.productId) throw new Error('Pick a product');
+      await addReview({
+        productSupabaseId: form.productId,
+        rating: form.rating,
+        userName: form.userName || undefined,
+        title: form.title || undefined,
+        comment: form.comment || undefined,
+      });
+      setForm({ productId: '', rating: 5, userName: '', title: '', comment: '' });
+      setShowForm(false);
+    }, 'Review added', 'Failed to add review');
 
   const act = async (fn: () => Promise<unknown>, ok: string, fail: string) => {
     try {
@@ -113,6 +136,37 @@ export function ReviewsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <div>
+          <Button size="sm" onClick={() => setShowForm((s) => !s)}>
+            <Plus className="w-4 h-4 mr-1" /> Add review
+          </Button>
+          {showForm && (
+            <div className="mt-3 max-w-xl space-y-3 rounded-lg border border-[var(--color-coyote)]/30 bg-[var(--color-creme-light)] p-4">
+              <Select value={form.productId} onValueChange={(v) => set({ productId: v })}>
+                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <SelectContent>
+                  {((products || []) as any[]).filter((p) => p.isActive).map((p) => (
+                    <SelectItem key={p.supabaseId} value={p.supabaseId}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} type="button" onClick={() => set({ rating: n })} aria-label={`${n} stars`}>
+                    <Star className={`w-6 h-6 ${n <= form.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+                  </button>
+                ))}
+              </div>
+              <Input placeholder="Name (blank = Cigarro Team)" value={form.userName} onChange={(e) => set({ userName: e.target.value })} />
+              <Input placeholder="Title (optional)" value={form.title} onChange={(e) => set({ title: e.target.value })} />
+              <Textarea placeholder="Review (optional)" value={form.comment} onChange={(e) => set({ comment: e.target.value })} />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={submit}>Save review</Button>
+                <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </div>
         <DataTable
           data={(rows || []) as ReviewRow[]}
           columns={columns}

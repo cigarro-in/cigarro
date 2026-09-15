@@ -60,6 +60,25 @@ export function initAnalytics(): void {
     ad_personalization: 'denied',
     analytics_storage: stored === 'granted' ? 'granted' : 'denied',
   });
+  // The 130KiB gtag.js only downloads after consent: queued hits replay from
+  // dataLayer on load, so nothing is lost for later granters.
+  if (stored === 'granted') injectScript();
+  window.gtag('js', new Date());
+  // Manual page_view events (SPA); the automatic one would double-count.
+  window.gtag('config', MEASUREMENT_ID, { send_page_view: false });
+}
+
+export function getConsent(): ConsentChoice | null {
+  if (typeof window === 'undefined') return null;
+  const stored = safeGet(CONSENT_KEY);
+  return stored === 'granted' || stored === 'denied' ? stored : null;
+}
+
+let scriptInjected = false;
+
+function injectScript(): void {
+  if (scriptInjected || typeof document === 'undefined' || !MEASUREMENT_ID) return;
+  scriptInjected = true;
   const script = document.createElement('script');
   script.async = true;
   script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
@@ -73,15 +92,6 @@ export function initAnalytics(): void {
     console.error('[analytics] gtag.js blocked — hits are dropped. Turn off adblocker/Brave Shields and check CSP.');
   };
   document.head.appendChild(script);
-  window.gtag('js', new Date());
-  // Manual page_view events (SPA); the automatic one would double-count.
-  window.gtag('config', MEASUREMENT_ID, { send_page_view: false });
-}
-
-export function getConsent(): ConsentChoice | null {
-  if (typeof window === 'undefined') return null;
-  const stored = safeGet(CONSENT_KEY);
-  return stored === 'granted' || stored === 'denied' ? stored : null;
 }
 
 export function setConsent(choice: ConsentChoice): void {
@@ -91,6 +101,7 @@ export function setConsent(choice: ConsentChoice): void {
       analytics_storage: choice === 'granted' ? 'granted' : 'denied',
     });
   }
+  if (choice === 'granted') injectScript();
 }
 
 function ready(): boolean {
