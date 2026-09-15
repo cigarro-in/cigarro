@@ -9,16 +9,23 @@ import {
   query,
 } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
+import { mergeSenders } from "./appConfig";
 
-// ---------- Gmail OAuth inbox poller (replaces GAS per-org polling) ----------
+// ---------- Gmail OAuth inbox poller — the single payment-verification feed ----------
 // One Google account (the founder's inbox receiving bank alerts) polled on a
 // cron. Secrets stay in Convex env, never in the DB:
 //   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN
 // Founder one-time dance: Google Cloud OAuth client + gmail.readonly scope,
 // paste the refresh token into BOTH Convex deployments' env.
-// GAS + Email Worker paths stay as fallbacks (ingest is idempotent).
+//
+// Design: stateless. Each poll runs messages.list with a `from:` search query
+// and ingests every hit; ingestBankEmail dedupes by gmailMessageId, so
+// re-polling the same window is safe. No historyId cursor, nothing to seed or
+// reseed (the old history.list approach needed constant plumbing: historyIds
+// expire after ~7 days and history.list silently ignores the `q` filter).
 
 const SINGLETON = "singleton";
+const WAKE_THROTTLE_MS = 3 * 60 * 1000;
 
 async function getConfig(ctx: any) {
   return await ctx.db
@@ -97,18 +104,49 @@ async function gmail(
   return res.json();
 }
 
+/** Build the Gmail search query: sender allowlist + recent window. */
+export function buildPollQuery(senders: string[], extra?: string | null): string {
+  const from =
+    senders.length > 0 ? `{${senders.map((s) => `from:${s}`).join(" ")}} ` : "";
+  return `${from}newer_than:2d${extra ? ` ${extra}` : ""}`.trim();
+}
+
 export const pollInbox = internalAction({
-  args: { seedOnly: v.optional(v.boolean()), maxMessages: v.optional(v.number()) },
-  handler: async (ctx, { seedOnly, maxMessages }): Promise<any> => {
+  args: {
+    orgId: v.optional(v.id("organizations")),
+    maxMessages: v.optional(v.number()),
+    reason: v.optional(
+      v.union(
+        v.literal("scheduled"),
+        v.literal("wake"),
+        v.literal("refresh"),
+        v.literal("manual"),
+      ),
+    ),
+  },
+  handler: async (ctx, { orgId, maxMessages, reason }): Promise<any> => {
+    const mode = reason ?? "scheduled";
     const clientId = process.env.GMAIL_CLIENT_ID;
     const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-    const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
-    if (!clientId || !clientSecret || !refreshToken)
+    if (!clientId || !clientSecret)
       return { skipped: "gmail oauth not configured" };
 
     const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, {});
-    if (!cfg?.enabled) return { skipped: "poll disabled" };
-    if (!cfg?.orgId) return { skipped: "no org bound" };
+    // One-click Connect stores the token in the DB; env var stays as fallback.
+    const refreshToken = cfg?.refreshToken ?? process.env.GMAIL_REFRESH_TOKEN;
+    if (!refreshToken) return { skipped: "gmail not connected" };
+    const targetOrgId = orgId ?? cfg?.orgId;
+    if (mode !== "manual" && !cfg?.enabled) return { skipped: "poll disabled" };
+    if (!targetOrgId) return { skipped: "no org bound" };
+
+    // Idle-skip scheduled polls when nothing is awaiting payment.
+    if (mode === "scheduled") {
+      const anyPending: boolean = await ctx.runQuery(
+        internal.gmail.hasPendingOrders,
+        { orgId: targetOrgId },
+      );
+      if (!anyPending) return { skipped: "no_pending_orders" };
+    }
 
     const accessToken = await refreshAccessToken(clientId, clientSecret, refreshToken);
     if (!accessToken) {
@@ -118,81 +156,262 @@ export const pollInbox = internalAction({
       return { error: "token refresh failed" };
     }
 
-    const labelIds = "INBOX";
-    const q = cfg.query || undefined;
+    const q = cfg?.query?.trim()
+      ? cfg.query.trim()
+      : buildPollQuery(cfg?.senders ?? []);
     let processed = 0;
+    let matched = 0;
+    let duplicates = 0;
+    let parseFailures = 0;
 
-    // First run: seed historyId without processing (never flood old mail).
-    if (!cfg.historyId) {
+    try {
       const list = await gmail(accessToken, "/users/me/messages", {
-        ...(q ? { q } : {}),
-        maxResults: "1",
+        q,
+        maxResults: String(Math.min(maxMessages ?? 20, 50)),
       });
-      void list;
-      const profile = await gmail(accessToken, "/users/me/profile", {});
-      await ctx.runMutation((internal as any).gmail.notePollResult, {
-        historyId: String(profile.historyId),
+      const messages: Array<{ id: string }> = list?.messages ?? [];
+
+      for (const m of messages) {
+        try {
+          const full = await gmail(accessToken, `/users/me/messages/${m.id}`, {
+            format: "full",
+          });
+          const r: any = await ctx.runMutation(internal.payments.ingestBankEmail, {
+            orgId: targetOrgId,
+            to: header(full, "delivered-to") || header(full, "to") || undefined,
+            from: header(full, "from"),
+            subject: header(full, "subject") || undefined,
+            textBody: extractBody(full) || undefined,
+            messageId: String(full.id),
+          });
+          processed++;
+          if (r?.matched) matched++;
+          else if (r?.duplicate) duplicates++;
+          else if (r?.parsed === false) parseFailures++;
+        } catch (e: any) {
+          // Per-message failures must not stop the batch.
+          console.error("[gmail] message failed:", m?.id, e?.message);
+        }
+      }
+    } catch (e: any) {
+      await ctx.runMutation(internal.gmail.notePollResult, {
+        error: String(e?.message || e).slice(0, 300),
       });
-      return { seeded: true };
+      return { error: String(e?.message || e).slice(0, 300) };
     }
 
-    const history = await gmail(accessToken, "/users/me/history", {
-      startHistoryId: cfg.historyId,
-      historyTypes: "messageAdded",
-      labelId: labelIds,
-      maxResults: String(Math.min(maxMessages ?? 25, 50)),
-      ...(q ? { q } : {}),
-    }).catch(async (e: any) => {
-      // Expired historyId (too old) → reseed.
-      if (String(e?.message || "").includes("404")) {
-        const profile = await gmail(accessToken, "/users/me/profile", {});
-        await ctx.runMutation(internal.gmail.notePollResult, {
-          historyId: String(profile.historyId),
-        });
-        return { reseeded: true };
-      }
-      throw e;
-    });
-    if ((history as any)?.reseeded) return history;
-
-    const added: any[] = [];
-    for (const h of (history as any)?.history ?? [])
-      for (const m of h?.messagesAdded ?? []) added.push(m.message);
-
-    for (const m of added.slice(0, maxMessages ?? 25)) {
-      try {
-        const full = await gmail(accessToken, `/users/me/messages/${m.id}`, {
-          format: "full",
-        });
-        await ctx.runMutation(internal.payments.ingestBankEmail, {
-          orgId: cfg.orgId,
-          to: header(full, "delivered-to") || header(full, "to") || undefined,
-          from: header(full, "from"),
-          subject: header(full, "subject") || undefined,
-          textBody: extractBody(full) || undefined,
-          messageId: String(full.id),
-        });
-        processed++;
-      } catch (e: any) {
-        // Per-message failures must not stop the batch or lose historyId.
-        console.error("[gmail] message failed:", m?.id, e?.message);
-      }
-    }
-
-    await ctx.runMutation(internal.gmail.notePollResult, {
-      historyId: String((history as any)?.historyId ?? cfg.historyId),
-    });
-    return { processed };
+    await ctx.runMutation(internal.gmail.notePollResult, {});
+    return { ok: true, reason: mode, fetched: processed, processed, matched, duplicates, parseFailures };
   },
 });
 
-// Manual trigger from Payment Settings (Test button). Same path as cron.
+// Manual trigger from Payment Settings ("Check inbox now"). Same path as cron.
 export const triggerPoll = action({
   args: { maxMessages: v.optional(v.number()) },
   handler: async (ctx, args): Promise<any> => {
+    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, {});
     return await ctx.runAction(internal.gmail.pollInbox, {
-      maxMessages: args.maxMessages ?? 5,
+      maxMessages: args.maxMessages ?? 20,
+      reason: "manual",
     });
+  },
+});
+
+// ---------- One-click Google connect ----------
+//
+// Admin clicks "Connect with Google" → this returns the Google consent URL
+// (offline access, so Google issues a refresh token). Google redirects back
+// to /gmailOAuthCallback, which exchanges the code and stores the refresh
+// token in appConfig. No env-var dance, no re-pasting.
+
+const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+
+export const assertPaymentsAdmin = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await requireIdentity(ctx);
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .filter((q) =>
+        q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
+      )
+      .first();
+    if (!membership) throw new ConvexError({ code: "NOT_PAYMENTS_ADMIN" });
+    return identity.subject;
+  },
+});
+
+export const getOAuthUrl = action({
+  args: { redirectUri: v.string() },
+  handler: async (ctx, { redirectUri }): Promise<{ url: string }> => {
+    const adminUserId: string = await ctx.runQuery(
+      internal.gmail.assertPaymentsAdmin,
+      {},
+    );
+    const clientId = process.env.GMAIL_CLIENT_ID;
+    if (!clientId) throw new ConvexError({ code: "GMAIL_NOT_CONFIGURED" });
+    if (!/^https:\/\/[a-z0-9-]+\.convex\.site\/gmailOAuthCallback$/.test(redirectUri))
+      throw new ConvexError({ code: "BAD_REDIRECT_URI" });
+
+    const state = crypto.randomUUID();
+    await ctx.runMutation(internal.gmail.saveOAuthState, {
+      state,
+      redirectUri,
+      adminUserId,
+    });
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: GMAIL_READONLY,
+      access_type: "offline",
+      prompt: "consent",
+      state,
+    });
+    return {
+      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    };
+  },
+});
+
+export const saveOAuthState = internalMutation({
+  args: {
+    state: v.string(),
+    redirectUri: v.string(),
+    adminUserId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const cfg = await getConfig(ctx);
+    const patch = {
+      pendingOAuthState: args.state,
+      pendingOAuthBy: args.adminUserId,
+      pendingOAuthUri: args.redirectUri,
+      pendingOAuthAt: now,
+      updatedAt: now,
+    };
+    if (!cfg) {
+      await ctx.db.insert("appConfig", { key: SINGLETON, ...patch });
+    } else {
+      await ctx.db.patch(cfg._id, patch);
+    }
+  },
+});
+
+export const getOAuthState = internalQuery({
+  args: { state: v.string() },
+  handler: async (ctx, { state }) => {
+    const cfg = await getConfig(ctx);
+    if (!cfg || cfg.pendingOAuthState !== state) return null;
+    return {
+      redirectUri: cfg.pendingOAuthUri ?? null,
+      adminUserId: cfg.pendingOAuthBy ?? null,
+      createdAt: cfg.pendingOAuthAt ?? 0,
+    };
+  },
+});
+
+export const finishOAuthConnect = internalMutation({
+  args: {
+    state: v.string(),
+    refreshToken: v.string(),
+    accountEmail: v.optional(v.string()),
+  },
+  handler: async (ctx, { state, refreshToken, accountEmail }) => {
+    const cfg = await getConfig(ctx);
+    if (!cfg || cfg.pendingOAuthState !== state)
+      throw new ConvexError({ code: "OAUTH_STATE_MISMATCH" });
+    if (Date.now() - (cfg.pendingOAuthAt ?? 0) > OAUTH_STATE_TTL_MS)
+      throw new ConvexError({ code: "OAUTH_STATE_EXPIRED" });
+    await ctx.db.patch(cfg._id, {
+      gmailRefreshToken: refreshToken,
+      gmailAccountEmail: accountEmail,
+      pendingOAuthState: undefined,
+      pendingOAuthBy: undefined,
+      pendingOAuthUri: undefined,
+      pendingOAuthAt: undefined,
+      gmailLastError: undefined,
+      updatedAt: Date.now(),
+    });
+    return { ok: true as const, accountEmail: accountEmail ?? null };
+  },
+});
+
+export const disconnectGmail = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await requirePaymentsAdmin(ctx);
+    const cfg = await getConfig(ctx);
+    if (cfg) {
+      await ctx.db.patch(cfg._id, {
+        gmailRefreshToken: undefined,
+        gmailAccountEmail: undefined,
+        gmailPollEnabled: false,
+        updatedAt: Date.now(),
+        updatedBy: identity.subject,
+      });
+    }
+    return { ok: true as const };
+  },
+});
+
+// Customer "Refresh status" / wake-on-return from the Transaction page.
+// Throttled per order; schedules a poll rather than polling inline (mutations
+// can't call actions, and scheduling keeps the mutation fast).
+export const wake = mutation({
+  args: {
+    orderId: v.id("orders"),
+    source: v.union(v.literal("wake"), v.literal("refresh")),
+  },
+  handler: async (ctx, { orderId, source }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) throw new ConvexError({ code: "NOT_FOUND" });
+
+    const identity = await requireIdentity(ctx);
+    if (order.userId !== identity.subject)
+      throw new ConvexError({ code: "FORBIDDEN" });
+
+    if (order.status !== "pending") {
+      return { skipped: "not_pending", status: order.status };
+    }
+
+    const now = Date.now();
+    const last = order.lastWakeAt ?? 0;
+    if (now - last < WAKE_THROTTLE_MS) {
+      return {
+        throttled: true,
+        retryAfterMs: WAKE_THROTTLE_MS - (now - last),
+      };
+    }
+
+    await ctx.db.patch(orderId, { lastWakeAt: now });
+
+    await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, {
+      orgId: order.orgId,
+      reason: source,
+    });
+    await ctx.scheduler.runAfter(15_000, internal.gmail.pollInbox, {
+      orgId: order.orgId,
+      reason: source,
+    });
+
+    return { poked: true };
+  },
+});
+
+export const hasPendingOrders = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const row = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status", (q) =>
+        q.eq("orgId", orgId).eq("status", "pending"),
+      )
+      .first();
+    return !!row;
   },
 });
 
@@ -202,9 +421,11 @@ export const getPollConfigInternal = internalQuery({
     const cfg = await getConfig(ctx);
     return {
       enabled: cfg?.gmailPollEnabled ?? false,
-      historyId: cfg?.gmailHistoryId ?? null,
       query: cfg?.gmailQuery ?? null,
       orgId: cfg?.gmailOrgId ?? null,
+      senders: mergeSenders(cfg?.bankSenders),
+      // Server-side only — never exposed to the client.
+      refreshToken: cfg?.gmailRefreshToken ?? null,
     };
   },
 });
@@ -214,15 +435,23 @@ export const getGmailStatus = query({
   args: {},
   handler: async (ctx) => {
     const cfg = await getConfig(ctx);
+    const senders = mergeSenders(cfg?.bankSenders);
+    const hasDbToken = !!cfg?.gmailRefreshToken;
+    const hasEnvToken = !!process.env.GMAIL_REFRESH_TOKEN;
     return {
       enabled: cfg?.gmailPollEnabled ?? false,
       query: cfg?.gmailQuery ?? null,
+      effectiveQuery: cfg?.gmailQuery?.trim()
+        ? cfg.gmailQuery.trim()
+        : buildPollQuery(senders),
+      senders,
+      boundOrgId: cfg?.gmailOrgId ?? null,
       lastPollAt: cfg?.gmailLastPollAt ?? null,
       lastError: cfg?.gmailLastError ?? null,
-      hasHistory: !!cfg?.gmailHistoryId,
-      configured: !!(
-        process.env.GMAIL_CLIENT_ID && process.env.GMAIL_REFRESH_TOKEN
-      ),
+      connected: hasDbToken || hasEnvToken,
+      connectedVia: hasDbToken ? ("google" as const) : hasEnvToken ? ("env" as const) : null,
+      accountEmail: cfg?.gmailAccountEmail ?? null,
+      configured: !!(process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET),
     };
   },
 });
@@ -252,7 +481,7 @@ export const setGmailConfig = mutation({
     const cfg = await getConfig(ctx);
     const patch: any = { updatedAt: now, updatedBy: identity.subject };
     if (args.enabled !== undefined) patch.gmailPollEnabled = args.enabled;
-    if (args.query !== undefined) patch.gmailQuery = args.query || undefined;
+    if (args.query !== undefined) patch.gmailQuery = args.query.trim() || undefined;
     if (args.orgId !== undefined) patch.gmailOrgId = args.orgId;
     if (!cfg) {
       await ctx.db.insert("appConfig", { key: SINGLETON, ...patch });
@@ -265,7 +494,6 @@ export const setGmailConfig = mutation({
 
 export const notePollResult = internalMutation({
   args: {
-    historyId: v.optional(v.string()),
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -274,7 +502,6 @@ export const notePollResult = internalMutation({
     if (!cfg) {
       await ctx.db.insert("appConfig", {
         key: SINGLETON,
-        gmailHistoryId: args.historyId,
         gmailLastPollAt: now,
         gmailLastError: args.error,
         updatedAt: now,
@@ -282,7 +509,6 @@ export const notePollResult = internalMutation({
       return;
     }
     await ctx.db.patch(cfg._id, {
-      ...(args.historyId !== undefined ? { gmailHistoryId: args.historyId } : {}),
       gmailLastPollAt: now,
       gmailLastError: args.error,
       updatedAt: now,

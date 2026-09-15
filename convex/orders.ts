@@ -268,7 +268,8 @@ export const createOrder = mutation({
       { orderId },
     );
 
-    // Schedule the 5 Gmail pokes — idle-skipped server-side if no GAS config.
+    // Schedule 5 Gmail polls — the poller idle-skips when nothing is pending,
+    // and ingest dedupes by messageId, so overlapping polls are safe.
     const pokeOffsets = [
       30_000,
       90_000,
@@ -277,10 +278,9 @@ export const createOrder = mutation({
       9 * 60_000 + 45_000,
     ];
     for (const ms of pokeOffsets) {
-      await ctx.scheduler.runAfter(ms, internal.scheduler.pokeGas, {
+      await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, {
         orgId: args.orgId,
         reason: "scheduled",
-        triggerOrderId: orderId,
       });
     }
 

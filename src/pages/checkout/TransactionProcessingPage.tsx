@@ -81,7 +81,7 @@ export function TransactionProcessingPage() {
   const lastPokeRef = useRef<number>(0);
   const [refreshing, setRefreshing] = useState(false);
 
-  const wakeMutation = useMutation(api.scheduler.wake);
+  const wakeMutation = useMutation(api.gmail.wake);
   const pokeWake = useCallback(
     async (source: 'wake' | 'refresh') => {
       if (!orderId) return;

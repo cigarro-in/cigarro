@@ -12,6 +12,7 @@ convex/
   organizations.ts         Org settings + seedOrg bootstrap
   orders.ts                createOrder, cancelOrder, retryOrder, queries
   payments.ts              Internal: expireHeldSlot, releaseQuarantine, ingestBankEmail
+  gmail.ts                 Gmail OAuth poller (the verification feed), wake, triggerPoll
   wallet.ts                Wallet primitives + balance/ledger queries + admin credit
   admin.ts                 markPaid, refundOrder, voidOrder, resolveLatePayment
   lib/

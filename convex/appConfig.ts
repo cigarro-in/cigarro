@@ -5,11 +5,9 @@ import { requireIdentity } from "./lib/auth";
 const KEY = "singleton";
 
 /**
- * Public read — returns platform-wide config like the GAS template URL.
- * Safe to expose: the template URL is intentionally shared with tenants
- * (it's the "copy this master project" link).
+ * Public read — returns platform-wide config like the bank-alert sender list.
  */
-// Sender patterns used for the Gmail `from:` search. Domain-level is safer
+ // Sender patterns used for the Gmail `from:` search. Domain-level is safer
 // than exact address — HDFC can rotate sender addresses without breaking us.
 // The template parser's senderRegex does the final check to decide which
 // matched emails are genuine transaction alerts.
@@ -23,7 +21,7 @@ export const DEFAULT_SENDERS = [
  * Custom senders are always added — never replace — so enabling one bank
  * doesn't disable HDFC.
  */
-function mergeSenders(custom: string[] | undefined): string[] {
+export function mergeSenders(custom: string[] | undefined): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const s of [...(custom ?? []), ...DEFAULT_SENDERS]) {
@@ -43,7 +41,6 @@ export const get = query({
       .withIndex("by_key", (q) => q.eq("key", KEY))
       .unique();
     return {
-      gasTemplateUrl: row?.gasTemplateUrl ?? null,
       bankSenders: mergeSenders(row?.bankSenders),
       customBankSenders: row?.bankSenders ?? [],
       defaultBankSenders: DEFAULT_SENDERS,
@@ -52,8 +49,8 @@ export const get = query({
 });
 
 /**
- * Internal-ish read for the pokeGas action — returns the merged sender list
- * (custom + defaults, deduped) the GAS should search Gmail for.
+ * Internal-ish read for the Gmail poller — returns the merged sender list
+ * (custom + defaults, deduped) used to build the Gmail search query.
  */
 export const getBankSenders = query({
   args: {},
@@ -72,7 +69,6 @@ export const getBankSenders = query({
  */
 export const set = mutation({
   args: {
-    gasTemplateUrl: v.optional(v.string()),
     bankSenders: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -88,14 +84,6 @@ export const set = mutation({
       updatedAt: Date.now(),
       updatedBy: identity.subject,
     };
-
-    if (args.gasTemplateUrl !== undefined) {
-      const url = args.gasTemplateUrl.trim();
-      if (url && !/^https:\/\/script\.google\.com\/home\/projects\/[^/]+\/copy$/i.test(url)) {
-        throw new ConvexError({ code: "INVALID_TEMPLATE_URL" });
-      }
-      patch.gasTemplateUrl = url || undefined;
-    }
 
     if (args.bankSenders !== undefined) {
       const cleaned = args.bankSenders

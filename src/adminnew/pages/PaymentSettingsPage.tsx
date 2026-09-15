@@ -1,29 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Copy, RefreshCw, Link2, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { convexUrl } from '../../lib/convex/client';
 
-function randomSecret(length = 40) {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, length);
-}
+// The browser knows the .cloud URL; the OAuth callback lives on .site.
+const GMAIL_CALLBACK_URL =
+  convexUrl.replace('.convex.cloud', '.convex.site') + '/gmailOAuthCallback';
 
 export function PaymentSettingsPage() {
   const org = useOrg();
@@ -34,7 +26,6 @@ export function PaymentSettingsPage() {
   const appConfig = useQuery(api.appConfig.get, {});
   const update = useMutation(api.organizations.updateSettings);
   const setAppConfig = useMutation(api.appConfig.set);
-  const testConnection = useAction(api.scheduler.testGasConnection);
   const gmailStatus = useQuery(api.gmail.getGmailStatus, {});
   const setGmailConfig = useMutation(api.gmail.setGmailConfig);
   const triggerGmailPoll = useAction(api.gmail.triggerPoll);
@@ -44,11 +35,8 @@ export function PaymentSettingsPage() {
   const [slotTimeoutMin, setSlotTimeoutMin] = useState('10');
   const [quarantineMin, setQuarantineMin] = useState('20');
   const [slotsPerBase, setSlotsPerBase] = useState('100');
-  const [gasUrl, setGasUrl] = useState('');
-  const [gasSecret, setGasSecret] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -57,7 +45,6 @@ export function PaymentSettingsPage() {
     setSlotTimeoutMin(String(Math.round(settings.slotTimeoutMs / 60000)));
     setQuarantineMin(String(Math.round(settings.quarantineMs / 60000)));
     setSlotsPerBase(String(settings.slotsPerBase));
-    setGasUrl(settings.gasWebhookUrl ?? '');
   }, [settings]);
 
   const handleSaveGeneral = async () => {
@@ -80,70 +67,32 @@ export function PaymentSettingsPage() {
     }
   };
 
-  const handleSaveGas = async (url: string, secret?: string) => {
-    if (!org) return;
-    setSaving(true);
+  const handleCheckInbox = async () => {
     try {
-      await update({
-        orgId: org._id,
-        gasWebhookUrl: url.trim() || '',
-        ...(secret !== undefined ? { gasWebhookSecret: secret } : {}),
-      });
-      toast.success('Apps Script saved');
-    } catch (e: any) {
-      const code = e?.data?.code;
-      if (code === 'INVALID_GAS_URL')
-        toast.error('URL must start with https://script.google.com/…');
-      else if (code === 'SECRET_TOO_SHORT')
-        toast.error('Secret must be at least 20 characters');
-      else toast.error(code || 'Failed to save');
-      throw e;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleTest = async () => {
-    if (!org) return;
-    try {
-      const r: any = await testConnection({ orgId: org._id });
-      if (r?.error) {
-        toast.error(`${r.error}${r.message ? ': ' + r.message : ''}`);
-      } else if (r?.skipped) {
-        toast.message(`Skipped: ${r.skipped}`);
-      } else {
+      const r: any = await triggerGmailPoll({ maxMessages: 20 });
+      if (r?.error) toast.error(r.error);
+      else if (r?.skipped) toast.message(`Skipped: ${r.skipped}`);
+      else
         toast.success(
-          `OK — fetched ${r?.ingested ?? 0}, matched ${r?.matched ?? 0}, duplicates ${r?.duplicates ?? 0}`,
+          `Checked ${r?.fetched ?? 0} email(s)` +
+            (r?.matched ? `, ${r.matched} matched` : ', none matched a pending order'),
         );
-      }
     } catch (e: any) {
-      toast.error(e?.data?.code || e?.message || 'Test failed');
+      toast.error(e?.data?.message || e?.message || 'Check failed');
     }
   };
 
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
-      <PageHeader title="Payment Settings" description="UPI, slots, and bank-email connection" />
+      <PageHeader title="Payment Settings" description="UPI, slots, and Gmail verification" />
       <div className="p-6 max-w-[720px] mx-auto space-y-4">
         {settings === undefined ? (
           <p>Loading...</p>
         ) : (
           <>
             <GmailConnectionCard
-              connected={settings.gasConnected}
-              currentUrl={settings.gasWebhookUrl}
-              onOpenWizard={() => setWizardOpen(true)}
-              onTest={handleTest}
-              onDisconnect={async () => {
-                if (!confirm('Disconnect the Apps Script? Payments will stop auto-confirming.'))
-                  return;
-                await handleSaveGas('', '');
-              }}
-            />
-
-            <GmailOAuthCard
               status={gmailStatus}
-              orgId={org?._id}
+              callbackUrl={GMAIL_CALLBACK_URL}
               onToggle={async (enabled) => {
                 try {
                   await setGmailConfig({
@@ -155,17 +104,7 @@ export function PaymentSettingsPage() {
                   toast.error(e?.data?.code || 'Failed to save');
                 }
               }}
-              onTest={async () => {
-                try {
-                  const r: any = await triggerGmailPoll({ maxMessages: 5 });
-                  if (r?.error) toast.error(r.error);
-                  else if (r?.skipped) toast.message(`Skipped: ${r.skipped}`);
-                  else if (r?.seeded) toast.success('History seeded — next poll processes new mail');
-                  else toast.success(`Processed ${r?.processed ?? 0} message(s)`);
-                } catch (e: any) {
-                  toast.error(e?.data?.message || e?.message || 'Test failed');
-                }
-              }}
+              onCheckInbox={handleCheckInbox}
             />
 
             <Card>
@@ -239,33 +178,9 @@ export function PaymentSettingsPage() {
                     <Label>Bank Email Alias (legacy)</Label>
                     <Input value={settings.bankEmailAlias} disabled />
                   </div>
-                  <div>
-                    <Label>Apps Script Web App URL (manual)</Label>
-                    <Input value={gasUrl} onChange={(e) => setGasUrl(e.target.value)} placeholder="https://script.google.com/..." />
-                  </div>
-                  <div>
-                    <Label>Apps Script Secret (manual)</Label>
-                    <Input
-                      type="password"
-                      value={gasSecret}
-                      onChange={(e) => setGasSecret(e.target.value)}
-                      placeholder="Leave blank to keep existing"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Only paste if reconfiguring manually. Use the wizard for new setup.
-                    </p>
-                  </div>
                   <div className="flex gap-2">
                     <Button onClick={handleSaveGeneral} disabled={saving} variant="secondary">
                       Save slot settings
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        handleSaveGas(gasUrl, gasSecret.trim() ? gasSecret.trim() : undefined)
-                      }
-                      disabled={saving}
-                    >
-                      Save Apps Script
                     </Button>
                   </div>
                 </CardContent>
@@ -274,23 +189,14 @@ export function PaymentSettingsPage() {
           </>
         )}
 
-        <ConnectGmailWizard
-          open={wizardOpen}
-          onClose={() => setWizardOpen(false)}
-          onComplete={handleSaveGas}
-          templateUrl={appConfig?.gasTemplateUrl ?? ''}
-        />
-
         {/* Platform-level config — only shown to users with owner role somewhere */}
         <PlatformConfigCard
-          currentTemplateUrl={appConfig?.gasTemplateUrl ?? ''}
           customSenders={(appConfig as any)?.customBankSenders ?? []}
           defaultSenders={(appConfig as any)?.defaultBankSenders ?? []}
           mergedSenders={appConfig?.bankSenders ?? []}
-          onSave={async (templateUrl, sendersCsv) => {
+          onSave={async (sendersCsv) => {
             try {
               await setAppConfig({
-                gasTemplateUrl: templateUrl.trim(),
                 bankSenders: sendersCsv
                   .split(/[\n,]/)
                   .map((s) => s.trim())
@@ -301,8 +207,6 @@ export function PaymentSettingsPage() {
               const code = e?.data?.code;
               if (code === 'NOT_PLATFORM_OWNER')
                 toast.error('Only owners can edit platform config');
-              else if (code === 'INVALID_TEMPLATE_URL')
-                toast.error('URL must look like https://script.google.com/home/projects/…/copy');
               else toast.error(code || 'Save failed');
             }
           }}
@@ -313,87 +217,77 @@ export function PaymentSettingsPage() {
 }
 
 function GmailConnectionCard(props: {
-  connected: boolean;
-  currentUrl: string | null;
-  onOpenWizard: () => void;
-  onTest: () => void;
-  onDisconnect: () => void;
+  status: any;
+  callbackUrl: string;
+  onToggle: (enabled: boolean) => void;
+  onCheckInbox: () => void;
 }) {
+  const s = props.status;
+  const [connecting, setConnecting] = useState(false);
+  const connectUrl = useAction(api.gmail.getOAuthUrl);
+  const disconnect = useMutation(api.gmail.disconnectGmail);
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    try {
+      const r = await connectUrl({ redirectUri: props.callbackUrl });
+      window.location.href = r.url;
+    } catch (e: any) {
+      toast.error(e?.data?.code || e?.message || 'Could not start Google connect');
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Gmail? Order auto-confirm will stop.')) return;
+    try {
+      await disconnect({});
+      toast.success('Gmail disconnected');
+    } catch (e: any) {
+      toast.error(e?.data?.code || 'Disconnect failed');
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Bank-email connection</CardTitle>
-        {props.connected ? (
-          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Connected</Badge>
+        {s === undefined ? (
+          <Badge variant="outline">Loading…</Badge>
+        ) : s.enabled && s.connected ? (
+          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Polling</Badge>
+        ) : s.connected ? (
+          <Badge variant="outline">Connected</Badge>
         ) : (
           <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Not connected</Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {props.connected ? (
-          <>
-            <p className="text-sm text-gray-600">
-              Your Apps Script is relaying bank emails to this store.
-            </p>
-            {props.currentUrl && (
-              <p className="text-xs font-mono text-gray-500 break-all">{props.currentUrl}</p>
-            )}
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={props.onTest}>
-                <RefreshCw className="w-4 h-4 mr-2" /> Test
-              </Button>
-              <Button size="sm" variant="outline" onClick={props.onOpenWizard}>
-                Reconnect
-              </Button>
-              <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={props.onDisconnect}>
-                Disconnect
-              </Button>
-            </div>
-          </>
+        {s?.connected ? (
+          <p className="text-sm text-gray-600">
+            Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null} every
+            5 minutes so orders auto-confirm.
+          </p>
         ) : (
           <>
             <p className="text-sm text-gray-600">
-              Connect an Apps Script that reads bank-alert emails from your Gmail and
-              relays them here so orders auto-confirm.
+              Connect the inbox that receives bank alerts. Approve read-only
+              access once — done.
             </p>
-            <Button onClick={props.onOpenWizard}>
-              <Link2 className="w-4 h-4 mr-2" /> Connect Gmail
+            {s && !s.configured && (
+              <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+                Server keys missing (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET).
+                Add them in the Convex dashboard → Settings → Environment Variables first.
+              </p>
+            )}
+            <p className="text-xs text-gray-500">
+              First time only: add this redirect URI in your Google Cloud OAuth client:{' '}
+              <code className="font-mono break-all">{props.callbackUrl}</code>
+            </p>
+            <Button onClick={handleConnect} disabled={connecting || !s?.configured}>
+              {connecting ? 'Opening Google…' : 'Connect with Google'}
             </Button>
           </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function GmailOAuthCard(props: {
-  status: any;
-  orgId?: string;
-  onToggle: (enabled: boolean) => void;
-  onTest: () => void;
-}) {
-  const s = props.status;
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Gmail OAuth polling (new)</CardTitle>
-        {s === undefined ? (
-          <Badge variant="outline">Loading…</Badge>
-        ) : s.enabled ? (
-          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Polling</Badge>
-        ) : (
-          <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Off</Badge>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-gray-600">
-          Reads bank alerts straight from Gmail every 5 minutes — no Apps Script.
-          Needs the one-time OAuth setup (refresh token in Convex env), then flip the switch.
-        </p>
-        {s && !s.configured && (
-          <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
-            Server keys missing (GMAIL_CLIENT_ID / REFRESH_TOKEN). Add them in Convex env first.
-          </p>
         )}
         {s && s.lastError && (
           <p className="text-xs text-red-700">Last error: {s.lastError}</p>
@@ -401,15 +295,19 @@ function GmailOAuthCard(props: {
         {s && s.lastPollAt && (
           <p className="text-xs text-gray-500">
             Last poll: {new Date(s.lastPollAt).toLocaleString()}
-            {s.hasHistory ? ' · history seeded' : ''}
           </p>
         )}
         <div className="flex items-center gap-2">
-          <Switch checked={!!s?.enabled} onCheckedChange={props.onToggle} />
-          <Label>Poll every 5 min{props.orgId ? '' : ' (store org unavailable)'}</Label>
+          <Switch checked={!!s?.enabled} onCheckedChange={props.onToggle} disabled={!s?.connected} />
+          <Label>Poll every 5 min</Label>
           <span className="flex-1" />
-          <Button size="sm" variant="outline" onClick={props.onTest}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Test
+          {s?.connected && s?.connectedVia === 'google' && (
+            <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={handleDisconnect}>
+              Disconnect
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={props.onCheckInbox} disabled={!s?.connected}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Check inbox now
           </Button>
         </div>
       </CardContent>
@@ -418,26 +316,23 @@ function GmailOAuthCard(props: {
 }
 
 function PlatformConfigCard(props: {
-  currentTemplateUrl: string;
   customSenders: string[];
   defaultSenders: string[];
   mergedSenders: string[];
-  onSave: (templateUrl: string, sendersCsv: string) => Promise<void>;
+  onSave: (sendersCsv: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState(props.currentTemplateUrl);
   const [sendersCsv, setSendersCsv] = useState(props.customSenders.join('\n'));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setUrl(props.currentTemplateUrl);
     setSendersCsv(props.customSenders.join('\n'));
-  }, [props.currentTemplateUrl, props.customSenders]);
+  }, [props.customSenders]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await props.onSave(url, sendersCsv);
+      await props.onSave(sendersCsv);
     } finally {
       setSaving(false);
     }
@@ -460,19 +355,6 @@ function PlatformConfigCard(props: {
             These settings apply to every tenant. Only users with an <b>owner</b> role
             on any org can save.
           </p>
-          <div>
-            <Label>Apps Script template copy-URL</Label>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://script.google.com/home/projects/<PROJECT_ID>/copy"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Create a master Apps Script project with <code>gas/Cigarro.gs</code>,
-              share "Anyone with link · Viewer", copy the project ID from the URL,
-              build the <code>/copy</code> form and paste here.
-            </p>
-          </div>
           <div>
             <Label>Additional bank-alert senders</Label>
             <textarea
@@ -512,166 +394,3 @@ function PlatformConfigCard(props: {
   );
 }
 
-function ConnectGmailWizard(props: {
-  open: boolean;
-  onClose: () => void;
-  onComplete: (url: string, secret: string) => Promise<void>;
-  templateUrl: string;
-}) {
-  const [step, setStep] = useState(1);
-  const [url, setUrl] = useState('');
-  const [secret, setSecret] = useState(() => randomSecret(40));
-  const [submitting, setSubmitting] = useState(false);
-
-  const copyTemplateLink = props.templateUrl;
-
-  const reset = () => {
-    setStep(1);
-    setUrl('');
-    setSecret(randomSecret(40));
-  };
-
-  const handleClose = () => {
-    props.onClose();
-    setTimeout(reset, 300);
-  };
-
-  const copy = (s: string) => {
-    navigator.clipboard.writeText(s).then(
-      () => toast.success('Copied'),
-      () => toast.error('Copy failed'),
-    );
-  };
-
-  const handleFinish = async () => {
-    if (!url.trim()) return toast.error('Paste the Web App URL first');
-    setSubmitting(true);
-    try {
-      await props.onComplete(url.trim(), secret);
-      handleClose();
-    } catch {
-      // toast already fired inside onComplete
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open={props.open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Connect Gmail — step {step} of 4</DialogTitle>
-          <DialogDescription>
-            Sets up an Apps Script in your own Google account to relay bank emails.
-          </DialogDescription>
-        </DialogHeader>
-
-        {step === 1 && (
-          <div className="space-y-4">
-            {copyTemplateLink ? (
-              <>
-                <p className="text-sm">
-                  Click below to open our template in Google Apps Script. In the page that opens,
-                  click <b>Make a copy</b> at the top-right.
-                </p>
-                <Button asChild>
-                  <a href={copyTemplateLink} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Apps Script template
-                  </a>
-                </Button>
-              </>
-            ) : (
-              <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
-                Platform template URL not configured yet. Ask your platform owner to set it in
-                <b> Payment Settings → Platform Config</b>.
-              </div>
-            )}
-            <p className="text-xs text-gray-500">
-              The copy lives in <b>your</b> Google Drive and reads <b>your</b> Gmail — we never see
-              your inbox.
-            </p>
-            <div className="flex justify-end">
-              <Button onClick={() => setStep(2)}>I copied it → Next</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-4">
-            <p className="text-sm">
-              In your copy of Apps Script, go to <b>Project Settings (gear icon, left sidebar)</b> →
-              <b> Script Properties</b> → <b>Add script property</b>:
-            </p>
-            <div className="bg-gray-50 border rounded-lg p-3 text-sm font-mono space-y-1">
-              <div>Name: <b>CONVEX_SECRET</b></div>
-              <div className="flex items-center gap-2">
-                Value:
-                <code className="px-2 py-1 bg-white rounded border break-all">{secret}</code>
-                <Button size="sm" variant="ghost" onClick={() => copy(secret)}>
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500">
-              Save the property, then come back here. Keep this secret — you'll paste it into our
-              system in the final step (it'll autofill for you).
-            </p>
-            <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)}>Property saved → Next</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-4">
-            <p className="text-sm">
-              Now deploy the script as a Web App. In Apps Script click <b>Deploy</b> (top-right)
-              → <b>New deployment</b>:
-            </p>
-            <ul className="text-sm list-disc list-inside space-y-1 text-gray-700">
-              <li>Select type: <b>Web app</b></li>
-              <li>Execute as: <b>Me</b></li>
-              <li>Who has access: <b>Anyone</b></li>
-              <li>Click <b>Deploy</b> → approve the permissions (you'll see a "Google hasn't
-                verified this app" warning — that's normal, click <b>Advanced</b> → <b>Go to (project name)</b>
-                → <b>Allow</b>).</li>
-            </ul>
-            <p className="text-sm">
-              Copy the <b>Web app URL</b> Google shows you and paste below:
-            </p>
-            <Input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://script.google.com/macros/s/.../exec"
-            />
-            <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
-              <Button onClick={() => setStep(4)} disabled={!url.trim()}>Next</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-4">
-            <p className="text-sm">
-              We'll save and fire a test poke. You should see a <b>convex-sent</b> Gmail label
-              appear on any recent HDFC mails within seconds.
-            </p>
-            <div className="bg-gray-50 border rounded-lg p-3 text-xs space-y-1">
-              <div><b>URL:</b> <span className="font-mono break-all">{url}</span></div>
-              <div><b>Secret:</b> <span className="font-mono">{secret.slice(0, 8)}…</span></div>
-            </div>
-            <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
-              <Button onClick={handleFinish} disabled={submitting}>
-                {submitting ? 'Saving…' : 'Save & test'}
-              </Button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}

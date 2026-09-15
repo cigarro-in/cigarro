@@ -59,9 +59,9 @@ export const releaseQuarantine = internalMutation({
 // ---------- Bank email ingestion (public entrypoint called via HTTP) ----------
 
 /**
- * Called by the external GAS/worker when a bank email is received or discovered.
- * Deduplicates by messageId, resolves the org via bankInboxes (or legacy alias),
- * picks a parser template, and attempts to match the credit to an order.
+ * Ingest one bank-credit email and attempt to match it to an order.
+ * Called by the Gmail poller (primary feed) or the push webhook (fallback).
+ * Deduplicates by messageId; safe to re-ingest the same email.
  */
 export const ingestBankEmail = internalMutation({
   args: {
@@ -86,12 +86,10 @@ export const ingestBankEmail = internalMutation({
     if (seen) return { duplicate: true, emailId: seen._id };
 
     // 2) Resolve org.
-    //    Prefer the explicit orgId passed by the scheduler (GAS reads the
-    //    admin's personal inbox — the email's `to:` is their personal Gmail,
-    //    not an org-specific alias, so we can't derive orgId from the email
-    //    itself).
-    //    Fall back to bankInboxes / legacy org.bankEmailAlias for direct
-    //    webhook ingestion paths (e.g. a future Cloudflare Email Worker).
+    //    Prefer the explicit orgId passed by the Gmail poller (it polls one
+    //    bound inbox, so the email's `to:` can't identify the tenant).
+    //    Fall back to bankInboxes / legacy org.bankEmailAlias for the push
+    //    webhook path.
     const toLower = (args.to ?? "").toLowerCase();
     let orgId: Id<"organizations"> | undefined = args.orgId;
 

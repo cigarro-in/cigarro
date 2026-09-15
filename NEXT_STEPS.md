@@ -25,9 +25,11 @@ settings managers). Deployed DEV, build green.
   fallback, never blocks); ONE Convex address book (killed dual
   `saved_addresses`/`addresses` writes); GPS lat/lng/userProvidedAddress added
   to `addressV`; pincode lookup via India Post API (pincode_lookup unread).
-- **Gmail OAuth poller** (`af115e47`): `convex/gmail.ts` (history poll, reseed,
-  per-message ingest, dark without env) + 5-min cron + admin status/test card.
-  NEEDS founder OAuth dance (below). GAS + Email Worker stay as fallbacks.
+- **Gmail OAuth poller** (single verification feed, stateless messages.list —
+  no history cursor): `convex/gmail.ts` + 5-min cron + admin status/test card.
+  GAS + scheduler removed. NEEDS founder: OAuth env
+  (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN on both deployments) + flip the switch
+  in Payment Settings.
 - **SEO/speed audits**: findings banked (age-gate blocks all crawling, bot-only
   links, no ItemList/reviews corpus, 1600px images to phones, dead cache rule,
   framer/fuse in critical path). Fixes NOT started — needs founder prioritization.

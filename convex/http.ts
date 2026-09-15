@@ -4,10 +4,87 @@ import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
-// ---------- Bank email ingestion ----------
+// ---------- Google OAuth callback (one-click Gmail connect) ----------
 //
-// Called by the Google Apps Script (or any trusted relay) when a bank
-// transaction email is observed. Auth via Bearer token matching the
+// Google redirects here after the admin approves gmail.readonly access.
+// Verifies the single-use state, exchanges the code for a refresh token,
+// stores it server-side, and shows a plain result page. No auth header —
+// the unguessable `state` (10-min expiry, single use) is the auth.
+http.route({
+  path: "/gmailOAuthCallback",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const url = new URL(req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const denied = url.searchParams.get("error");
+    if (denied || !code || !state) {
+      return oauthPage(false, "Google did not approve access. Go back and try again.");
+    }
+
+    const pending: any = await ctx.runQuery(internal.gmail.getOAuthState, { state });
+    if (!pending?.redirectUri) {
+      return oauthPage(false, "This connect link expired or was already used. Start again from Payment Settings.");
+    }
+
+    const clientId = process.env.GMAIL_CLIENT_ID;
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return oauthPage(false, "Server is missing GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET.");
+    }
+
+    let tokens: any;
+    try {
+      const res = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: pending.redirectUri,
+          grant_type: "authorization_code",
+        }).toString(),
+      });
+      tokens = await res.json();
+    } catch {
+      return oauthPage(false, "Could not reach Google. Try again.");
+    }
+    if (!tokens?.refresh_token) {
+      return oauthPage(
+        false,
+        "Google did not issue a refresh token. Remove the app's access at myaccount.google.com/permissions and try again.",
+      );
+    }
+
+    let accountEmail: string | undefined;
+    try {
+      const profile = await fetch(
+        "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        { headers: { Authorization: `Bearer ${tokens.access_token}` } },
+      ).then((r) => r.json());
+      if (profile?.emailAddress) accountEmail = String(profile.emailAddress);
+    } catch {
+      // Non-fatal — token is what matters.
+    }
+
+    try {
+      await ctx.runMutation(internal.gmail.finishOAuthConnect, {
+        state,
+        refreshToken: String(tokens.refresh_token),
+        accountEmail,
+      });
+    } catch (e: any) {
+      return oauthPage(false, "Connect link expired. Start again from Payment Settings.");
+    }
+    return oauthPage(true, accountEmail ?? null);
+  }),
+});
+
+// ---------- Bank email ingestion (push fallback) ----------
+//
+// Optional push path (e.g. Cloudflare Email Worker) into the same idempotent
+// `ingestBankEmail` the Gmail poller uses. Auth via Bearer token matching the
 // EMAIL_WEBHOOK_SECRET env var set in Convex.
 http.route({
   path: "/receiveBankEmail",
@@ -142,33 +219,6 @@ http.route({
   }),
 });
 
-// ---------- Poke from the client: wake / refresh an order ----------
-//
-// The Transaction page calls this the moment the customer returns from
-// their UPI app (visibilitychange), or when they press "Refresh status".
-// Throttled server-side per order to avoid abuse.
-http.route({
-  path: "/wakeOrder",
-  method: "POST",
-  handler: httpAction(async (ctx, req) => {
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return jsonResponse({ ok: false, error: "bad json" }, 400);
-    }
-    const orderId = body.orderId;
-    const source = body.source === "refresh" ? "refresh" : "wake";
-    if (!orderId) return jsonResponse({ ok: false, error: "missing orderId" }, 400);
-
-    const result = await ctx.runMutation(internal.scheduler.wakeOrder, {
-      orderId,
-      source,
-    });
-    return jsonResponse({ ok: true, ...result });
-  }),
-});
-
 // ---------- CORS preflight ----------
 const preflight = httpAction(async () => {
   return new Response(null, {
@@ -181,10 +231,10 @@ const preflight = httpAction(async () => {
   });
 });
 http.route({ path: "/receiveBankEmail", method: "OPTIONS", handler: preflight });
+http.route({ path: "/gmailOAuthCallback", method: "OPTIONS", handler: preflight });
 http.route({ path: "/resolvePhoneIdentity", method: "OPTIONS", handler: preflight });
 http.route({ path: "/debugIdentity", method: "OPTIONS", handler: preflight });
 http.route({ path: "/repairMyAccess", method: "OPTIONS", handler: preflight });
-http.route({ path: "/wakeOrder", method: "OPTIONS", handler: preflight });
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -194,6 +244,23 @@ function jsonResponse(payload: unknown, status = 200) {
       "access-control-allow-origin": "*",
     },
   });
+}
+
+function oauthPage(ok: boolean, detail: string | null): Response {
+  const title = ok ? "Gmail connected" : "Connect failed";
+  const body = ok
+    ? `<p><b>${escapeHtml(detail ?? "Inbox")} is connected.</b></p><p>Return to Payment Settings and flip on polling.</p>`
+    : `<p>${escapeHtml(detail ?? "Something went wrong.")}</p><p>Go back and try again.</p>`;
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
+      `<body style="font-family:system-ui,sans-serif;display:flex;min-height:90vh;align-items:center;justify-content:center;background:#faf7f2;margin:0">` +
+      `<div style="max-width:420px;text-align:center;padding:32px"><div style="font-size:44px">${ok ? "✓" : "✗"}</div><h1>${title}</h1>${body}</div></body></html>`,
+    { status: ok ? 200 : 400, headers: { "content-type": "text/html" } },
+  );
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export default http;

@@ -95,8 +95,6 @@ export const updateSettings = mutation({
     slotTimeoutMs: v.optional(v.number()),
     quarantineMs: v.optional(v.number()),
     slotsPerBase: v.optional(v.number()),
-    gasWebhookUrl: v.optional(v.string()),
-    gasWebhookSecret: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireOrgAdmin(ctx, args.orgId);
@@ -119,18 +117,6 @@ export const updateSettings = mutation({
         throw new ConvexError({ code: "SLOTS_OUT_OF_RANGE" });
       patch.slotsPerBase = args.slotsPerBase;
     }
-    if (args.gasWebhookUrl !== undefined) {
-      const v = args.gasWebhookUrl.trim();
-      if (v && !/^https:\/\/script\.google(?:usercontent)?\.com\//i.test(v))
-        throw new ConvexError({ code: "INVALID_GAS_URL" });
-      patch.gasWebhookUrl = v || undefined;
-    }
-    if (args.gasWebhookSecret !== undefined) {
-      const v = args.gasWebhookSecret.trim();
-      if (v && v.length < 20)
-        throw new ConvexError({ code: "SECRET_TOO_SHORT" });
-      patch.gasWebhookSecret = v || undefined;
-    }
     await ctx.db.patch(args.orgId, patch);
   },
 });
@@ -148,8 +134,6 @@ export const getSettings = query({
       quarantineMs: org.quarantineMs,
       slotsPerBase: org.slotsPerBase,
       bankEmailAlias: org.bankEmailAlias,
-      gasWebhookUrl: org.gasWebhookUrl ?? null,
-      gasConnected: !!(org.gasWebhookUrl && org.gasWebhookSecret),
     };
   },
 });

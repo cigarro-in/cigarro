@@ -104,12 +104,6 @@ export default defineSchema({
     slotsPerBase: v.number(),
     active: v.boolean(),
     createdAt: v.number(),
-
-    // Per-tenant GAS webhook for on-demand email polling.
-    // If set, Convex will POST {orgId, orderId, amountPaise, bankKey?} to
-    // gasWebhookUrl with `Authorization: Bearer <gasWebhookSecret>`.
-    gasWebhookUrl: v.optional(v.string()),
-    gasWebhookSecret: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
@@ -166,7 +160,7 @@ export default defineSchema({
     payerName: v.optional(v.string()),
     idempotencyKey: v.optional(v.string()),  // client-provided; prevents double-create on retry
     extraCreditsPaise: v.optional(v.number()), // sum of duplicate/over-payments credited beyond this order
-    lastWakeAt: v.optional(v.number()),      // throttle for /wakeOrder pokes
+    lastWakeAt: v.optional(v.number()),      // throttle for customer wake/refresh polls
   })
     .index("by_org_user", ["orgId", "userId", "createdAt"])
     .index("by_org_final_status", ["orgId", "finalAmountPaise", "status"])
@@ -296,16 +290,24 @@ export default defineSchema({
   // Platform-wide singleton config. One row expected; use `key = "singleton"`.
   appConfig: defineTable({
     key: v.string(),
-    gasTemplateUrl: v.optional(v.string()),
     bankSenders: v.optional(v.array(v.string())), // e.g. ["@hdfcbank.bank.in", "@icicibank.com"]
-    // Gmail OAuth poller (replaces GAS per-org polling). Secrets live in
+    // Gmail OAuth poller (the payment-verification feed). Secrets live in
     // Convex env (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN), never here.
     gmailPollEnabled: v.optional(v.boolean()),
-    gmailHistoryId: v.optional(v.string()),
     gmailQuery: v.optional(v.string()),
     gmailOrgId: v.optional(v.id("organizations")),
     gmailLastPollAt: v.optional(v.number()),
     gmailLastError: v.optional(v.string()),
+    // One-click Google connect: refresh token + connected inbox, stored
+    // server-side so nobody pastes tokens. Env GMAIL_REFRESH_TOKEN still
+    // works as fallback when this is unset.
+    gmailRefreshToken: v.optional(v.string()),
+    gmailAccountEmail: v.optional(v.string()),
+    // Pending OAuth handshake (single-use, 10-min expiry).
+    pendingOAuthState: v.optional(v.string()),
+    pendingOAuthBy: v.optional(v.string()),
+    pendingOAuthUri: v.optional(v.string()),
+    pendingOAuthAt: v.optional(v.number()),
     updatedAt: v.number(),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
@@ -468,6 +470,10 @@ export default defineSchema({
     faviconUrl: v.optional(v.string()),
     activeTheme: v.optional(v.string()),
     upiId: v.optional(v.string()),
+    // Shipping methods config (admin-edited). Shape:
+    // { standard?: {enabled, priceRupees, label, eta}, express?: {...}, priority?: {...} }
+    // Absent keys fall back to DEFAULT_SHIPPING_METHODS in src/lib/shipping.ts.
+    shippingConfig: v.optional(v.any()),
     updatedAt: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
