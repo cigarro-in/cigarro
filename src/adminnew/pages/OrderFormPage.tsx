@@ -186,7 +186,7 @@ export function OrderFormPage() {
   const createdAt = new Date(order._creationTime);
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
       <PageHeader
         title={`Order #${order.displayOrderId}`}
         description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()}`}
@@ -273,6 +273,17 @@ export function OrderFormPage() {
             <AdminCard>
               <AdminCardHeader><AdminCardTitle>Tracking</AdminCardTitle></AdminCardHeader>
               <AdminCardContent>
+                {(order as any).shippingMethod && (
+                  <div className="flex justify-between text-sm pb-3 mb-1 border-b border-gray-100">
+                    <span className="text-gray-600">Delivery option</span>
+                    <span className="font-medium capitalize">
+                      {(order as any).shippingMethod}
+                      {(order as any).shippingPricePaise != null && (order as any).shippingPricePaise > 0
+                        ? ` · ${formatINR(paiseToRupees((order as any).shippingPricePaise))}`
+                        : ' · Free'}
+                    </span>
+                  </div>
+                )}
                 <div className="space-y-3">
                   <div>
                     <Label>Carrier</Label>

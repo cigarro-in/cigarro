@@ -118,6 +118,7 @@ export interface CollectionInfo {
 }
 
 export interface HomepageData {
+  sectionsEnabled?: Record<string, boolean>;
   heroSlides: HeroSlide[];
   featuredProducts: HomepageProduct[];
   categories: Category[];

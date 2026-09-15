@@ -120,7 +120,20 @@ export function useHomepageData() {
     ? { title: showcaseCollection.title, background_image: (showcaseCfg as any)?.background_image ?? (showcaseCfg as any)?.backgroundImage ?? showcaseCollection.imageUrl, button_text: (showcaseCfg as any)?.button_text ?? (showcaseCfg as any)?.buttonText, button_url: (showcaseCfg as any)?.button_url ?? (showcaseCfg as any)?.buttonUrl, is_enabled: (showcaseCfg as any)?.is_enabled ?? (showcaseCfg as any)?.isEnabled }
     : showcaseCfg;
 
+  // Admin on/off toggles (absent row = enabled, so existing installs keep rendering).
+  const compEnabled = (name: string) =>
+    (homepageComponents || []).find((c: any) => c.componentName === name)?.isEnabled !== false;
+  const sectionsEnabled: Record<string, boolean> = {
+    hero_section: compEnabled('hero_section'),
+    featured_products: compEnabled('featured_products'),
+    product_showcase: compEnabled('product_showcase'),
+    brands_section: compEnabled('brands_section'),
+    categories_section: compEnabled('categories_section'),
+    blog_section: compEnabled('blog_section'),
+  };
+
   const data: HomepageData = {
+    sectionsEnabled,
     featuredProducts,
     categories: categories.slice(0, 20).map((c: any) => ({
       id: c.supabaseId,

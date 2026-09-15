@@ -204,6 +204,16 @@ export function useSiteSettings() {
   }, [row]);
 }
 
+// Payment VPA the customer's money must go to (mirrors the order's
+// payingVpa pick). Public query — the VPA is customer-visible by design.
+export function usePaymentVpa(orgId: unknown) {
+  const row = useQuery(
+    api.organizations.getPaymentVpa,
+    orgId ? { orgId: orgId as any } : 'skip',
+  );
+  return useMemo(() => ({ vpa: (row as any)?.vpa ?? null, loading: row === undefined }), [row]);
+}
+
 // Shipping methods for checkout + admin: Convex config merged over defaults.
 // Only enabled methods are returned (in standard/express/priority order).
 export function useShippingMethods() {

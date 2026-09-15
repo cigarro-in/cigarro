@@ -19,6 +19,8 @@ const SectionFallback = ({ height = "h-96" }: { height?: string }) => (
 
 export function HomePage() {
   const { data, isLoading } = useHomepageData();
+  // Admin Homepage toggles; absent row = enabled (existing installs unaffected).
+  const on = (name: string) => data?.sectionsEnabled?.[name] !== false;
 
   return (
     <>
@@ -30,58 +32,72 @@ export function HomePage() {
         keywords={['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes', 'luxury tobacco']}
         image={data?.heroSlides?.[0]?.image_url}
       />
-      <Hero slides={data?.heroSlides} isLoading={isLoading} />
+      {on('hero_section') && <Hero slides={data?.heroSlides} isLoading={isLoading} />}
 
       {/* Same sections on mobile + desktop (each section is responsive) */}
-      <CategoriesScroller categories={data?.categories} config={data?.categoriesSectionConfig} isLoading={isLoading} />
+      {on('categories_section') && (
+        <CategoriesScroller categories={data?.categories} config={data?.categoriesSectionConfig} isLoading={isLoading} />
+      )}
 
       <div className="h-0 md:h-12"></div>
 
-      <Suspense fallback={<SectionFallback height="h-[500px]" />}>
-        <FeaturedProducts
-          products={data?.featuredProducts}
-          config={data?.featuredSectionConfig}
-          isLoading={isLoading}
-        />
-      </Suspense>
+      {on('featured_products') && (
+        <Suspense fallback={<SectionFallback height="h-[500px]" />}>
+          <FeaturedProducts
+            products={data?.featuredProducts}
+            config={data?.featuredSectionConfig}
+            isLoading={isLoading}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionFallback height="h-32" />}>
-        <BrandsScroller brands={data?.brands} config={data?.brandsSectionConfig} isLoading={isLoading} />
-      </Suspense>
+      {on('brands_section') && (
+        <Suspense fallback={<SectionFallback height="h-32" />}>
+          <BrandsScroller brands={data?.brands} config={data?.brandsSectionConfig} isLoading={isLoading} />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionFallback height="h-[800px]" />}>
-        <CategoryShowcases
-          categoriesWithProducts={data?.categoriesWithProducts}
-          isLoading={isLoading}
-        />
-      </Suspense>
+      {on('categories_section') && (
+        <Suspense fallback={<SectionFallback height="h-[800px]" />}>
+          <CategoryShowcases
+            categoriesWithProducts={data?.categoriesWithProducts}
+            isLoading={isLoading}
+          />
+        </Suspense>
+      )}
 
-      <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-        <ProductShowcase
-          products={data?.showcaseProducts}
-          config={data?.showcaseConfig}
-          collection={data?.showcaseCollection}
-          isLoading={isLoading}
-        />
-      </Suspense>
+      {on('product_showcase') && (
+        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+          <ProductShowcase
+            products={data?.showcaseProducts}
+            config={data?.showcaseConfig}
+            collection={data?.showcaseCollection}
+            isLoading={isLoading}
+          />
+        </Suspense>
+      )}
       <div className="h-8 md:h-12"></div>
 
-      <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-        <CategoriesGrid
-          categories={data?.categories}
-          config={data?.categoriesSectionConfig}
-          isLoading={isLoading}
-        />
-      </Suspense>
-      
+      {on('categories_section') && (
+        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+          <CategoriesGrid
+            categories={data?.categories}
+            config={data?.categoriesSectionConfig}
+            isLoading={isLoading}
+          />
+        </Suspense>
+      )}
+
       <div className="h-8 md:h-12"></div>
-      <Suspense fallback={<SectionFallback height="h-[400px]" />}>
-        <BlogSection 
-          posts={data?.blogPosts} 
-          config={data?.blogSectionConfig}
-          isLoading={isLoading} 
-        />
-      </Suspense>
+      {on('blog_section') && (
+        <Suspense fallback={<SectionFallback height="h-[400px]" />}>
+          <BlogSection
+            posts={data?.blogPosts}
+            config={data?.blogSectionConfig}
+            isLoading={isLoading}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

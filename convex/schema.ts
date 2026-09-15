@@ -135,6 +135,10 @@ export default defineSchema({
 
     cartTotalPaise: v.number(),
     walletDebitPaise: v.number(),
+    // Customer-chosen delivery option (informational: not part of the UPI
+    // fingerprint amount). shippingPricePaise is a paise integer like the rest.
+    shippingMethod: v.optional(v.string()),
+    shippingPricePaise: v.optional(v.number()),
     baseAmountPaise: v.number(),
     slotOffsetPaise: v.number(),
     finalAmountPaise: v.number(),

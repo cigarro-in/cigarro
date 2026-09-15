@@ -16,7 +16,7 @@ import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
 import { useMutation } from 'convex/react';
-import { useShippingMethods } from '../../hooks/data/useContent';
+import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
@@ -44,6 +44,9 @@ export function CheckoutPage() {
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
   const org = useOrg();
+  // Live VPA from Payment Settings (never hardcoded — wrong VPA = unmatched payment).
+  const { vpa: paymentVpa } = usePaymentVpa((org as any)?._id);
+  const payVpa = paymentVpa ?? '';
   const createConvexOrder = useMutation(api.orders.createOrder);
   const convexClient = useConvex();
   // Single address book (Convex). The legacy dual-table
@@ -172,8 +175,12 @@ export function CheckoutPage() {
     trackBeginCheckout(items, Number(totalPrice ?? 0));
   }, [items, totalPrice]);
 
-  // Load saved addresses and preload QR code on component mount
+  // Load saved addresses and preload QR code on component mount.
+  // Re-runs when the live VPA arrives so the QR never bakes an empty pa.
   useEffect(() => {
+    if (payVpa && !preloadedQRCode) {
+      preloadQRCode();
+    }
     if (user && !addressesLoadedRef.current) {
       loadSavedAddresses();
       preloadQRCode();
@@ -188,7 +195,8 @@ export function CheckoutPage() {
       // Reset when user logs out
       addressesLoadedRef.current = false;
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, payVpa]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -318,6 +326,7 @@ export function CheckoutPage() {
   };
 
   const preloadQRCode = async () => {
+    if (!payVpa) return;
     try {
       // Generate a temporary transaction ID for QR code preloading
       const tempTransactionId = `TXN${Date.now().toString().slice(-8)}`;
@@ -326,7 +335,7 @@ export function CheckoutPage() {
       const QRCode = await import('qrcode');
       
       // Create UPI payment URL with estimated amount
-      const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${tempTransactionId}&tn=${tempTransactionId}`;
+      const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${tempTransactionId}&tn=${tempTransactionId}`;
       
       // Generate QR code
       const qrDataURL = await QRCode.toDataURL(upiURL, {
@@ -850,9 +859,10 @@ export function CheckoutPage() {
   };
 
   const generatePaymentQRCode = async () => {
+    if (!payVpa) return;
     try {
       const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-      const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+      const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
       
       const qrDataURL = await QRCode.toDataURL(upiURL, {
         width: 256,
@@ -934,6 +944,8 @@ export function CheckoutPage() {
         kind: 'purchase',
         items: convexItems,
         address,
+        shippingMethod: activeShippingId,
+        shippingPricePaise: rupeesToPaise(shippingCost),
       });
 
       if (user) await saveAddressOnOrderSuccess();
@@ -979,7 +991,7 @@ export function CheckoutPage() {
     // In a real app, you would send the payment link via email/SMS
     // For now, we'll just copy the UPI link to clipboard
     const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-    const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+    const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
     
     try {
       await navigator.clipboard.writeText(upiURL);
@@ -1601,12 +1613,13 @@ export function CheckoutPage() {
                         <p className="text-sm text-muted-foreground">
                           Click to open your UPI app and complete payment.
                         </p>
-                        <Button 
+                        <Button
                           onClick={() => {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-                            const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+                            const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             window.location.href = upiURL;
                           }}
+                          disabled={!payVpa}
                           variant="default"
                           className="w-full text-accent-foreground"
                         >
@@ -1642,11 +1655,12 @@ export function CheckoutPage() {
                             </div>
                           )}
                         </div>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
+                          disabled={!payVpa}
                           onClick={() => {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-                            const upiURL = `upi://pay?pa=hrejuh@upi&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+                            const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             navigator.clipboard.writeText(upiURL);
                             toast.success('UPI link copied to clipboard');
                           }}

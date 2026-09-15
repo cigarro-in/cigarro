@@ -105,6 +105,8 @@ export const createOrder = mutation({
     walletAmountPaise: v.optional(v.number()),
     retryOfOrderId: v.optional(v.id("orders")),
     idempotencyKey: v.optional(v.string()),
+    shippingMethod: v.optional(v.string()),
+    shippingPricePaise: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireMember(ctx, args.orgId);
@@ -237,6 +239,8 @@ export const createOrder = mutation({
       address: args.address,
       cartTotalPaise: cartTotal,
       walletDebitPaise: walletDebit,
+      shippingMethod: args.shippingMethod,
+      shippingPricePaise: args.shippingPricePaise,
       baseAmountPaise: effectiveBasePaise,
       slotOffsetPaise: slot.slot,
       finalAmountPaise: finalAmount,

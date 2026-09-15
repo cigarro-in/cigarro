@@ -29,6 +29,22 @@ export const getBySlug = query({
   },
 });
 
+// Public: the exact VPA an order will embed (active paymentVpas entry,
+// else org.upiVpa). Checkout QR/links must use this — a hardcoded VPA here
+// sends money somewhere the matcher never looks.
+export const getPaymentVpa = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const org = await ctx.db.get(orgId);
+    if (!org || !org.active) return null;
+    const activeVpa = await ctx.db
+      .query("paymentVpas")
+      .withIndex("by_org_active", (q) => q.eq("orgId", orgId).eq("active", true))
+      .first();
+    return { vpa: activeVpa?.vpa ?? org.upiVpa };
+  },
+});
+
 export const listMine = query({
   args: {},
   handler: async (ctx) => {

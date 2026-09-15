@@ -509,6 +509,8 @@ export function MobileCheckoutPage() {
         items: buildConvexItems(),
         address,
         walletAmountPaise,
+        shippingMethod: activeShippingId,
+        shippingPricePaise: rupeesToPaise(getShippingCost()),
       });
 
       isNavigatingRef.current = true;
