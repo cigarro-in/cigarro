@@ -374,6 +374,58 @@ export const clearCart = mutation({
   },
 });
 
+// Atomic full-replace: delete + re-add in ONE mutation so concurrent
+// readers never observe the empty middle state. useCart.persistAllConvex
+// used to do clear→N×add as separate round-trips; any poll landing
+// between them adopted the empty cart and wiped local state.
+export const replaceCart = mutation({
+  args: {
+    orgId: v.id("organizations"),
+    lines: v.array(
+      v.object({
+        productId: v.string(),
+        variantId: v.optional(v.string()),
+        comboId: v.optional(v.string()),
+        name: v.string(),
+        variantName: v.optional(v.string()),
+        unitPriceRupees: v.number(),
+        qty: v.number(),
+        imageUrl: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireMember(ctx, args.orgId);
+    const existing = await ctx.db
+      .query("carts")
+      .withIndex("by_org_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", userId),
+      )
+      .collect();
+    await Promise.all(existing.map((l) => ctx.db.delete(l._id)));
+    const now = Date.now();
+    for (const l of args.lines) {
+      const qty = Math.floor(l.qty);
+      if (!Number.isFinite(qty) || qty <= 0 || qty > 99) continue;
+      if (!Number.isFinite(l.unitPriceRupees) || l.unitPriceRupees < 0) continue;
+      await ctx.db.insert("carts", {
+        orgId: args.orgId,
+        userId,
+        productId: l.productId,
+        variantId: l.variantId,
+        comboId: l.comboId,
+        name: l.name,
+        variantName: l.variantName,
+        unitPriceRupees: l.unitPriceRupees,
+        qty,
+        imageUrl: l.imageUrl,
+        updatedAt: now,
+      });
+    }
+    return args.lines.length;
+  },
+});
+
 // ----- Wishlist -----
 
 export const listWishlist = query({

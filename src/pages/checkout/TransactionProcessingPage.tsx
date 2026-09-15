@@ -41,15 +41,19 @@ export function TransactionProcessingPage() {
     if (!state || !user) navigate('/');
   }, [state, user, navigate]);
 
-  // Clear cart once after mount (on successful order creation path)
+  // Clear cart exactly once after mount (order-creation path). Ref-guarded,
+  // not dep-guarded: clearCart identity changes per render and re-firing the
+  // timeout stacked duplicate clears in the log storm.
+  const clearedRef = useRef(false);
   useEffect(() => {
-    if (state?.shouldClearCart) {
-      const t = setTimeout(() => {
-        clearCart().catch((err) => console.error('clearCart error', err));
-      }, 500);
-      return () => clearTimeout(t);
-    }
-  }, [state?.shouldClearCart, clearCart]);
+    if (!state?.shouldClearCart || clearedRef.current) return;
+    clearedRef.current = true;
+    const t = setTimeout(() => {
+      clearCart().catch((err) => console.error('clearCart error', err));
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.shouldClearCart]);
 
   // Tick every second for countdown
   useEffect(() => {

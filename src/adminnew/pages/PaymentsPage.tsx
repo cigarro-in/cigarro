@@ -40,11 +40,13 @@ export function PaymentsPage() {
     setTab(initialTab(location.pathname));
   }, [location.pathname]);
 
-  // Toast after returning from the Google OAuth bounce.
+  // After returning from the Google OAuth bounce, strip the query param.
+  // No toast at all: the card flipping to Connected/Polling in place is the
+  // confirmation. (A success toast here would violate the errors-only policy
+  // and fire on every return from Google.)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('gmail') === 'connected') {
-      toast.success('Gmail connected — flip on polling');
       navigate(location.pathname, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,6 +54,9 @@ export function PaymentsPage() {
 
   const checkInbox = useAction(api.gmail.triggerPoll);
   const [checking, setChecking] = useState(false);
+  // Last inbox-check outcome, rendered inline next to the button (replaces
+  // the old success/info toasts — the page, not a popup, reports results).
+  const [checkNote, setCheckNote] = useState<string | null>(null);
 
   const recentOrders = useQuery(
     api.admin.listRecentOrders,
@@ -77,17 +82,18 @@ export function PaymentsPage() {
 
   const handleCheckInbox = async () => {
     setChecking(true);
+    setCheckNote(null);
     try {
       const r: any = await checkInbox({ maxMessages: 20 });
       if (r?.error) {
         toast.error(`Inbox check failed: ${r.error}`);
       } else if (r?.skipped) {
-        toast.message(`Skipped: ${r.skipped}`);
+        setCheckNote(`Skipped: ${r.skipped}`);
       } else if ((r?.fetched ?? 0) === 0) {
-        toast.message('Inbox check complete — no new bank emails.');
+        setCheckNote('Inbox check complete — no new bank emails.');
       } else {
-        toast.success(
-          `Checked — ${r.fetched} email${r.fetched === 1 ? '' : 's'}${r.matched ? `, ${r.matched} matched` : ''}${r.duplicates ? `, ${r.duplicates} duplicate` : ''}`,
+        setCheckNote(
+          `Checked — ${r.fetched} email${r.fetched === 1 ? '' : 's'}${r.matched ? `, ${r.matched} matched` : ''}${r.duplicates ? `, ${r.duplicates} duplicate` : ''}${r.parseFailures ? `, ${r.parseFailures} unreadable` : ''}`,
         );
       }
     } catch (e: any) {
@@ -106,16 +112,23 @@ export function PaymentsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
       <PageHeader title="Payments" description="UPI payment operations">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleCheckInbox}
-          disabled={checking}
-          title="Poll Gmail now for new bank-alert emails"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-          {checking ? 'Checking...' : 'Check inbox now'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {checkNote && (
+            <span className="text-xs text-gray-600 max-w-[320px] truncate" title={checkNote}>
+              {checkNote}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCheckInbox}
+            disabled={checking}
+            title="Poll Gmail now for new bank-alert emails"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+            {checking ? 'Checking...' : 'Check inbox now'}
+          </Button>
+        </div>
       </PageHeader>
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         <div className="flex gap-2 border-b border-gray-200">
@@ -150,7 +163,7 @@ export function PaymentsPage() {
         )}
         {tab === 'unmatched' && <UnmatchedTab emails={unmatched} />}
         {tab === 'settings' && (
-          <SettingsTab org={org} settings={settings} appConfig={appConfig} gmailStatus={gmailStatus} />
+          <SettingsTab org={org} settings={settings} appConfig={appConfig} gmailStatus={gmailStatus} setCheckNoteParent={setCheckNote} />
         )}
       </div>
     </div>
@@ -263,8 +276,14 @@ function BankEmailRow({ email }: { email: any }) {
     email.status === 'matched' ? 'bg-green-100 text-green-800' :
     email.status === 'duplicate' ? 'bg-yellow-100 text-yellow-800' :
     email.status === 'no_match' ? 'bg-orange-100 text-orange-800' :
+    email.status === 'no_candidate' ? 'bg-amber-100 text-amber-800' :
     email.status === 'parse_failed' ? 'bg-red-100 text-red-800' :
+    email.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
     'bg-gray-100 text-gray-800';
+  const statusHint =
+    email.status === 'no_candidate' ? ' — no pending order within ₹2' :
+    email.status === 'parse_failed' ? ' — amount unreadable, check template' :
+    '';
 
   return (
     <div className="py-3 flex items-start justify-between gap-3">
@@ -273,7 +292,7 @@ function BankEmailRow({ email }: { email: any }) {
           <span className="font-semibold text-sm">
             {email.amountPaise > 0 ? formatINR(paiseToRupees(email.amountPaise)) : '—'}
           </span>
-          <Badge className={statusColor}>{email.status}</Badge>
+          <Badge className={statusColor}>{email.status}{statusHint}</Badge>
           {email.bankKey && (
             <Badge variant="outline" className="text-xs">
               {email.bankKey.toUpperCase()}
@@ -308,8 +327,8 @@ function BankEmailRow({ email }: { email: any }) {
 
 // ---------- Settings ----------
 
-function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStatus: any }) {
-  const { org, settings, appConfig, gmailStatus } = props;
+function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStatus: any; setCheckNoteParent?: (s: string | null) => void }) {
+  const { org, settings, appConfig, gmailStatus, setCheckNoteParent } = props;
   const update = useMutation(api.organizations.updateSettings);
   const setAppConfig = useMutation(api.appConfig.set);
   const setGmailConfig = useMutation(api.gmail.setGmailConfig);
@@ -322,6 +341,8 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
   const [slotsPerBase, setSlotsPerBase] = useState('100');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Inline save confirmation (replaces the old success toast).
+  const [savedNote, setSavedNote] = useState<string | null>(null);
   const [saveAttempted, setSaveAttempted] = useState(false);
 
   useEffect(() => {
@@ -361,7 +382,8 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
         quarantineMs: Math.round(parseFloat(quarantineMin) * 60000),
         slotsPerBase: parseInt(slotsPerBase, 10),
       });
-      toast.success('Settings saved');
+      // No success toast: the inline note + persisted field values confirm it.
+      setSavedNote(`Saved ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`);
     } catch (e: any) {
       toast.error(e?.data?.code || 'Failed to save');
     } finally {
@@ -373,12 +395,13 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
     try {
       const r: any = await triggerGmailPoll({ maxMessages: 20 });
       if (r?.error) toast.error(r.error);
-      else if (r?.skipped) toast.message(`Skipped: ${r.skipped}`);
-      else
-        toast.success(
-          `Checked ${r?.fetched ?? 0} email(s)` +
-            (r?.matched ? `, ${r.matched} matched` : ', none matched a pending order'),
-        );
+      else setCheckNoteParent?.(
+        r?.skipped
+          ? `Skipped: ${r.skipped}`
+          : `Checked ${r?.fetched ?? 0} email(s)` +
+            (r?.matched ? `, ${r.matched} matched` : ', none matched a pending order') +
+            (r?.parseFailures ? `, ${r.parseFailures} unreadable` : ''),
+      );
     } catch (e: any) {
       toast.error(e?.data?.message || e?.message || 'Check failed');
     }
@@ -397,7 +420,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
               enabled,
               ...(enabled && org ? { orgId: org._id } : {}),
             });
-            toast.success(enabled ? 'Gmail polling enabled' : 'Gmail polling disabled');
+            // No toast: the card badge flips Polling/Connected in place.
           } catch (e: any) {
             toast.error(e?.data?.code || 'Failed to save');
           }
@@ -425,9 +448,12 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
             <Label>Wallet Enabled</Label>
             <Switch checked={walletEnabled} onCheckedChange={setWalletEnabled} />
           </div>
-          <Button onClick={handleSaveGeneral} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSaveGeneral} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+            {savedNote && <span className="text-xs text-green-700">{savedNote}</span>}
+          </div>
         </AdminCardContent>
       </AdminCard>
 
@@ -515,7 +541,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
                 .map((s) => s.trim())
                 .filter(Boolean),
             });
-            toast.success('Platform config saved');
+            // No success toast: PlatformConfigCard shows its own inline note.
           } catch (e: any) {
             const code = e?.data?.code;
             if (code === 'NOT_PLATFORM_OWNER')
@@ -557,7 +583,7 @@ function GmailConnectionCard(props: {
     if (!confirm('Disconnect Gmail? Order auto-confirm will stop.')) return;
     try {
       await disconnect({});
-      toast.success('Gmail disconnected');
+      // No toast: the card badge flips to Not connected in place.
     } catch (e: any) {
       toast.error(e?.data?.code || 'Disconnect failed');
     }
@@ -639,6 +665,8 @@ function PlatformConfigCard(props: {
   const [open, setOpen] = useState(false);
   const [sendersCsv, setSendersCsv] = useState(props.customSenders.join('\n'));
   const [saving, setSaving] = useState(false);
+  // Inline save confirmation (replaces the old success toast).
+  const [savedNote, setSavedNote] = useState<string | null>(null);
 
   useEffect(() => {
     setSendersCsv(props.customSenders.join('\n'));
@@ -646,8 +674,11 @@ function PlatformConfigCard(props: {
 
   const handleSave = async () => {
     setSaving(true);
+    setSavedNote(null);
     try {
       await props.onSave(sendersCsv);
+      // No toast: the note + updated "Currently searched" list confirm it.
+      setSavedNote(`Saved ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`);
     } finally {
       setSaving(false);
     }
@@ -700,9 +731,12 @@ function PlatformConfigCard(props: {
               </ul>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save platform config'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save platform config'}
+            </Button>
+            {savedNote && <span className="text-xs text-green-700">{savedNote}</span>}
+          </div>
         </AdminCardContent>
       )}
     </AdminCard>

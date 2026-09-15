@@ -64,8 +64,8 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
     try {
       if (useConvexPath) {
-        const result = await convexToggle({ orgId: org!._id, productId });
-        toast.success(result.wishlisted ? 'Added to wishlist' : 'Removed from wishlist');
+        await convexToggle({ orgId: org!._id, productId });
+        // No toast: the heart fills/unfills in place.
         window.dispatchEvent(new Event('wishlistUpdated'));
         return;
       }
@@ -79,7 +79,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       setLocalItems(next);
       localStorage.setItem('wishlist', JSON.stringify(next));
       window.dispatchEvent(new Event('wishlistUpdated'));
-      toast.success(isCurrentlyWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
+      // No toast: the heart fills/unfills in place.
     } catch (error) {
       console.error('Error toggling wishlist:', error);
       toast.error('Failed to update wishlist');
@@ -95,13 +95,13 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       if (useConvexPath) {
         await convexClear({ orgId: org!._id });
         window.dispatchEvent(new Event('wishlistUpdated'));
-        toast.success('Wishlist cleared');
+        // No toast: the emptied list is the confirmation.
         return;
       }
       localStorage.setItem('wishlist', JSON.stringify([]));
       setLocalItems([]);
       window.dispatchEvent(new Event('wishlistUpdated'));
-      toast.success('Wishlist cleared');
+      // No toast: the emptied list is the confirmation.
     } catch (error) {
       console.error('Error clearing wishlist:', error);
       toast.error('Failed to clear wishlist');

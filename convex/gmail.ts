@@ -74,19 +74,50 @@ function header(msg: any, name: string): string {
   return String(h?.value || "");
 }
 
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|td|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/\s+/g, " ")
+    .replace(/\[([^\]]{1,200}?)\]\s*\(\s*https?:[^)]+\)/g, "$1")
+    .trim();
+}
+
 function extractBody(msg: any): string {
   const payload = msg?.payload;
   if (!payload) return String(msg?.snippet || "");
-  const walk = (part: any): string[] => {
-    const out: string[] = [];
-    if (part?.body?.data && String(part?.mimeType || "").includes("text/plain"))
-      out.push(b64ToText(part.body.data));
-    for (const p of part?.parts ?? []) out.push(...walk(p));
-    return out;
+  const texts: string[] = [];
+  const htmls: string[] = [];
+  const walk = (part: any): void => {
+    const mime = String(part?.mimeType || "");
+    if (part?.body?.data) {
+      if (mime.includes("text/plain")) texts.push(b64ToText(part.body.data));
+      else if (mime.includes("text/html")) htmls.push(b64ToText(part.body.data));
+    }
+    for (const p of part?.parts ?? []) walk(p);
   };
-  const texts = walk(payload);
-  if (texts.length) return texts.join("\n");
+  walk(payload);
+  if (texts.length) {
+    const plain = texts.join("\n").trim();
+    // Truncated view-source variant: the snippet carries the tail the
+    // stripped part lost (amount line sits past the cut).
+    if (/Transaction Details:\s*[ab]\.?\s*$/i.test(plain) && msg?.snippet) {
+      return `${plain}\n${String(msg.snippet)}`;
+    }
+    return plain;
+  }
   if (payload?.body?.data) return b64ToText(payload.body.data);
+  if (htmls.length) return htmlToText(htmls.join("\n"));
   return String(msg?.snippet || "");
 }
 

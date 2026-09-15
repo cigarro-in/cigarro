@@ -24,6 +24,12 @@ import { useOrg } from './lib/convex/useOrg';
 import { ThemeProvider, useTheme } from './themes';
 import { Toaster } from 'sonner';
 
+// Errors-only toast policy: success/info toasts were deleted at the call
+// sites (checkout/admin/storefront) because every one of them duplicated
+// inline UI feedback. The Toaster stays mounted for toast.error only —
+// removing it would swallow real failure messages. Do NOT re-add
+// toast.success/info/message calls; render the state in place instead.
+
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
 function LoadingSpinner() {

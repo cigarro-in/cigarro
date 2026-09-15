@@ -86,6 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const convexSetQty = useMutation(api.userState.setCartQty);
   const convexRemove = useMutation(api.userState.removeCartLine);
   const convexClear = useMutation(api.userState.clearCart);
+  const convexReplace = useMutation(api.userState.replaceCart);
   // Subscription keeps the hook reactive to server-side cart changes
   // (multi-tab / Phase-3 realtime). Local optimistic state stays primary.
   const convexLineCount = useQuery(
@@ -133,13 +134,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Adopt server-side changes (other tabs/devices) when our local state is
   // untouched by an in-flight optimistic update. Keyed on line count + total
-  // quantity so identical carts never trigger a reload loop.
+  // quantity so identical carts never trigger a reload loop. Never adopts an
+  // EMPTY server snapshot while we hold local items: the empty middle of a
+  // non-atomic replace must not wipe the UI (that was the self-wipe bug —
+  // replaceCart is atomic now, this guard covers legacy races + clearCart).
   const serverCartSig = (convexLineCount ?? [])
     .map((l) => `${l.variantId || ''}:${l.comboId || ''}:${l.productId}:${l.qty}`)
     .sort()
     .join('|');
   useEffect(() => {
     if (!useConvexPath || !isInitialized || convexLineCount === undefined) return;
+    if (convexLineCount.length === 0 && (items || []).length > 0) return;
     const localSig = (items || [])
       .map((i) => `${i.variant_id || ''}:${i.combo_id || ''}:${i.id}:${i.quantity}`)
       .sort()
@@ -234,10 +239,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const persistAllConvex = async (newItems: CartItem[]) => {
     if (!org) return;
-    await convexClear({ orgId: org._id });
-    for (const item of newItems) {
-      await convexAdd({
-        orgId: org._id,
+    // Single atomic mutation — readers never see the empty middle state
+    // that clear→N×add exposed (the self-wipe in the cart-clear storm).
+    await convexReplace({
+      orgId: org._id,
+      lines: newItems.map((item) => ({
         productId: String(item.id),
         variantId: item.variant_id ? String(item.variant_id) : undefined,
         comboId: item.combo_id ? String(item.combo_id) : undefined,
@@ -248,8 +254,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ) || 0,
         qty: Number(item.quantity ?? 1) || 1,
         imageUrl: (item as any).image ? String((item as any).image) : undefined,
-      });
-    }
+      })),
+    });
   };
 
   const loadCart = async () => {

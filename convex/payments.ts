@@ -170,7 +170,13 @@ export const ingestBankEmail = internalMutation({
       status: parsed ? "unmatched" : "parse_failed",
     });
 
-    if (!parsed) return { parsed: false, emailId };
+    if (!parsed) {
+      // No amount could be extracted at all (e.g. marketing mail). Mark
+      // separately so the admin Unmatched tab isn't flooded with statements
+      // and promos — those were never payable candidates.
+      await ctx.db.patch(emailId, { status: "ignored" });
+      return { parsed: false, emailId };
+    }
 
     // 6) Duplicate-by-UPI-ref check — same reference already processed
     if (parsed.upiRef) {
@@ -309,9 +315,25 @@ async function matchEmailToOrder(
     };
   }
 
-  // 4) No match — orphan payment for admin
-  await ctx.db.patch(emailId, { status: "no_match" });
-  return { matched: false };
+  // 4) No match — orphan payment for admin. Distinguish "nothing was
+  //    even close" (wrong amount / stale order / drift) from "close but no
+  //    cigar" (likely rounding or a fingerprint collision) so the admin tab
+  //    can say something actionable instead of a bare no_match.
+  const RUPEE = 100;
+  const pendings = await ctx.db
+    .query("orders")
+    .withIndex("by_org_status", (q) => q.eq("orgId", orgId).eq("status", "pending"))
+    .order("desc")
+    .take(200);
+  let nearest = Infinity;
+  for (const o of pendings) {
+    const d = Math.abs(o.finalAmountPaise - amountPaise);
+    if (d < nearest) nearest = d;
+  }
+  await ctx.db.patch(emailId, {
+    status: nearest <= 2 * RUPEE ? "no_match" : "no_candidate",
+  });
+  return { matched: false, nearestPaise: nearest === Infinity ? null : nearest };
 }
 
 async function markOrderPaid(

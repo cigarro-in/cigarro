@@ -47,6 +47,13 @@ export const bankEmailStatus = v.union(
   v.literal("no_match"),
   v.literal("parse_failed"),
   v.literal("duplicate"),
+  // Parseable amount but matched nothing AND no pending order was within
+  // ₹2 at ingest (diagnostic aid: usually wrong amount paid, stale order,
+  // or slot math drift — not a parser problem).
+  v.literal("no_candidate"),
+  // Nothing payable in the mail at all (statements, promos, mixed-mail
+  // digests). Excluded from the admin Unmatched tab by design.
+  v.literal("ignored"),
 );
 
 export const latePaymentStatus = v.union(

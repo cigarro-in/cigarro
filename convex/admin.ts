@@ -173,13 +173,16 @@ export const listUnmatchedEmails = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await requireOrgAdmin(ctx, orgId);
-    return await ctx.db
+    // Every non-terminal email state: parse failures, close-but-no-match,
+    // nothing-close, and legacy leftovers. Matched/duplicate/ignored are
+    // resolved by definition and stay out.
+    const rows = await ctx.db
       .query("bankEmails")
-      .withIndex("by_org_status", (q) =>
-        q.eq("orgId", orgId).eq("status", "no_match"),
-      )
+      .withIndex("by_org_status", (q) => q.eq("orgId", orgId))
       .order("desc")
-      .take(100);
+      .take(300);
+    const open = new Set(["no_match", "no_candidate", "parse_failed", "unmatched"]);
+    return rows.filter((r) => open.has(r.status)).slice(0, 100);
   },
 });
 
