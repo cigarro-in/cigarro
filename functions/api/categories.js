@@ -34,7 +34,8 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Categories API request received');
 
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from '../lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
     const bundle = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
     const brandById = new Map((bundle.brands || []).map((b) => [b.supabaseId, b]));
     const variantsByProduct = new Map();

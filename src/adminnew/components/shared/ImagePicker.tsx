@@ -19,6 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui
 import { toast } from 'sonner';
 import { cn } from '../../../components/ui/utils';
 import { uploadImageToR2, listR2Images, deleteR2Image } from '../../../lib/images/upload';
+import { confirmImageDelete } from '../../../lib/images/guard';
+import { useConvex } from 'convex/react';
 
 // ============================================================================
 // TYPES
@@ -328,10 +330,14 @@ export function ImagePicker({
     }
   };
 
+  const convex = useConvex();
+
   const deleteImage = async (e: React.MouseEvent, image: StorageImage) => {
     e.stopPropagation(); // Prevent selection when clicking delete
 
-    if (!confirm('Delete this image? This cannot be undone.')) return;
+    // Block-or-warn when a variant still references this key (orphaned
+    // cards render the "No Image" placeholder).
+    if (!(await confirmImageDelete(convex, { key: image.path, url: image.url, name: image.name }))) return;
 
     try {
       await deleteR2Image(image.path);

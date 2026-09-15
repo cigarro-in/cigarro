@@ -35,7 +35,8 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Brands API request received');
 
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from '../lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
     const bundle = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
 
     // Legacy `select('*')` row shape, name-ascending, active only.

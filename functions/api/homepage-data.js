@@ -38,7 +38,8 @@ export async function onRequest(context) {
   try {
     console.log('🔍 Homepage data request received');
 
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from '../lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
     const [bundle, heroSlides, featuredCfg, showcaseCfg, blogSecCfg, blogRows, blogCats] = await Promise.all([
       cxQuery(convexUrl, 'catalog:fullCatalog', {}),
       cxQuery(convexUrl, 'content:listHeroSlides', {}),

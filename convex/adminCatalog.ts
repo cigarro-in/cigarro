@@ -75,6 +75,43 @@ export const listProductsForAdmin = query({
   },
 });
 
+// Which catalog rows still reference an R2 object. The admin image library
+// deletes by key with no other guard; deleting a referenced key orphans the
+// variant → storefront cards fall back to the "No Image" placeholder.
+// Public read like the catalog (returns names only, no pricing).
+export const imageUsage = query({
+  args: { key: v.string(), url: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const base = args.key.split("/").pop() || args.key;
+    const hits = (s: unknown) =>
+      typeof s === "string" &&
+      (s === args.key ||
+        s === args.url ||
+        s.endsWith(`/${args.key}`) ||
+        (base.length > 0 && s.endsWith(`/${base}`)));
+    const products = await ctx.db.query("catalogProducts").collect();
+    const nameById = new Map(products.map((p) => [p.supabaseId, p.name]));
+    const variants = await ctx.db.query("catalogVariants").collect();
+    const usedBy = [];
+    let total = 0;
+    for (const x of variants) {
+      const image = (x.images || []).find(hits);
+      if (!image) continue;
+      total += 1;
+      if (usedBy.length < 10) {
+        usedBy.push({
+          productSupabaseId: x.productSupabaseId,
+          productName: nameById.get(x.productSupabaseId) ?? x.productSupabaseId,
+          variantSupabaseId: x.supabaseId,
+          variantName: x.variantName,
+          image,
+        });
+      }
+    }
+    return { usedBy, total };
+  },
+});
+
 // ---------------- Brands ----------------
 // Admin brand list with product counts (replaces the products(count) join).
 export const listBrandsForAdmin = query({

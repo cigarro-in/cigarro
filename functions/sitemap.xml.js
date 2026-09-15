@@ -31,7 +31,8 @@ export async function onRequest(context) {
   
   try {
     // Convex URL rides the same Pages env as the client bundle.
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from './lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
 
     // Generate sitemap XML
     const xml = await generateSitemap(convexUrl);

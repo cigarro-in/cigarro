@@ -120,7 +120,8 @@ export async function onRequest(context) {
 
     const msg91AuthKey = env.MSG91_AUTH_KEY;
     const edgeSecret = env.EDGE_SHARED_SECRET;
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from '../../lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
     const convexSite = (env.CONVEX_SITE_URL || convexUrl).replace('.convex.cloud', '.convex.site');
 
     if (!msg91AuthKey || !edgeSecret) {

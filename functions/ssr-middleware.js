@@ -1345,7 +1345,8 @@ export async function onRequest(context) {
   try {
     // Wave 8: all catalog reads (bot HTML + search + ?format= feeds) come
     // from Convex. Supabase is fully decoupled from this middleware.
-    const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from './lib/env.js';
+    const convexUrl = requiredConvexUrl(env);
 
     // Use static favicon path (no database fetch needed)
     const faviconUrl = 'https://cigarro.in/icons/android-chrome-512x512.png';

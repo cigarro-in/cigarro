@@ -35,7 +35,8 @@ function json(payload, status, cors) {
 
 async function requireAdmin(request, env) {
   if (env.PURGE_REQUIRE_ADMIN === 'false') return { ok: true };
-  const convexUrl = env.VITE_CONVEX_URL || 'https://proper-coyote-383.convex.cloud';
+import { requiredConvexUrl } from '../lib/env.js';
+  const convexUrl = requiredConvexUrl(env);
   const header = request.headers.get('Authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return { ok: false, error: 'Missing session' };

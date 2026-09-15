@@ -37,6 +37,8 @@ import {
   SelectValue 
 } from '../../components/ui/select';
 import { listR2Images, deleteR2Image, uploadImageToR2, uploadRawToR2 } from '../../lib/images/upload';
+import { confirmImageDelete } from '../../lib/images/guard';
+import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -148,8 +150,12 @@ export function AssetManager() {
     }
   };
 
+  const convex = useConvex();
+
   const handleDeleteAsset = async (asset: Asset) => {
-    if (!confirm(`Are you sure you want to delete "${asset.name}"?`)) return;
+    // Block-or-warn when a variant still references this key (orphaned
+    // cards render the "No Image" placeholder).
+    if (!(await confirmImageDelete(convex, { key: asset.path, url: asset.public_url, name: asset.name }))) return;
 
     try {
       await deleteR2Image(asset.path);
