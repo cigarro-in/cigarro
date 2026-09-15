@@ -24,8 +24,6 @@ import {
   BlogFormPage,
   HeroSlideFormPage,
   PaymentsPage,
-  UnmatchedEmailsPage,
-  PaymentSettingsPage,
 } from './pages';
 
 /**
@@ -48,8 +46,9 @@ export const ADMIN_ROUTES = [
   { path: '/admin/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
   { path: '/admin/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
   { path: '/admin/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
-  { path: '/admin/payments/unmatched', element: UnmatchedEmailsPage, label: 'Unmatched Emails', section: 'payments' },
-  { path: '/admin/payments/settings', element: PaymentSettingsPage, label: 'Payment Settings', section: 'payments' },
+  // Deep links into the Payments tabs (single page, tab picked from the path).
+  { path: '/admin/payments/unmatched', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/admin/payments/settings', element: PaymentsPage, label: 'Payments', section: 'payments' },
 ] as const;
 
 export function AdminRouter() {
