@@ -133,7 +133,8 @@ function extractFromTemplate(
   if (t.payerNameRegex) {
     const re = safeRegex(t.payerNameRegex);
     const m = re && text.match(re);
-    if (m) payerName = m[1].trim().replace(/\s+/g, " ");
+    // Alternation templates capture the name in group 1 or 2 by variant.
+    if (m) payerName = (m[1] ?? m[2])?.trim().replace(/\s+/g, " ");
   }
 
   return {
@@ -199,18 +200,24 @@ export const SYSTEM_TEMPLATES: Omit<BankEmailTemplate, "_id">[] = [
   {
     bankKey: "hdfc",
     label: "HDFC Bank UPI credit alert",
-    senderRegex: "@hdfcbank\\.bank\\.in|@hdfcbank\\.net",
+    senderRegex: "@hdfcbank\\.bank\\.in|@hdfcbank\\.net|alerts@hdfcbank",
     // HDFC subject observed: "Account update for your HDFC Bank A/c"
     // Client may prefix with "View:" so make subject optional / lenient.
     subjectRegex: "account\\s+update|upi|credited",
+    // Real bodies vary: "Rs.1.55 has been successfully credited" (new) and
+    // "Rs.41.07 ... is successfully credited" (old). Both must match.
     amountRegex:
-      "Rs\\.?\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s+is\\s+successfully\\s+credited",
+      "Rs\\.?\\s*([0-9,]+(?:\\.[0-9]{1,2})?)\\s+(?:has\\s+been\\s+|is\\s+)?successfully\\s+credited",
+    // "UPI Reference No.: 662405881995" (new) and
+    // "UPI transaction reference number is 123..." (old).
     refRegex:
-      "UPI\\s+transaction\\s+reference\\s+number\\s+is\\s+([0-9]{6,})",
-    payerVpaRegex: "by\\s+VPA\\s+([A-Za-z0-9._\\-]+@[A-Za-z0-9.\\-]+)",
-    // Name appears after the VPA, before " on <date>". All-caps or Title.
+      "(?:UPI\\s+(?:transaction\\s+)?(?:reference|ref)(?:\\s+no\\.?|\\s+number)?|UPI\\s+Ref)[^0-9]{0,10}([0-9]{6,})",
+    // "Sender: NAME (VPA: xxx)" (new) and "by VPA xxx" (old).
+    payerVpaRegex: "(?:by\\s+VPA|VPA\\s*:?)\\s*([A-Za-z0-9._\\-]+@[A-Za-z0-9.\\-]+)",
+    // Name appears after the VPA, before " on <date>" (old), or after
+    // "Sender:" before "(VPA" (new). Group 1 or 2 captures by variant.
     payerNameRegex:
-      "by\\s+VPA\\s+[A-Za-z0-9._\\-]+@[A-Za-z0-9.\\-]+\\s+([A-Za-z][A-Za-z .'\\-]+?)\\s+on\\s+\\d",
+      "Sender\\s*:\\s*([A-Za-z][A-Za-z .'\\-]+?)\\s*\\(VPA|by\\s+VPA\\s+[A-Za-z0-9._\\-]+@[A-Za-z0-9.\\-]+\\s+([A-Za-z][A-Za-z .'\\-]+?)\\s+on\\s+\\d",
     creditOnly: false,
     debitGuardRegex: "\\bdebited\\b|\\bwithdrawn\\b|\\bDr\\.\\s",
     priority: 10,

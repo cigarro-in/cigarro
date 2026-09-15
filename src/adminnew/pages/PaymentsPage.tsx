@@ -272,6 +272,7 @@ function UnmatchedTab(props: { emails: any[] | undefined }) {
 }
 
 function BankEmailRow({ email }: { email: any }) {
+  const [open, setOpen] = useState(false);
   const statusColor =
     email.status === 'matched' ? 'bg-green-100 text-green-800' :
     email.status === 'duplicate' ? 'bg-yellow-100 text-yellow-800' :
@@ -311,6 +312,17 @@ function BankEmailRow({ email }: { email: any }) {
         )}
         {email.subject && (
           <div className="text-xs text-gray-500 italic truncate">{email.subject}</div>
+        )}
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="mt-1 text-xs text-blue-600 hover:underline"
+        >
+          {open ? 'Hide full email' : 'View full email'}
+        </button>
+        {open && email.rawBody && (
+          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words max-h-96 overflow-auto rounded border bg-gray-50 p-3 font-mono">
+            {email.rawBody}
+          </pre>
         )}
       </div>
       <div className="text-xs text-gray-500 shrink-0">

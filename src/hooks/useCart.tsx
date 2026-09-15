@@ -567,6 +567,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const clearCart = async () => {
+    // Skip the server round-trip when the cart is already empty: the
+    // Transaction page calls this on every mount, and each no-op delete
+    // was a full mutation + listCart re-fire in the prod log stream.
+    if ((items || []).length === 0) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       await saveCart([]);

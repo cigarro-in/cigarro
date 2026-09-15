@@ -369,6 +369,10 @@ export const clearCart = mutation({
         q.eq("orgId", args.orgId).eq("userId", userId),
       )
       .collect();
+    // Idempotent: callers fire clear on every visit to /transaction
+    // (mount + StrictMode remount + countdown re-renders). Skipping the
+    // writes when already empty stops the no-op delete storm in prod logs.
+    if (lines.length === 0) return 0;
     await Promise.all(lines.map((l) => ctx.db.delete(l._id)));
     return lines.length;
   },

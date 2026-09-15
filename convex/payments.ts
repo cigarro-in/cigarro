@@ -171,6 +171,21 @@ export const ingestBankEmail = internalMutation({
     });
 
     if (!parsed) {
+      // Re-check: this row may be a re-ingest of an email that already
+      // errored. But a row with amountPaise > 0 / upiRef / amount-like text
+      // is a TEMPLATE gap, not junk — keep it visible as unmatched so the
+      // admin tab + seed-sync can act on it instead of silently ignoring.
+      const looksPayable =
+        /rs\.?\s*[0-9]|inr\s*[0-9]|₹\s*[0-9]|credited|upi\s+ref/i.test(body);
+      if (looksPayable) {
+        await ctx.db.patch(emailId, { status: "unmatched" });
+        return await matchEmailToOrder(ctx, emailId, orgId, {
+          amountPaise: 0,
+          upiRef: undefined,
+          payerVpa: undefined,
+          payerName: undefined,
+        });
+      }
       // No amount could be extracted at all (e.g. marketing mail). Mark
       // separately so the admin Unmatched tab isn't flooded with statements
       // and promos — those were never payable candidates.
