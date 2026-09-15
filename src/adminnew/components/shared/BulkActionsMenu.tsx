@@ -21,7 +21,7 @@ interface BulkActionsMenuProps {
 export function BulkActionsMenu({ selectedIds, actions }: BulkActionsMenuProps) {
   if (selectedIds.length === 0 || actions.length === 0) return null;
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
           Actions ({selectedIds.length})

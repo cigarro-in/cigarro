@@ -556,7 +556,7 @@ export function AssetManager() {
 
                   {/* Actions */}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 bg-white/90">
                           <MoreHorizontal className="h-4 w-4" />
@@ -601,9 +601,26 @@ export function AssetManager() {
                       onCheckedChange={() => toggleSelect(asset.id)}
                       aria-label={`Select ${asset.name}`}
                     />
-                    <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded">
-                      {getFileIcon(asset.content_type)}
-                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        setShowPreview(true);
+                      }}
+                      className="shrink-0"
+                      aria-label={`Preview ${asset.name}`}
+                    >
+                      {asset.content_type.startsWith('image/') && asset.public_url ? (
+                        <ImageWithFallback
+                          src={asset.public_url}
+                          alt={asset.name}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded">
+                          {getFileIcon(asset.content_type)}
+                        </div>
+                      )}
+                    </button>
                     <div>
                       <p className="font-medium text-gray-900">{asset.name}</p>
                       <p className="text-sm text-gray-500">

@@ -249,7 +249,7 @@ export function BlogsPage() {
               {selectedPosts.length} selected
             </span>
             <div className="flex-1" />
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
                   Change Status <ChevronDown className="ml-2 h-4 w-4" />
