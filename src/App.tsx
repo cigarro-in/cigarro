@@ -22,6 +22,7 @@ import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
 import { ThemeProvider, useTheme } from './themes';
+import { Toaster } from 'sonner';
 
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
@@ -278,6 +279,7 @@ export default function App() {
               <CartProvider>
                 <ThemeProvider>
                   <AppContent />
+                  <Toaster richColors closeButton position="top-center" />
                 </ThemeProvider>
               </CartProvider>
             </WishlistProvider>
