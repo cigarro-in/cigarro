@@ -21,7 +21,9 @@ export function buildUpiUrl({
     am: paiseToRupees(amountPaise).toFixed(2),
     cu: "INR",
     tr: referenceId,
-    ...(note ? { tn: note } : {}),
+    // tn echoes the ref into the payer's app + the bank alert text, which is
+    // what the email templates actually parse. Belt and suspenders with tr.
+    tn: note ?? `Order ${referenceId}`,
   });
   return `upi://pay?${params.toString()}`;
 }

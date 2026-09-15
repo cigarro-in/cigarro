@@ -163,7 +163,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
         }));
 
         if (addr.postcode) fetchLocationFromPincode(addr.postcode);
-        toast.success('Location updated!');
+        // No toast: the form fields filling in IS the confirmation.
       }
     } catch (error) {
       console.error('Location error:', error);

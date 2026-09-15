@@ -56,7 +56,7 @@ export function OrderSummary({
     setWalletAmountToUse(amount);
     setShowCustomInput(false);
     setCustomAmount('');
-    toast.success(`Using ${formatINR(amount)} from wallet`);
+    // No toast: the wallet deduction line item renders in place.
   };
 
   return (
@@ -109,7 +109,7 @@ export function OrderSummary({
                 onCheckedChange={(checked) => {
                   if (checked) {
                     setWalletAmountToUse(Math.min(walletBalance, getFinalTotal()));
-                    toast.success('Wallet applied');
+                    // No toast: the deduction line item appears in place.
                   } else {
                     setWalletAmountToUse(0);
                     setShowCustomInput(false);

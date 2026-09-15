@@ -210,7 +210,27 @@ async function matchEmailToOrder(
 ) {
   const { amountPaise, upiRef, payerVpa, payerName } = parsed;
 
-  // 1) Exact match on a pending order at that amount
+  // 0) UPI ref first: exact, collision-proof, amount-independent. Our
+  //    deeplink sets tr=<displayOrderId>, but the bank's credit alert
+  //    carries the BANK's ref (UTR/RRN), not our tr — so this only hits
+  //    when a template was explicitly taught the mapping. Falls through
+  //    to amount matching otherwise.
+  if (upiRef) {
+    const byRef = await ctx.db
+      .query("orders")
+      .withIndex("by_display_id", (q) => q.eq("displayOrderId", upiRef))
+      .first();
+    if (byRef && byRef.orgId === orgId && byRef.status === "pending") {
+      await markOrderPaid(ctx, byRef, emailId, "paid", { upiRef, payerVpa, payerName });
+      return { matched: true, orderId: byRef._id, via: "upi_ref" };
+    }
+  }
+
+  // 1) Exact amount match on a pending order (lucky-paisa fingerprint).
+  //    No tolerance window: UPI carries paise and templates parse them, so
+  //    the alert amount equals finalAmountPaise to the paisa. A ±window
+  //    would MERGE distinct orders (same cart total, different lucky paise)
+  //    into one match — exactness is the whole point of the fingerprint.
   const pending = await ctx.db
     .query("orders")
     .withIndex("by_org_final_status", (q) =>

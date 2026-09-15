@@ -105,6 +105,12 @@ export const createOrder = mutation({
     walletAmountPaise: v.optional(v.number()),
     discountPaise: v.optional(v.number()),
     discountLabel: v.optional(v.string()),
+    // Lucky discount 1–99 paise, generated client-side per order. It doubles
+    // as the payment fingerprint: UPI carries paise, so cart totals that
+    // collide at the rupee level stay distinguishable in bank emails, which
+    // match finalAmountPaise exactly. Must be 1–99, never 0/100+ —
+    // 0 collides across orders, 100+ shifts the rupee figure.
+    luckyPaise: v.optional(v.number()),
     retryOfOrderId: v.optional(v.id("orders")),
     idempotencyKey: v.optional(v.string()),
     shippingMethod: v.optional(v.string()),
@@ -156,15 +162,22 @@ export const createOrder = mutation({
     if (cartTotal <= 0)
       throw new ConvexError({ code: "ZERO_AMOUNT" });
 
-    // Discounts (lucky + coupon) are computed + displayed client-side from
-    // the discounts table. Clamp so a stale/tampered client can't drive the
-    // payable negative — and subtract BEFORE wallet/slot math so the UPI
-    // deeplink, /transaction timer amount, and bank-email match all see the
+    // Discounts (coupon) are computed + displayed client-side from the
+    // discounts table. Clamp so a stale/tampered client can't drive the
+    // payable negative — and subtract BEFORE wallet math so the UPI
+    // deeplink, /transaction amount, and bank-email match all see the
     // same discounted total the customer approved at checkout.
     const discountPaise = Math.max(
       0,
       Math.min(Math.floor(args.discountPaise ?? 0), cartTotal),
     );
+
+    // Lucky discount doubles as the payment fingerprint (see arg docs):
+    // validate strictly, floor to >= 1 when wallet math would zero the base.
+    let luckyPaise = Math.floor(args.luckyPaise ?? 0);
+    if (!Number.isInteger(luckyPaise) || luckyPaise < 1 || luckyPaise > 99) {
+      throw new ConvexError({ code: "BAD_LUCKY_PAISE", value: args.luckyPaise });
+    }
 
     // Wallet debit (purchase only; wallet_load cannot use wallet)
     let walletDebit = 0;
@@ -172,6 +185,9 @@ export const createOrder = mutation({
       if (!org.walletEnabled)
         throw new ConvexError({ code: "WALLET_DISABLED" });
       walletDebit = Math.min(args.walletAmountPaise!, cartTotal - discountPaise);
+      // Never let wallet eat the lucky paise: the fingerprint must survive
+      // in the UPI amount or email matching can't tell orders apart.
+      walletDebit = Math.max(0, Math.min(walletDebit, cartTotal - discountPaise - luckyPaise));
       await debitWallet(ctx, {
         orgId: args.orgId,
         userId,
@@ -181,10 +197,11 @@ export const createOrder = mutation({
       });
     }
 
-    const baseAmount = cartTotal - discountPaise - walletDebit;
+    const baseAmount = cartTotal - discountPaise - luckyPaise - walletDebit;
     const displayOrderId = genDisplayOrderId();
 
-    // Fully-paid-by-wallet: no slot, no UPI, immediately paid.
+    // Fully-paid-by-wallet: no UPI, immediately paid. No slot needed — the
+    // lucky discount still applies (customer keeps the saving).
     if (baseAmount === 0) {
       const orderId = await ctx.db.insert("orders", {
         orgId: args.orgId,
@@ -218,14 +235,10 @@ export const createOrder = mutation({
       };
     }
 
-    // UPI / mixed path: allocate slot (with ±1 rupee fallback on exhaustion)
-    const { slot, effectiveBasePaise } = await allocateSlot(
-      ctx,
-      args.orgId,
-      baseAmount,
-      org.slotsPerBase,
-    );
-    const finalAmount = effectiveBasePaise + slot.slot;
+    // UPI / mixed path: the payable IS the fingerprint — no additive slot.
+    // Lucky paise keep same-rupee totals distinct for exact email matching.
+    // Slot tables stay only for legacy rows.
+    const finalAmount = baseAmount;
 
     // Pick a VPA — prefer active entry in paymentVpas, fall back to org.upiVpa.
     const activeVpa = await ctx.db
@@ -253,14 +266,16 @@ export const createOrder = mutation({
       address: args.address,
       cartTotalPaise: cartTotal,
       walletDebitPaise: walletDebit,
-      discountPaise,
+      discountPaise: discountPaise + luckyPaise,
       discountLabel: args.discountLabel,
       shippingMethod: args.shippingMethod,
       shippingPricePaise: args.shippingPricePaise,
-      baseAmountPaise: effectiveBasePaise,
-      slotOffsetPaise: slot.slot,
+      // Legacy fingerprint columns, now vestigial: no slot is held, so the
+      // base IS the final. Kept populated so old indexes/queries keep working.
+      baseAmountPaise: finalAmount,
+      slotOffsetPaise: 0,
       finalAmountPaise: finalAmount,
-      slotId: slot._id,
+      slotId: undefined,
       upiUrl,
       status: "pending",
       createdAt: Date.now(),
@@ -275,12 +290,6 @@ export const createOrder = mutation({
     if (walletDebit > 0) {
       await linkLatestDebitToOrder(ctx, args.orgId, userId, orderId);
     }
-
-    await ctx.db.patch(slot._id, {
-      state: "held",
-      orderId,
-      heldAt: Date.now(),
-    });
 
     await ctx.scheduler.runAfter(
       org.slotTimeoutMs,
@@ -365,6 +374,8 @@ export const cancelOrder = mutation({
 
     if (!order.slotId) return;
 
+    // Legacy slot rows (pre-lucky-fingerprint orders) still go through the
+    // quarantine path; new orders never hold a slot so this is a no-op.
     if (userOpenedUpiApp) {
       // Payment may still arrive — quarantine
       await ctx.db.patch(order.slotId, {
@@ -395,7 +406,11 @@ export const retryOrder = mutation({
       throw new ConvexError({ code: "NOT_RETRYABLE", status: old.status });
 
     // Delegate to createOrder. Wallet not reapplied automatically — user
-    // can choose to reapply on the checkout UI if they want.
+    // can choose to reapply on the checkout UI if they want. Lucky re-rolls
+    // per attempt so the new order gets a fresh fingerprint. Coupon vs lucky
+    // can't be told apart here (both live in discountPaise), so the retry
+    // keeps the whole discount: worst case the new order is up to 99p cheaper
+    // than the original — never more expensive, never a matching hazard.
     return await ctx.runMutation(api.orders.createOrder, {
       orgId: old.orgId,
       kind: old.kind,
@@ -404,6 +419,7 @@ export const retryOrder = mutation({
       walletAmountPaise: 0,
       discountPaise: old.discountPaise,
       discountLabel: old.discountLabel,
+      luckyPaise: 1 + Math.floor(Math.random() * 99),
       retryOfOrderId: oldOrderId,
     });
   },

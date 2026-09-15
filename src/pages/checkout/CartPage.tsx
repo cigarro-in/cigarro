@@ -52,7 +52,7 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
   const handleRemove = async () => {
     try {
       await removeFromCart(item.id, item.variant_id, item.combo_id);
-      toast.success('Item removed from cart');
+      // No toast: the row animates out; removal is self-evident.
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error('❌ Failed to remove item:', error);

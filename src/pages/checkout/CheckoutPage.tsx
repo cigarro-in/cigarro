@@ -307,7 +307,7 @@ export function CheckoutPage() {
       
       if (discount && discount.is_applicable) {
         setAppliedDiscount(discount);
-        toast.success(`Coupon applied! You saved ${formatINR(discount.discount_amount ?? discount.discount_value ?? 0)}`);
+        // No toast: the coupon row + total update in place; success is visible.
       } else {
         setDiscountError(discount?.reason || 'Coupon not applicable');
       }
@@ -323,7 +323,7 @@ export function CheckoutPage() {
     setAppliedDiscount(null);
     setCouponCode('');
     setDiscountError('');
-    toast.success('Coupon removed');
+    // No toast: the coupon row disappears and the total updates in place.
   };
 
   const preloadQRCode = async () => {
@@ -466,9 +466,7 @@ export function CheckoutPage() {
           state: '',
           pincode: ''
         }));
-
-        // Show success message
-        toast.success(`Location found: ${office.District}, ${office.State}`);
+        // No toast: city/state filling in IS the confirmation.
       } catch (error) {
         console.error('Error fetching location from pincode:', error);
         setValidationErrors(prev => ({
@@ -499,7 +497,7 @@ export function CheckoutPage() {
 
       const { latitude, longitude } = position.coords;
       setCurrentLocationData({ lat: latitude, lng: longitude });
-      toast.info('📍 Found location, fetching address...');
+      // No toast: the spinner + fields filling in are the feedback.
 
       // Use Nominatim for reverse geocoding
       const response = await fetch(
@@ -557,8 +555,7 @@ export function CheckoutPage() {
         if (pincode && pincode.length === 6) {
           await fetchLocationFromPincode(pincode);
         }
-
-        toast.success('📍 Location details found!');
+        // No toast: the form fields filling in IS the confirmation.
       } else {
         throw new Error('Incomplete address data received');
       }
@@ -598,7 +595,7 @@ export function CheckoutPage() {
         userProvidedAddress: addressData.userProvidedAddress || addressData.address,
       } as FlatAddress);
       loadSavedAddresses(true); // Skip auto-fill when saving new address
-      toast.success('Address saved successfully!');
+      // No toast: the address list updating is the confirmation.
     } catch (error: any) {
       console.error('Error saving address:', error);
       toast.error(error?.message || 'Failed to save address');
@@ -646,7 +643,7 @@ export function CheckoutPage() {
       await setStoreDefaultAddress(addressId);
       // Reload addresses
       await loadSavedAddresses(true); // Skip auto-fill when updating primary address
-      toast.success('Primary address updated');
+      // No toast: the primary badge moving is the confirmation.
     } catch (error) {
       console.error('Error setting primary address:', error);
       toast.error('Failed to set primary address');
@@ -665,7 +662,7 @@ export function CheckoutPage() {
 
     try {
       await deleteStoreAddress(addressId);
-      toast.success('Address deleted successfully');
+      // No toast: the row disappearing is the confirmation.
       loadSavedAddresses(true); // Skip auto-fill when deleting address
       // Clear selection if this address was selected
       if (selectedSavedAddress === addressId) {
@@ -728,7 +725,7 @@ export function CheckoutPage() {
         latitude: currentLocationData?.lat,
         longitude: currentLocationData?.lng,
       } as FlatAddress);
-      toast.success(`Address saved as "${addressLabel}" for future orders`);
+      // No toast: order success screen is confirmation enough; saving is silent.
       // Reload addresses to update the UI
       await loadSavedAddresses(true);
     } catch (error) {
@@ -762,7 +759,7 @@ export function CheckoutPage() {
     // Check for duplicates
     const isDuplicate = await checkForDuplicateAddress();
     if (isDuplicate) {
-      toast.info('This address is already saved');
+      // No toast: the save-suggestion row just hides; nothing changed.
       setShowSaveSuggestion(false);
       return;
     }
@@ -791,11 +788,11 @@ export function CheckoutPage() {
           longitude: currentLocationData?.lng,
           userProvidedAddress: formData.address,
         } as FlatAddress);
-        toast.success('Address updated');
         setShowSaveSuggestion(false);
         setIsNewAddress(false);
         setEditingAddressId(null);
         loadSavedAddresses(true);
+        // No toast: the form closing + address selected is the confirmation.
         return;
       }
 
@@ -813,7 +810,7 @@ export function CheckoutPage() {
         userProvidedAddress: formData.address,
       } as FlatAddress);
 
-      toast.success(`Address saved as "${addressLabel}"`);
+      // No toast: the save-suggestion row hiding is the confirmation.
       setShowSaveSuggestion(false);
       setIsNewAddress(false);
       setEditingAddressId(null);
@@ -937,7 +934,7 @@ export function CheckoutPage() {
         })
       );
       if (convexItems.some((it, i) => it.unitPricePaise !== rupeesToPaise(Number((items[i] as any).variant_price ?? (items[i] as any).combo_price ?? (items[i] as any).price ?? 0)))) {
-        toast.info('Prices refreshed from the latest catalog');
+        // No toast: prices refresh silently; the summary re-renders with them.
       }
 
       const result = await createConvexOrder({
@@ -945,8 +942,12 @@ export function CheckoutPage() {
         kind: 'purchase',
         items: convexItems,
         address,
-        discountPaise: rupeesToPaise(totalDiscountAmount),
-        discountLabel: appliedDiscount?.discount_name ?? (randomDiscount > 0 ? 'Lucky Discount' : undefined),
+        discountPaise: rupeesToPaise(couponDiscountAmount),
+        discountLabel: appliedDiscount?.discount_name ?? undefined,
+        // Lucky 1–99p: the customer-visible discount AND the server-side
+        // payment fingerprint (orders.ts validates 1–99, strips it from the
+        // payable before wallet/slot math — total only ever goes DOWN).
+        luckyPaise: rupeesToPaise(randomDiscount),
         shippingMethod: activeShippingId,
         shippingPricePaise: rupeesToPaise(shippingCost),
       });
@@ -1003,7 +1004,7 @@ export function CheckoutPage() {
     
     try {
       await navigator.clipboard.writeText(upiURL);
-      toast.success(`Payment link copied to clipboard! Share it via ${method}.`);
+      // No toast: clipboard write is user-initiated + visible; skip the noise.
     } catch (error) {
       console.error('Failed to copy link:', error);
       toast.error('Failed to copy payment link');
@@ -1669,8 +1670,10 @@ export function CheckoutPage() {
                           onClick={() => {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
                             const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
-                            navigator.clipboard.writeText(upiURL);
-                            toast.success('UPI link copied to clipboard');
+                            navigator.clipboard.writeText(upiURL).catch(() => {
+                              toast.error('Copy failed — long-press the QR instead');
+                            });
+                            // No success toast: clipboard write is user-initiated.
                           }}
                           className="w-full"
                         >

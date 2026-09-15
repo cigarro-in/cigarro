@@ -260,7 +260,7 @@ export function MobileCheckoutPage() {
       });
 
       if (data.success) {
-        toast.success('Referral code applied successfully!');
+        // No toast: the "Referral code activated" line renders in place.
         setReferralApplied(true);
         setShowReferralInput(false);
         setReferralCode('');
@@ -446,7 +446,7 @@ export function MobileCheckoutPage() {
 
       if (result.isValid && result.discount) {
         setAppliedDiscount(result.discount);
-        toast.success(`Coupon applied! You saved ₹${result.discount.discount_amount ?? result.discount.discount_value ?? 0}`);
+        // No toast: the "✓ Coupon applied" line + total update in place.
       } else {
         toast.error(result.message || 'Invalid coupon code');
       }
@@ -514,8 +514,10 @@ export function MobileCheckoutPage() {
         items: buildConvexItems(),
         address,
         walletAmountPaise,
-        discountPaise: luckyPaise + couponPaise,
-        discountLabel: couponName ?? (randomDiscount > 0 ? 'Lucky Discount' : undefined),
+        discountPaise: couponPaise,
+        discountLabel: couponName ?? undefined,
+        // Lucky 1–99p: visible discount + server-side payment fingerprint.
+        luckyPaise,
         shippingMethod: activeShippingId,
         shippingPricePaise: rupeesToPaise(getShippingCost()),
       });

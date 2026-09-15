@@ -175,7 +175,7 @@ export function AddressManager({
       });
 
       const { latitude, longitude } = position.coords;
-      toast.info('📍 Found location, fetching address...');
+      // No toast: the form fills in place; the spinner + fields are the feedback.
 
       // Use Nominatim for reverse geocoding
       const response = await fetch(
@@ -218,8 +218,7 @@ export function AddressManager({
         if (pincode && pincode.length === 6) {
           await fetchLocationFromPincode(pincode);
         }
-
-        toast.success('📍 Location details found!');
+        // No toast: the form fields filling in IS the confirmation.
       } else {
         throw new Error('Incomplete address data received');
       }
@@ -270,8 +269,7 @@ export function AddressManager({
       if (selectedAddress?.id === addressId) {
         onAddressSelect(null as any);
       }
-
-      toast.success('Address deleted successfully');
+      // No toast: the row disappearing + selection clearing is the feedback.
     } catch (error) {
       console.error('Error deleting address:', error);
       toast.error('Failed to delete address');
@@ -333,8 +331,7 @@ export function AddressManager({
       onAddressSelect(data);
       setShowAddNewDialog(false);
       resetForm();
-      
-      toast.success(editingAddress ? '✅ Address updated!' : '✅ Address saved!');
+      // No toast: the dialog closes and the address appears selected.
     } catch (error) {
       console.error('Error saving address:', error);
       toast.error('Failed to save address. Please try again.');
@@ -484,7 +481,7 @@ export function AddressManager({
                         onClick={() => {
                           onAddressSelect(address);
                           onDialogChange(false);
-                          toast.success(`📍 ${address.label} address selected`);
+                          // No toast: the dialog closes onto the chosen address.
                         }}
                         className="w-full p-3 text-left hover:bg-muted/20 transition-all"
                       >

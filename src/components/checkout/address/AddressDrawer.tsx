@@ -56,7 +56,7 @@ export const AddressDrawer = memo(function AddressDrawer({
       });
       const savedData = { ...addressData, ...saved } as Address;
 
-      toast.success(addressData.id ? 'Address updated' : 'Address added');
+      // No toast: the drawer returns to the list with the address selected.
 
       await onAddressesUpdate();
 
