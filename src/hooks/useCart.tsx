@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
 import { useConvex, useMutation, useQuery } from 'convex/react';
@@ -87,7 +87,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const org = useOrg();
   const convex = useConvex();
+  // Mirror of items for mutation closures. Rapid +/- taps used to build
+  // each persist from a stale `items` snapshot, so the second full-replace
+  // overwrote the first (lost updates). Mutators read/write the ref and
+  // persists run through a FIFO queue — ponytail: in-memory chain, no lib.
+  const itemsRef = useRef<CartItem[]>([]);
+  const opQueue = useRef<Promise<void>>(Promise.resolve());
 
+  const setItemsSync = (next: CartItem[]) => {
+    itemsRef.current = next;
+    setItems(next);
+  };
+
+  const persistSnapshot = async (snapshot: CartItem[]) => {
+    if (!user) {
+      localStorage.setItem('cart', JSON.stringify(snapshot));
+      return;
+    }
+    if (!org) {
+      // Org transiently unresolved: keep a device-local backup; the Convex
+      // path merges it on the next load once org resolves.
+      localStorage.setItem('cart', JSON.stringify(snapshot));
+      return;
+    }
+    await persistAllConvex(snapshot);
+  };
+
+  const enqueuePersist = (snapshot: CartItem[]): Promise<void> => {
+    const run = opQueue.current.then(() => persistSnapshot(snapshot));
+    opQueue.current = run.catch(() => {});
+    return run;
+  };
   const useConvexPath = !!user && !!org;
   const convexAdd = useMutation(api.userState.addToCart);
   const convexSetQty = useMutation(api.userState.setCartQty);
@@ -275,17 +305,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         try {
           const parsedCart = JSON.parse(savedCart);
           if (!Array.isArray(parsedCart)) throw new Error('Cart must be an array');
-          setItems(parsedCart.map((item) => ({
+          setItemsSync(parsedCart.map((item) => ({
             ...item,
             quantity: normalizeCartQuantity(item?.quantity),
           })));
         } catch (error) {
           console.error('Failed to parse cart from localStorage:', error);
           localStorage.removeItem('cart');
-          setItems([]);
+          setItemsSync([]);
         }
       } else {
-        setItems([]);
+        setItemsSync([]);
       }
       return;
     }
@@ -293,6 +323,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Convex path: server lines -> rehydrate -> merge guest cart
     // Convex: server lines -> rehydrate rich items -> merge guest cart.
     if (useConvexPath && org) {
+      // Subscription not loaded yet: an empty snapshot here is "unknown",
+      // not "empty server cart". Show the device-local cart without
+      // persisting so we never overwrite server lines with guest-only
+      // state. The serverCartSig effect re-runs loadCart once lines arrive.
+      if (convexLineCount === undefined) {
+        const savedCart = localStorage.getItem('cart');
+        if (savedCart) {
+          try {
+            const parsedCart = JSON.parse(savedCart);
+            if (Array.isArray(parsedCart)) {
+              setItemsSync(parsedCart.map((item) => ({
+                ...item,
+                quantity: normalizeCartQuantity(item?.quantity),
+              })));
+              return;
+            }
+          } catch {
+            /* fall through to empty */
+          }
+        }
+        setItemsSync([]);
+        return;
+      }
       try {
         const guestCart = localStorage.getItem('cart');
         const parsedGuestCart = guestCart ? JSON.parse(guestCart) : [];
@@ -333,40 +386,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
               merged.push(guestItem);
             }
           }
-          setItems(merged);
+          setItemsSync(merged);
           localStorage.removeItem('cart');
           await persistAllConvex(merged);
         } else {
-          setItems(serverItems);
+          setItemsSync(serverItems);
         }
       } catch (error) {
         console.error('Failed to load cart:', error);
-        setItems([]);
+        setItemsSync([]);
       }
     }
-  };
-
-  const saveCartToServer = async (newItems: CartItem[]) => {
-    if (!user) return;
-    if (!org) {
-      // Org transiently unresolved: keep a device-local backup; the Convex
-      // path merges it on the next load once org resolves.
-      localStorage.setItem('cart', JSON.stringify(newItems));
-      return;
-    }
-    await persistAllConvex(newItems);
-  };
-
-  const saveCart = async (newItems: CartItem[]) => {
-    setItems(newItems);
-
-    if (!user) {
-      // Save to localStorage for guests
-      localStorage.setItem('cart', JSON.stringify(newItems));
-      return;
-    }
-
-    await saveCartToServer(newItems);
   };
 
   const addToCart = async (product: Product, quantity = 1, variantId?: string, comboId?: string) => {
@@ -378,8 +408,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         variantId = defaultVariant.id;
       }
     }
-    // Optimistic update - update UI immediately
-    const existingItem = items.find(item =>
+    // Optimistic update from the ref mirror, then a serialized persist so
+    // rapid taps build on the latest snapshot instead of a stale closure.
+    const previous = itemsRef.current;
+    const existingItem = previous.find(item =>
       item.id === product.id &&
       item.variant_id === variantId &&
       item.combo_id === comboId
@@ -387,7 +419,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     let newItems: CartItem[];
 
     if (existingItem) {
-      newItems = items.map(item =>
+      newItems = previous.map(item =>
         item.id === product.id && item.variant_id === variantId && item.combo_id === comboId
           ? { ...item, quantity: normalizeCartQuantity(item.quantity + quantity) }
           : item
@@ -417,40 +449,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
         combo_name: (product as any).combo_name || undefined,
         combo_price: (product as any).combo_price || undefined
       };
-      newItems = [...items, newItem];
+      newItems = [...previous, newItem];
     }
 
     // Update UI immediately
-    setItems(newItems);
+    setItemsSync(newItems);
 
     // Dispatch event to auto-show mini cart
     window.dispatchEvent(new CustomEvent('cartItemAdded'));
 
-    // Save in background
+    // Persist in FIFO order — concurrent taps queue instead of racing.
+    // Analytics stays outside the revert scope: a tracking failure must
+    // never roll back a persisted cart.
     try {
-      if (!user) {
-        localStorage.setItem('cart', JSON.stringify(newItems));
-      } else {
-        await saveCartToServer(newItems);
-      }
-      // GA4: every add path funnels through here (PLP quick-add, PDP,
-      // vivid cards, combos). Resolve the sold variant's rupee price —
-      // default variant when none was picked — so hits are honest.
-      const soldVariant = (product.product_variants || []).find((v: any) => v.id === (variantId ?? comboId))
-        ?? (product.product_variants || []).find((v: any) => v.is_default)
-        ?? (product.product_variants || [])[0];
-      trackAddToCart(mapCartItem({
-        ...product,
-        variant_name: (product as any).variant_name ?? soldVariant?.variant_name,
-        variant_price: (product as any).variant_price ?? (product as any).combo_price ?? soldVariant?.price ?? (product as any).price ?? 0,
-        quantity,
-      }));
+      await enqueuePersist(newItems);
     } catch (error) {
       // Revert on error
-      setItems(items);
+      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
+    // GA4: every add path funnels through here (PLP quick-add, PDP,
+    // vivid cards, combos). Resolve the sold variant's rupee price —
+    // default variant when none was picked — so hits are honest.
+    const soldVariant = (product.product_variants || []).find((v: any) => v.id === (variantId ?? comboId))
+      ?? (product.product_variants || []).find((v: any) => v.is_default)
+      ?? (product.product_variants || [])[0];
+    trackAddToCart(mapCartItem({
+      ...product,
+      variant_name: (product as any).variant_name ?? soldVariant?.variant_name,
+      variant_price: (product as any).variant_price ?? (product as any).combo_price ?? soldVariant?.price ?? (product as any).price ?? 0,
+      quantity,
+    }));
   };
 
   const addMultipleToCart = async (products: Product[], quantities: number[]) => {
@@ -458,8 +488,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       throw new Error('Products and quantities arrays must have the same length');
     }
 
-    // Start with current items
-    let newItems = [...items];
+    // Start with the latest snapshot, not a stale render closure.
+    const previous = itemsRef.current;
+    let newItems = [...previous];
 
     // Add each product with its quantity
     for (let i = 0; i < products.length; i++) {
@@ -494,54 +525,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Update UI immediately
-    setItems(newItems);
+    // Update UI immediately, persist in FIFO order.
+    setItemsSync(newItems);
 
-    // Save in background
     try {
-      if (!user) {
-        localStorage.setItem('cart', JSON.stringify(newItems));
-      } else {
-        await saveCartToServer(newItems);
-      }
-      // GA4 reorder (OrdersPage): one add_to_cart per restored line.
-      for (let i = 0; i < products.length; i++) {
-        trackAddToCart(mapCartItem({ ...products[i], quantity: quantities[i] }));
-      }
+      await enqueuePersist(newItems);
     } catch (error) {
       // Revert on error
-      setItems(items);
+      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
+    }
+    // GA4 reorder (OrdersPage): one add_to_cart per restored line.
+    // Outside the revert scope — tracking never rolls back the cart.
+    for (let i = 0; i < products.length; i++) {
+      trackAddToCart(mapCartItem({ ...products[i], quantity: quantities[i] }));
     }
   };
 
   const removeFromCart = async (productId: string, variantId?: string, comboId?: string) => {
-    const originalItems = items;
-    const removed = items.find(item =>
+    const previous = itemsRef.current;
+    const removed = previous.find(item =>
       item.id === productId && item.variant_id === variantId && item.combo_id === comboId
     );
-    const newItems = items.filter(item =>
+    const newItems = previous.filter(item =>
       !(item.id === productId && item.variant_id === variantId && item.combo_id === comboId)
     );
 
-    // Update UI immediately
-    setItems(newItems);
+    // Update UI immediately, persist in FIFO order.
+    setItemsSync(newItems);
 
-    // Save in background
     try {
-      if (!user) {
-        localStorage.setItem('cart', JSON.stringify(newItems));
-      } else {
-        await saveCartToServer(newItems);
-      }
-      if (removed) trackRemoveFromCart(removed);
+      await enqueuePersist(newItems);
     } catch (error) {
       // Revert on error
-      setItems(originalItems);
+      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
+    if (removed) trackRemoveFromCart(removed);
   };
 
   const updateQuantity = async (productId: string, quantity: number, variantId?: string, comboId?: string) => {
@@ -551,10 +573,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     quantity = normalizeCartQuantity(quantity);
-    const originalItems = items;
+    const previous = itemsRef.current;
 
     // Find matching item
-    const matchingItem = items.find(item => {
+    const matchingItem = previous.find(item => {
       const idMatch = item.id === productId;
       const variantMatch = item.variant_id === variantId;
       const comboMatch = item.combo_id === comboId;
@@ -567,25 +589,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const newItems = items.map(item =>
+    const newItems = previous.map(item =>
       item.id === productId && item.variant_id === variantId && item.combo_id === comboId
         ? { ...item, quantity }
         : item
     );
 
-    // Update UI immediately
-    setItems(newItems);
+    // Update UI immediately, persist in FIFO order.
+    setItemsSync(newItems);
 
-    // Save in background
     try {
-      if (!user) {
-        localStorage.setItem('cart', JSON.stringify(newItems));
-      } else {
-        await saveCartToServer(newItems);
-      }
+      await enqueuePersist(newItems);
     } catch (error) {
       // Revert on error
-      setItems(originalItems);
+      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
@@ -595,13 +612,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Skip the server round-trip when the cart is already empty: the
     // Transaction page calls this on every mount, and each no-op delete
     // was a full mutation + listCart re-fire in the prod log stream.
-    if ((items || []).length === 0) {
+    if ((itemsRef.current || []).length === 0) {
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      await saveCart([]);
+      const snapshot: CartItem[] = [];
+      setItemsSync(snapshot);
+      await enqueuePersist(snapshot);
     } finally {
       setIsLoading(false);
     }

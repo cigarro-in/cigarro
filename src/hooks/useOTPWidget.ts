@@ -17,6 +17,10 @@ import type { MSG91Config } from '../types/msg91';
 interface OTPWidgetProps {
   onSuccess: (phone: string, countryCode: string, token: string) => void;
   onError?: (error: string) => void;
+  // Only the currently-open dialog claims the singleton widget's callbacks.
+  // Mounted-but-closed dialogs (header + bottom-nav + page hosts) must not
+  // steal results. Defaults to true to preserve the existing contract.
+  enabled?: boolean;
 }
 
 const WIDGET_ID = import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined;
@@ -44,7 +48,7 @@ const widgetState: {
   scriptLoadListeners: [],
 };
 
-export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
+export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
@@ -62,8 +66,11 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
 
   // Register this component's callbacks with the singleton dispatcher so the
   // already-initialized widget's success/failure routes to the current caller.
+  // Claimed only while `enabled` (dialog open) — a mounted-but-closed dialog
+  // releases the dispatcher on close so it can never intercept another
+  // dialog's OTP result.
   useEffect(() => {
-    if (!isConfigured) return;
+    if (!isConfigured || !enabled) return;
     const callbacks: WidgetCallbacks = {
       success: (data) => {
         setStep('success');
@@ -85,7 +92,7 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
         widgetState.activeCallbacks = null;
       }
     };
-  }, [isConfigured]);
+  }, [isConfigured, enabled]);
 
   // Ensure the MSG91 script is loaded and initSendOTP is called exactly once
   // per page lifetime. Subsequent mounts just mark themselves as loaded.
@@ -215,15 +222,30 @@ export function useOTPWidget({ onSuccess, onError }: OTPWidgetProps) {
         (data) => {
           setStep('success');
           setIsLoading(false);
-          onSuccessRef.current(
-            data.mobile || phoneRef.current,
-            data.countryCode || '91',
-            data.message || ''
-          );
+          // Route through the singleton dispatcher so only the currently-open
+          // (claiming) dialog receives the result — never a stale background
+          // mount. Fall back to local refs when nobody claimed (unmounted).
+          const claimed = widgetState.activeCallbacks?.success;
+          if (claimed) {
+            claimed(data);
+          } else {
+            onSuccessRef.current(
+              data.mobile || phoneRef.current,
+              data.countryCode || '91',
+              data.message || ''
+            );
+          }
         },
         (err) => {
-          setError(err.message || 'Invalid OTP');
           setIsLoading(false);
+          const message = err.message || 'Invalid OTP';
+          const claimed = widgetState.activeCallbacks?.failure;
+          if (claimed) {
+            claimed(err);
+          } else {
+            setError(message);
+            onErrorRef.current?.(message);
+          }
         }
       );
     },

@@ -166,6 +166,8 @@ export default defineSchema({
     orgId: v.id("organizations"),
     userId: v.string(),
     displayOrderId: v.string(),
+    // Customer-facing five-digit order number; legacy rows may omit it.
+    orderNumber: v.optional(v.number()),
     kind: orderKind,
     retryOfOrderId: v.optional(v.id("orders")),
 
@@ -227,6 +229,7 @@ export default defineSchema({
     .index("by_org_user", ["orgId", "userId", "createdAt"])
     .index("by_org_final_status", ["orgId", "finalAmountPaise", "status"])
     .index("by_display_id", ["displayOrderId"])
+    .index("by_org_order_number", ["orgId", "orderNumber"])
     .index("by_retry_of", ["retryOfOrderId"])
     .index("by_org_status", ["orgId", "status", "createdAt"])
     .index("by_org_user_idem", ["orgId", "userId", "idempotencyKey"]),

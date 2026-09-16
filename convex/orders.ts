@@ -3,7 +3,7 @@ import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
 import { requireIdentity, requireMember } from "./lib/auth";
-import { genDisplayOrderId } from "./lib/ids";
+import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf } from "./lib/ids";
 import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
 import { addressV, orderItemV, orderKind } from "./schema";
@@ -241,6 +241,32 @@ async function pricePurchaseItems(
   return priced;
 }
 
+// Customer-facing order number shown in UPI notes, QR screen, and order
+// history. Five digits (10000–99999), unique per org. Race-free thanks to
+// Convex serializable mutations: the check-and-insert below runs in one
+// transaction, so two concurrent createOrder calls can't take the same number.
+// Legacy rows predate the field — read via orderNumberOf() (from lib/ids,
+// re-exported here for existing importers) which falls back
+// to undefined (callers then show displayOrderId).
+export { orderNumberOf };
+
+async function allocateOrderNumber(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+): Promise<number> {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const candidate = genOrderNumberCandidate();
+    const hit = await ctx.db
+      .query("orders")
+      .withIndex("by_org_order_number", (q) =>
+        q.eq("orgId", orgId).eq("orderNumber", candidate),
+      )
+      .first();
+    if (!hit) return candidate;
+  }
+  throw new ConvexError({ code: "ORDER_NUMBER_EXHAUSTED" });
+}
+
 // Race-free thanks to Convex serializable mutations.
 async function allocateSlotAtBase(
   ctx: MutationCtx,
@@ -374,6 +400,7 @@ export const createOrder = mutation({
         return {
           orderId: prior._id,
           displayOrderId: prior.displayOrderId,
+          orderNumber: orderNumberOf(prior),
           finalAmountPaise: prior.finalAmountPaise,
           upiUrl: prior.upiUrl || null,
           status: prior.status,
@@ -472,6 +499,10 @@ export const createOrder = mutation({
 
     const baseAmount = orderTotal - discountPaise - luckyPaise - walletDebit;
     const displayOrderId = genDisplayOrderId();
+    // Allocated transactionally (see allocateOrderNumber). Patched onto the
+    // row right after insert, same mutation = same transaction. Requires the
+    // documented schema edit (orders.orderNumber, optional) to be deployed.
+    const orderNumber = await allocateOrderNumber(ctx, args.orgId);
 
     // Consume the coupon in the same transaction as the order. This closes
     // the usage-limit race and removes the unauthenticated fire-and-forget
@@ -505,6 +536,7 @@ export const createOrder = mutation({
         createdAt: Date.now(),
         paidAt: Date.now(),
       });
+      await ctx.db.patch(orderId, { orderNumber });
       const paidOrder = await ctx.db.get(orderId);
       if (paidOrder) await commitOrderInventory(ctx, paidOrder, `user:${userId}`);
       // Link ledger debit to order
@@ -512,6 +544,7 @@ export const createOrder = mutation({
       return {
         orderId,
         displayOrderId,
+        orderNumber,
         finalAmountPaise: 0,
         upiUrl: null as string | null,
         status: "paid" as const,
@@ -537,6 +570,8 @@ export const createOrder = mutation({
       payeeName: org.name,
       amountPaise: finalAmount,
       referenceId: displayOrderId,
+      // 5-digit number first: bank alerts echo tn, and the matcher keys on it.
+      note: `Order ${orderNumber} / ${displayOrderId}`,
     });
 
     const orderId = await ctx.db.insert("orders", {
@@ -566,6 +601,7 @@ export const createOrder = mutation({
       payingVpa,
       idempotencyKey: args.idempotencyKey,
     });
+    await ctx.db.patch(orderId, { orderNumber });
 
     if (args.kind === "purchase") {
       await reserveOrderInventory(ctx, args.orgId, orderItems, orderId, `user:${userId}`);
@@ -605,6 +641,7 @@ export const createOrder = mutation({
     return {
       orderId,
       displayOrderId,
+      orderNumber,
       finalAmountPaise: finalAmount,
       upiUrl,
       status: "pending" as const,
@@ -704,6 +741,7 @@ export const retryOrder = mutation({
       return {
         orderId: existingRetry._id,
         displayOrderId: existingRetry.displayOrderId,
+        orderNumber: orderNumberOf(existingRetry),
         finalAmountPaise: existingRetry.finalAmountPaise,
         upiUrl: existingRetry.upiUrl || null,
         status: existingRetry.status,

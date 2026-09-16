@@ -76,7 +76,7 @@ function OrderRow({ order }: { order: NormalizedOrder }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-[15px] font-semibold text-[var(--vv-fg)] truncate">
-            #{order.displayOrderId}
+            #{order.orderNumber ?? order.displayOrderId}
           </p>
           <span className={`vv-badge ${meta.cls}`}>{meta.label}</span>
         </div>

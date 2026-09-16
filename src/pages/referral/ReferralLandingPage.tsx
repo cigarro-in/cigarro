@@ -4,22 +4,21 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import { Sparkles, ArrowRight, Gift, Leaf, Heart } from 'lucide-react';
 import { validateReferralCode } from '../../utils/referral/referralService';
-import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { motion } from 'framer-motion';
 
 export default function ReferralLandingPage() {
   const { code } = useParams<{ code: string }>();
   const { user } = useAuth();
+  const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
   
   const [validating, setValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [referrerName, setReferrerName] = useState('A friend');
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   useEffect(() => {
     if (code) {
@@ -55,8 +54,8 @@ export default function ReferralLandingPage() {
       // User is already logged in, redirect to home
       navigate('/');
     } else {
-      // Show signup dialog
-      setShowAuthDialog(true);
+      // Global storefront dialog; on success follow the logged-in path home
+      requestAuth({ onSuccess: () => navigate('/') });
     }
   };
 
@@ -230,11 +229,6 @@ export default function ReferralLandingPage() {
         </div>
       </div>
 
-      {/* Auth Dialog */}
-      <PhoneAuthDialog 
-        open={showAuthDialog} 
-        onOpenChange={setShowAuthDialog}
-      />
     </div>
   );
 }

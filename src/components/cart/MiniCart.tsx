@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatINR } from '../../utils/currency';
-import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
+import { toast } from 'sonner';
+import { QuantityStepper } from './QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
 
 interface MiniCartProps {
@@ -14,26 +15,26 @@ interface MiniCartProps {
 }
 
 export function MiniCart({ isVisible, onClose }: MiniCartProps) {
-  const { items, removeFromCart, totalPrice, getCartItemPrice } = useCart();
+  const { items, removeFromCart, updateQuantity, totalPrice, getCartItemPrice } = useCart();
   const { user } = useAuth();
+  const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
-  // Debug: Log cart items to identify any issues
-  /* React.useEffect(() => {
-    if (items.length > 0) {
-      => ({
-        index,
-        id: item.id,
-        name: item.name,
-        variant_id: item.variant_id,
-        combo_id: item.combo_id
-      })));
+  const handleProceedToCheckout = () => {
+    onClose();
+    if (user) {
+      navigate('/checkout');
+    } else {
+      requestAuth({ onSuccess: () => navigate('/checkout') });
     }
-  }, [items]); */
+  };
 
   const handleRemoveItem = (productId: string, variantId?: string, comboId?: string) => {
-    removeFromCart(productId, variantId, comboId);
+    removeFromCart(productId, variantId, comboId).catch(() => toast.error('Failed to remove item'));
+  };
+
+  const handleQuantityChange = (productId: string, next: number, variantId?: string, comboId?: string) => {
+    updateQuantity(productId, next, variantId, comboId).catch(() => toast.error('Failed to update quantity'));
   };
 
   return (
@@ -104,9 +105,20 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                                 </p>
                               )}
 
-                              <p className="text-dark font-sans text-sm mt-1">
-                                {item.quantity} x {formatINR(itemPrice)}
-                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <QuantityStepper
+                                  quantity={item.quantity}
+                                  onChange={(next) => handleQuantityChange(item.id, next, item.variant_id, item.combo_id)}
+                                  min={1}
+                                  size="sm"
+                                  className="rounded-full border border-coyote"
+                                  buttonClassName="text-dark"
+                                  valueClassName="text-dark"
+                                />
+                                <span className="text-dark font-sans text-sm">
+                                  {formatINR(itemPrice)} each
+                                </span>
+                              </div>
                               <p className="text-dark font-sans font-medium text-sm mt-1">
                                 {formatINR(itemPrice * item.quantity)}
                               </p>
@@ -136,14 +148,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                     <div className="mini-cart__controls text-center px-[21px] pb-[28px]">
                       <button
                         className="mini-cart__proceed inline-block w-full bg-dark text-creme-light py-3 rounded-full font-medium hover:bg-creme-light hover:text-dark transition-colors duration-300 text-sm uppercase tracking-wide mb-[23px]"
-                        onClick={() => {
-                          onClose();
-                          if (user) {
-                            navigate('/checkout');
-                          } else {
-                            setShowAuthDialog(true);
-                          }
-                        }}
+                        onClick={handleProceedToCheckout}
                       >
                         Proceed to order
                       </button>
@@ -249,10 +254,15 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                                   </p>
                                 )}
 
-                                <div className="flex items-center justify-between">
-                                  <span className="text-muted-foreground text-sm">
-                                    Qty: {item.quantity}
-                                  </span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <QuantityStepper
+                                    quantity={item.quantity}
+                                    onChange={(next) => handleQuantityChange(item.id, next, item.variant_id, item.combo_id)}
+                                    min={1}
+                                    size="sm"
+                                    className="rounded-md border border-border/20"
+                                    valueClassName="text-foreground"
+                                  />
                                   <span className="text-foreground font-bold text-sm">
                                     {formatINR(itemPrice * item.quantity)}
                                   </span>
@@ -288,14 +298,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                     <div className="space-y-3">
                       <button
                         className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors duration-300 text-sm uppercase tracking-wide"
-                        onClick={() => {
-                          onClose();
-                          if (user) {
-                            navigate('/checkout');
-                          } else {
-                            setShowAuthDialog(true);
-                          }
-                        }}
+                        onClick={handleProceedToCheckout}
                       >
                         Proceed to Checkout
                       </button>
@@ -326,19 +329,6 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
           </>
         )}
       </AnimatePresence>
-      
-      {/* Auth Dialog */}
-      {showAuthDialog && (
-        <PhoneAuthDialog 
-          key="mini-cart-auth-dialog"
-          open={showAuthDialog} 
-          onOpenChange={setShowAuthDialog}
-          onAuthSuccess={() => {
-            setShowAuthDialog(false);
-            navigate('/checkout');
-          }}
-        />
-      )}
     </>
   );
 } 

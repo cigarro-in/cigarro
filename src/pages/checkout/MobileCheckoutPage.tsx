@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, MapPin, Wallet, ChevronRight, Truck, Clock, Zap, Minus, Plus, QrCode, Gift, CheckCircle } from 'lucide-react';
+import { Tag, MapPin, Wallet, ChevronRight, Truck, Clock, Zap, QrCode, Gift, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -422,8 +423,10 @@ export function MobileCheckoutPage() {
             'Saved address'
         });
       } else if (rows.length > 0) {
-        // Auto-select first (most recent) address for normal checkout
-        const addressToSelect = rows[0];
+        // Deterministic default: explicit default wins, else newest (last —
+        // listAddresses returns oldest-first). Matches desktop checkout.
+        const addressToSelect =
+          rows.find((r: any) => (r as any).is_default) ?? rows[rows.length - 1];
         setSelectedAddress({
           id: addressToSelect.id,
           full_name: addressToSelect.full_name,
@@ -549,7 +552,8 @@ export function MobileCheckoutPage() {
         }
       }
 
-      navigate('/transaction', {
+      sessionStorage.setItem('pendingOrderId', String(result.orderId));
+      navigate(`/transaction/${result.orderId}`, {
         state: {
           orderId: result.orderId,
           shouldClearCart,
@@ -660,21 +664,15 @@ export function MobileCheckoutPage() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                      onClick={() => handleUpdateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id, item.combo_id)}
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-sm font-semibold w-8 text-center">{item.quantity}</span>
-                    <button
-                      className="w-8 h-8 rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, item.variant_id, item.combo_id)}
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <QuantityStepper
+                    quantity={item.quantity}
+                    onChange={(next) => handleUpdateQuantity(item.id, next, item.variant_id, item.combo_id)}
+                    min={0}
+                    size="lg"
+                    className="gap-2"
+                    buttonClassName="rounded-lg border-2 border-coyote/30 bg-background text-dark hover:bg-dark hover:text-creme-light hover:border-dark active:scale-95"
+                    valueClassName="text-foreground"
+                  />
                 </div>
               ))}
             </div>

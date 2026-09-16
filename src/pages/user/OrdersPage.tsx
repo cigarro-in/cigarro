@@ -30,6 +30,7 @@ interface OrderItem {
 interface Order {
   id: string;
   displayOrderId: string;
+  orderNumber?: number;
   transactionId?: string;
   items: OrderItem[];
   total: number;
@@ -107,6 +108,10 @@ export function OrdersPage() {
     return {
       id: o._id,
       displayOrderId: o.displayOrderId ?? 'N/A',
+      orderNumber:
+        Number.isInteger(o.orderNumber) && o.orderNumber >= 10000 && o.orderNumber <= 99999
+          ? o.orderNumber
+          : undefined,
       transactionId: o.displayOrderId,
       items: (o.items ?? []).map((it: any) => ({
         id: it.productId,
@@ -258,7 +263,8 @@ export function OrdersPage() {
           console.error('Failed to open UPI link:', e);
         }
       }
-      navigate('/transaction', {
+      sessionStorage.setItem('pendingOrderId', String(result.orderId));
+      navigate(`/transaction/${result.orderId}`, {
         state: { orderId: result.orderId, shouldClearCart: false },
         replace: result.status === 'paid',
       });
@@ -363,7 +369,7 @@ export function OrdersPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0 pr-3">
                         <h3 className="font-mono tracking-tight text-base md:text-lg text-foreground font-bold mb-1">
-                          Order #{order.displayOrderId}
+                          Order #{order.orderNumber ?? order.displayOrderId}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{new Date(order.createdAt).toLocaleDateString('en-IN', {
@@ -686,7 +692,7 @@ export function OrdersPage() {
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/transaction', { state: { orderId: order.id } });
+                                navigate(`/transaction/${order.id}`, { state: { orderId: order.id } });
                               }}
                               className="flex-1 bg-canyon text-creme-light px-4 py-2.5 rounded-full font-medium text-sm uppercase tracking-wide transition-all duration-300 hover:bg-canyon/90 flex items-center justify-center gap-2"
                             >

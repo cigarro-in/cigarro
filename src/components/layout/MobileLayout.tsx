@@ -20,8 +20,11 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
     setIsMobileMenuOpen(false);
   };
 
-  // Hide bottom nav on checkout pages
-  const hideBottomNav = location.pathname === '/checkout' || location.pathname === '/mobile-checkout';
+  // Hide bottom nav on checkout + transaction pages (fullscreen payment flow)
+  const hideBottomNav =
+    location.pathname === '/checkout' ||
+    location.pathname === '/mobile-checkout' ||
+    location.pathname.startsWith('/transaction');
 
   return (
     <>

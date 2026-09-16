@@ -6,6 +6,11 @@ interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  // 'page' (default) renders the full-screen crash card. 'inline' renders a
+  // compact card with a retry that resets the boundary without reloading —
+  // use it around recoverable scoped surfaces (e.g. the auth dialog host) so
+  // they never blow up into the generic global crash screen.
+  variant?: 'page' | 'inline';
 }
 
 interface State {
@@ -36,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log to audit system
     auditLogger.logError(error, {
       componentStack: errorInfo.componentStack,
-      boundary: 'ErrorBoundary'
+      boundary: `ErrorBoundary:${this.props.variant || 'page'}`
     });
 
     // Call custom error handler if provided
@@ -47,11 +52,35 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ error, errorInfo });
   }
 
+  reset = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+  };
+
   render() {
     if (this.state.hasError) {
       // Custom fallback UI
       if (this.props.fallback) {
         return this.props.fallback;
+      }
+
+      // Compact scoped fallback: inline card with a no-reload retry.
+      if (this.props.variant === 'inline') {
+        return (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center">
+            <p className="text-sm font-semibold text-red-700">
+              Something went wrong here.
+            </p>
+            <p className="mt-0.5 text-xs text-red-600/80">
+              This section failed to load — the rest of the page is unaffected.
+            </p>
+            <button
+              onClick={this.reset}
+              className="mt-2 h-9 px-4 rounded-lg bg-dark text-creme-light text-[13px] font-semibold hover:bg-opacity-90 transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        );
       }
 
       // Default fallback UI
@@ -81,8 +110,14 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
             <div className="space-y-2">
               <button
-                onClick={() => window.location.reload()}
+                onClick={this.reset}
                 className="w-full bg-dark text-creme px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors"
+              >
+                Try again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors"
               >
                 Refresh Page
               </button>
@@ -122,11 +157,12 @@ export class ErrorBoundary extends Component<Props, State> {
 // Higher-order component for easier usage
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
-  fallback?: ReactNode
+  fallback?: ReactNode,
+  variant?: 'page' | 'inline'
 ) {
   return function WrappedComponent(props: P) {
     return (
-      <ErrorBoundary fallback={fallback}>
+      <ErrorBoundary fallback={fallback} variant={variant}>
         <Component {...props} />
       </ErrorBoundary>
     );

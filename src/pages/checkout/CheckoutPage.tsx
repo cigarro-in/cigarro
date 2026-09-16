@@ -10,7 +10,7 @@ import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { useAddresses, FlatAddress } from '../../lib/convex/useAddresses';
 import { useConvex } from 'convex/react';
 import { toast } from 'sonner';
@@ -21,7 +21,6 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
-import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
 import { getProductImageUrl } from '../../lib/images/urls';
@@ -43,6 +42,7 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
+  const { requestAuth } = useAuthDialog();
   const org = useOrg();
   // Live VPA from Payment Settings (never hardcoded — wrong VPA = unmatched payment).
   const { vpa: paymentVpa } = usePaymentVpa((org as any)?._id);
@@ -86,9 +86,7 @@ export function CheckoutPage() {
     : (isBuyNow && buyNowItem 
       ? (buyNowItem.variant_price || buyNowItem.price) * buyNowItem.quantity 
       : cartTotalPrice);
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [currentStep, setCurrentStep] = useState(1); // 1: shipping, 2: review, 3: payment
-  const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -103,7 +101,6 @@ export function CheckoutPage() {
   const [paymentLinkPhone, setPaymentLinkPhone] = useState<string>('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [countryCode, setCountryCode] = useState('+91');
-  const [showAddressSelection, setShowAddressSelection] = useState(false);
   const [isNewAddress, setIsNewAddress] = useState(true);
   const [showSaveSuggestion, setShowSaveSuggestion] = useState(false);
   const [isAddressComplete, setIsAddressComplete] = useState(false);
@@ -146,11 +143,9 @@ export function CheckoutPage() {
   });
   const luckyDiscount = luckyOn ? randomDiscount : 0;
 
-  // Handle successful authentication
-  const handleAuthSuccess = () => {
-    setShowAuthDialog(false);
-    // User data will be updated automatically via useAuth hook
-  };
+  // Auth goes through the global StorefrontAuthHost dialog (requestAuth).
+  // On success the user state updates and this page re-renders past the
+  // !user gate below — no local dialog, no navigation needed.
 
   // Clear sessionStorage on mount if this is a normal cart checkout (no URL params)
   useEffect(() => {
@@ -163,15 +158,15 @@ export function CheckoutPage() {
     }
   }, [urlRetryParam, urlBuyNowParam]);
 
-  // Auto-show auth dialog for non-authenticated users after a brief delay to prevent flicker
+  // Auto-show the global auth dialog for non-authenticated users after a brief delay to prevent flicker
   useEffect(() => {
     if (!user && !authLoading && !isOrderProcessing && !orderComplete) {
       const timer = setTimeout(() => {
-        setShowAuthDialog(true);
+        requestAuth();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, isOrderProcessing, orderComplete]);
+  }, [user, authLoading, isOrderProcessing, orderComplete, requestAuth]);
 
   // GA4 begin_checkout: once per checkout entry (funnel entry point).
   const checkoutTrackedRef = useRef(false);
@@ -190,11 +185,13 @@ export function CheckoutPage() {
     if (user && !addressesLoadedRef.current) {
       loadSavedAddresses();
       preloadQRCode();
-      // Auto-fill user details if available
+      // Auto-fill user details if available — profile phone (digits-only)
+      // pre-fills the local-number field when no saved address wins.
       setFormData(prev => ({
         ...prev,
         fullName: user.name || prev.fullName,
         email: user.email || prev.email,
+        phone: prev.phone || String((user as any)?.phone ?? '').replace(/\D/g, ''),
       }));
       addressesLoadedRef.current = true;
     } else if (!user) {
@@ -245,7 +242,7 @@ export function CheckoutPage() {
           </p>
           <div className="space-y-3">
             <Button 
-              onClick={() => setShowAuthDialog(true)}
+              onClick={() => requestAuth()}
               className="w-full"
               size="lg"
             >
@@ -264,11 +261,6 @@ export function CheckoutPage() {
             You can continue shopping and sign in when you're ready to checkout
           </p>
         </div>
-        <PhoneAuthDialog 
-          open={showAuthDialog} 
-          onOpenChange={setShowAuthDialog}
-          onAuthSuccess={handleAuthSuccess}
-        />
       </div>
     );
   }
@@ -369,7 +361,9 @@ export function CheckoutPage() {
 
       // Only auto-fill with primary address on initial load, not on every reload
       if (!skipAutoFill) {
-        const primaryAddress = data?.find((addr) => addr.is_default);
+        // Prefer the explicit default; otherwise use the newest saved row so
+        // first-time checkout remains deterministic even if no default exists.
+        const primaryAddress = data?.find((addr) => addr.is_default) ?? data?.[data.length - 1];
         if (primaryAddress && !hasInitializedForm && !formData.address) {
           setFormData((prev) => ({
             ...prev,
@@ -631,7 +625,7 @@ export function CheckoutPage() {
       }));
       setSelectedSavedAddress(addressId);
       setIsNewAddress(false);
-      setShowAddressSelection(false);
+      setIsAddressSectionCollapsed(true);
       setShowSaveSuggestion(false); // Hide save suggestion when selecting existing address
       setEditingAddressId(null); // Clear editing state
       
@@ -796,13 +790,16 @@ export function CheckoutPage() {
         } as FlatAddress);
         setShowSaveSuggestion(false);
         setIsNewAddress(false);
+        // Close the edit loop with the updated address selected.
+        setSelectedSavedAddress(editingAddressId);
+        setIsAddressSectionCollapsed(true);
         setEditingAddressId(null);
         loadSavedAddresses(true);
         // No toast: the form closing + address selected is the confirmation.
         return;
       }
 
-      await saveStoreAddress({
+      const saved = await saveStoreAddress({
         label: addressLabel,
         full_name: formData.fullName,
         phone: phoneDigits,
@@ -819,6 +816,9 @@ export function CheckoutPage() {
       // No toast: the save-suggestion row hiding is the confirmation.
       setShowSaveSuggestion(false);
       setIsNewAddress(false);
+      // Close the new-address loop with the just-saved address selected.
+      if (saved?.id) setSelectedSavedAddress(String(saved.id));
+      setIsAddressSectionCollapsed(true);
       setEditingAddressId(null);
       loadSavedAddresses(true);
     } catch (error: any) {
@@ -979,7 +979,8 @@ export function CheckoutPage() {
         }
       }
 
-      navigate('/transaction', {
+      sessionStorage.setItem('pendingOrderId', String(result.orderId));
+      navigate(`/transaction/${result.orderId}`, {
         state: { orderId: result.orderId, shouldClearCart: true },
         replace: result.status === 'paid',
       });

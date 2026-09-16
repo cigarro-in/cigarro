@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, Trash2, ArrowLeft, ShoppingCart, Package, Shield, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Trash2, ArrowLeft, ShoppingCart, Package, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
+import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 import { Card, CardContent } from '../../components/ui/card';
@@ -113,26 +113,14 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
             </div>
 
             {/* Modern Quantity Controls */}
-            <div className="flex items-center bg-muted/20 rounded-lg border border-border/20 overflow-hidden h-9">
-              <button
-                onClick={() => handleQuantityChange(item.quantity - 1)}
-                disabled={item.quantity <= 1}
-                className="w-9 h-full flex items-center justify-center text-foreground hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-foreground active:bg-accent/80"
-                aria-label="Decrease quantity"
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-              <div className="w-8 h-full flex items-center justify-center font-sans font-semibold text-foreground text-sm border-x border-border/10 bg-background/50">
-                {item.quantity}
-              </div>
-              <button
-                onClick={() => handleQuantityChange(item.quantity + 1)}
-                className="w-9 h-full flex items-center justify-center text-foreground hover:bg-accent hover:text-white transition-colors active:bg-accent/80"
-                aria-label="Increase quantity"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <QuantityStepper
+              quantity={item.quantity}
+              onChange={handleQuantityChange}
+              min={1}
+              className="bg-muted/20 rounded-lg border border-border/20 h-9"
+              buttonClassName="h-full text-foreground hover:bg-accent hover:text-white active:bg-accent/80"
+              valueClassName="h-full flex items-center justify-center font-sans text-foreground border-x border-border/10 bg-background/50"
+            />
           </div>
         </div>
       </div>
@@ -278,8 +266,8 @@ const CartSummary: React.FC<{
 export default function CartPage() {
   const { items, totalPrice, isLoading, updateQuantity, removeFromCart, totalItems } = useCart();
   const { user } = useAuth();
+  const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   // GA4 view_cart: once per distinct cart content.
   const cartSentRef = useRef<string | null>(null);
@@ -295,7 +283,7 @@ export default function CartPage() {
     if (user) {
       navigate('/checkout');
     } else {
-      setShowAuthDialog(true);
+      requestAuth({ onSuccess: () => navigate('/checkout') });
     }
   };
 
@@ -379,14 +367,6 @@ export default function CartPage() {
         )}
       </div>
 
-      <PhoneAuthDialog
-        open={showAuthDialog}
-        onOpenChange={setShowAuthDialog}
-        onAuthSuccess={() => {
-          setShowAuthDialog(false);
-          navigate('/checkout');
-        }}
-      />
     </>
   );
 }

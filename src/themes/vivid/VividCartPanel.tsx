@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Minus, Plus, Trash2 } from 'lucide-react';
+import { ShoppingBag, Trash2 } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
+import { QuantityStepper } from '../../components/cart/QuantityStepper';
+import { toast } from 'sonner';
 import { getProductImageUrl } from '../../lib/images/urls';
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
@@ -38,21 +40,19 @@ export function VividCartPanel() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[var(--color-foreground)] text-xs font-semibold truncate">{item.name}</p>
                     <p className="text-[var(--color-muted-foreground)] text-[11px]">₹{formatPrice(price)}</p>
-                    <div className="mt-1 inline-flex items-center rounded-md border border-[var(--color-border)]">
-                      <button
-                        onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id, item.combo_id)}
-                        className="w-6 h-6 grid place-items-center text-[var(--color-foreground)]"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="w-6 text-center text-[11px] font-semibold">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id, item.combo_id)}
-                        className="w-6 h-6 grid place-items-center text-[var(--color-foreground)]"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
+                    <QuantityStepper
+                      quantity={item.quantity}
+                      onChange={(next) =>
+                        updateQuantity(item.id, next, item.variant_id, item.combo_id).catch(() =>
+                          toast.error('Failed to update quantity'),
+                        )
+                      }
+                      min={0}
+                      size="sm"
+                      className="mt-1 rounded-md border border-[var(--color-border)]"
+                      buttonClassName="text-[var(--color-foreground)]"
+                      valueClassName="text-[var(--color-foreground)]"
+                    />
                   </div>
                   <button
                     onClick={() => removeFromCart(item.id, item.variant_id, item.combo_id)}

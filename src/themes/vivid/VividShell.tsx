@@ -1,9 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, User, Grid3X3, Home, Package } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
-import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 
 interface Props {
   children: ReactNode;
@@ -14,7 +13,7 @@ export function VividShell({ children }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [authOpen, setAuthOpen] = useState(false);
+  const { requestAuth } = useAuthDialog();
 
   const hideBottomNav =
     location.pathname.startsWith('/checkout') ||
@@ -63,7 +62,7 @@ export function VividShell({ children }: Props) {
               <HeaderLink to="/profile" icon={<User className="w-4 h-4" />} label="Account" />
             ) : (
               <button
-                onClick={() => setAuthOpen(true)}
+                onClick={() => requestAuth()}
                 className="relative px-3 py-2 rounded-lg text-sm text-[var(--color-foreground)] hover:bg-[var(--color-surface-2)] flex items-center gap-2"
               >
                 <User className="w-4 h-4" />
@@ -123,18 +122,18 @@ export function VividShell({ children }: Props) {
             {user ? (
               <BottomLink to="/orders" icon={<Package className="w-5 h-5" />} label="Orders" active={location.pathname.startsWith('/orders')} />
             ) : (
-              <BottomButton onClick={() => setAuthOpen(true)} icon={<Package className="w-5 h-5" />} label="Orders" />
+              <BottomButton onClick={() => requestAuth()} icon={<Package className="w-5 h-5" />} label="Orders" />
             )}
             {user ? (
               <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Me" active={location.pathname.startsWith('/profile')} />
             ) : (
-              <BottomButton onClick={() => setAuthOpen(true)} icon={<User className="w-5 h-5" />} label="Sign in" />
+              <BottomButton onClick={() => requestAuth()} icon={<User className="w-5 h-5" />} label="Sign in" />
             )}
           </div>
         </nav>
       )}
 
-      <PhoneAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+      {/* Auth dialog is hosted once in AppContent via the shared controller. */}
     </div>
   );
 }

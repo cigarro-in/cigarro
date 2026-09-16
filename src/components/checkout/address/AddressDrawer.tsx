@@ -64,6 +64,7 @@ export const AddressDrawer = memo(function AddressDrawer({
 
       setView('list');
       setEditingAddress(null);
+      onOpenChange(false);
     } catch (err) {
       console.error('Error saving address:', err);
       toast.error('Failed to save address');

@@ -2,21 +2,20 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, Package, User, Grid3x3 } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
-import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { MiniCart } from '../cart/MiniCart';
 
 export const MobileBottomNav = () => {
   const location = useLocation();
   const { totalItems } = useCart();
   const { user } = useAuth();
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const { requestAuth } = useAuthDialog();
   const [isMiniCartOpen, setIsMiniCartOpen] = useState(false);
 
   const handleProfileClick = (e: React.MouseEvent) => {
     if (!user) {
       e.preventDefault();
-      setIsAuthDialogOpen(true);
+      requestAuth();
     }
   };
 
@@ -87,7 +86,7 @@ export const MobileBottomNav = () => {
               return (
                 <button
                   key={index}
-                  onClick={() => setIsAuthDialogOpen(true)}
+                  onClick={() => requestAuth()}
                   className="flex flex-col items-center justify-center flex-1 h-full relative text-muted-foreground"
                 >
                   <div className="relative">
@@ -132,12 +131,6 @@ export const MobileBottomNav = () => {
         </div>
       </nav>
 
-      {/* Authentication Dialog */}
-      <PhoneAuthDialog 
-        open={isAuthDialogOpen} 
-        onOpenChange={setIsAuthDialogOpen} 
-      />
-      
       {/* Mobile Mini Cart */}
       <MiniCart 
         isVisible={isMiniCartOpen} 

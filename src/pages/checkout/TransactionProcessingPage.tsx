@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { Check, Smartphone, RefreshCw, Wallet, X, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -8,23 +8,36 @@ import { useCart } from '../../hooks/useCart';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { useOrg } from '../../lib/convex/useOrg';
-import { paiseToRupees, formatPaiseINR } from '../../lib/convex/money';
+import { formatPaiseINR } from '../../lib/convex/money';
 import QRCode from 'qrcode';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface TransactionState {
   orderId: Id<'orders'>;
   shouldClearCart?: boolean;
 }
 
+const looksLikeOrderId = (v: string) => /^[A-Za-z0-9]{8,}$/.test(v);
+
+// Scrollable fullscreen shell: min-h-[100dvh] + safe-area padding so QR and
+// controls stay reachable at 360x800 / 375x812 / 390x844. Inner `m-auto`
+// centers short states but lets tall content scroll instead of clipping.
+const PAGE_SHELL =
+  'min-h-[100dvh] overflow-y-auto bg-creme flex flex-col items-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(5rem,env(safe-area-inset-bottom))]';
+
 export function TransactionProcessingPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { orderId: orderIdParam } = useParams();
   const { user } = useAuth();
   const { clearCart } = useCart();
 
   const state = location.state as TransactionState | null;
-  const orderId = state?.orderId;
+  const storedOrderId = sessionStorage.getItem('pendingOrderId');
+  // Persistent route wins, then navigation state, then session fallback.
+  const rawOrderId = orderIdParam ?? state?.orderId ?? storedOrderId ?? null;
+  const malformed = rawOrderId != null && !looksLikeOrderId(String(rawOrderId));
+  const orderId = malformed ? null : (rawOrderId as Id<'orders'> | null);
 
   const org = useOrg();
   const order = useQuery(
@@ -33,13 +46,24 @@ export function TransactionProcessingPage() {
   );
 
   const [qrCode, setQrCode] = useState<string>('');
-  const [showQR, setShowQR] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const MAX_MANUAL_REFRESH = 5;
 
-  // Redirect if no order context
+  // Persist the route param so a refresh keeps context; bare /transaction
+  // falls back to navigation state then session. No order id at all → home.
+  // Malformed / not-owned ids render a safe inline state below, never a loop.
   useEffect(() => {
-    if (!state || !user) navigate('/');
-  }, [state, user, navigate]);
+    if (!user) {
+      navigate('/');
+      return;
+    }
+    if (orderIdParam && looksLikeOrderId(orderIdParam)) sessionStorage.setItem('pendingOrderId', orderIdParam);
+    else if (state?.orderId) sessionStorage.setItem('pendingOrderId', String(state.orderId));
+    else if (!storedOrderId) navigate('/');
+  }, [orderIdParam, state?.orderId, storedOrderId, user, navigate]);
 
   // Clear cart exactly once after mount (order-creation path). Ref-guarded,
   // not dep-guarded: clearCart identity changes per render and re-firing the
@@ -73,11 +97,12 @@ export function TransactionProcessingPage() {
   // Clean up Buy-Now / retry session flags once a terminal state is reached
   useEffect(() => {
     if (!order) return;
-    if (['paid', 'late_paid', 'expired', 'cancelled', 'refunded'].includes(order.status)) {
+    if (['paid', 'late_paid', 'expired', 'cancelled', 'refunded', 'voided'].includes(order.status)) {
       sessionStorage.removeItem('buyNowItem');
       sessionStorage.removeItem('isBuyNow');
       sessionStorage.removeItem('retryOrder');
       sessionStorage.removeItem('isRetryPayment');
+      sessionStorage.removeItem('pendingOrderId');
     }
   }, [order?.status]);
 
@@ -86,18 +111,22 @@ export function TransactionProcessingPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const wakeMutation = useMutation(api.gmail.wake);
+  const retryMutation = useMutation(api.orders.retryOrder);
+  // Returns true when a wake was actually sent (false = throttled) so the
+  // manual-refresh counter only burns on real polls.
   const pokeWake = useCallback(
-    async (source: 'wake' | 'refresh') => {
-      if (!orderId) return;
+    async (source: 'wake' | 'refresh'): Promise<boolean> => {
+      if (!orderId) return false;
       const now = Date.now();
-      if (source === 'refresh' && now - lastPokeRef.current < 60_000) return;
-      if (source === 'wake' && now - lastPokeRef.current < 30_000) return;
+      if (source === 'refresh' && now - lastPokeRef.current < 60_000) return false;
+      if (source === 'wake' && now - lastPokeRef.current < 30_000) return false;
       lastPokeRef.current = now;
       try {
         await wakeMutation({ orderId, source });
       } catch (_) {
         /* non-fatal */
       }
+      return true;
     },
     [orderId, wakeMutation],
   );
@@ -113,24 +142,95 @@ export function TransactionProcessingPage() {
   }, [order?.status, pokeWake]);
 
   const handleRefresh = useCallback(async () => {
+    if (refreshCount >= MAX_MANUAL_REFRESH) return;
     setRefreshing(true);
-    await pokeWake('refresh');
+    const poked = await pokeWake('refresh');
+    if (poked) setRefreshCount((c) => c + 1);
     setTimeout(() => setRefreshing(false), 2000);
-  }, [pokeWake]);
+  }, [pokeWake, refreshCount]);
+
+  // Reopen recovery: expired/cancelled orders get a fresh UPI attempt via
+  // retryOrder (new order, new fingerprint), then land back here.
+  const handleRetry = useCallback(async () => {
+    if (!orderId || retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const result = await retryMutation({ oldOrderId: orderId });
+      setRetrying(false);
+      sessionStorage.setItem('pendingOrderId', String(result.orderId));
+      navigate(`/transaction/${result.orderId}`);
+    } catch (e: unknown) {
+      const err = e as { data?: { code?: string }; message?: string };
+      setRetryError(err?.data?.code ?? err?.message ?? 'Retry failed');
+      setRetrying(false);
+    }
+  }, [orderId, retrying, retryMutation, navigate]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   // --- Loading state (waiting on order fetch) ---
-  if (!order || !org) {
+  // order === undefined = loading; null = not found / not owned (safe UI below).
+  if (order === undefined || !org) {
     return (
-      <div className="fixed inset-0 z-50 min-h-screen bg-creme flex items-center justify-center">
-        <div className="animate-pulse text-coyote font-sans">Loading transaction…</div>
+      <div className={PAGE_SHELL}>
+        <div className="m-auto animate-pulse text-coyote font-sans">Loading transaction…</div>
+      </div>
+    );
+  }
+
+  // --- Invalid / not-owned order: safe inline state, no redirect loop ---
+  if (malformed || order === null) {
+    return (
+      <div className={PAGE_SHELL}>
+        <div className="m-auto text-center max-w-sm w-full">
+          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <X className="w-10 h-10" strokeWidth={2.5} />
+          </div>
+          <h2 className="text-2xl font-serif text-dark mb-2">Order not found</h2>
+          <p className="text-coyote mb-8 text-sm leading-relaxed px-4">
+            {malformed
+              ? 'This payment link looks invalid. Please start again from your orders.'
+              : 'This order isn’t available on this account. It may belong to a different number.'}
+          </p>
+          <div className="space-y-3">
+            <Button
+              onClick={() => navigate('/orders')}
+              className="w-full bg-dark text-creme-light hover:bg-canyon h-14 rounded-xl shadow-lg transition-transform active:scale-95"
+            >
+              Go to Orders
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/')}
+              className="w-full text-coyote hover:text-dark"
+            >
+              Continue Shopping
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   const isWalletOnly = order.verificationMethod === 'wallet_only';
   const amountPaise = order.finalAmountPaise > 0 ? order.finalAmountPaise : order.cartTotalPaise;
+  // Five-digit customer order number; legacy rows fall back to displayOrderId.
+  const rawNumber = (order as unknown as { orderNumber?: unknown }).orderNumber;
+  const orderNumber =
+    typeof rawNumber === 'number' && Number.isInteger(rawNumber) && rawNumber >= 10000 && rawNumber <= 99999
+      ? rawNumber
+      : null;
+  const orderLabel = orderNumber ? `#${orderNumber}` : `#${order.displayOrderId}`;
+  // Explicit UPI app choices: same params, app-specific scheme so the OS
+  // opens the chosen app directly.
+  const upiQuery = order.upiUrl?.split('?')[1] ?? '';
+  const upiAppLinks = [
+    { label: 'GPay', url: `tez://upi/pay?${upiQuery}` },
+    { label: 'PhonePe', url: `phonepe://pay?${upiQuery}` },
+    { label: 'Paytm', url: `paytmmp://pay?${upiQuery}` },
+  ];
+  const refreshExhausted = refreshCount >= MAX_MANUAL_REFRESH;
   // Fall back to the 10-min server default so the countdown never NaNs when
   // the org row hasn't loaded or predates the slotTimeoutMs field.
   const timeoutAt = order.createdAt + (org.slotTimeoutMs ?? 10 * 60 * 1000);
@@ -139,7 +239,7 @@ export function TransactionProcessingPage() {
   // --- SUCCESS ---
   if (order.status === 'paid' || order.status === 'late_paid') {
     return (
-      <div className="fixed inset-0 z-50 min-h-screen bg-creme flex flex-col items-center justify-center p-6 overflow-hidden relative">
+      <div className={`${PAGE_SHELL} relative`}>
         {[...Array(12)].map((_, i) => (
           <motion.div
             key={i}
@@ -159,7 +259,7 @@ export function TransactionProcessingPage() {
           initial={{ scale: 0.8, opacity: 0, y: 50 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-          className="w-full max-w-sm relative z-10"
+          className="w-full max-w-sm relative z-10 m-auto"
         >
           <div className="bg-creme-light border border-coyote rounded-t-3xl p-8 text-center relative shadow-2xl">
             <div className="relative mb-6 mx-auto w-20 h-20 flex items-center justify-center">
@@ -182,14 +282,8 @@ export function TransactionProcessingPage() {
                 <span className="text-dark font-mono font-bold text-xl">{formatPaiseINR(amountPaise)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-coyote text-sm font-medium">Order ID</span>
-                <span className="text-dark font-mono font-bold text-lg">#{order.displayOrderId}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-coyote text-sm font-medium">Verified By</span>
-                <span className="text-dark font-medium capitalize">
-                  {order.verificationMethod?.replace('_', ' ') ?? 'pending'}
-                </span>
+                <span className="text-coyote text-sm font-medium">Order</span>
+                <span className="text-dark font-mono font-bold text-lg">{orderLabel}</span>
               </div>
             </div>
           </div>
@@ -221,12 +315,13 @@ export function TransactionProcessingPage() {
   // --- EXPIRED / CANCELLED / FAILED ---
   if (order.status === 'expired' || order.status === 'cancelled' || order.status === 'refunded' || order.status === 'voided') {
     const isExpired = order.status === 'expired';
+    const canRetry = order.status === 'expired' || order.status === 'cancelled';
     return (
-      <div className="fixed inset-0 z-50 min-h-screen bg-creme flex flex-col items-center justify-center p-6">
+      <div className={PAGE_SHELL}>
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="text-center max-w-sm w-full"
+          className="text-center max-w-sm w-full m-auto"
         >
           <div className={`w-24 h-24 ${isExpired ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'} rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg`}>
             {isExpired ? <Clock className="w-12 h-12" strokeWidth={2.5} /> : <X className="w-12 h-12" strokeWidth={2.5} />}
@@ -235,18 +330,32 @@ export function TransactionProcessingPage() {
           <h2 className="text-3xl font-serif text-dark mb-2">
             {isExpired ? 'Payment Timed Out' : 'Payment Not Completed'}
           </h2>
-          <p className="text-coyote mb-8 text-sm leading-relaxed px-4">
+          <p className="text-coyote mb-2 text-sm leading-relaxed px-4">
             {isExpired
               ? "We didn't receive your payment in time. If money was deducted, it will arrive shortly and we'll credit your wallet."
               : 'Your order was cancelled. Any wallet debit has been refunded.'}
           </p>
+          <p className="text-xs text-coyote mb-8 font-mono">Order {orderLabel}</p>
 
           <div className="space-y-3">
+            {canRetry && (
+              <Button
+                onClick={handleRetry}
+                disabled={retrying}
+                className="w-full bg-dark text-creme-light hover:bg-canyon h-14 rounded-xl shadow-lg transition-transform active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-5 h-5 mr-2 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Creating fresh payment…' : 'Retry payment'}
+              </Button>
+            )}
+            {retryError && (
+              <p className="text-sm text-red-600">Couldn't restart payment ({retryError}). Try again from Orders.</p>
+            )}
             <Button
               onClick={() => navigate('/orders')}
-              className="w-full bg-dark text-creme-light hover:bg-canyon h-14 rounded-xl shadow-lg transition-transform active:scale-95"
+              className={`w-full h-14 rounded-xl shadow-lg transition-transform active:scale-95 ${canRetry ? 'bg-transparent border border-coyote/30 text-dark hover:bg-creme-light' : 'bg-dark text-creme-light hover:bg-canyon'}`}
             >
-              <RefreshCw className="w-5 h-5 mr-2" /> Retry from Orders
+              Retry from Orders
             </Button>
             <Button
               variant="ghost"
@@ -263,14 +372,14 @@ export function TransactionProcessingPage() {
 
   // --- PENDING (UPI / QR) ---
   return (
-    <div className="fixed inset-0 z-50 min-h-screen bg-creme flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className={`${PAGE_SHELL} relative`}>
       <motion.div
-        className="absolute w-[500px] h-[500px] bg-canyon/5 rounded-full blur-3xl"
+        className="absolute w-[500px] h-[500px] bg-canyon/5 rounded-full blur-3xl pointer-events-none"
         animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      <div className="z-10 w-full max-w-sm text-center space-y-12">
+      <div className="z-10 w-full max-w-sm text-center space-y-6 m-auto">
         <div className="relative flex justify-center">
           <motion.div
             className="w-24 h-24 rounded-full border-4 border-coyote/20 flex items-center justify-center bg-creme-light shadow-xl"
@@ -317,50 +426,56 @@ export function TransactionProcessingPage() {
           className="bg-white/50 border border-coyote/20 rounded-2xl p-8 backdrop-blur-sm shadow-sm"
         >
           <p className="text-xs text-coyote uppercase tracking-widest font-bold mb-2">Pay exactly</p>
-          <p className="text-5xl font-mono tracking-tighter text-dark">{formatPaiseINR(amountPaise)}</p>
-          <p className="text-xs text-coyote mt-2 font-mono">Order #{order.displayOrderId}</p>
+          <p className="text-4xl sm:text-5xl font-mono tracking-tighter text-dark break-all">{formatPaiseINR(amountPaise)}</p>
+          <p className="text-xs text-coyote mt-2 font-mono">Order {orderLabel}</p>
         </motion.div>
 
         <div className="space-y-4">
           {order.upiUrl && (
-            <Button
-              onClick={() => (window.location.href = order.upiUrl)}
-              className="w-full bg-dark text-creme-light hover:bg-canyon h-14 rounded-xl text-lg font-medium shadow-lg transition-transform active:scale-95"
-            >
-              Pay via UPI App
-            </Button>
+            <>
+              <p className="text-xs text-coyote font-medium">Choose how to pay</p>
+              <div className="grid grid-cols-2 gap-2">
+                {upiAppLinks.map((app) => (
+                  <button
+                    key={app.label}
+                    onClick={() => (window.location.href = app.url)}
+                    className="h-11 rounded-xl border border-coyote/30 bg-white/60 text-sm font-bold text-dark hover:border-canyon hover:text-canyon transition-colors"
+                  >
+                    {app.label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => (window.location.href = order.upiUrl as string)}
+                  className="h-11 rounded-xl border border-coyote/30 bg-white/60 text-sm font-bold text-dark hover:border-canyon hover:text-canyon transition-colors"
+                >
+                  Other UPI app
+                </button>
+              </div>
+            </>
           )}
 
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setShowQR((v) => !v)}
-              className="text-sm text-canyon font-bold hover:underline transition-colors"
-            >
-              {showQR ? 'Hide QR Code' : 'Show QR Code'}
-            </button>
-            <span className="text-coyote/50">·</span>
+          {qrCode && (
+            <div className="bg-white p-4 rounded-xl shadow-inner inline-block border border-coyote/20">
+              <img src={qrCode} alt={`UPI QR for order ${orderLabel}`} className="w-48 h-48 mix-blend-multiply" />
+              <p className="text-[11px] text-coyote mt-2 font-mono">Scan with any UPI app</p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-center">
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
-              className="text-sm text-canyon font-bold hover:underline transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+              disabled={refreshing || refreshExhausted}
+              className="text-sm text-canyon font-bold hover:underline transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:no-underline"
             >
               <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Checking…' : 'Refresh status'}
+              {refreshing ? 'Checking…' : refreshExhausted ? 'Refresh limit reached' : 'Refresh status'}
             </button>
           </div>
-
-          <AnimatePresence>
-            {showQR && qrCode && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
-                exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                className="bg-white p-4 rounded-xl shadow-inner inline-block border border-coyote/20 overflow-hidden"
-              >
-                <img src={qrCode} alt="QR" className="w-48 h-48 mix-blend-multiply" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {refreshExhausted && (
+            <p className="text-xs text-coyote leading-relaxed">
+              Still pending? Confirm you paid the exact amount above, then check Orders in a few minutes or contact support.
+            </p>
+          )}
         </div>
       </div>
     </div>

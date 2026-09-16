@@ -4,7 +4,7 @@ export interface BuildUpiUrlArgs {
   vpa: string;
   payeeName?: string;
   amountPaise: number;
-  referenceId: string; // our displayOrderId
+  referenceId: string; // our displayOrderId (stable; bank-email ref matching)
   note?: string;
 }
 
@@ -26,4 +26,23 @@ export function buildUpiUrl({
     tn: note ?? `Order ${referenceId}`,
   });
   return `upi://pay?${params.toString()}`;
+}
+
+// Explicit customer UPI app choices. Same params, app-specific scheme so the
+// OS opens the chosen app directly. Unknown apps fall back to the generic
+// upi:// URL (lets the OS show the app picker).
+export type UpiAppId = "gpay" | "phonepe" | "paytm" | "bhim" | "generic";
+
+const UPI_APP_SCHEMES: Record<UpiAppId, string> = {
+  gpay: "tez://upi/pay",
+  phonepe: "phonepe://pay",
+  paytm: "paytmmp://pay",
+  bhim: "bhim://pay",
+  generic: "upi://pay",
+};
+
+export function buildUpiAppUrl(app: UpiAppId, baseUpiUrl: string): string {
+  if (app === "generic") return baseUpiUrl;
+  const query = baseUpiUrl.split("?")[1] ?? "";
+  return `${UPI_APP_SCHEMES[app]}?${query}`;
 }

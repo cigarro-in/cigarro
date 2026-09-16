@@ -25,6 +25,9 @@ export interface NormalizedOrderItem {
 export interface NormalizedOrder {
   id: string;
   displayOrderId: string;
+  // Five-digit customer-facing number (10000–99999). Absent on legacy rows —
+  // views must fall back to displayOrderId.
+  orderNumber?: number;
   kind: 'purchase' | 'wallet_load';
   paymentStatus: 'pending' | 'paid' | 'late_paid' | 'expired' | 'cancelled' | 'refunded' | 'voided';
   shippingStatus?: 'awaiting' | 'processing' | 'shipped' | 'delivered' | 'returned';
@@ -75,9 +78,15 @@ function deriveUiStatus(o: any): OrderUiStatus {
 }
 
 function normalize(o: any): NormalizedOrder {
+  const rawNumber = o.orderNumber;
+  const orderNumber =
+    typeof rawNumber === 'number' && Number.isInteger(rawNumber) && rawNumber >= 10000 && rawNumber <= 99999
+      ? rawNumber
+      : undefined;
   return {
     id: o._id,
     displayOrderId: o.displayOrderId,
+    orderNumber,
     kind: o.kind,
     paymentStatus: o.status,
     shippingStatus: o.shippingStatus,

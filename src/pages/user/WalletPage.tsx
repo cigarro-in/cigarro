@@ -95,7 +95,8 @@ export function WalletPage() {
         }
       }
 
-      navigate('/transaction', {
+      sessionStorage.setItem('pendingOrderId', String(result.orderId));
+      navigate(`/transaction/${result.orderId}`, {
         state: { orderId: result.orderId },
         replace: result.status === 'paid',
       });

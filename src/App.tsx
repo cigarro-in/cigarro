@@ -8,7 +8,7 @@ import { MobileLayout } from './components/layout/MobileLayout';
 import { BreadcrumbNav } from './components/layout/BreadcrumbNav';
 import { PageTransition } from './components/layout/PageTransition';
 import Footer from './components/layout/Footer';
-import { AuthProvider, useAuth } from './hooks/useAuth';
+import { AuthProvider, useAuth, useAuthDialog } from './hooks/useAuth';
 import { PhoneAuthDialog } from './components/auth/PhoneAuthDialog';
 import { ConvexAuthProvider } from './lib/convex/ConvexAuthProvider';
 import { CartProvider } from './hooks/useCart';
@@ -102,8 +102,28 @@ function AdminHostView() {
   );
 }
 
-function AppContent() {
-  const { user } = useAuth();
+// Single global auth-dialog host: the only PhoneAuthDialog mounted on the
+// storefront across desktop/mobile. Header, MobileBottomNav, and theme shells
+// open it via useAuthDialog().requestAuth() instead of mounting their own.
+// Wrapped in an inline boundary so a recoverable auth failure never shows
+// the generic global crash screen. (AdminHostView keeps its own dialog — it
+// renders on a separate host branch and is never co-mounted.)
+function StorefrontAuthHost() {
+  const { open, onSuccess, closeAuthDialog } = useAuthDialog();
+  return (
+    <ErrorBoundary variant="inline">
+      <PhoneAuthDialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) closeAuthDialog();
+        }}
+        onAuthSuccess={onSuccess}
+      />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {  const { user } = useAuth();
   const { theme } = useTheme();
   const location = useLocation();
   const ThemeLayout = theme.slots.Layout;
@@ -213,6 +233,7 @@ function AppContent() {
   return (
     <HelmetProvider>
       <ReferralTracker />
+      <StorefrontAuthHost />
       {/* Consent banner must render on admin routes too: admins are
           auto-redirected to /admin, so gating on isUserPage left them
           consent-denied forever and their visits never reached GA. */}

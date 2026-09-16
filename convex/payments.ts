@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, internalMutation } from "./_generated/server";
 import { parseWithTemplates, parseBankEmail } from "./lib/email";
+import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
 import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory } from "./lib/inventory";
@@ -246,6 +247,39 @@ async function matchEmailToOrder(
     if (byRef && byRef.orgId === orgId && byRef.status === "pending") {
       await markOrderPaid(ctx, byRef, emailId, "paid", { upiRef, payerVpa, payerName });
       return { matched: true, orderId: byRef._id, via: "upi_ref" };
+    }
+  }
+
+  // 0b) Order-number fallback: our UPI note echoes `Order <5-digit>`, which
+  //    bank alerts carry in the body text. Exact and idempotent (email dedupe
+  //    by messageId happens before we get here). The amount must still equal
+  //    the order's fingerprint — otherwise an under/over-payment would mark
+  //    the order paid. Legacy orders have no orderNumber and skip this path —
+  //    displayOrderId ref (above) and exact-amount matching (below) cover them.
+  const email = await ctx.db.get(emailId);
+  const bodyText = `${email?.subject ?? ""}\n${email?.rawBody ?? ""}`;
+  const numberCandidates = [
+    ...new Set(bodyText.match(/\b\d{5}\b/g) ?? []),
+  ]
+    .map(Number)
+    .filter(isValidOrderNumber)
+    .slice(0, 5);
+  if (numberCandidates.length > 0) {
+    for (const n of numberCandidates) {
+      const hit = await ctx.db
+        .query("orders")
+        .withIndex("by_org_order_number", (q) =>
+          q.eq("orgId", orgId).eq("orderNumber", n),
+        )
+        .first();
+      if (hit && hit.status === "pending" && hit.finalAmountPaise === amountPaise) {
+        await markOrderPaid(ctx, hit, emailId, "paid", {
+          upiRef,
+          payerVpa,
+          payerName,
+        });
+        return { matched: true, orderId: hit._id, via: "order_number" };
+      }
     }
   }
 

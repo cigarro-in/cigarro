@@ -1,0 +1,52 @@
+/* =========================================================================
+   Classic Design System — semantic token mapping
+   ------------------------------------------------------------------------
+   Maps the shared `--vv-*` tokens onto the Classic (creme/canyon) palette
+   so shared surfaces (auth dialog, drawers) render on-brand under
+   data-theme="classic" with no blue/white fallbacks.
+   ========================================================================= */
+
+[data-theme="classic"] {
+  /* -------- Color · Brand (canyon) -------- */
+  --vv-brand:         #8c4630;
+  --vv-brand-hover:   #6e3524;
+  --vv-brand-active:  #5d2d1f;
+  --vv-brand-soft:    #f0e4d3;
+  --vv-brand-on:      #fff7e9;
+
+  /* -------- Color · Accent (sunflower) -------- */
+  --vv-accent:        #dea138;
+  --vv-accent-hover:  #c78d2c;
+  --vv-accent-soft:   #f7ecd4;
+  --vv-accent-on:     #433c35;
+
+  /* -------- Color · Surfaces -------- */
+  --vv-bg:            #e8e0d2;
+  --vv-bg-elevated:   #fff7e9;
+  --vv-bg-inset:      #ded3bf;
+  --vv-bg-overlay:    rgba(67, 60, 53, 0.48);
+
+  /* -------- Color · Foreground -------- */
+  --vv-fg:            #433c35;
+  --vv-fg-muted:      #6f6259;
+  --vv-fg-subtle:     #8a7a6d;
+  --vv-fg-on-brand:   #fff7e9;
+
+  /* -------- Color · Borders -------- */
+  --vv-border:        #ded3bf;
+  --vv-border-strong: #a68e7d;
+  --vv-border-focus:  var(--vv-brand);
+
+  /* -------- Color · Feedback -------- */
+  --vv-success:       #3d7a44;
+  --vv-success-soft:  #e9f1e4;
+  --vv-warning:       #a86a12;
+  --vv-warning-soft:  #f7ecd4;
+  --vv-danger:        #dc2626;
+  --vv-danger-soft:   #f9e9e4;
+  --vv-info:          #2c6e7f;
+  --vv-info-soft:     #e4efec;
+
+  /* -------- Shadows -------- */
+  --vv-shadow-focus: 0 0 0 3px rgba(140, 70, 48, 0.2);
+}

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
 import { Search, ShoppingBag, Menu, X, Heart, User, LogOut, Loader2, Package, ExternalLink } from 'lucide-react';
-import { PhoneAuthDialog } from '../auth/PhoneAuthDialog';
 import { MiniCart } from '../cart/MiniCart';
 import { Badge } from '../ui/badge';
 import { Product } from '../../hooks/useCart';
@@ -18,7 +17,7 @@ import { InstallPWA } from '../pwa/InstallPWA';
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const { requestAuth } = useAuthDialog();
   const [isMiniCartOpen, setIsMiniCartOpen] = useState(false);
   const [autoShowTimeout, setAutoShowTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -446,7 +445,7 @@ const Header = () => {
           ) : (
             <button
               className="flex items-center justify-center w-12 h-12 hover:bg-creme-light rounded-lg transition-colors duration-300"
-              onClick={() => setIsAuthDialogOpen(true)}
+              onClick={() => requestAuth()}
               aria-label="Sign in"
             >
               <User className="w-5 h-5 text-dark" strokeWidth={1.5} />
@@ -505,7 +504,7 @@ const Header = () => {
                 </>
               ) : (
                 <button
-                  onClick={() => { setIsAuthDialogOpen(true); setIsMenuOpen(false); }}
+                  onClick={() => { requestAuth(); setIsMenuOpen(false); }}
                   className="block py-2 text-dark font-sans font-normal text-sm leading-relaxed tracking-tight transition-colors duration-300 hover:text-canyon text-left"
                 >
                   Sign In / Register
@@ -708,11 +707,6 @@ const Header = () => {
         </div>
       )}
 
-      {/* Authentication Dialog */}
-      <PhoneAuthDialog
-        open={isAuthDialogOpen}
-        onOpenChange={setIsAuthDialogOpen}
-      />
     </header>
   );
 };

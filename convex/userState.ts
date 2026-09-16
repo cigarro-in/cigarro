@@ -438,12 +438,16 @@ export const listAddresses = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
     const { userId } = await requireMember(ctx, args.orgId);
-    return await ctx.db
+    const rows = await ctx.db
       .query("savedAddresses")
       .withIndex("by_org_user", (q) =>
         q.eq("orgId", args.orgId).eq("userId", userId),
       )
       .collect();
+    // Deterministic order (oldest first) so "default else newest (last)"
+    // picks the same row on every client.
+    rows.sort((a, b) => a.createdAt - b.createdAt);
+    return rows;
   },
 });
 
@@ -468,14 +472,18 @@ export const addAddress = mutation({
   handler: async (ctx, args) => {
     const { userId } = await requireMember(ctx, args.orgId);
     const now = Date.now();
-    const makeDefault =
-      args.isDefault ??
-      ((await ctx.db
+    const existingCount = (
+      await ctx.db
         .query("savedAddresses")
         .withIndex("by_org_user", (q) =>
           q.eq("orgId", args.orgId).eq("userId", userId),
         )
-        .collect()).length === 0);
+        .collect()
+    ).length;
+    // First address is always the default (explicit isDefault:false must not
+    // leave a new book with zero defaults — the form sends false by default).
+    const makeDefault =
+      existingCount === 0 ? true : (args.isDefault ?? false);
     if (makeDefault) {
       const existing = await ctx.db
         .query("savedAddresses")
@@ -519,6 +527,23 @@ export const removeAddress = mutation({
       throw new ConvexError({ code: "NOT_FOUND" });
     }
     await ctx.db.delete(args.addressId);
+    // Deleting the default must not leave zero defaults: promote the oldest
+    // remaining row so the next "default else newest" pick stays deterministic.
+    if (row.isDefault) {
+      const remaining = await ctx.db
+        .query("savedAddresses")
+        .withIndex("by_org_user", (q) =>
+          q.eq("orgId", args.orgId).eq("userId", userId),
+        )
+        .collect();
+      if (remaining.length > 0) {
+        remaining.sort((a, b) => a.createdAt - b.createdAt);
+        await ctx.db.patch(remaining[0]._id, {
+          isDefault: true,
+          updatedAt: Date.now(),
+        });
+      }
+    }
     return null;
   },
 });

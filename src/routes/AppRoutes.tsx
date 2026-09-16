@@ -78,6 +78,7 @@ export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) =>
       <Route path={ROUTES.MOBILE_CHECKOUT} element={<MobileCheckoutPage />} />
 
       {/* Payment & Orders */}
+      <Route path={ROUTES.TRANSACTION_DETAIL} element={<ProtectedRoute><TransactionProcessingPage /></ProtectedRoute>} />
       <Route path={ROUTES.TRANSACTION} element={<ProtectedRoute><TransactionProcessingPage /></ProtectedRoute>} />
       <Route path={ROUTES.ORDERS} element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
 

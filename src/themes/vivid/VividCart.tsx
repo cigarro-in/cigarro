@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
-import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
+import { useAuth, useAuthDialog } from '../../hooks/useAuth';
+import { QuantityStepper } from '../../components/cart/QuantityStepper';
+import { toast } from 'sonner';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 
@@ -12,8 +13,8 @@ const formatPrice = (n: number) => n.toLocaleString('en-IN');
 export default function VividCart() {
   const { items, totalPrice, totalItems, updateQuantity, removeFromCart } = useCart();
   const { user } = useAuth();
+  const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
-  const [authOpen, setAuthOpen] = useState(false);
 
   // GA4 view_cart: once per distinct cart content.
   const cartSentRef = useRef<string | null>(null);
@@ -27,7 +28,7 @@ export default function VividCart() {
 
   const handleCheckout = () => {
     if (!user) {
-      setAuthOpen(true);
+      requestAuth({ onSuccess: () => navigate('/checkout') });
       return;
     }
     navigate('/checkout');
@@ -79,25 +80,19 @@ export default function VividCart() {
                 <p className="text-[var(--color-muted-foreground)] text-xs">
                   ₹{formatPrice(price)}
                 </p>
-                <div className="mt-2 inline-flex items-center bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-full">
-                  <button
-                    onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1), item.variant_id, item.combo_id)}
-                    className="w-7 h-7 grid place-items-center text-[var(--color-foreground)]"
-                    aria-label="Decrease"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="w-7 text-center text-[var(--color-foreground)] text-xs font-semibold">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => updateQuantity(item.id, item.quantity + 1, item.variant_id, item.combo_id)}
-                    className="w-7 h-7 grid place-items-center text-[var(--color-foreground)]"
-                    aria-label="Increase"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </div>
+                <QuantityStepper
+                  quantity={item.quantity}
+                  onChange={(next) =>
+                    updateQuantity(item.id, next, item.variant_id, item.combo_id).catch(() =>
+                      toast.error('Failed to update quantity'),
+                    )
+                  }
+                  min={0}
+                  size="sm"
+                  className="mt-2 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-full"
+                  buttonClassName="text-[var(--color-foreground)]"
+                  valueClassName="text-[var(--color-foreground)] text-xs"
+                />
               </div>
               <div className="text-right flex flex-col items-end gap-2">
                 <span className="text-[var(--color-foreground)] font-bold text-sm">
@@ -139,11 +134,6 @@ export default function VividCart() {
         </button>
       </div>
 
-      <PhoneAuthDialog
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        onAuthSuccess={() => navigate('/checkout')}
-      />
     </div>
   );
 }
