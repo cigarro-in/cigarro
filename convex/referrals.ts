@@ -1,11 +1,11 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireIdentity } from "./lib/auth";
+import { creditWallet } from "./wallet";
 
 // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
-// Ports the exact RPC semantics from 040 (record/validate) that the app
-// consumes. Reward *payout* never existed server-side (no trigger/RPC sets
-// first_order_completed), so flags are carried, not invented.
+// Ports the record/validate semantics from 040 and pays the configured reward
+// from the trusted delivered-order transition.
 // Reads stay snake_case + ISO dates, matching the old row shape.
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -173,6 +173,71 @@ async function attach(ctx: any, subject: string, referredUserId: string, referra
     referrer_id: referrer.userId,
     referrer_name: await nameFor(ctx, referrer.userId),
   };
+}
+
+// Pay both sides exactly once when the referred customer's first order is
+// delivered. This is called from the shipping transition, not the client, so
+// a caller cannot award credits by replaying or fabricating a request.
+export async function rewardDeliveredReferral(
+  ctx: any,
+  order: { orgId: any; userId: string; _id: any },
+  createdBy: string,
+) {
+  const mine = await ctx.db
+    .query("referrals")
+    .withIndex("by_user", (q: any) => q.eq("userId", order.userId))
+    .unique();
+  if (!mine?.referredByUserId || mine.firstOrderCompleted) return false;
+
+  const referrer = await ctx.db
+    .query("referrals")
+    .withIndex("by_user", (q: any) => q.eq("userId", mine.referredByUserId))
+    .unique();
+  if (!referrer || !referrer.isActive || !mine.isActive) return false;
+  const referrerMembership = await ctx.db
+    .query("memberships")
+    .withIndex("by_org_user", (q: any) =>
+      q.eq("orgId", order.orgId).eq("userId", referrer.userId),
+    )
+    .unique();
+  if (!referrerMembership) return false;
+
+  const now = Date.now();
+  const rewardPaise = Math.max(0, Math.floor(mine.referralRewardAmount * 100));
+  await ctx.db.patch(mine._id, {
+    firstOrderCompleted: true,
+    firstOrderId: String(order._id),
+    firstOrderDate: now,
+    ownRewardPaid: rewardPaise > 0,
+    ownRewardPaidAt: rewardPaise > 0 ? now : undefined,
+    updatedAt: now,
+  });
+  await ctx.db.patch(referrer._id, {
+    successfulReferrals: referrer.successfulReferrals + 1,
+    totalRewardsEarned: referrer.totalRewardsEarned + mine.referralRewardAmount,
+    updatedAt: now,
+  });
+  if (rewardPaise > 0) {
+    await creditWallet(ctx, {
+      orgId: order.orgId,
+      userId: order.userId,
+      amountPaise: rewardPaise,
+      reason: "referral_reward",
+      relatedOrderId: order._id,
+      createdBy,
+      note: "referral_first_order",
+    });
+    await creditWallet(ctx, {
+      orgId: order.orgId,
+      userId: referrer.userId,
+      amountPaise: rewardPaise,
+      reason: "referral_reward",
+      relatedOrderId: order._id,
+      createdBy,
+      note: "referral_success",
+    });
+  }
+  return true;
 }
 
 // Signup-time attach (ReferralTracker) — mirrors record_referral (040).

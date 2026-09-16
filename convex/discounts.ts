@@ -25,6 +25,7 @@ async function requireDiscountAdmin(ctx: any) {
 export const listDiscountsForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireDiscountAdmin(ctx);
     const rows = await ctx.db.query("discounts").collect();
     rows.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     return rows;
@@ -61,7 +62,10 @@ export const getDiscountByCode = query({
 
 export const getDiscountForEdit = query({
   args: { id: v.id("discounts") },
-  handler: async (ctx, { id }) => ctx.db.get(id),
+  handler: async (ctx, { id }) => {
+    await requireDiscountAdmin(ctx);
+    return ctx.db.get(id);
+  },
 });
 
 const discountFields = {
@@ -133,21 +137,5 @@ export const setDiscountsStatus = mutation({
       await ctx.db.patch(id, { is_active: isActive, updatedAt: now });
     }
     return { updated: ids.length };
-  },
-});
-
-// Coupon accounting, best-effort fire-and-forget from checkout. (The old
-// Supabase path called supabase.raw — which doesn't exist — so usage_count
-// never moved; anything here is strictly better.)
-export const registerUse = mutation({
-  args: { id: v.id("discounts") },
-  handler: async (ctx, { id }) => {
-    const row = await ctx.db.get(id);
-    if (!row) return { ok: false };
-    await ctx.db.patch(id, {
-      usage_count: row.usage_count + 1,
-      updatedAt: Date.now(),
-    });
-    return { ok: true };
   },
 });

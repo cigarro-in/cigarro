@@ -72,6 +72,13 @@ interface CartContextType {
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+const MAX_CART_QUANTITY = 99;
+
+const normalizeCartQuantity = (value: unknown, fallback = 1): number => {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity)) return fallback;
+  return Math.min(MAX_CART_QUANTITY, Math.max(1, Math.floor(quantity)));
+};
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -267,7 +274,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (savedCart) {
         try {
           const parsedCart = JSON.parse(savedCart);
-          setItems(parsedCart);
+          if (!Array.isArray(parsedCart)) throw new Error('Cart must be an array');
+          setItems(parsedCart.map((item) => ({
+            ...item,
+            quantity: normalizeCartQuantity(item?.quantity),
+          })));
         } catch (error) {
           console.error('Failed to parse cart from localStorage:', error);
           localStorage.removeItem('cart');
@@ -284,7 +295,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (useConvexPath && org) {
       try {
         const guestCart = localStorage.getItem('cart');
-        const guestItems: CartItem[] = guestCart ? JSON.parse(guestCart) : [];
+        const parsedGuestCart = guestCart ? JSON.parse(guestCart) : [];
+        const guestItems: CartItem[] = Array.isArray(parsedGuestCart)
+          ? parsedGuestCart.map((item) => ({
+            ...item,
+            quantity: normalizeCartQuantity(item?.quantity),
+          }))
+          : [];
 
         const currentLines = (convexLineCount ?? []).map((l) => ({
           productId: l.productId,
@@ -308,7 +325,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 item.combo_id === guestItem.combo_id
             );
             if (idx >= 0) {
-              merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + guestItem.quantity };
+              merged[idx] = {
+                ...merged[idx],
+                quantity: normalizeCartQuantity(merged[idx].quantity + guestItem.quantity),
+              };
             } else {
               merged.push(guestItem);
             }
@@ -350,6 +370,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const addToCart = async (product: Product, quantity = 1, variantId?: string, comboId?: string) => {
+    quantity = normalizeCartQuantity(quantity);
     // If no variantId is provided but product has variants, use the default variant
     if (!variantId && product.product_variants?.length) {
       const defaultVariant = product.product_variants.find(v => v.is_default);
@@ -368,7 +389,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (existingItem) {
       newItems = items.map(item =>
         item.id === product.id && item.variant_id === variantId && item.combo_id === comboId
-          ? { ...item, quantity: item.quantity + quantity }
+          ? { ...item, quantity: normalizeCartQuantity(item.quantity + quantity) }
           : item
       );
     } else {
@@ -444,6 +465,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
       const quantity = quantities[i];
+      const normalizedQuantity = normalizeCartQuantity(quantity);
 
       // Check for existing item considering variant_id and combo_id
       const existingItemIndex = newItems.findIndex(item =>
@@ -454,7 +476,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (existingItemIndex >= 0) {
         // Add to existing quantity
-        newItems[existingItemIndex].quantity += quantity;
+        newItems[existingItemIndex].quantity = normalizeCartQuantity(
+          newItems[existingItemIndex].quantity + normalizedQuantity
+        );
       } else {
         // Add new item
         newItems.push({
@@ -463,7 +487,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           brand: typeof product.brand === 'object' ? product.brand?.name : product.brand || 'Premium',
           // Get price from default variant
           price: (product as any).variant_price || product.product_variants?.find(v => v.is_default)?.price || product.product_variants?.[0]?.price || 0,
-          quantity,
+          quantity: normalizedQuantity,
           variant_id: (product as any).variant_id,
           combo_id: (product as any).combo_id
         });
@@ -526,6 +550,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    quantity = normalizeCartQuantity(quantity);
     const originalItems = items;
 
     // Find matching item

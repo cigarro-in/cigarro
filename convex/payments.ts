@@ -284,6 +284,31 @@ async function matchEmailToOrder(
     .order("desc")
     .first();
   if (expired && expired.terminalAt && expired.terminalAt >= cutoff) {
+    // A mixed-wallet order refunds its wallet portion when it expires. If the
+    // old UPI request is paid afterwards, fulfilling it would underpay the
+    // order. Preserve the expired order and credit only the newly received
+    // bank amount to the customer's wallet.
+    if (expired.walletDebitPaise > 0 && expired.walletRefundedAt) {
+      await creditWallet(ctx, {
+        orgId,
+        userId: expired.userId,
+        amountPaise,
+        reason: "late_payment_credit",
+        relatedOrderId: expired._id,
+        createdBy: "system",
+        note: `late payment for expired order ${expired.displayOrderId}`,
+      });
+      await ctx.db.patch(emailId, {
+        status: "matched",
+        matchedOrderId: expired._id,
+      });
+      return {
+        matched: false,
+        credited: true,
+        orderId: expired._id,
+        via: "late_wallet_credit",
+      };
+    }
     await markOrderPaid(ctx, expired, emailId, "late_paid", {
       upiRef,
       payerVpa,

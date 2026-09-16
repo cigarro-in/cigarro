@@ -30,6 +30,9 @@ export async function getUserReferral(_userId: string): Promise<Referral | null>
 // =====================================================
 export async function getUserReferralStats(_userId: string): Promise<ReferralStats | null> {
   try {
+    // Existing users may never have visited the referral page before. Mint
+    // their code lazily so the dashboard is usable for them as well.
+    await convex.mutation(api.referrals.ensureMyReferral, {});
     const stats = await convex.query(api.referrals.getReferralStats, {});
     if (!stats) return null;
     if (!stats.referral_link && stats.referral_code) {

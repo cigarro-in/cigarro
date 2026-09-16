@@ -46,16 +46,17 @@ function useOwnAuthForConvex() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tick],
   );
+  const isAuthenticated = getAccessToken() !== null;
 
   return useMemo(
     () => ({
       isLoading,
-      isAuthenticated: true,
+      isAuthenticated,
       fetchAccessToken,
     }),
     // tick re-resolves auth state on session changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, fetchAccessToken, tick],
+    [isLoading, isAuthenticated, fetchAccessToken, tick],
   );
 }
 

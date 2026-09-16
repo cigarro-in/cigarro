@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Wallet, Plus, History, TrendingUp, TrendingDown } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -21,6 +21,8 @@ const REASON_LABELS: Record<string, string> = {
   wallet_load_credit: 'Wallet Load',
   admin_credit: 'Admin Credit',
   late_payment_credit: 'Late Payment Credit',
+  duplicate_payment_credit: 'Duplicate Payment Credit',
+  referral_reward: 'Referral Reward',
 };
 
 export function WalletPage() {
@@ -28,12 +30,16 @@ export function WalletPage() {
   const { user } = useAuth();
   const org = useOrg();
 
-  const balanceData = useQuery(api.wallet.getMyBalance, org ? { orgId: org._id } : 'skip');
+  const balanceData = useQuery(
+    api.wallet.getMyBalance,
+    org && user ? { orgId: org._id } : 'skip',
+  );
   const ledger = useQuery(
     api.wallet.getMyLedger,
-    org ? { orgId: org._id, limit: 50 } : 'skip',
+    org && user ? { orgId: org._id, limit: 50 } : 'skip',
   );
   const createOrder = useMutation(api.orders.createOrder);
+  const loadIdempotencyKeyRef = useRef<string | null>(null);
 
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [loadAmount, setLoadAmount] = useState('');
@@ -59,9 +65,15 @@ export function WalletPage() {
 
     setIsProcessing(true);
     try {
+      const idempotencyKey = loadIdempotencyKeyRef.current ??= (
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `wallet-load-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
       const result = await createOrder({
         orgId: org._id,
         kind: 'wallet_load',
+        idempotencyKey,
         items: [
           {
             productId: 'wallet-load',
@@ -91,7 +103,7 @@ export function WalletPage() {
       console.error('Wallet load error:', error);
       const code = error?.data?.code;
       toast.error(
-        code === 'SLOT_POOL_EXHAUSTED'
+        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending loads at this amount — retry shortly.'
           : 'Failed to initiate wallet load',
       );

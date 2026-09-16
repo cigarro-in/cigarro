@@ -1,9 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { requireIdentity } from "./lib/auth";
+import { requireIdentity, requireMember } from "./lib/auth";
 import { normalizePhoneE164 } from "./lib/phone";
 import {
   internalMutation,
-  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
@@ -42,88 +41,28 @@ export const getMyProfile = query({
   },
 });
 
-// Self-debug for the /debugIdentity HTTP route (which can't touch ctx.db
-// directly — HTTP actions only get runQuery/runMutation). Returns only rows
-// belonging to the caller.
-export const debugMyIdentity = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { ok: false as const, error: "no identity" };
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .unique();
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .collect();
-    const orgs = await ctx.db.query("organizations").collect();
-    return {
-      ok: true as const,
-      subject: identity.subject,
-      issuer: identity.issuer,
-      user: user
-        ? { userId: user.userId, phone: user.phone, name: user.name }
-        : null,
-      memberships: memberships.map((m) => ({
-        orgId: m.orgId,
-        role: m.role,
-      })),
-      orgSlugs: orgs.map((o) => ({ id: o._id, slug: o.slug })),
-    };
-  },
-});
-
-// One-off PROD repair (cutover lockout): normalize a user's phone to E.164
-// and ensure an owner membership on the org. Only reachable via the
-// secret-guarded HTTP route; delete both after the repair.
-export const repairAccess = internalMutation({
-  args: { userId: v.string(), orgSlug: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
-    if (!user) throw new ConvexError({ code: "NO_USER" });
-    const phone = normalizePhoneE164(user.phone) ?? user.phone;
-    await ctx.db.patch(user._id, { phone, updatedAt: Date.now() });
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", args.orgSlug ?? "smokeshop"))
-      .unique();
-    if (!org) throw new ConvexError({ code: "NO_ORG" });
-    const existing = await ctx.db
-      .query("memberships")
-      .withIndex("by_org_user", (q) =>
-        q.eq("orgId", org._id).eq("userId", args.userId),
-      )
-      .unique();
-    if (existing) {
-      if (existing.role !== "owner") {
-        await ctx.db.patch(existing._id, { role: "owner" });
-      }
-    } else {
-      await ctx.db.insert("memberships", {
-        orgId: org._id,
-        userId: args.userId,
-        role: "owner",
-        createdAt: Date.now(),
-      });
-    }
-    return { userId: args.userId, phone, orgId: org._id, role: "owner" };
-  },
-});
-
-// Lazy spine that works for everyone (upsertUser requires org membership
-// and silently no-ops for unenrolled customers — this one doesn't).
+// Authenticated session handshake: maintain the user spine and guarantee the
+// shopper has a customer membership for the active storefront. Existing
+// staff/admin/owner roles are preserved.
 export const ensureMyProfile = mutation({
   args: {
+    orgSlug: v.string(),
     phone: v.optional(v.string()),
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
+    const allowedOrgSlug = process.env.CUSTOMER_ORG_SLUG ?? "smokeshop";
+    if (args.orgSlug !== allowedOrgSlug) {
+      throw new ConvexError({ code: "ORG_NOT_ALLOWED" });
+    }
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", allowedOrgSlug))
+      .unique();
+    if (!org || !org.active) {
+      throw new ConvexError({ code: "ORG_INACTIVE" });
+    }
     const existing = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
@@ -132,21 +71,38 @@ export const ensureMyProfile = mutation({
     // Normalize on write: a raw client phone must never overwrite the E.164
     // form, or the next by_phone lookup forks a second users row.
     const profilePhone = normalizePhoneE164(args.phone);
+    let userId = existing?._id;
     if (existing) {
       await ctx.db.patch(existing._id, {
         ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
         ...(args.name !== undefined ? { name: args.name } : {}),
         updatedAt: now,
       });
-      return existing._id;
+    } else {
+      userId = await ctx.db.insert("users", {
+        userId: identity.subject,
+        phone: profilePhone,
+        name: args.name,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
-    return await ctx.db.insert("users", {
-      userId: identity.subject,
-      phone: profilePhone,
-      name: args.name,
-      createdAt: now,
-      updatedAt: now,
-    });
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("orgId", org._id).eq("userId", identity.subject),
+      )
+      .unique();
+    if (!membership) {
+      await ctx.db.insert("memberships", {
+        orgId: org._id,
+        userId: identity.subject,
+        role: "customer",
+        createdAt: now,
+      });
+    }
+    return userId;
   },
 });
 
@@ -192,7 +148,7 @@ export const upsertUser = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const existing = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -220,7 +176,7 @@ export const upsertUser = mutation({
 export const getMe = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     return await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -246,7 +202,7 @@ const cartLine = (d: Doc<"carts">) => ({
 export const listCart = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const lines = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -270,9 +226,9 @@ export const addToCart = mutation({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const qty = args.qty ?? 1;
-    if (!Number.isFinite(qty) || qty <= 0 || qty > 99) {
+    if (!Number.isInteger(qty) || qty <= 0 || qty > 99) {
       throw new ConvexError({ code: "BAD_QTY" });
     }
     if (!Number.isFinite(args.unitPriceRupees) || args.unitPriceRupees < 0) {
@@ -329,7 +285,7 @@ export const setCartQty = mutation({
     qty: v.number(),
   },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const line = await ctx.db.get(args.lineId);
     if (!line || line.userId !== userId || line.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -338,7 +294,7 @@ export const setCartQty = mutation({
       await ctx.db.delete(args.lineId);
       return null;
     }
-    if (!Number.isFinite(args.qty) || args.qty > 99) {
+    if (!Number.isInteger(args.qty) || args.qty > 99) {
       throw new ConvexError({ code: "BAD_QTY" });
     }
     await ctx.db.patch(args.lineId, { qty: args.qty, updatedAt: Date.now() });
@@ -349,7 +305,7 @@ export const setCartQty = mutation({
 export const removeCartLine = mutation({
   args: { orgId: v.id("organizations"), lineId: v.id("carts") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const line = await ctx.db.get(args.lineId);
     if (!line || line.userId !== userId || line.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -362,7 +318,7 @@ export const removeCartLine = mutation({
 export const clearCart = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const lines = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -399,7 +355,16 @@ export const replaceCart = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
+    const validated = args.lines.map((line) => {
+      if (!Number.isInteger(line.qty) || line.qty <= 0 || line.qty > 99) {
+        throw new ConvexError({ code: "BAD_QTY" });
+      }
+      if (!Number.isFinite(line.unitPriceRupees) || line.unitPriceRupees < 0) {
+        throw new ConvexError({ code: "BAD_PRICE" });
+      }
+      return line;
+    });
     const existing = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -408,10 +373,7 @@ export const replaceCart = mutation({
       .collect();
     await Promise.all(existing.map((l) => ctx.db.delete(l._id)));
     const now = Date.now();
-    for (const l of args.lines) {
-      const qty = Math.floor(l.qty);
-      if (!Number.isFinite(qty) || qty <= 0 || qty > 99) continue;
-      if (!Number.isFinite(l.unitPriceRupees) || l.unitPriceRupees < 0) continue;
+    for (const l of validated) {
       await ctx.db.insert("carts", {
         orgId: args.orgId,
         userId,
@@ -421,12 +383,12 @@ export const replaceCart = mutation({
         name: l.name,
         variantName: l.variantName,
         unitPriceRupees: l.unitPriceRupees,
-        qty,
+        qty: l.qty,
         imageUrl: l.imageUrl,
         updatedAt: now,
       });
     }
-    return args.lines.length;
+    return validated.length;
   },
 });
 
@@ -435,7 +397,7 @@ export const replaceCart = mutation({
 export const listWishlist = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const rows = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user", (q) =>
@@ -449,7 +411,7 @@ export const listWishlist = query({
 export const toggleWishlist = mutation({
   args: { orgId: v.id("organizations"), productId: v.string() },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const existing = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user_product", (q) =>
@@ -475,7 +437,7 @@ export const toggleWishlist = mutation({
 export const listAddresses = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     return await ctx.db
       .query("savedAddresses")
       .withIndex("by_org_user", (q) =>
@@ -504,7 +466,7 @@ const addressArgs = {
 export const addAddress = mutation({
   args: addressArgs,
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const now = Date.now();
     const makeDefault =
       args.isDefault ??
@@ -551,7 +513,7 @@ export const addAddress = mutation({
 export const removeAddress = mutation({
   args: { orgId: v.id("organizations"), addressId: v.id("savedAddresses") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -564,7 +526,7 @@ export const removeAddress = mutation({
 export const setDefaultAddress = mutation({
   args: { orgId: v.id("organizations"), addressId: v.id("savedAddresses") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -590,7 +552,7 @@ export const setDefaultAddress = mutation({
 export const clearWishlist = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const rows = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user", (q) =>
@@ -620,7 +582,7 @@ export const updateAddress = mutation({
     isDefault: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { subject: userId } = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, args.orgId);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });

@@ -1,5 +1,10 @@
 # IMPORTANT: More specific rules MUST come first in Cloudflare Pages
 
+# The service worker must always be revalidated so it cannot pin an old app
+# shell or chunk manifest after a deployment.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
 # Static assets - EXPLICIT Content-Type headers to fix Firefox MIME type issues
 /assets/*.css
   Content-Type: text/css; charset=utf-8

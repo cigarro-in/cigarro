@@ -6,6 +6,7 @@ import { freeSlot } from "./orders";
 import { orderStatus, shippingStatus } from "./schema";
 import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, returnOrderInventory } from "./lib/inventory";
+import { rewardDeliveredReferral } from "./referrals";
 
 // ---------- Mark a pending order as paid manually ----------
 
@@ -20,6 +21,10 @@ export const markPaid = mutation({
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
     const { identity } = await requireOrgAdmin(ctx, order.orgId);
     if (order.status === "paid" || order.status === "late_paid") return;
+    if (["refunded", "voided"].includes(order.status))
+      throw new ConvexError({ code: "ORDER_NOT_PAYABLE", status: order.status });
+    if (order.walletDebitPaise > 0 && order.walletRefundedAt)
+      throw new ConvexError({ code: "WALLET_PORTION_ALREADY_REFUNDED" });
 
     await ctx.db.patch(orderId, {
       status: "paid",
@@ -74,6 +79,22 @@ export const refundOrder = mutation({
       terminalAt: Date.now(),
     });
     if (restock) await returnOrderInventory(ctx, order, `admin:${identity.subject}`);
+
+    // A mixed-wallet order has two customer-funded portions. The UPI portion
+    // follows the selected refund destination; the wallet portion must always
+    // return to the wallet or it would be silently lost on a bank refund.
+    if (order.walletDebitPaise > 0 && !order.walletRefundedAt) {
+      await creditWallet(ctx, {
+        orgId: order.orgId,
+        userId: order.userId,
+        amountPaise: order.walletDebitPaise,
+        reason: "order_refund_admin",
+        relatedOrderId: orderId,
+        createdBy: `admin:${identity.subject}`,
+        note: "wallet portion of order refund",
+      });
+      await ctx.db.patch(orderId, { walletRefundedAt: Date.now() });
+    }
 
     if (toWallet) {
       await creditWallet(ctx, {
@@ -230,6 +251,10 @@ export const updateShipping = mutation({
       patch.shippingNotes = args.shippingNotes;
 
     await ctx.db.patch(args.orderId, patch);
+
+    if (args.shippingStatus === "delivered") {
+      await rewardDeliveredReferral(ctx, order, `admin:${identity.subject}`);
+    }
 
     await audit(ctx, {
       orgId: order.orgId,

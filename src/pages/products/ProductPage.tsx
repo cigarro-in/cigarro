@@ -126,7 +126,7 @@ function ProductPage() {
     setProduct(catalogProduct as any);
     setVariants(activeVariants);
     // Auto-select default variant (single source of truth)
-    const defaultVariant = getDefaultVariant(activeVariants);
+    const defaultVariant = getDefaultVariant<ProductVariant>(activeVariants);
     if (defaultVariant) {
       setSelectedVariant(defaultVariant);
     }

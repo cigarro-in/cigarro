@@ -157,6 +157,7 @@ export const createReview = mutation({
 export const listReviewsForAdmin = query({
   args: { approved: v.optional(v.boolean()) },
   handler: async (ctx, { approved }) => {
+    await requireReviewsAdmin(ctx);
     const rows = await ctx.db.query("productReviews").order("desc").take(500);
     const products = await ctx.db.query("catalogProducts").collect();
     const bySupabaseId = new Map(products.map((p) => [p.supabaseId, p]));

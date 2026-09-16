@@ -28,16 +28,16 @@ convex/
 
 Everything is **integer paise**. `500.47` rupees ↔ `50047` paise. No floats crossing the DB.
 
-## Paise-slot fingerprinting (the matching trick)
+## Paise fingerprinting (the matching trick)
 
 Bank alert emails only expose the amount (note field is stripped). To match a payment to an order, we make each pending order's amount unique via the last two paise digits:
 
-1. Compute `baseAmountPaise` (cart total minus wallet debit).
-2. `allocateSlot(orgId, baseAmountPaise)` picks the lowest free slot `0..99` for that `(orgId, baseAmount)` pair.
-3. `finalAmountPaise = baseAmount + slot`. That's the UPI ask.
-4. Bank email arrives for `X` → `orders.by_org_final_status` index hits exactly one held order.
+1. Re-price the cart, shipping, coupon, and wallet contribution on the server.
+2. Choose a 1–99 paise discount whose resulting amount is not used by a pending order, a recently terminal order in quarantine, or a recently paid order in the duplicate-detection window.
+3. Store that exact amount in `finalAmountPaise` and use it in the UPI request.
+4. Bank email arrives for `X` → `orders.by_org_final_status` identifies the order exactly.
 
-Slot states: `free → held → quarantined → free`. Verified payments free instantly; every other terminal state goes through a 30-minute quarantine so late UPI arrivals don't get misattributed to a freshly-assigned order.
+Legacy `paymentSlots` rows remain supported for older orders, but new orders use the server-selected paise fingerprint directly.
 
 ## Retry model
 

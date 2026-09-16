@@ -14,6 +14,7 @@ import { Req, ReqError } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface ReviewRow {
+  id: string;
   _id: string;
   productSupabaseId: string;
   productName: string;
@@ -207,7 +208,7 @@ export function ReviewsPage() {
           )}
         </div>
         <DataTable
-          data={(rows || []) as ReviewRow[]}
+          data={(rows || []).map((row: Omit<ReviewRow, 'id'>) => ({ ...row, id: row._id }))}
           columns={columns}
           loading={loading}
           selectedItems={selected}

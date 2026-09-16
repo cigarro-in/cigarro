@@ -16,6 +16,7 @@ export function getActiveVariants<T extends { is_active?: boolean }>(
 // Explicit default first; otherwise a stable sort so the pick does not
 // depend on database return order.
 export function getDefaultVariant<T extends {
+  is_active?: boolean;
   is_default?: boolean;
   variant_slug?: string;
   variant_name?: string;

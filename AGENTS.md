@@ -42,7 +42,7 @@ Themes own:
 - `convex/admin.ts` — `markPaid`, `voidOrder`, `refundOrder`, `updateShipping`, `getOrder`, late-payment + bank-email admin
 - `convex/wallet.ts` — append-only ledger + materialized `walletAccounts.balancePaise`
 - `convex/payments.ts` — `expireHeldSlot`, `releaseQuarantine`, `ingestBankEmail`
-- **Paise-slot fingerprinting**: each order gets a unique offset 0–99 paise added to the base so the incoming UPI email amount uniquely identifies the order. `slotsPerBase` is configurable per org.
+- **Paise fingerprinting**: the server selects a collision-free 1–99 paise discount so the incoming UPI email amount uniquely identifies the order. Pending, quarantined terminal, and recent paid amounts are excluded; legacy slot rows remain supported.
 - **Retry semantics**: `retryOrder` only accepts `expired` or `cancelled` source orders. It creates a new order with `retryOfOrderId` link. For `pending` orders the UI shows "Continue Payment" (go back to the existing order), not "Retry".
 
 ## Admin UI structure

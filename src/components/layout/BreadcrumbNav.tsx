@@ -67,7 +67,7 @@ export function BreadcrumbNav({ customBreadcrumbs }: BreadcrumbNavProps) {
 
   // Generate breadcrumbs from URL path
   const generateBreadcrumbs = () => {
-    const breadcrumbs = [];
+    const breadcrumbs: Array<{ name: string; href?: string; isLast: boolean }> = [];
     
     pathnames.forEach((name, index) => {
       const routeTo = `/${pathnames.slice(0, index + 1).join('/')}`;

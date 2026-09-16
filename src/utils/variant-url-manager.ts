@@ -3,10 +3,17 @@
 
 import React from 'react';
 import { VariantURLState } from '../types/product-seo';
+import type { ProductVariant } from '../types/product';
+
+// The persisted URL state type predates variant-specific structured data. Keep
+// that public shape compatible while typing the optional runtime enrichment.
+type VariantURLStateWithVariant = VariantURLState & {
+  selectedVariant?: ProductVariant;
+};
 
 export class VariantURLManager {
   private static instance: VariantURLManager;
-  private currentState: VariantURLState | null = null;
+  private currentState: VariantURLStateWithVariant | null = null;
   private listeners: ((state: VariantURLState) => void)[] = [];
 
   static getInstance(): VariantURLManager {
@@ -21,30 +28,31 @@ export class VariantURLManager {
    * This maintains SEO benefits without page reload
    */
   updateVariantURL(state: VariantURLState): void {
-    this.currentState = state;
+    const enrichedState = state as VariantURLStateWithVariant;
+    this.currentState = enrichedState;
     
     // Update browser URL without reload
     const newUrl = state.variantSlug 
-      ? `/product/${state.productSlug}?variant=${state.variantSlug}`
-      : `/product/${state.productSlug}`;
+      ? `/product/${enrichedState.productSlug}?variant=${enrichedState.variantSlug}`
+      : `/product/${enrichedState.productSlug}`;
     
     window.history.replaceState(
-      { productSlug: state.productSlug, variantSlug: state.variantSlug },
-      state.metaTitle,
+      { productSlug: enrichedState.productSlug, variantSlug: enrichedState.variantSlug },
+      enrichedState.metaTitle,
       newUrl
     );
 
     // Update meta tags dynamically
-    this.updateMetaTags(state);
+    this.updateMetaTags(enrichedState);
     
     // Notify listeners
-    this.listeners.forEach(listener => listener(state));
+    this.listeners.forEach(listener => listener(enrichedState));
   }
 
   /**
    * Update meta tags for SEO without page reload
    */
-  private updateMetaTags(state: VariantURLState): void {
+  private updateMetaTags(state: VariantURLStateWithVariant): void {
     // Update title
     document.title = state.metaTitle;
 
@@ -102,7 +110,7 @@ export class VariantURLManager {
   /**
    * Update structured data for variant
    */
-  private updateStructuredData(state: VariantURLState): void {
+  private updateStructuredData(state: VariantURLStateWithVariant): void {
     const existingScript = document.querySelector('script[type="application/ld+json"]');
     if (existingScript) {
       existingScript.remove();
@@ -113,13 +121,13 @@ export class VariantURLManager {
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: `${state.selectedVariant.variant_name}`,
-        description: state.selectedVariant.meta_description || state.metaDescription,
+        description: state.metaDescription,
         url: state.canonicalUrl,
         offers: {
           '@type': 'Offer',
           price: state.selectedVariant.price,
           priceCurrency: 'INR',
-          availability: state.selectedVariant.stock > 0 
+          availability: Number(state.selectedVariant.stock ?? 0) > 0
             ? 'https://schema.org/InStock' 
             : 'https://schema.org/OutOfStock'
         }
@@ -198,7 +206,7 @@ export class VariantURLManager {
       
       // Trigger variant change without updating URL again
       if (this.currentState) {
-        const newState: VariantURLState = {
+        const newState: VariantURLStateWithVariant = {
           ...this.currentState,
           productSlug,
           variantSlug,

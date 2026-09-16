@@ -62,7 +62,7 @@ const UpdateSW = () => {
       // Registration error
     },
     registrationOptions: {
-      updateViaCache: 'always',
+      updateViaCache: 'none',
     },
     immediate: true,
     onNeedRefresh: () => {

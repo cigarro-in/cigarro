@@ -60,6 +60,7 @@ async function assertVariantHasNoInventoryHistory(ctx: any, variantSupabaseId: s
 export const listProductsForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const products = await ctx.db.query("catalogProducts").collect();
     products.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     const brands = await ctx.db.query("catalogBrands").collect();
@@ -100,6 +101,7 @@ export const listProductsForAdmin = query({
 export const imageUsage = query({
   args: { key: v.string(), url: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    await requireCatalogAdmin(ctx);
     const base = args.key.split("/").pop() || args.key;
     const hits = (s: unknown) =>
       typeof s === "string" &&
@@ -135,6 +137,7 @@ export const imageUsage = query({
 export const listBrandsForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const brands = await ctx.db.query("catalogBrands").collect();
     brands.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     const out = [];
@@ -246,6 +249,7 @@ export const deleteBrand = mutation({
 export const listCategoriesForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const categories = await ctx.db.query("catalogCategories").collect();
     categories.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     const out = [];
@@ -586,6 +590,7 @@ export const setProductsActive = mutation({
 export const getProductForEdit = query({
   args: { supabaseId: v.string() },
   handler: async (ctx, { supabaseId }) => {
+    await requireCatalogAdmin(ctx);
     const product = await ctx.db
       .query("catalogProducts")
       .withIndex("by_supabase", (q) => q.eq("supabaseId", supabaseId))
@@ -617,6 +622,7 @@ export const getProductForEdit = query({
 export const listCollectionsForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const collections = await ctx.db.query("catalogCollections").collect();
     collections.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     const out = [];
@@ -849,6 +855,7 @@ export const deleteCombo = mutation({
 export const listBlogPostsForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const posts = await ctx.db.query("blogPosts").collect();
     posts.sort((a, b) => (b.publishedAt ?? b.updatedAt ?? 0) - (a.publishedAt ?? a.updatedAt ?? 0));
     const cats = await ctx.db.query("blogCategories").collect();
@@ -889,6 +896,7 @@ export const setBlogPostsStatus = mutation({
 export const listHeroSlidesForAdmin = query({
   args: {},
   handler: async (ctx) => {
+    await requireCatalogAdmin(ctx);
     const rows = await ctx.db.query("heroSlides").collect();
     rows.sort((a, b) => a.sortOrder - b.sortOrder);
     return rows;

@@ -20,7 +20,7 @@ import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { rupeesToPaise } from '../../lib/convex/money';
-import { calculateDiscount, applyDiscountToCart, validateCouponCode, registerDiscountUse } from '../../utils/discounts';
+import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
 import { PhoneAuthDialog } from '../../components/auth/PhoneAuthDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
 import { validateEmail, validatePhone, validateName, validatePincode, validateAddress, validateFormData } from '../../utils/validation';
@@ -49,6 +49,8 @@ export function CheckoutPage() {
   const payVpa = paymentVpa ?? '';
   const createConvexOrder = useMutation(api.orders.createOrder);
   const convexClient = useConvex();
+  // Reuse the key if a response is lost after Convex committed the order.
+  const paymentIdempotencyKeyRef = useRef<string | null>(null);
   // Single address book (Convex). The legacy dual-table
   // saved_addresses/addresses Supabase writes are gone.
   const {
@@ -893,6 +895,11 @@ export function CheckoutPage() {
     setIsProcessingPayment(true);
 
     try {
+      const idempotencyKey = paymentIdempotencyKeyRef.current ??= (
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
       const address = {
         line1: formData.address,
         city: formData.city,
@@ -946,6 +953,8 @@ export function CheckoutPage() {
         kind: 'purchase',
         items: convexItems,
         address,
+        idempotencyKey,
+        discountId: appliedDiscount?.discount_id ?? undefined,
         discountPaise: rupeesToPaise(couponDiscountAmount),
         discountLabel: appliedDiscount?.discount_name ?? undefined,
         // Lucky 1–99p: the customer-visible discount AND the server-side
@@ -958,11 +967,6 @@ export function CheckoutPage() {
       });
 
       if (user) await saveAddressOnOrderSuccess();
-
-      // Count one coupon redemption per created order (fire-and-forget).
-      if (result.status === 'pending' || result.status === 'paid') {
-        void registerDiscountUse(appliedDiscount);
-      }
 
       // GA4: order created in Convex = purchase (UPI capture follows async).
       trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
@@ -983,7 +987,7 @@ export function CheckoutPage() {
       console.error('Failed to process order:', error);
       const code = error?.data?.code;
       const msg =
-        code === 'SLOT_POOL_EXHAUSTED'
+        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry shortly.'
           : code === 'ORG_INACTIVE'
           ? 'Store is currently unavailable.'

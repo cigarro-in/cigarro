@@ -174,58 +174,6 @@ http.route({
   }),
 });
 
-// ---------- Self-debug: whose identity is this? ----------
-//
-// GET with the caller's own JWT as Bearer. Returns only rows belonging to
-// the caller (user row, memberships + orgs). No secret — you can only ever
-// see yourself. Used once to diagnose a missing-membership lockout.
-http.route({
-  path: "/debugIdentity",
-  method: "GET",
-  handler: httpAction(async (ctx, req) => {
-    try {
-      const result = await ctx.runQuery(internal.userState.debugMyIdentity, {});
-      return jsonResponse(result, result.ok ? 200 : 401);
-    } catch (e: any) {
-      return jsonResponse(
-        { ok: false, error: "debug failed", detail: String(e?.message ?? e) },
-        500,
-      );
-    }
-  }),
-});
-
-// ---------- One-off access repair (delete after use) ----------
-//
-// Secret-guarded (EDGE_SHARED_SECRET). Normalizes the user's phone and
-// ensures an owner membership. Called once from a console snippet.
-http.route({
-  path: "/repairMyAccess",
-  method: "POST",
-  handler: httpAction(async (ctx, req) => {
-    const expected = process.env.EDGE_SHARED_SECRET;
-    if (!expected) {
-      return jsonResponse({ ok: false, error: "misconfigured" }, 500);
-    }
-    if (req.headers.get("authorization") !== `Bearer ${expected}`) {
-      return jsonResponse({ ok: false, error: "unauthorized" }, 401);
-    }
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return jsonResponse({ ok: false, error: "bad json" }, 400);
-    }
-    const userId = String(body.userId ?? "").trim();
-    if (!userId) return jsonResponse({ ok: false, error: "missing userId" }, 400);
-    const result = await ctx.runMutation(internal.userState.repairAccess, {
-      userId,
-      orgSlug: body.orgSlug ? String(body.orgSlug) : undefined,
-    });
-    return jsonResponse({ ok: true, ...result });
-  }),
-});
-
 // ---------- CORS preflight ----------
 const preflight = httpAction(async () => {
   return new Response(null, {
@@ -240,8 +188,6 @@ const preflight = httpAction(async () => {
 http.route({ path: "/receiveBankEmail", method: "OPTIONS", handler: preflight });
 http.route({ path: "/gmailOAuthCallback", method: "OPTIONS", handler: preflight });
 http.route({ path: "/resolvePhoneIdentity", method: "OPTIONS", handler: preflight });
-http.route({ path: "/debugIdentity", method: "OPTIONS", handler: preflight });
-http.route({ path: "/repairMyAccess", method: "OPTIONS", handler: preflight });
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {

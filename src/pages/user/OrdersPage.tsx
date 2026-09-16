@@ -267,7 +267,7 @@ export function OrdersPage() {
       const code = error?.data?.code;
       if (code === 'NOT_RETRYABLE') {
         toast.error('This order can no longer be retried.');
-      } else if (code === 'SLOT_POOL_EXHAUSTED') {
+      } else if (code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED') {
         toast.error('Too many pending orders at this price — try again in a few minutes.');
       } else {
         toast.error('Failed to initiate retry. Please try again.');

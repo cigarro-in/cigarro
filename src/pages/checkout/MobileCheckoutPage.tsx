@@ -12,7 +12,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { formatINR } from '../../utils/currency';
-import { validateCouponCode, registerDiscountUse } from '../../utils/discounts';
+import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMutation, useQuery } from 'convex/react';
@@ -44,8 +44,13 @@ export function MobileCheckoutPage() {
   const { fetchNow: fetchStoreAddresses } = useAddresses(user);
 
   const org = useOrg();
-  const convexWallet = useQuery(api.wallet.getMyBalance, org ? { orgId: org._id } : 'skip');
+  const convexWallet = useQuery(
+    api.wallet.getMyBalance,
+    org && user ? { orgId: org._id } : 'skip',
+  );
   const createConvexOrder = useMutation(api.orders.createOrder);
+  // Reuse the key if a response is lost after Convex committed the order.
+  const paymentIdempotencyKeyRef = useRef<string | null>(null);
 
   // Determine checkout flow type using URL params as source of truth, initialized once
   const [isBuyNow] = useState(() => {
@@ -362,7 +367,7 @@ export function MobileCheckoutPage() {
   });
 
   // Fetch saved addresses and auto-select (memoized to prevent re-render loops)
-  // Phase 1: adapter-backed (Convex or Supabase) so Drawer saves stay visible.
+  // Adapter-backed so Drawer saves stay visible immediately.
   const fetchSavedAddresses = useCallback(async () => {
     if (!user?.id) {
       return;
@@ -416,9 +421,9 @@ export function MobileCheckoutPage() {
             normalizeString(shippingAddress.tag) ||
             'Saved address'
         });
-      } else if (addresses && addresses.length > 0) {
+      } else if (rows.length > 0) {
         // Auto-select first (most recent) address for normal checkout
-        const addressToSelect = addresses[0];
+        const addressToSelect = rows[0];
         setSelectedAddress({
           id: addressToSelect.id,
           full_name: addressToSelect.full_name,
@@ -496,6 +501,11 @@ export function MobileCheckoutPage() {
     setIsCompletingOrder(true);
 
     try {
+      const idempotencyKey = paymentIdempotencyKeyRef.current ??= (
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
       const address = {
         line1: selectedAddress.address,
         city: selectedAddress.city,
@@ -508,7 +518,6 @@ export function MobileCheckoutPage() {
       const walletAmountPaise = walletAmountToUse > 0 ? rupeesToPaise(walletAmountToUse) : 0;
 
       const luckyPaise = rupeesToPaise(luckyDiscount);
-      const couponPaise = rupeesToPaise(appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0);
       const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
 
       const result = await createConvexOrder({
@@ -516,8 +525,9 @@ export function MobileCheckoutPage() {
         kind: 'purchase',
         items: buildConvexItems(),
         address,
+        idempotencyKey,
         walletAmountPaise,
-        discountPaise: couponPaise,
+        discountId: appliedDiscount?.discount_id ?? undefined,
         discountLabel: couponName ?? undefined,
         // Lucky 1–99p: visible discount + server-side payment fingerprint.
         luckyPaise,
@@ -526,11 +536,6 @@ export function MobileCheckoutPage() {
       });
 
       isNavigatingRef.current = true;
-
-      // Count one coupon redemption per created order (fire-and-forget).
-      if (result.status === 'pending' || result.status === 'paid') {
-        void registerDiscountUse(appliedDiscount);
-      }
 
       // GA4: order created in Convex = purchase (UPI capture follows async).
       trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
@@ -555,7 +560,7 @@ export function MobileCheckoutPage() {
       console.error('❌ Payment error:', error);
       const code = error?.data?.code ?? error?.message;
       const msg =
-        code === 'SLOT_POOL_EXHAUSTED'
+        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry in a few minutes.'
           : code === 'WALLET_INSUFFICIENT'
           ? 'Wallet balance is insufficient.'

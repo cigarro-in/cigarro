@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { requireIdentity, requireMember, requireOrgAdmin } from "./lib/auth";
+import { requireMember, requireOrgAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { assertPositiveInt } from "./lib/money";
 import { ledgerReason } from "./schema";
@@ -107,11 +107,11 @@ export async function creditWallet(
 export const getMyBalance = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    const identity = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, orgId);
     const acct = await ctx.db
       .query("walletAccounts")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", orgId).eq("userId", identity.subject),
+        q.eq("orgId", orgId).eq("userId", userId),
       )
       .unique();
     return { balancePaise: acct?.balancePaise ?? 0 };
@@ -124,11 +124,11 @@ export const getMyLedger = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { orgId, limit }) => {
-    const identity = await requireIdentity(ctx);
+    const { userId } = await requireMember(ctx, orgId);
     return await ctx.db
       .query("walletLedger")
       .withIndex("by_org_user_time", (q) =>
-        q.eq("orgId", orgId).eq("userId", identity.subject),
+        q.eq("orgId", orgId).eq("userId", userId),
       )
       .order("desc")
       .take(limit ?? 50);
@@ -147,6 +147,14 @@ export const adminCreditWallet = mutation({
   handler: async (ctx, args) => {
     const { identity } = await requireOrgAdmin(ctx, args.orgId);
     assertPositiveInt(args.amountPaise, "amountPaise");
+    const targetMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", args.targetUserId),
+      )
+      .unique();
+    if (!targetMembership)
+      throw new ConvexError({ code: "TARGET_NOT_MEMBER" });
     await creditWallet(ctx, {
       orgId: args.orgId,
       userId: args.targetUserId,

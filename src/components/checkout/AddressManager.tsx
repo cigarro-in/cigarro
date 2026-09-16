@@ -300,7 +300,8 @@ export function AddressManager({
       const finalLabel = addressForm.label === 'other' ? customLabel :
         addressSuggestions.find(s => s.id === addressForm.label)?.label || 'My Address';
 
-      let data, error;
+      let data: Address | undefined;
+      let error: unknown;
 
       try {
         data = await storeSaveAddress({
@@ -319,6 +320,7 @@ export function AddressManager({
       }
 
       if (error) throw error;
+      if (!data) throw new Error('Address save returned no data');
 
       if (editingAddress) {
         setSavedAddresses(prev => prev.map(addr => 

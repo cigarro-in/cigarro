@@ -281,7 +281,7 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
                         >
                           <div className="flex-shrink-0 border border-border/10 rounded-lg overflow-hidden">
                             <img
-                              src={getProductImageUrl(result.gallery_images?.[0])}
+                              src={getProductImageUrl(result.image)}
                               alt={result.name}
                               className="w-14 h-14 object-cover bg-muted/20"
                               onError={(e) => {

@@ -80,7 +80,17 @@ export const getDashboardStats = query({
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .collect();
     const inventoryByVariant = new Map(inventory.map((row) => [row.variantSupabaseId, row]));
-    const users = await ctx.db.query("users").collect();
+    const memberships = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .collect();
+    const customerIds = new Set([
+      ...orders.map((o) => o.userId),
+      ...memberships.map((m) => m.userId),
+    ]);
+    const users = (await ctx.db.query("users").collect()).filter((u) =>
+      customerIds.has(u.userId),
+    );
 
     const recentOrders = orders.slice(0, 5).map((o) => ({
       id: o._id,
@@ -134,7 +144,6 @@ export const listCustomersForAdmin = query({
   handler: async (ctx, { orgId }) => {
     await requireOrgAdmin(ctx, orgId);
 
-    const users = await ctx.db.query("users").collect();
     const orders = await ctx.db
       .query("orders")
       .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
@@ -145,6 +154,13 @@ export const listCustomersForAdmin = query({
       .withIndex("by_org_role", (q) => q.eq("orgId", orgId))
       .collect();
     const roleByUser = new Map(memberships.map((m) => [m.userId, m.role]));
+    const customerIds = new Set([
+      ...orders.map((o) => o.userId),
+      ...memberships.map((m) => m.userId),
+    ]);
+    const users = (await ctx.db.query("users").collect()).filter((u) =>
+      customerIds.has(u.userId),
+    );
 
     return users
       .slice()
@@ -179,12 +195,6 @@ export const getCustomerForAdmin = query({
   handler: async (ctx, { orgId, userId }) => {
     await requireOrgAdmin(ctx, orgId);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
-    if (!user) return null;
-
     const membership = await ctx.db
       .query("memberships")
       .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
@@ -195,6 +205,13 @@ export const getCustomerForAdmin = query({
       .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
       .order("desc")
       .take(100);
+    if (!membership && orders.length === 0) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (!user) return null;
     const paid = orders.filter((o) => PAID.includes(o.status));
     const totalSpent = paid.reduce((s, o) => s + rupees(o.finalAmountPaise), 0);
     const times = orders.map((o) => o.createdAt);

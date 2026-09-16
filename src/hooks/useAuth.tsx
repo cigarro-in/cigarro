@@ -1,8 +1,9 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { ConvexHttpClient } from 'convex/browser';
-import { convex, convexUrl } from '../lib/convex/client';
+import { convexUrl } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
-import { getSession, getAccessToken, storeSession, clearSession, notifyAuthChanged } from '../lib/auth/session';
+import { getSession, storeSession, clearSession, notifyAuthChanged } from '../lib/auth/session';
+import { ORG_SLUG } from '../lib/convex/org';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 
@@ -34,20 +35,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function loadConvexUser(client: any = convex): Promise<User | null> {
-  try {
-    const profile = await client.query(api.userState.getMyProfile, {});
-    if (!profile) return null;
-    return {
-      id: profile.userId,
-      email: null,
-      phone: profile.phone,
-      name: profile.name || 'Customer',
-      isAdmin: profile.isAdmin,
-    };
-  } catch {
-    return null;
-  }
+async function loadConvexUser(client: ConvexHttpClient): Promise<User> {
+  const profile = await client.query(api.userState.getMyProfile, {});
+  return {
+    id: profile.userId,
+    email: null,
+    phone: profile.phone,
+    name: profile.name || 'Customer',
+    isAdmin: profile.isAdmin,
+  };
+}
+
+async function establishCustomerSession(
+  token: string,
+  profile: { phone?: string; name?: string } = {},
+): Promise<User> {
+  const client = new ConvexHttpClient(convexUrl);
+  client.setAuth(token);
+  const org = await client.query(api.organizations.getBySlug, { slug: ORG_SLUG });
+  if (!org) throw new Error('Store unavailable');
+  await client.mutation(api.userState.ensureMyProfile, {
+    orgSlug: ORG_SLUG,
+    phone: profile.phone || undefined,
+    name: profile.name || undefined,
+  });
+  return loadConvexUser(client);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -56,21 +68,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void checkSession();
+    const onStorage = () => void checkSession();
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkSession = async () => {
     try {
       // Own JWT only (auth cutover complete — no Supabase).
-      if (getAccessToken()) {
-        const u = await loadConvexUser();
+      const session = getSession();
+      if (session) {
+        const u = await establishCustomerSession(session.token, {
+          phone: session.phone,
+        });
         setUser(u);
       } else {
         setUser(null);
       }
-      setIsLoading(false);
     } catch (error) {
       logger.error('Session check error:', error);
+      setUser(null);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -93,28 +112,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     {
       const phone = data.user_id && args.phone ? args.phone : '';
       storeSession(data.cigarro_token, data.user_id, phone);
-      // Wake the reactive client so hooks use the new token from here on.
-      notifyAuthChanged();
       // Handshake over a directly-authed client: the shared reactive client
       // still holds the pre-login (empty) auth on its live socket, so these
       // calls would go out unauthenticated until it re-auths (hence the
       // login-then-refresh dance).
-      const handshake = new ConvexHttpClient(convexUrl);
-      handshake.setAuth(data.cigarro_token);
       try {
-        await handshake.mutation(api.userState.ensureMyProfile, {
+        const u = await establishCustomerSession(data.cigarro_token, {
           phone: phone || undefined,
           name: args.name || undefined,
         });
-      } catch (e) {
-        logger.error('Profile spine error', e);
-      }
-      const u = await loadConvexUser(handshake);
-      if (!u) {
+        setUser(u);
+        // Wake the reactive client only after the customer profile and
+        // membership are ready, so mounted queries cannot race the bootstrap.
+        notifyAuthChanged();
+      } catch (error) {
         clearSession();
-        throw new Error('Profile unavailable — please try again');
+        notifyAuthChanged();
+        logger.error('Customer session setup error', error);
+        throw error;
       }
-      setUser(u);
       try {
         if (await shouldTransferGuestData(data.user_id)) {
           await transferGuestDataToUser(data.user_id);
