@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { requireIdentity, requireMember } from "./lib/auth";
+import { requireIdentity } from "./lib/auth";
 import { normalizePhoneE164 } from "./lib/phone";
 import {
   internalMutation,
@@ -192,7 +192,7 @@ export const upsertUser = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const existing = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -220,7 +220,7 @@ export const upsertUser = mutation({
 export const getMe = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     return await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -246,7 +246,7 @@ const cartLine = (d: Doc<"carts">) => ({
 export const listCart = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const lines = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -270,7 +270,7 @@ export const addToCart = mutation({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const qty = args.qty ?? 1;
     if (!Number.isFinite(qty) || qty <= 0 || qty > 99) {
       throw new ConvexError({ code: "BAD_QTY" });
@@ -329,7 +329,7 @@ export const setCartQty = mutation({
     qty: v.number(),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const line = await ctx.db.get(args.lineId);
     if (!line || line.userId !== userId || line.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -349,7 +349,7 @@ export const setCartQty = mutation({
 export const removeCartLine = mutation({
   args: { orgId: v.id("organizations"), lineId: v.id("carts") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const line = await ctx.db.get(args.lineId);
     if (!line || line.userId !== userId || line.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -362,7 +362,7 @@ export const removeCartLine = mutation({
 export const clearCart = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const lines = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -399,7 +399,7 @@ export const replaceCart = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const existing = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
@@ -435,7 +435,7 @@ export const replaceCart = mutation({
 export const listWishlist = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const rows = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user", (q) =>
@@ -449,7 +449,7 @@ export const listWishlist = query({
 export const toggleWishlist = mutation({
   args: { orgId: v.id("organizations"), productId: v.string() },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const existing = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user_product", (q) =>
@@ -475,7 +475,7 @@ export const toggleWishlist = mutation({
 export const listAddresses = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     return await ctx.db
       .query("savedAddresses")
       .withIndex("by_org_user", (q) =>
@@ -504,7 +504,7 @@ const addressArgs = {
 export const addAddress = mutation({
   args: addressArgs,
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const now = Date.now();
     const makeDefault =
       args.isDefault ??
@@ -551,7 +551,7 @@ export const addAddress = mutation({
 export const removeAddress = mutation({
   args: { orgId: v.id("organizations"), addressId: v.id("savedAddresses") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -564,7 +564,7 @@ export const removeAddress = mutation({
 export const setDefaultAddress = mutation({
   args: { orgId: v.id("organizations"), addressId: v.id("savedAddresses") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -590,7 +590,7 @@ export const setDefaultAddress = mutation({
 export const clearWishlist = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const rows = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user", (q) =>
@@ -620,7 +620,7 @@ export const updateAddress = mutation({
     isDefault: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const { subject: userId } = await requireIdentity(ctx);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
