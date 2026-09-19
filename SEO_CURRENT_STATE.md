@@ -1,7 +1,8 @@
 # Cigarro SEO current state
 
-**Updated:** 2026-09-20  
-**Purpose:** durable handoff for future sessions. Read this before starting SEO work.  
+**Updated:** 2026-09-20
+
+**Purpose:** durable handoff for future sessions. Read this before starting SEO work.
 **Precedence:** this file records the current state. `SEO Audits/` is historical evidence and `03-consolidated-final-audit-2026-09-10.md` is the pre-fix baseline, not a current task list.
 
 ## Objective and success condition
