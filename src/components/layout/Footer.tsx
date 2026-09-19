@@ -35,23 +35,18 @@ const Footer = () => {
         <div className="bg-creme-light rounded-lg p-8 lg:p-16">
           {/* Main Footer Content */}
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-8 lg:gap-16 mb-12">
-            {/* Newsletter Section */}
+            {/* Brand promise and support */}
             <div className="lg:col-span-4 text-center">
               <h3 className="font-serif text-dark text-[clamp(2rem,4000vw/1440,4rem)] font-normal mb-8 px-8">
-                Stay informed about our exclusive releases
+                Clear information. Straightforward support.
               </h3>
-              
-              {/* Newsletter Form */}
-              <div className="relative max-w-md mx-auto">
-                <input 
-                  type="email" 
-                  placeholder="Enter your email address"
-                  className="w-full bg-transparent text-dark placeholder-dark/60 border-b border-dark/30 pb-4 pr-16 text-base font-normal focus:outline-none focus:border-dark transition-colors"
-                />
-                <button className="absolute right-2 bottom-2 w-6 h-6 flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-dark hover:text-canyon transition-colors" />
-                </button>
-              </div>
+              <a
+                href="mailto:support@cigarro.in"
+                className="inline-flex items-center gap-2 text-dark hover:text-canyon transition-colors"
+              >
+                <Mail className="w-5 h-5" />
+                support@cigarro.in
+              </a>
             </div>
             
             {/* Menu Links */}
@@ -147,7 +142,7 @@ const Footer = () => {
             <div className="text-center">
               {/* Copyright */}
               <div className="text-coyote text-base leading-relaxed">
-                2025 Cigarro. All rights reserved.
+                {new Date().getFullYear()} Cigarro. All rights reserved.
               </div>
             </div>
           </div>

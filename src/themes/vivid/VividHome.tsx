@@ -51,8 +51,8 @@ export function VividHome() {
   return (
     <>
       <SEOHead
-        title="Cigarro - Premium Cigarettes & Tobacco Online"
-        description="India's premier online marketplace for premium cigarettes and tobacco products."
+        title="Cigarro | Cigarettes and Tobacco Products Online"
+        description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
         url="https://cigarro.in/"
         type="website"
       />

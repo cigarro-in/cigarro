@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { Truck, Shield, CheckCircle, MapPin, Clock, Package, AlertTriangle, Globe, Users, Phone, Heart } from 'lucide-react';
+import { Truck, Shield, CheckCircle, MapPin, Clock, Package, AlertTriangle, Globe, CalendarDays, Mail } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { useShippingMethods } from '../../hooks/data/useContent';
 import { formatINR } from '../../utils/currency';
@@ -14,12 +14,13 @@ export function ShippingPage() {
   const deliveryItems = methods.map((m) =>
     `${m.label}: ${m.eta}${m.priceRupees === 0 ? ', free' : `, ${formatINR(m.priceRupees)}`}`,
   );
+  const allMethodsAreFree = methods.length > 0 && methods.every((m) => m.priceRupees === 0);
 
   return (
     <>
       <SEOHead
-        title="Shipping Policy - Delivery Information"
-        description="Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India."
+        title="Shipping and Delivery Policy | Cigarro"
+        description="See how Cigarro delivery availability, shipping options, dispatch, tracking and age verification work for orders within India."
         url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['shipping policy', 'delivery information', 'shipping costs', 'delivery times India']}
@@ -45,23 +46,23 @@ export function ShippingPage() {
                 <Truck className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-sans text-lg font-bold text-foreground mb-2">
-                    {methods.every((m) => m.priceRupees === 0)
+                    {allMethodsAreFree
                       ? 'Free Shipping on All Orders'
-                      : 'Shipping Across India'}
+                      : 'Delivery Options at Checkout'}
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {methods.every((m) => m.priceRupees === 0)
-                      ? 'We offer free shipping on all orders within India. Your premium tobacco products will be delivered safely and securely to your doorstep with full tracking and insurance coverage.'
-                      : 'Your premium tobacco products will be delivered safely and securely to your doorstep with full tracking and insurance coverage. Pick standard or faster delivery at checkout.'}
+                    {allMethodsAreFree
+                      ? 'The delivery methods currently available at checkout do not add a shipping charge. Availability still depends on the delivery pin code.'
+                      : 'Available delivery methods, estimated times and any shipping charge are shown at checkout before you place the order.'}
                   </p>
                   <div className="flex items-center gap-6 mt-4 text-xs text-accent font-medium">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4" />
-                      <span>Nationwide Delivery</span>
+                      <span>India only</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Shield className="w-4 h-4" />
-                      <span>Fully Insured</span>
+                      <span>Tracked when available</span>
                     </div>
                   </div>
                 </div>
@@ -74,12 +75,12 @@ export function ShippingPage() {
                 {
                   icon: MapPin,
                   title: "1. Delivery Areas",
-                  content: "We currently deliver to all major cities and towns across India. Our delivery network covers:",
+                  content: "We currently ship only within India. Serviceability depends on the delivery pin code and the available delivery partner.",
                   items: [
-                    "All metropolitan cities (Mumbai, Delhi, Bangalore, Chennai, Kolkata, Hyderabad, Pune)",
-                    "State capitals and major district headquarters",
-                    "Most tier-2 and tier-3 cities",
-                    "Remote areas (delivery times may vary)"
+                    "Enter the complete address and pin code during checkout",
+                    "Delivery options may differ by location",
+                    "Some remote or restricted pin codes may not be serviceable",
+                    "An order may be cancelled and refunded if delivery cannot be arranged"
                   ],
                   note: "If you're unsure about delivery to your location, please contact our customer support team before placing your order."
                 },
@@ -89,21 +90,20 @@ export function ShippingPage() {
                   content: "Choose a delivery speed at checkout — same options, same prices as below:",
                   items: [
                     ...deliveryItems,
-                    "Dispatched within 1-2 business days of ordering",
-                    "Full tracking shared by email and SMS once your order ships"
+                    "The estimate begins after the order is confirmed for fulfilment",
+                    "Tracking information is shared when the delivery partner provides it"
                   ],
-                  note: "Remote pin codes can occasionally take a day or two longer. If that happens, we'll keep you posted over SMS."
+                  note: "Delivery dates are estimates, not guarantees. Carrier delays and service interruptions can affect them."
                 },
                 {
                   icon: Package,
                   title: "3. Packaging and Handling",
-                  content: "All tobacco products are packaged with the utmost care to ensure freshness and quality:",
+                  content: "Orders are packed for transport using the product and order information available to us:",
                   items: [
-                    "Premium packaging materials to protect products",
-                    "Temperature-controlled storage and transport",
-                    "Discrete packaging for privacy",
-                    "Proper labeling and handling instructions",
-                    "Insurance coverage for all shipments"
+                    "Protective outer packaging is used where appropriate",
+                    "The shipping label contains the information required for delivery",
+                    "Check the parcel and items promptly after delivery",
+                    "Report damage or an incorrect item within 48 hours"
                   ]
                 },
                 {
@@ -124,34 +124,32 @@ export function ShippingPage() {
                   content: "If you experience any issues with your delivery:",
                   items: [
                     "Contact our customer support immediately",
-                    "We will investigate and resolve the issue promptly",
-                    "Damaged or incorrect items will be replaced at no cost",
+                    "We will review the order details and evidence",
+                    "An eligible damaged or incorrect item may be replaced or refunded",
                     "Failed deliveries due to age verification are non-refundable",
-                    "All returns must be initiated within 7 days of delivery"
+                    "Damage or an incorrect item must be reported within 48 hours of delivery"
                   ]
                 },
                 {
                   icon: Globe,
                   title: "6. International Shipping",
-                  content: "Currently, we only ship within India. International shipping is not available due to:",
+                  content: "Cigarro does not currently offer international shipping.",
                   items: [
-                    "Complex international tobacco regulations",
-                    "Customs and import restrictions",
-                    "Age verification requirements vary by country",
-                    "Shipping and handling complexities"
+                    "Orders require an Indian delivery address",
+                    "International forwarding is not supported",
+                    "We cannot advise on customs or import requirements outside India"
                   ],
-                  note: "We are evaluating international shipping options for the future. Please contact us if you're interested in international delivery."
+                  note: "The website will be updated if this policy changes."
                 },
                 {
                   icon: Truck,
                   title: "7. Tracking Your Order",
                   content: "Once your order is dispatched, you will receive:",
                   items: [
-                    "Email confirmation with tracking number",
-                    "SMS updates on delivery status",
-                    "Real-time tracking through our website",
-                    "Delivery notifications and estimated arrival time",
-                    "Contact information for the delivery partner"
+                    "A dispatch update when the order leaves for delivery",
+                    "A tracking number or link when supplied by the delivery partner",
+                    "Carrier updates and an estimated arrival date where available",
+                    "Order status in your Cigarro account"
                   ]
                 }
               ].map((section, index) => (
@@ -185,12 +183,10 @@ export function ShippingPage() {
             {/* Contact Information */}
             <div className="pt-8 border-t border-border/20">
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Shipping Questions?</h3>
-              <div className="grid md:grid-cols-4 gap-4">
-                {[
-                  { title: "Shipping Support", contact: "shipping@cigarro.com", icon: Truck },
-                  { title: "General Support", contact: "support@cigarro.com", icon: Users },
-                  { title: "Phone Support", contact: "+91 98765 43210", icon: Phone },
-                  { title: "Last Updated", contact: "January 2025", icon: Heart }
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                  { title: "Shipping support", contact: "support@cigarro.in", icon: Mail },
+                  { title: "Last updated", contact: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">
                     <item.icon className="w-5 h-5 text-muted-foreground mx-auto mb-2" />

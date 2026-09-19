@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { AlertTriangle, Scale, Users, Heart } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Mail } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function TermsPage() {
@@ -9,8 +9,8 @@ export function TermsPage() {
   return (
     <>
       <SEOHead
-        title="Terms of Service - Legal Information"
-        description="Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform."
+        title="Terms of Service | Cigarro"
+        description="Read the terms that apply when you browse, create an account or place an order with Cigarro."
         url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
@@ -37,7 +37,7 @@ export function TermsPage() {
                 <div>
                   <h3 className="font-sans text-lg font-bold text-foreground mb-2">Age Verification Required</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    You must be 18 years or older to purchase tobacco products from our marketplace. 
+                    You must be 18 years or older to purchase tobacco products from Cigarro.
                     By using our services, you confirm that you are of legal smoking age in your jurisdiction.
                   </p>
                 </div>
@@ -49,7 +49,7 @@ export function TermsPage() {
               {[
                 {
                   title: "1. Acceptance of Terms",
-                  content: "By accessing and using Cigarro Premium Marketplace, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service."
+                  content: "By accessing or using Cigarro, you agree to these terms. If you do not agree, please do not use the website or place an order."
                 },
                 {
                   title: "2. Product Information",
@@ -66,11 +66,11 @@ export function TermsPage() {
                 },
                 {
                   title: "5. Payment and Billing",
-                  content: "All payments are processed securely through our payment partners. Prices are subject to change without notice. We reserve the right to refuse or cancel orders at our discretion."
+                  content: "Prices and availability can change. Payment instructions and the final payable amount are shown during checkout. We may refuse or cancel an order when we cannot lawfully or operationally fulfil it."
                 },
                 {
                   title: "6. Limitation of Liability",
-                  content: "Cigarro Premium Marketplace shall not be liable for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use our services or products."
+                  content: "To the extent permitted by applicable law, Cigarro is not liable for indirect, incidental or consequential loss resulting from use of the website or products. Nothing in these terms excludes a right that cannot lawfully be excluded."
                 },
                 {
                   title: "7. Modifications to Terms",
@@ -91,11 +91,10 @@ export function TermsPage() {
             {/* Contact Information */}
             <div className="pt-8 border-t border-border/20">
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Questions?</h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { title: "Legal Team", email: "legal@cigarro.com", icon: Scale },
-                  { title: "Support", email: "support@cigarro.com", icon: Users },
-                  { title: "Last Updated", email: "January 2025", icon: Heart }
+                  { title: "Questions", email: "support@cigarro.in", icon: Mail },
+                  { title: "Last updated", email: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">
                     <item.icon className="w-5 h-5 text-muted-foreground mx-auto mb-2" />

@@ -25,11 +25,11 @@ export function HomePage() {
   return (
     <>
       <SEOHead
-        title="Cigarro - Premium Cigarettes & Tobacco Online"
-        description="India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery."
+        title="Cigarro | Cigarettes and Tobacco Products Online"
+        description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
         url="https://cigarro.in/"
         type="website"
-        keywords={['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes', 'luxury tobacco']}
+        keywords={['cigarettes online', 'cigarette brands India', 'tobacco products India', 'rolling papers India']}
         image={data?.heroSlides?.[0]?.image_url}
       />
       {on('hero_section') && <Hero slides={data?.heroSlides} isLoading={isLoading} />}

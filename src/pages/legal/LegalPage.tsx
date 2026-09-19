@@ -1,218 +1,98 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, FileText, RotateCcw, Shield, Truck } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { Shield, FileText, Eye, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Card, CardContent } from '../../components/ui/card';
+
+const policyLinks = [
+  {
+    icon: FileText,
+    title: 'Terms of Service',
+    description: 'The rules that apply when you browse the website, create an account or place an order.',
+    href: '/terms',
+  },
+  {
+    icon: Shield,
+    title: 'Privacy Policy',
+    description: 'What personal information we collect, why we use it and how to make a data request.',
+    href: '/privacy',
+  },
+  {
+    icon: Truck,
+    title: 'Shipping Policy',
+    description: 'Delivery availability, shipping options, tracking and age verification information.',
+    href: '/shipping',
+  },
+  {
+    icon: RotateCcw,
+    title: 'Returns and Refunds',
+    description: 'What to do when an order arrives damaged, defective or different from what you ordered.',
+    href: '/returns',
+  },
+];
 
 export function LegalPage() {
   const location = useLocation();
+
   return (
     <>
       <SEOHead
-        title="Legal Information - Terms & Policies"
-        description="Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace"
+        title="Cigarro Policies | Terms, Privacy, Shipping and Returns"
+        description="Find Cigarro's terms of service, privacy policy, shipping information and returns and refunds policy."
         url={`https://cigarro.in${location.pathname}`}
         type="website"
-        keywords={['legal information', 'terms and conditions', 'privacy policy', 'legal disclaimers']}
+        keywords={['Cigarro policies', 'Cigarro terms', 'Cigarro privacy', 'Cigarro shipping', 'Cigarro returns']}
       />
-      
-      <div className="min-h-screen bg-creme">
-        {/* Hero Section */}
-        <section className="section bg-gradient-to-b from-creme-light to-creme">
-          <div className="main-container">
-            <div className="text-center max-w-4xl mx-auto">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="mb-8"
-              >
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-dark/10 rounded-full mb-6">
-                  <Shield className="w-10 h-10 text-dark" />
-                </div>
-                <h1 className="font-serif text-dark text-[clamp(3rem,6000vw/1440,6rem)] lg:text-[clamp(4rem,8000vw/1440,8rem)] font-normal leading-tight mb-6">
-                  Legal Information
-                </h1>
-                <p className="text-dark/80 text-xl lg:text-2xl leading-relaxed max-w-3xl mx-auto">
-                  Important information about our terms of service, privacy policy, and legal disclaimers for responsible tobacco commerce.
-                </p>
-              </motion.div>
-            </div>
+
+      <main className="min-h-screen bg-background pb-20 md:pb-12">
+        <section className="border-b border-border/30 bg-creme-light/40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+            <p className="mb-5 text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-canyon">
+              Policies
+            </p>
+            <h1 className="font-serif text-foreground text-4xl sm:text-6xl leading-[1.02] tracking-tight max-w-4xl">
+              The important information, without the fine-print maze.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg sm:text-xl leading-relaxed text-muted-foreground">
+              Start with the policy that matches your question. Each page explains the current position
+              and how to contact Cigarro when you need help.
+            </p>
           </div>
         </section>
 
-        {/* Content Sections */}
-        <section className="section bg-creme">
-          <div className="main-container">
-            <div className="max-w-4xl mx-auto">
-              
-              {/* Age Verification Notice */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="bg-canyon/10 border-2 border-canyon/20 rounded-xl p-8 mb-12"
-              >
-                <div className="flex items-start space-x-4">
-                  <AlertTriangle className="w-8 h-8 text-canyon flex-shrink-0 mt-1" />
-                  <div>
-                    <h2 className="font-serif text-dark text-3xl font-normal mb-4">Age Verification Required</h2>
-                    <p className="text-dark/80 text-lg leading-relaxed mb-4">
-                      You must be 18 years or older to purchase tobacco products from our marketplace. 
-                      By using our services, you confirm that you are of legal smoking age in your jurisdiction.
-                    </p>
-                    <div className="flex items-center space-x-2 text-canyon font-medium">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Age verification is required for all purchases</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Terms of Service */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="mb-16"
-              >
-                <div className="flex items-center space-x-4 mb-8">
-                  <div className="w-12 h-12 bg-dark/10 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-dark" />
-                  </div>
-                  <h2 className="font-serif text-dark text-4xl font-normal">Terms of Service</h2>
-                </div>
-                
-                <div className="prose prose-lg max-w-none">
-                  <div className="space-y-8">
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">1. Acceptance of Terms</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        By accessing and using Cigarro Premium Marketplace, you accept and agree to be bound by the terms and provision of this agreement. 
-                        If you do not agree to abide by the above, please do not use this service.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">2. Product Information</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        All product descriptions, images, and specifications are provided for informational purposes. 
-                        We strive for accuracy but cannot guarantee that all information is complete, reliable, or error-free.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">3. Health Disclaimer</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        <strong className="text-canyon">Important:</strong> Tobacco products are harmful to your health and may cause serious health conditions including cancer, 
-                        heart disease, and respiratory problems. Smoking is addictive and can be fatal. 
-                        We strongly advise against tobacco use and encourage smoking cessation.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">4. Age Restrictions</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        You must be at least 18 years old to purchase tobacco products. We reserve the right to request age verification 
-                        and refuse service to anyone who cannot provide adequate proof of age.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">5. Limitation of Liability</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        Cigarro Premium Marketplace shall not be liable for any direct, indirect, incidental, special, or consequential damages 
-                        resulting from the use or inability to use our services or products.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Privacy Policy */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="mb-16"
-              >
-                <div className="flex items-center space-x-4 mb-8">
-                  <div className="w-12 h-12 bg-dark/10 rounded-lg flex items-center justify-center">
-                    <Lock className="w-6 h-6 text-dark" />
-                  </div>
-                  <h2 className="font-serif text-dark text-4xl font-normal">Privacy Policy</h2>
-                </div>
-                
-                <div className="prose prose-lg max-w-none">
-                  <div className="space-y-8">
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">Information We Collect</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        We collect information you provide directly to us, such as when you create an account, make a purchase, 
-                        or contact us for support. This may include your name, email address, shipping address, and payment information.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">How We Use Your Information</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        We use the information we collect to process transactions, provide customer support, 
-                        improve our services, and comply with legal requirements. We do not sell your personal information to third parties.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">Data Security</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        We implement appropriate security measures to protect your personal information against unauthorized access, 
-                        alteration, disclosure, or destruction. All payment processing is handled by secure, PCI-compliant providers.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="font-sans text-dark text-2xl font-medium mb-4">Cookies and Tracking</h3>
-                      <p className="text-dark/80 text-lg leading-relaxed">
-                        We use cookies and similar technologies to enhance your browsing experience, analyze site traffic, 
-                        and personalize content. You can control cookie settings through your browser preferences.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Contact Information */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="bg-dark/5 rounded-xl p-8"
-              >
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="w-12 h-12 bg-dark/10 rounded-lg flex items-center justify-center">
-                    <Eye className="w-6 h-6 text-dark" />
-                  </div>
-                  <h2 className="font-serif text-dark text-3xl font-normal">Questions or Concerns?</h2>
-                </div>
-                <p className="text-dark/80 text-lg leading-relaxed mb-6">
-                  If you have any questions about these terms, our privacy practices, or need assistance with your account, 
-                  please don't hesitate to contact us.
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+          <Card className="mb-8 border-2 border-accent/20 bg-accent/5">
+            <CardContent className="p-6 sm:p-7 flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-accent shrink-0 mt-0.5" />
+              <div>
+                <h2 className="font-sans text-lg font-bold text-foreground mb-2">Adults of legal smoking age only</h2>
+                <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                  Tobacco and nicotine products carry serious health risks and can be addictive. Age
+                  verification may be required before an order is accepted or delivered.
                 </p>
-                <div className="space-y-3">
-                  <p className="text-dark font-medium">
-                    <span className="text-coyote">Email:</span> legal@cigarro.com
-                  </p>
-                  <p className="text-dark font-medium">
-                    <span className="text-coyote">Support:</span> support@cigarro.com
-                  </p>
-                  <p className="text-dark font-medium">
-                    <span className="text-coyote">Last Updated:</span> January 2025
-                  </p>
-                </div>
-              </motion.div>
-            </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            {policyLinks.map((policy) => (
+              <Link key={policy.href} to={policy.href} className="group">
+                <Card className="h-full border-2 border-border/40 bg-card group-hover:border-accent/40 transition-colors">
+                  <CardContent className="p-7 sm:p-8">
+                    <div className="w-11 h-11 rounded-full bg-muted/40 flex items-center justify-center mb-6">
+                      <policy.icon className="w-5 h-5 text-accent" />
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl text-foreground mb-3">{policy.title}</h2>
+                    <p className="text-muted-foreground leading-relaxed mb-6">{policy.description}</p>
+                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-canyon">
+                      Read policy <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         </section>
-      </div>
+      </main>
     </>
   );
 }

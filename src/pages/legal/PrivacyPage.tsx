@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { Lock, Shield, Mail, CheckCircle, Database } from 'lucide-react';
+import { CalendarDays, Mail, Shield } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function PrivacyPage() {
@@ -13,8 +13,8 @@ export function PrivacyPage() {
         intro: 'We collect information you provide directly to us, such as when you create an account, make a purchase, or contact us for support. This may include:',
         items: [
           'Name and contact information (email, phone, address)',
-          'Payment and billing information',
-          'Account credentials and preferences',
+          'Order amounts, payment status and transaction references',
+          'Account identifiers and preferences',
           'Communication history and support requests',
           'Purchase history and product preferences'
         ]
@@ -37,7 +37,7 @@ export function PrivacyPage() {
     {
       title: '3. Data Security',
       content: {
-        intro: 'We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. All payment processing is handled by secure, PCI-compliant providers. We use industry-standard encryption and security protocols to safeguard your data.',
+        intro: 'We use technical and organisational safeguards intended to protect personal information. No online service can guarantee absolute security, so please contact us if you believe your account or information has been misused.',
         items: []
       }
     },
@@ -49,7 +49,6 @@ export function PrivacyPage() {
           'Essential cookies: Required for basic website functionality',
           'Analytics cookies: Help us understand how visitors use our site',
           'Preference cookies: Remember your settings and preferences',
-          'Marketing cookies: Used to deliver relevant advertisements'
         ]
       }
     },
@@ -68,14 +67,14 @@ export function PrivacyPage() {
     {
       title: '6. Your Rights',
       content: {
-        intro: 'You have the right to:',
+        intro: 'Subject to applicable law, you may ask us to:',
         items: [
           'Access and review your personal information',
           'Request correction of inaccurate data',
           'Request deletion of your personal information',
           'Opt-out of marketing communications',
-          'Data portability (receive your data in a structured format)',
-          'Withdraw consent for data processing'
+          'Provide a copy of information associated with your account',
+          'Stop optional communications'
         ]
       }
     },
@@ -91,8 +90,8 @@ export function PrivacyPage() {
   return (
     <>
       <SEOHead
-        title="Privacy Policy - Data Protection"
-        description="Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information."
+        title="Privacy Policy | Cigarro"
+        description="Learn what personal information Cigarro collects, why it is used, when it may be shared and how to make a privacy request."
         url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
@@ -119,19 +118,9 @@ export function PrivacyPage() {
                 <div>
                   <h3 className="font-sans text-lg font-bold text-foreground mb-2">Your Privacy Matters</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    At Cigarro, we are committed to protecting your privacy and ensuring the security of your personal information. 
-                    This policy explains how we collect, use, and safeguard your data when you use our services.
+                    This policy explains what information Cigarro collects, why we use it, when it may
+                    be shared and how you can contact us about it.
                   </p>
-                  <div className="flex items-center gap-6 mt-4 text-xs text-accent font-medium">
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-4 h-4" />
-                      <span>Secure Encryption</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>GDPR Compliant</span>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -163,11 +152,10 @@ export function PrivacyPage() {
             {/* Contact Information */}
             <div className="pt-8 border-t border-border/20">
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Privacy Questions?</h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { title: "Privacy Officer", email: "privacy@cigarro.com", icon: Lock },
-                  { title: "Data Requests", email: "data@cigarro.com", icon: Database },
-                  { title: "General Support", email: "support@cigarro.com", icon: Mail }
+                  { title: "Privacy and data requests", email: "support@cigarro.in", icon: Mail },
+                  { title: "Last updated", email: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">
                     <item.icon className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
@@ -182,4 +170,3 @@ export function PrivacyPage() {
     </>
   );
 }
-

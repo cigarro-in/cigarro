@@ -42,9 +42,9 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = 'Cigarro - Premium Cigarettes & Tobacco Online',
-  description = 'India\'s premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery.',
-  keywords = ['premium cigarettes', 'buy cigars online', 'tobacco products India', 'cigarette delivery', 'authentic cigarettes'],
+  title = 'Cigarro | Cigarettes and Tobacco Products Online',
+  description = 'Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro.',
+  keywords = ['cigarettes online', 'cigarette brands India', 'tobacco products India'],
   image,
   url = 'https://cigarro.in',
   type = 'website',
@@ -322,7 +322,7 @@ export function SEOHead({
           name: 'Cigarro',
           url: 'https://cigarro.in',
           logo: SITE_LOGO_URL,
-          description: 'India\'s premier online marketplace for premium cigarettes and tobacco products',
+          description: 'Online cigarette and tobacco product catalogue for adult customers in India',
           address: {
             '@type': 'PostalAddress',
             addressCountry: 'IN'

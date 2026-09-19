@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { Truck, Shield, CheckCircle, MapPin, Clock, Package, AlertTriangle, Globe, Users, Phone, Heart, RotateCcw, XCircle, ShieldCheck } from 'lucide-react';
+import { Shield, Clock, Package, AlertTriangle, CalendarDays, Mail, RotateCcw, XCircle, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function ReturnsPage() {
@@ -10,8 +10,8 @@ export function ReturnsPage() {
   return (
     <>
       <SEOHead
-        title="Returns Policy - Cigarro"
-        description="Returns and refunds policy for Cigarro Premium Marketplace. Tobacco products are non-returnable due to health regulations. Damaged or incorrect items will be replaced."
+        title="Returns and Refunds Policy | Cigarro"
+        description="Read Cigarro's policy for non-returnable tobacco products and how to report a damaged, defective or incorrect item within 48 hours."
         url={`https://cigarro.in${location.pathname}`}
         type="website"
         keywords={['returns policy', 'refund policy', 'tobacco returns', 'damaged items replacement']}
@@ -36,9 +36,8 @@ export function ReturnsPage() {
               <div>
                 <h3 className="font-sans text-lg font-bold text-foreground mb-2">Important: Tobacco Products Are Non-Returnable</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Due to health regulations and the nature of consumable products, we cannot accept returns or exchanges 
-                  on any tobacco products once they have been dispatched. This is for your safety and compliance with 
-                  Indian law. Please review your order carefully before confirming.
+                  Because tobacco products are consumable goods, we do not accept change-of-mind returns
+                  or exchanges after dispatch. Please review the product, variant and quantity before ordering.
                 </p>
               </div>
             </CardContent>
@@ -48,8 +47,8 @@ export function ReturnsPage() {
             {[
               {
                 icon: RotateCcw,
-                title: "1. When We Accept Returns",
-                content: "We only accept returns in the following limited circumstances:",
+                title: "1. When to Report a Problem",
+                content: "Contact us if an order arrives with one of these issues:",
                 items: [
                   "Damaged in transit: Products that arrive physically damaged (crushed, broken, leaking)",
                   "Incorrect items: You received a different product than what you ordered",
@@ -59,14 +58,14 @@ export function ReturnsPage() {
               },
               {
                 icon: ShieldCheck,
-                title: "2. What We'll Do Instead of a Return",
-                content: "We don't do traditional returns on consumables. Here's how we handle issues:",
+                title: "2. How We Resolve Eligible Claims",
+                content: "We review the order details and evidence before confirming a resolution. Depending on the issue and availability, we may:",
                 items: [
-                  "Damaged items: We'll send a replacement at no cost, no need to return the damaged goods",
-                  "Wrong items: We'll ship the correct product and you keep what arrived (or donate it)",
-                  "Defective products: Full replacement shipped immediately"
+                  "Replace the damaged, defective or incorrect item",
+                  "Refund the affected item when a suitable replacement is unavailable",
+                  "Ask for further information needed to assess the claim"
                 ],
-                note: "No return shipping labels, no restocking fees, no hassle. We just make it right."
+                note: "Do not dispose of an affected item until support confirms that it is no longer required for review."
               },
               {
                 icon: AlertTriangle,
@@ -76,7 +75,7 @@ export function ReturnsPage() {
                   "Change of mind or taste preference",
                   "Opened or partially used products",
                   "Products stored improperly after delivery",
-                  "Failed age verification at delivery (package returned to us)",
+                  "A delivery refused because age verification could not be completed",
                   "Delivery address errors provided by customer",
                   "Natural variations in tobacco products (leaf color, draw, burn)"
                 ]
@@ -87,32 +86,32 @@ export function ReturnsPage() {
                 content: "If your order qualifies under section 1, here's the process:",
                 items: [
                   "Take clear photos of the issue within 48 hours of delivery",
-                  "Email returns@cigarro.com with your order number and photos",
-                  "Our team reviews within 24 hours",
-                  "Approved replacements ship next business day",
-                  "You'll receive new tracking info via email/SMS"
+                  "Email support@cigarro.in with your order number and photos",
+                  "Keep the item and its packaging while the claim is reviewed",
+                  "Wait for support to confirm the available resolution",
+                  "If a replacement ships, tracking information will be shared when available"
                 ]
               },
               {
                 icon: Shield,
-                title: "5. Refunds (Rare Cases Only)",
-                content: "Refunds are only issued when:",
+                title: "5. Refunds",
+                content: "A refund may be approved when:",
                 items: [
-                  "We cannot fulfill a replacement (product discontinued/out of stock long-term)",
-                  "Repeated shipping failures to your address after 3 attempts",
-                  "Legal or regulatory requirement mandates a refund"
+                  "An eligible item cannot be replaced",
+                  "An order is cancelled before fulfilment and payment has already been received",
+                  "A refund is required by applicable law"
                 ],
-                note: "Refunds process to original payment method within 5-7 business days. We'll always offer a replacement first."
+                note: "The available refund method and expected processing time will be confirmed when the refund is approved."
               },
               {
                 icon: Package,
                 title: "6. Rolling Papers & Accessories",
-                content: "Non-tobacco accessories (rolling papers, filters, lighters) follow a more flexible policy:",
+                content: "For a damaged, defective or incorrect non-tobacco accessory:",
                 items: [
-                  "Unopened, unused items: 14-day return window",
-                  "Customer covers return shipping unless our error",
-                  "Refund issued upon receipt and inspection",
-                  "Same process: email returns@cigarro.com with photos"
+                  "Report the issue within 48 hours of delivery",
+                  "Keep the item unused and in its original packaging",
+                  "Email support@cigarro.in with the order number and clear photos",
+                  "Support will confirm whether a replacement, return or refund applies"
                 ]
               }
             ].map((section, index) => (
@@ -145,12 +144,10 @@ export function ReturnsPage() {
 
           <div className="pt-8 border-t border-border/20">
             <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Questions About Returns?</h3>
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               {[
-                { title: "Returns Support", contact: "returns@cigarro.com", icon: RotateCcw },
-                { title: "General Support", contact: "support@cigarro.com", icon: Users },
-                { title: "Phone Support", contact: "+91 98765 43210", icon: Phone },
-                { title: "Last Updated", contact: "January 2025", icon: Heart }
+                { title: "Returns support", contact: "support@cigarro.in", icon: Mail },
+                { title: "Last updated", contact: "20 September 2026", icon: CalendarDays }
               ].map((item, i) => (
                 <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">
                   <item.icon className="w-5 h-5 text-muted-foreground mx-auto mb-2" />

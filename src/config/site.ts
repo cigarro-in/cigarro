@@ -8,8 +8,8 @@
 export const siteConfig = {
   // Brand Identity
   name: 'Cigarro',
-  tagline: 'The Tobacco Marketplace',
-  description: "India's premier online marketplace for premium cigarettes and tobacco products",
+  tagline: 'A clearer way to browse',
+  description: 'An online store that helps adult customers in India browse cigarette brands, variants and pack options.',
   
   // URLs
   url: 'https://cigarro.in',
@@ -20,8 +20,6 @@ export const siteConfig = {
     support: 'support@cigarro.in',
     orders: 'orders@cigarro.in',
   },
-  phone: '+91 98765 43210',
-  
   // Social Media
   social: {
     instagram: '',
@@ -41,13 +39,12 @@ export const siteConfig = {
   // SEO Defaults
   seo: {
     titleTemplate: '%s | Cigarro',
-    defaultTitle: 'Cigarro - Premium Tobacco Marketplace',
-    defaultDescription: "India's premier online marketplace for premium cigarettes and tobacco products. Authentic brands, nationwide delivery.",
+    defaultTitle: 'Cigarro | Cigarettes and Tobacco Products Online',
+    defaultDescription: 'Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro.',
     defaultKeywords: [
       'premium cigarettes',
       'tobacco products',
       'buy cigarettes online',
-      'authentic tobacco',
       'cigarette delivery India',
     ],
   },

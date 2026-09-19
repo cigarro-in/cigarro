@@ -795,8 +795,8 @@ async function generateBrandHTML(slug, faviconUrl, convexUrl) {
 // Generate HTML for homepage
 function generateHomepageHTML(faviconUrl) {
   const canonicalUrl = 'https://cigarro.in/';
-  const title = 'Cigarro - Premium Cigarettes & Tobacco Online';
-  const description = "India's premier online marketplace for premium cigarettes, cigars, and tobacco products. Authentic brands, nationwide delivery.";
+  const title = 'Cigarro | Cigarettes and Tobacco Products Online';
+  const description = 'Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only.';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -861,7 +861,7 @@ function generateHomepageHTML(faviconUrl) {
   </script>
 </head>
 <body>
-  <h1>Cigarro - Premium Cigarettes & Tobacco Online</h1>
+  <h1>Cigarro | Cigarettes and Tobacco Products Online</h1>
   <p>${escapeHtml(description)}</p>
   
   <!-- This content is for search engines. Real users get the SPA. -->
@@ -877,48 +877,50 @@ function generateHomepageHTML(faviconUrl) {
 async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
   const pages = {
     '/about': {
-      title: 'About Us - Premium Tobacco Marketplace',
-      description: "Learn about Cigarro's commitment to excellence in premium tobacco products, our heritage, values, and the expert team behind our curated collection."
+      title: 'About Cigarro | Online Cigarette Store in India',
+      description: 'Learn how Cigarro helps adult customers in India browse cigarette brands, compare pack options and find clear product information online.',
+      body: '<h2>Clear information makes choosing simpler.</h2><p>Cigarro organises products by brand and category, with listings designed to show the variant, format, quantity and current price before an order is placed.</p><nav aria-label="Explore Cigarro"><a href="/products">Browse products</a> · <a href="/brands">Explore brands</a> · <a href="/contact">Contact support</a></nav>'
     },
     '/contact': {
-      title: 'Contact Us - Get Expert Tobacco Advice',
-      description: 'Get in touch with our tobacco experts for product recommendations, order support, and any questions about our premium collection. Available Mon-Sat, 9 AM - 8 PM.'
+      title: 'Contact Cigarro | Order and Product Support',
+      description: 'Contact Cigarro for help with an order, a product listing, shipping or using the online store. Email support@cigarro.in.',
+      body: '<h2>Email Cigarro support</h2><p>For an order question, include the order number and phone number used at checkout. For a product question, include the product name or page link.</p><p><a href="mailto:support@cigarro.in">support@cigarro.in</a></p><nav aria-label="Customer policies"><a href="/shipping">Shipping policy</a> · <a href="/returns">Returns policy</a></nav>'
     },
     '/products': {
-      title: 'All Products - Premium Cigarettes & Tobacco',
-      description: 'Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery.'
+      title: 'All Cigarettes and Tobacco Products | Cigarro',
+      description: 'Browse the current Cigarro catalogue by product, brand, variant, pack option, price and availability.'
     },
     '/categories': {
-      title: 'Product Categories - Browse by Category',
-      description: 'Explore our organized categories of premium cigarettes, cigars, and tobacco products. Find exactly what you\'re looking for by browsing our curated collections.'
+      title: 'Cigarette and Tobacco Product Categories | Cigarro',
+      description: 'Browse cigarettes, rolling papers, filter tips and other available products by category at Cigarro.'
     },
     '/brands': {
-      title: 'Our Premium Brands',
-      description: 'Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world\'s finest brands.'
+      title: 'Cigarette and Tobacco Brands | Cigarro',
+      description: 'Browse the cigarette, cigar and rolling accessory brands currently listed in the Cigarro catalogue.'
     },
     '/blogs': {
-      title: 'Blog - Stories of Craftsmanship & Heritage',
-      description: 'Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes.'
+      title: 'Cigarette Brand and Product Guides | Cigarro',
+      description: 'Read Cigarro guides to cigarette brands, variants, pack formats and related tobacco products.'
     },
     '/terms': {
-      title: 'Terms of Service - Legal Information',
-      description: 'Terms of Service for Cigarro Premium Marketplace - Important legal information about using our platform.'
+      title: 'Terms of Service | Cigarro',
+      description: 'Read the terms that apply when you browse, create an account or place an order with Cigarro.'
     },
     '/privacy': {
-      title: 'Privacy Policy - Data Protection',
-      description: 'Privacy Policy for Cigarro Premium Marketplace - How we collect, use, and protect your personal information.'
+      title: 'Privacy Policy | Cigarro',
+      description: 'Learn what personal information Cigarro collects, why it is used, when it may be shared and how to make a privacy request.'
     },
     '/shipping': {
-      title: 'Shipping Policy - Delivery Information',
-      description: 'Shipping Policy for Cigarro Premium Marketplace - Information about delivery, shipping costs, and delivery times across India.'
+      title: 'Shipping and Delivery Policy | Cigarro',
+      description: 'See how Cigarro delivery availability, shipping options, dispatch, tracking and age verification work for orders within India.'
     },
     '/returns': {
       title: 'Returns & Replacement Policy - Damaged Items',
       description: 'Returns policy for Cigarro: damaged or incorrect tobacco items are replaced free if reported within 48 hours of delivery. Consumables are otherwise non-returnable.'
     },
     '/legal': {
-      title: 'Legal Information - Terms & Policies',
-      description: 'Terms of Service, Privacy Policy, and Legal Disclaimers for Cigarro Premium Marketplace'
+      title: 'Cigarro Policies | Terms, Privacy, Shipping and Returns',
+      description: 'Find Cigarro\'s terms of service, privacy policy, shipping information and returns and refunds policy.'
     }
   };
 
@@ -1008,6 +1010,7 @@ async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
 <body>
   <h1>${escapeHtml(pageInfo.title)}</h1>
   <p>${escapeHtml(pageInfo.description)}</p>
+  ${pageInfo.body || ''}
   ${postsNav}
   
   <!-- This content is for search engines. Real users get the SPA. -->
