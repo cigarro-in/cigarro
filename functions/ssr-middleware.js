@@ -872,8 +872,9 @@ function generateHomepageHTML(faviconUrl) {
 </html>`;
 }
 
-// Generate HTML for static pages
-function generateStaticPageHTML(pathname, faviconUrl) {
+// Generate HTML for static pages. For /blogs the bot body also lists the
+// latest posts (crawlable internal links); failures degrade to title + desc.
+async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
   const pages = {
     '/about': {
       title: 'About Us - Premium Tobacco Marketplace',
@@ -924,6 +925,38 @@ function generateStaticPageHTML(pathname, faviconUrl) {
   const pageInfo = pages[pathname] || pages['/'];
   const canonicalUrl = `https://cigarro.in${pathname}`;
 
+  let postsNav = '';
+  let postsSchema = '';
+  if (pathname === '/blogs' && convexUrl) {
+    try {
+      const rows = await cxQuery(convexUrl, 'content:listBlogPosts', { limit: 50 });
+      const items = (rows || []).map((p) => ({
+        title: p.title,
+        url: `https://cigarro.in/blog/${p.slug}`,
+      }));
+      if (items.length > 0) {
+        postsNav = `<nav aria-label="Blog posts"><ul>\n${items.map((p) => `    <li><a href="${p.url}">${escapeHtml(p.title)}</a></li>`).join('\n')}\n  </ul></nav>`;
+        postsSchema = `
+  <!-- Structured Data: blog listing -->
+  <script type="application/ld+json">
+  ${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: pageInfo.title,
+    itemListElement: items.map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: p.url,
+      name: p.title,
+    })),
+  })}
+  </script>`;
+      }
+    } catch {
+      // Degrade to title + description (still indexable, still self-canonical).
+    }
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -970,11 +1003,12 @@ function generateStaticPageHTML(pathname, faviconUrl) {
     description: pageInfo.description,
     url: canonicalUrl
   })}
-  </script>
+  </script>${postsSchema}
 </head>
 <body>
   <h1>${escapeHtml(pageInfo.title)}</h1>
   <p>${escapeHtml(pageInfo.description)}</p>
+  ${postsNav}
   
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
@@ -1001,6 +1035,7 @@ async function generateBlogHTML(slug, faviconUrl, convexUrl) {
       meta_title: row.metaTitle,
       meta_description: row.metaDescription,
       published_at: row.publishedAt ? new Date(row.publishedAt).toISOString() : null,
+      updated_at: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
       author: { name: row.authorName },
     };
 
@@ -1011,6 +1046,9 @@ async function generateBlogHTML(slug, faviconUrl, convexUrl) {
     const description = post.meta_description || post.excerpt || post.content?.substring(0, 160) || '';
     const authorName = post.author?.name || 'Cigarro';
     const publishedDate = post.published_at ? new Date(post.published_at).toISOString() : new Date().toISOString();
+    // dateModified honors content refreshes (Convex updatedAt); a refresh
+    // that predates publishing data falls back to the publish date.
+    const modifiedDate = post.updated_at || publishedDate;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1049,12 +1087,12 @@ async function generateBlogHTML(slug, faviconUrl, convexUrl) {
   <script type="application/ld+json">
   ${JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'Article',
+      '@type': 'BlogPosting',
       headline: post.title,
       description: description,
       ...(imageUrl ? { image: imageUrl } : {}),
       datePublished: publishedDate,
-      dateModified: publishedDate,
+      dateModified: modifiedDate,
       author: {
         '@type': 'Person',
         name: authorName
@@ -1414,7 +1452,7 @@ export async function onRequest(context) {
       url.pathname === '/terms' || url.pathname === '/privacy' ||
       url.pathname === '/shipping' || url.pathname === '/returns' ||
       url.pathname === '/legal') {
-      html = generateStaticPageHTML(url.pathname, faviconUrl);
+      html = await generateStaticPageHTML(url.pathname, faviconUrl, convexUrl);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {

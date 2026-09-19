@@ -205,8 +205,9 @@ export function SEOHead({
     if (type === 'article') {
       return {
         ...baseData,
-        '@type': 'Article',
+        '@type': 'BlogPosting',
         headline: title,
+        mainEntityOfPage: canonicalUrl,
         author: author ? { '@type': 'Person', name: author } : undefined,
         publisher: {
           '@type': 'Organization',
