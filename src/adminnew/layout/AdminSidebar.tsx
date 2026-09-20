@@ -17,6 +17,7 @@ import {
   Star,
   Boxes,
   ReceiptIndianRupee,
+  Megaphone,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -60,6 +61,7 @@ const NAVIGATION_CONFIG: NavItem[] = [
   { id: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, section: 'commerce' },
   { id: 'invoices', label: 'Invoices', path: '/admin/invoices', icon: ReceiptIndianRupee, section: 'commerce' },
   { id: 'payments', label: 'Payments', path: '/admin/payments', icon: CreditCard, section: 'payments' },
+  { id: 'marketing', label: 'Marketing', path: '/admin/marketing', icon: Megaphone, section: 'marketing' },
   { id: 'customers', label: 'Customers', path: '/admin/customers', icon: Users, section: 'platform' },
   { id: 'discounts', label: 'Discounts', path: '/admin/discounts', icon: Percent, section: 'platform' },
   { id: 'homepage', label: 'Homepage', path: '/admin/homepage', icon: Home, section: 'platform' },
@@ -76,6 +78,7 @@ const SECTION_LABELS: Record<string, string> = {
   platform: 'Platform',
   payments: 'Payments',
   commerce: 'Offline sales',
+  marketing: 'Marketing',
 };
 
 /**

@@ -174,6 +174,43 @@ http.route({
   }),
 });
 
+// ---------- Marketing click redirect (/m?c=<campaignId>&p=<contactId>) ----------
+//
+// The {{link}} variable in WhatsApp copy expands to this URL. It logs the
+// tap (per-contact click counts feed campaignStats) and 302s to the shop.
+// Unknown/expired ids still redirect â€” a customer never sees an error page.
+http.route({
+  path: "/m",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const url = new URL(req.url);
+    const site = (process.env.SITE_URL ?? "https://cigarro.in").replace(/\/$/, "");
+    const fallback = `${site}/?utm_source=whatsapp&utm_medium=blast`;
+    const c = url.searchParams.get("c");
+    const p = url.searchParams.get("p");
+    if (!c || !p) return Response.redirect(fallback, 302);
+    let hit: { campaignName: string } | null = null;
+    try {
+      hit = await ctx.runMutation(internal.marketing.logClick, {
+        campaignId: c as never,
+        contactId: p as never,
+      });
+    } catch {
+      return Response.redirect(fallback, 302);
+    }
+    if (!hit) return Response.redirect(fallback, 302);
+    const slug = hit.campaignName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+    return Response.redirect(
+      `${site}/?utm_source=whatsapp&utm_medium=blast&utm_campaign=${slug}`,
+      302,
+    );
+  }),
+});
+
 // ---------- CORS preflight ----------
 const preflight = httpAction(async () => {
   return new Response(null, {

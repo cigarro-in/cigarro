@@ -840,6 +840,69 @@ export default defineSchema({
     .index("by_code", ["referralCode"])
     .index("by_referrer", ["referredByUserId"]),
 
+  // ---------- Marketing: WhatsApp deeplink blasts (admin) ----------
+  // Contacts are org-scoped, deduped by normalized phone (digits only,
+  // e.g. "9188XXXXXXXX"). Sends are click-to-chat deeplinks
+  // (https://wa.me/<phone>?text=...), recorded per open â€” no BSP involved.
+  marketingContacts: defineTable({
+    orgId: v.id("organizations"),
+    phone: v.string(),
+    name: v.optional(v.string()),
+    city: v.optional(v.string()),
+    email: v.optional(v.string()),
+    source: v.optional(v.string()),
+    totalOrders: v.optional(v.number()),
+    totalSalesPaise: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_org_phone", ["orgId", "phone"])
+    .index("by_org", ["orgId"]),
+
+  marketingCampaigns: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    // Supports {{name}} {{firstname}} {{city}} {{phone}} {{code}} {{link}}.
+    // Snapshot of the template at send time â€” later template edits don't
+    // rewrite history.
+    message: v.string(),
+    templateId: v.optional(v.id("marketingTemplates")),
+    // Optional coupon driving order attribution (orders carry discountId).
+    couponCode: v.optional(v.string()),
+    discountId: v.optional(v.id("discounts")),
+    createdAt: v.number(),
+    createdBy: v.string(),
+    sentCount: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  // Reusable copy blocks campaigns snapshot from.
+  marketingTemplates: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    message: v.string(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  }).index("by_org", ["orgId"]),
+
+  // One row per tap on the {{link}} short URL (see http.ts /m route).
+  marketingClicks: defineTable({
+    orgId: v.id("organizations"),
+    campaignId: v.id("marketingCampaigns"),
+    contactId: v.id("marketingContacts"),
+    clickedAt: v.number(),
+  }).index("by_campaign", ["campaignId"]),
+
+  marketingSends: defineTable({
+    orgId: v.id("organizations"),
+    campaignId: v.id("marketingCampaigns"),
+    contactId: v.id("marketingContacts"),
+    phone: v.string(),
+    sentAt: v.number(),
+    sentBy: v.string(),
+  })
+    .index("by_campaign", ["campaignId"])
+    .index("by_campaign_contact", ["campaignId", "contactId"])
+    .index("by_org", ["orgId"]),
+
   // ---------- Wave 10: product reviews, Convex-native ----------
   // Never existed in Supabase in usable form (product_reviews dropped by
   // migration 076), so no backfill: rows start here. GLOBAL, like catalog.

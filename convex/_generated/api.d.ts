@@ -29,6 +29,7 @@ import type * as lib_inventory from "../lib/inventory.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_phone from "../lib/phone.js";
 import type * as lib_upi from "../lib/upi.js";
+import type * as marketing from "../marketing.js";
 import type * as orders from "../orders.js";
 import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   "lib/money": typeof lib_money;
   "lib/phone": typeof lib_phone;
   "lib/upi": typeof lib_upi;
+  marketing: typeof marketing;
   orders: typeof orders;
   organizations: typeof organizations;
   payments: typeof payments;
