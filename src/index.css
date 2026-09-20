@@ -806,3 +806,16 @@ html {
   color: var(--color-canyon);
 }
 
+/* ponytail: MSG91 injects an invisible-captcha badge (recaptcha/hcaptcha) that
+   floats bottom-right over product cards. Keep it in DOM for OTP, push it
+   behind everything so it never shows. Remove only if OTP provider changes. */
+.grecaptcha-badge,
+iframe[src*="recaptcha"],
+iframe[src*="hcaptcha"],
+h-captcha {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
