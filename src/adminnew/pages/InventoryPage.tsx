@@ -3,6 +3,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { AlertTriangle, Boxes, History, PackageCheck, Pencil, Search } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { AdminCard, AdminCardContent } from '../components/shared/AdminCard';
@@ -42,7 +43,7 @@ const movementLabels: Record<string, string> = {
 
 export function InventoryPage() {
   const org = useOrg();
-  const rows = useQuery(api.inventory.list, org ? { orgId: org._id } : 'skip') as InventoryRow[] | undefined;
+  const rows = useQuery(api.inventory.list, org ? { orgId: org._id, orgSlug: ORG_SLUG } : 'skip') as InventoryRow[] | undefined;
   const [search, setSearch] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
   const [editing, setEditing] = useState<InventoryRow | null>(null);
@@ -57,7 +58,7 @@ export function InventoryPage() {
   const adjust = useMutation(api.inventory.adjust);
   const history = useQuery(
     api.inventory.history,
-    org && historyFor ? { orgId: org._id, variantSupabaseId: historyFor.variantSupabaseId, limit: 100 } : 'skip',
+    org && historyFor ? { orgId: org._id, orgSlug: ORG_SLUG, variantSupabaseId: historyFor.variantSupabaseId, limit: 100 } : 'skip',
   );
 
   const filtered = useMemo(() => {
@@ -87,6 +88,7 @@ export function InventoryPage() {
     try {
       await adjust({
         orgId: org._id,
+        orgSlug: ORG_SLUG,
         variantSupabaseId: editing.variantSupabaseId,
         targetOnHand,
         reorderPoint,
@@ -117,7 +119,7 @@ export function InventoryPage() {
         </Button>
       </PageHeader>
 
-      <div className="mx-auto max-w-[1600px] space-y-5 px-6 pt-6">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-6">
         <InlineStatus status={opStatus} />
         {savedMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{savedMessage}</div>}
         <div className="grid gap-4 sm:grid-cols-3">

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
@@ -64,7 +65,7 @@ export function DiscountFormPage() {
 
   const row = useQuery(
     api.discounts.getDiscountForEdit,
-    isEditMode ? { id: id as any } : 'skip'
+    isEditMode ? { id: id as any, orgSlug: ORG_SLUG } : 'skip'
   );
   const saveDiscount = useMutation(api.discounts.saveDiscount);
   const removeDiscount = useMutation(api.discounts.deleteDiscount);
@@ -159,10 +160,10 @@ export function DiscountFormPage() {
       };
 
       if (isEditMode) {
-        await saveDiscount({ id: id as any, ...payload });
+        await saveDiscount({ id: id as any, ...payload, orgSlug: ORG_SLUG });
         setOpOk('Discount updated successfully');
       } else {
-        await saveDiscount(payload);
+        await saveDiscount({ ...payload, orgSlug: ORG_SLUG });
         setOpOk('Discount created successfully');
       }
 
@@ -185,7 +186,7 @@ export function DiscountFormPage() {
     if (!confirm('Are you sure you want to delete this discount?')) return;
     setSaving(true);
     try {
-      await removeDiscount({ id: id as any });
+      await removeDiscount({ id: id as any, orgSlug: ORG_SLUG });
       setOpOk('Discount deleted successfully');
       navigate('/admin/discounts');
     } catch (error: any) {
@@ -277,11 +278,11 @@ export function DiscountFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">

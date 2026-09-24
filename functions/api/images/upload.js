@@ -65,6 +65,15 @@ function cleanFolder(folder) {
     .slice(0, 100);
 }
 
+function decodeListCursor(cursor) {
+  if (!cursor) return {};
+  try { return JSON.parse(atob(cursor)); } catch { return { tenant: cursor }; }
+}
+
+function encodeListCursor(tenant, legacy) {
+  return btoa(JSON.stringify({ tenant: tenant || null, legacy: legacy || null }));
+}
+
 // "Camel Yellow Packet!" → "camel-yellow-packet" (SEO-friendly R2 keys).
 function slugify(text) {
   return String(text || '')
@@ -85,36 +94,61 @@ export async function onRequest(context) {
   const bucket = env.R2_ASSETS;
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
+  const orgSlug = String(env.VITE_ORG_SLUG || 'smokeshop');
+  if (!/^[a-z0-9-]{1,50}$/.test(orgSlug)) return json({ error: 'Invalid org configuration' }, 500);
+  const tenantPrefix = `${LIB_PREFIX}orgs/${orgSlug}/`;
 
   // ---- List (library browser; cursor-paginated for bulk walks) ----
   if (request.method === 'GET') {
-    const prefix = String(url.searchParams.get('prefix') || LIB_PREFIX);
-    if (!prefix.startsWith(LIB_PREFIX)) return json({ error: 'Bad prefix' }, 400);
-    const cursor = url.searchParams.get('cursor') || undefined;
-    const listed = await bucket.list({ prefix, limit: 500, cursor });
+    const requestedPrefix = String(url.searchParams.get('prefix') || LIB_PREFIX);
+    if (!requestedPrefix.startsWith(LIB_PREFIX)) return json({ error: 'Bad prefix' }, 400);
+    const explicitTenantPrefix = `${tenantPrefix}`;
+    const explicitTenant = requestedPrefix.startsWith(explicitTenantPrefix);
+    if (explicitTenant && requestedPrefix.slice(explicitTenantPrefix.length).split('/').some((part) => part === 'orgs' || part === orgSlug))
+      return json({ error: 'Bad prefix' }, 400);
+    const relativePrefix = cleanFolder(requestedPrefix.slice(explicitTenant ? explicitTenantPrefix.length : LIB_PREFIX.length));
+    if (!explicitTenant && relativePrefix.split('/').some((part) => part === 'orgs'))
+      return json({ error: 'Bad prefix' }, 400);
+    const prefix = `${explicitTenantPrefix}${relativePrefix ? relativePrefix + '/' : ''}`;
+    const cursorState = decodeListCursor(url.searchParams.get('cursor'));
+    const [tenant, legacy] = await Promise.all([
+      bucket.list({ prefix, limit: 500, cursor: cursorState.tenant || undefined }),
+      orgSlug === 'smokeshop' && !explicitTenant
+        ? bucket.list({ prefix: `${LIB_PREFIX}${relativePrefix ? relativePrefix + '/' : ''}`, limit: 500, cursor: cursorState.legacy || undefined })
+        : Promise.resolve(null),
+    ]);
     const images = [];
-    const folderSet = new Set();
-    for (const obj of listed.objects || []) {
-      const rest = obj.key.slice(prefix.length);
-      if (!rest) continue;
-      if (rest.includes('/')) {
-        folderSet.add(rest.split('/')[0]);
-        continue;
+    const folderMap = new Map();
+    for (const [listed, sourcePrefix, isLegacy] of [
+      [tenant, prefix, false],
+      [legacy, `${LIB_PREFIX}${relativePrefix ? relativePrefix + '/' : ''}`, true],
+    ]) {
+      for (const obj of listed?.objects || []) {
+        if (isLegacy && obj.key.startsWith(`${LIB_PREFIX}orgs/`)) continue;
+        const rest = obj.key.slice(sourcePrefix.length);
+        if (!rest) continue;
+        if (rest.includes('/')) {
+          const folder = rest.split('/')[0];
+          if (folder !== 'orgs') folderMap.set(`${sourcePrefix}${folder}/`, { name: folder, path: `${sourcePrefix}${folder}/` });
+          continue;
+        }
+        if (!/\.(webp|jpg|jpeg|png|gif|avif)$/i.test(obj.key)) continue;
+        images.push({
+          id: obj.key,
+          name: obj.key.split('/').pop(),
+          path: obj.key,
+          url: `${cdn}/${obj.key}`,
+          size: obj.size || 0,
+          contentType: obj.httpMetadata?.contentType || 'image/webp',
+          createdAt: obj.uploaded ? new Date(obj.uploaded).toISOString() : new Date().toISOString(),
+          metadata: obj.customMetadata || {},
+        });
       }
-      if (!/\.(webp|jpg|jpeg|png|gif|avif)$/i.test(obj.key)) continue;
-      images.push({
-        id: obj.key,
-        name: obj.key.split('/').pop(),
-        path: obj.key,
-        url: `${cdn}/${obj.key}`,
-        size: obj.size || 0,
-        contentType: obj.httpMetadata?.contentType || 'image/webp',
-        createdAt: obj.uploaded ? new Date(obj.uploaded).toISOString() : new Date().toISOString(),
-      });
     }
     images.sort((a, b) => (b.createdAt < a.createdAt ? -1 : 1));
-    const out = { images, folders: [...folderSet].map((name) => ({ name, path: `${prefix}${name}/` })) };
-    if (listed.truncated) out.cursor = listed.cursor;
+    const out = { images, folders: [...folderMap.values()] };
+    if (tenant.truncated || legacy?.truncated)
+      out.cursor = encodeListCursor(tenant.truncated ? tenant.cursor : null, legacy?.truncated ? legacy.cursor : null);
     return json(out);
   }
 
@@ -145,31 +179,47 @@ export async function onRequest(context) {
       : 'webp';
     if (raw && /^(webp|jpe?g|png|gif|avif|svg)$/.test(ext))
       return json({ error: 'Images must use the WebP upload flow' }, 400);
-    const rand = Math.random().toString(36).substring(2, 8);
-    // SEO filename: item slug when the caller knows it, random suffix keeps
-    // keys unique (`camel-yellow-packet-a1b2c3.webp`).
-    const stem = slugify(String(form?.get('slug') || '').replace(/\.(jpe?g|png|gif|webp|avif)$/i, '')) || `${Date.now()}`;
-    const key = `${LIB_PREFIX}${folder ? folder + '/' : ''}${stem}-${rand}.${ext}`;
-    await bucket.put(key, bytes, {
+    // SEO filename: item slug when the caller knows it, numeric suffix on
+    // collision (`slug.webp`, `slug-2.webp`, …). Conditional put keeps this
+    // race-safe: onlyIf etagDoesNotMatch '*' never overwrites, retry next.
+    const sourceName = String(form?.get('slug') || (raw ? file.name : '') || '').replace(/\.[^.]+$/, '');
+    const stem = slugify(sourceName) || `${Date.now()}`;
+    const base = `${tenantPrefix}${folder ? folder + '/' : ''}${stem}`;
+    const meta = {
       httpMetadata: {
         contentType: raw ? mime : 'image/webp',
         cacheControl: 'public, max-age=31536000, immutable',
       },
-    });
+      // Create-only: R2 returns null when the key already exists.
+      onlyIf: { etagDoesNotMatch: '*' },
+      ...(form?.get('alt') ? { customMetadata: { alt: String(form.get('alt')).slice(0, 300) } } : {}),
+    };
+    let key = null;
+    for (let n = 1; n <= 100; n++) {
+      const candidate = n === 1 ? `${base}.${ext}` : `${base}-${n}.${ext}`;
+      const stored = await bucket.put(candidate, bytes, meta);
+      if (stored !== null) {
+        key = candidate;
+        break;
+      }
+    }
+    if (!key) return json({ error: 'Name collision; retry upload' }, 409);
     return json({ url: `${cdn}/${key}`, key, size: bytes.length });
   }
 
   // ---- Delete ----
   if (request.method === 'DELETE') {
     const key = String(url.searchParams.get('key') || '');
-    if (!key.startsWith(LIB_PREFIX)) return json({ error: 'Bad key' }, 400);
+    const isTenantKey = key.startsWith(tenantPrefix);
+    const isLegacyShopKey = orgSlug === 'smokeshop' && key.startsWith(LIB_PREFIX) && !key.startsWith(`${LIB_PREFIX}orgs/`);
+    if (!isTenantKey && !isLegacyShopKey) return json({ error: 'Bad key' }, 400);
     const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
     let usage;
     try {
       const check = await fetch(`${requiredConvexUrl(env)}/api/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ path: 'adminCatalog:imageUsage', args: { key, url: `${cdn}/${key}` }, format: 'json' }),
+        body: JSON.stringify({ path: 'adminCatalog:imageUsage', args: { orgSlug, key, url: `${cdn}/${key}` }, format: 'json' }),
       });
       const body = await check.json();
       if (!check.ok || body?.status !== 'success' || typeof body.value?.total !== 'number')

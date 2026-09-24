@@ -2,6 +2,7 @@
 // order totals are always recomputed from catalog prices at createOrder).
 import { convex } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
+import { ORG_SLUG } from '../lib/convex/org';
 import { Discount, DiscountResult, CartItemWithVariant } from '../types/variants';
 
 // Boundary: Convex ms timestamps → ISO strings the Discount type speaks.
@@ -35,7 +36,7 @@ export const calculateDiscount = async (
 
   try {
     // Active + in-window only (server-filtered, mirrors old RLS policy).
-    const rows = await convex.query(api.discounts.listActiveDiscounts, {});
+    const rows = await convex.query(api.discounts.listActiveDiscounts, { orgSlug: ORG_SLUG });
     const discounts: Discount[] = (rows || []).map(toDiscount);
 
     // Calculate cart totals
@@ -210,7 +211,7 @@ export const validateCouponCode = async (code: string): Promise<{
   }
 
   try {
-    const row = await convex.query(api.discounts.getDiscountByCode, { code });
+    const row = await convex.query(api.discounts.getDiscountByCode, { code, orgSlug: ORG_SLUG });
     if (!row) {
       return { isValid: false, message: 'Invalid coupon code' };
     }
@@ -247,7 +248,7 @@ export const validateCouponCode = async (code: string): Promise<{
 // Get available discounts for display
 export const getAvailableDiscounts = async (): Promise<Discount[]> => {
   try {
-    const rows = await convex.query(api.discounts.listActiveDiscounts, {});
+    const rows = await convex.query(api.discounts.listActiveDiscounts, { orgSlug: ORG_SLUG });
     return (rows || []).map(toDiscount);
   } catch (error) {
     console.error('Get available discounts error:', error);

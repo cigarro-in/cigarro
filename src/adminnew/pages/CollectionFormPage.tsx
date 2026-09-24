@@ -13,6 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
@@ -63,7 +64,7 @@ export function CollectionFormPage() {
     meta_description: ''
   });
 
-  const collectionRows = useQuery(api.adminCatalog.listCollectionsForAdmin, {});
+  const collectionRows = useQuery(api.adminCatalog.listCollectionsForAdmin, { orgSlug: ORG_SLUG });
   const saveCollection = useMutation(api.adminCatalog.saveCollection);
   const removeCollection = useMutation(api.adminCatalog.deleteCollection);
   const populatedRef = useRef(false);
@@ -140,6 +141,7 @@ export function CollectionFormPage() {
     try {
       // Joins ride inside saveCollection — one mutation, no separate writes.
       await saveCollection({
+        orgSlug: ORG_SLUG,
         supabaseId: isEditMode ? id : undefined,
         collection: {
           title: formData.title.trim(),
@@ -175,7 +177,7 @@ export function CollectionFormPage() {
     if (!confirm('Are you sure you want to delete this collection?')) return;
     setSaving(true);
     try {
-      await removeCollection({ supabaseId: id! });
+      await removeCollection({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Collection deleted successfully');
       navigate('/admin/collections');
     } catch (error: any) {
@@ -238,11 +240,11 @@ export function CollectionFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">

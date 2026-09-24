@@ -1,32 +1,38 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { requireIdentity } from "./lib/auth";
+import {
+  collectInOrg,
+  inOrg,
+  requireOrgAdminBySlug,
+  resolveOrg,
+} from "./lib/org";
 
 // ---------- Wave 7: commercial discounts (Supabase -> Convex) ----------
-// GLOBAL table (no orgId), like catalog. Writes gated on owner/admin of ANY
-// org. Reads stay public (Supabase RLS likewise allowed public reads).
+// ORG-SCOPED (codes unique per org). Writes gated on owner/admin of THAT org.
+// Public reads (active list, code lookup) filter by the slug-resolved org.
 // Money in RUPEES; dates as ms timestamps. Field names stay snake_case to
 // match the shape the admin UI and checkout already speak.
 
-async function requireDiscountAdmin(ctx: any) {
-  const identity = await requireIdentity(ctx);
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user", (q: any) => q.eq("userId", identity.subject))
-    .filter((q: any) =>
-      q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
+async function findDiscountByCode(ctx: any, org: any, code: string) {
+  const want = code.trim().toUpperCase();
+  const scoped = await ctx.db
+    .query("discounts")
+    .withIndex("by_org_code", (q: any) =>
+      q.eq("orgId", org._id).eq("code", want),
     )
-    .first();
-  if (!membership) throw new ConvexError({ code: "NOT_DISCOUNT_ADMIN" });
-  return identity;
+    .unique();
+  if (scoped) return scoped;
+  // Legacy rows predate UPPER normalization: case-insensitive scan in-org.
+  const rows = await collectInOrg(ctx, "discounts", org);
+  return rows.find((d: any) => (d.code ?? "").toUpperCase() === want) ?? null;
 }
 
-// Admin list: ALL discounts, newest first.
+// Admin list: ALL of this org's discounts, newest first.
 export const listDiscountsForAdmin = query({
-  args: {},
-  handler: async (ctx) => {
-    await requireDiscountAdmin(ctx);
-    const rows = await ctx.db.query("discounts").collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const { org } = await requireOrgAdminBySlug(ctx, args.orgSlug);
+    const rows = await collectInOrg(ctx, "discounts", org);
     rows.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     return rows;
   },
@@ -34,10 +40,11 @@ export const listDiscountsForAdmin = query({
 
 // Storefront: active + within date window (null bounds = open).
 export const listActiveDiscounts = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const now = Date.now();
-    const rows = await ctx.db.query("discounts").collect();
+    const rows = await collectInOrg(ctx, "discounts", org);
     return rows.filter(
       (d) =>
         d.is_active &&
@@ -51,20 +58,22 @@ export const listActiveDiscounts = query({
 // path compared lower-vs-upper and never matched). Validity (dates, usage)
 // stays client-side so messages match the checkout's existing copy.
 export const getDiscountByCode = query({
-  args: { code: v.string() },
-  handler: async (ctx, { code }) => {
+  args: { orgSlug: v.string(), code: v.string() },
+  handler: async (ctx, { orgSlug, code }) => {
+    const org = await resolveOrg(ctx, orgSlug);
     const want = code.trim().toUpperCase();
     if (!want) return null;
-    const rows = await ctx.db.query("discounts").collect();
-    return rows.find((d) => (d.code ?? "").toUpperCase() === want) ?? null;
+    return await findDiscountByCode(ctx, org, want);
   },
 });
 
 export const getDiscountForEdit = query({
-  args: { id: v.id("discounts") },
-  handler: async (ctx, { id }) => {
-    await requireDiscountAdmin(ctx);
-    return ctx.db.get(id);
+  args: { orgSlug: v.string(), id: v.id("discounts") },
+  handler: async (ctx, { orgSlug, id }) => {
+    const { org } = await requireOrgAdminBySlug(ctx, orgSlug);
+    const row = await ctx.db.get(id);
+    if (!row || !inOrg(row as any, org)) return null;
+    return row;
   },
 });
 
@@ -87,28 +96,27 @@ const discountFields = {
 };
 
 export const saveDiscount = mutation({
-  args: { id: v.optional(v.id("discounts")), ...discountFields },
-  handler: async (ctx, { id, ...d }) => {
-    await requireDiscountAdmin(ctx);
+  args: { orgSlug: v.string(), id: v.optional(v.id("discounts")), ...discountFields },
+  handler: async (ctx, { orgSlug, id, ...d }) => {
+    const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     const code = d.code?.trim() ? d.code.trim().toUpperCase() : undefined;
     if (code) {
-      const clash = await ctx.db
-        .query("discounts")
-        .withIndex("by_code", (q) => q.eq("code", code))
-        .unique();
-      if (clash && clash._id !== id) throw new ConvexError({ code: "CODE_TAKEN", value: code });
+      const clash = await findDiscountByCode(ctx, org, code);
+      if (clash && clash._id !== id)
+        throw new ConvexError({ code: "CODE_TAKEN", value: code });
     }
     const now = Date.now();
     // ponytail: patch drops undefined values on the wire, so spreads are safe.
     if (id) {
       const row = await ctx.db.get(id);
-      if (!row) throw new ConvexError({ code: "NOT_FOUND" });
-      await ctx.db.patch(id, { ...d, code, updatedAt: now });
+      if (!row || !inOrg(row as any, org)) throw new ConvexError({ code: "NOT_FOUND" });
+      await ctx.db.patch(id, { ...d, code, orgId, updatedAt: now });
       return { id };
     }
     const newId = await ctx.db.insert("discounts", {
       ...d,
       code,
+      orgId,
       usage_count: 0,
       createdAt: now,
       updatedAt: now,
@@ -118,23 +126,29 @@ export const saveDiscount = mutation({
 });
 
 export const deleteDiscount = mutation({
-  args: { id: v.id("discounts") },
-  handler: async (ctx, { id }) => {
-    await requireDiscountAdmin(ctx);
+  args: { orgSlug: v.string(), id: v.id("discounts") },
+  handler: async (ctx, { orgSlug, id }) => {
+    const { org } = await requireOrgAdminBySlug(ctx, orgSlug);
+    const row = await ctx.db.get(id);
+    if (!row || !inOrg(row as any, org)) throw new ConvexError({ code: "NOT_FOUND" });
     await ctx.db.delete(id);
     return { deleted: true };
   },
 });
 
 export const setDiscountsStatus = mutation({
-  args: { ids: v.array(v.id("discounts")), isActive: v.boolean() },
-  handler: async (ctx, { ids, isActive }) => {
-    await requireDiscountAdmin(ctx);
+  args: {
+    orgSlug: v.string(),
+    ids: v.array(v.id("discounts")),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, { orgSlug, ids, isActive }) => {
+    const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     const now = Date.now();
     for (const id of ids) {
       const row = await ctx.db.get(id);
-      if (!row) continue;
-      await ctx.db.patch(id, { is_active: isActive, updatedAt: now });
+      if (!row || !inOrg(row as any, org)) continue;
+      await ctx.db.patch(id, { is_active: isActive, orgId, updatedAt: now });
     }
     return { updated: ids.length };
   },

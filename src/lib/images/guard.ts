@@ -8,6 +8,7 @@
 
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { ORG_SLUG } from "../convex/org";
 import type { AssetUsage } from "./usage";
 
 export function describeUsage(u: {
@@ -32,6 +33,7 @@ export async function confirmImageDelete(
     usage = await convex.query(api.adminCatalog.imageUsage, {
       key: opts.key,
       url: opts.url,
+      orgSlug: ORG_SLUG,
     });
   } catch {
     // Usage check unavailable — fail closed.

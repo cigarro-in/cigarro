@@ -119,7 +119,7 @@ export function CustomerFormPage() {
         )}
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">

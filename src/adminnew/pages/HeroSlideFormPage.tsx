@@ -14,6 +14,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 
@@ -69,7 +70,7 @@ export function HeroSlideFormPage() {
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const populatedRef = useRef(false);
 
-  const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
+  const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, { orgSlug: ORG_SLUG });
   const saveSlide = useMutation(api.adminCatalog.saveHeroSlide);
   const removeSlide = useMutation(api.adminCatalog.deleteHeroSlide);
 
@@ -125,6 +126,7 @@ export function HeroSlideFormPage() {
     setSaving(true);
     try {
       await saveSlide({
+        orgSlug: ORG_SLUG,
         id: isEditMode && id ? (id as any) : undefined,
         slide: {
           title: form.title.trim(),
@@ -164,7 +166,7 @@ export function HeroSlideFormPage() {
 
     setSaving(true);
     try {
-      await removeSlide({ id: id as any });
+      await removeSlide({ id: id as any, orgSlug: ORG_SLUG });
       setOpOk('Slide deleted');
       await invalidateStorefront();
       navigate('/admin/homepage');
@@ -212,11 +214,11 @@ export function HeroSlideFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Basic Info */}

@@ -20,6 +20,7 @@ import { useMutation } from 'convex/react';
 import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
@@ -885,12 +886,14 @@ export function CheckoutPage() {
             if (item.combo_id && org) {
               const combos = await convexClient.query(api.catalog.combosBySupabaseIds, {
                 ids: [String(item.combo_id)],
+                orgSlug: ORG_SLUG,
               });
               const live = combos?.[0]?.combo_price;
               if (Number.isFinite(Number(live))) unitRupees = Number(live);
             } else if (org) {
               const found = await convexClient.query(api.catalog.productsBySupabaseIds, {
                 ids: [String(item.id)],
+                orgSlug: ORG_SLUG,
               });
               const variants = found?.[0]?.product_variants || [];
               const match = item.variant_id
@@ -915,6 +918,7 @@ export function CheckoutPage() {
       }
 
       const result = await createConvexOrder({
+        orgSlug: ORG_SLUG,
         orgId: org._id,
         kind: 'purchase',
         items: convexItems,

@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { findOrgDocBySupabase, inOrg } from "./org";
 
 export type InventoryMovement =
   | "opening_balance"
@@ -15,22 +16,75 @@ export type InventoryMovement =
 
 type Reference = { type?: string; id?: string; note?: string };
 type OrderLine = { productId: string; variantId?: string; qty: number };
+type Org = { _id: Id<"organizations">; slug: string };
 
-async function trackedVariantForLine(ctx: MutationCtx, line: OrderLine) {
+async function orgOf(ctx: MutationCtx, orgId: Id<"organizations">): Promise<Org> {
+  const org = await ctx.db.get(orgId);
+  if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+  return { _id: org._id, slug: org.slug };
+}
+
+async function orgVariantsByProduct(
+  ctx: MutationCtx,
+  org: Org,
+  productSupabaseId: string,
+): Promise<any[]> {
+  const scoped = await ctx.db
+    .query("catalogVariants")
+    .withIndex("by_org_product", (q) =>
+      q.eq("orgId", org._id).eq("productSupabaseId", productSupabaseId),
+    )
+    .collect();
+  if (org.slug !== "smokeshop") return scoped;
+  const legacy = await ctx.db
+    .query("catalogVariants")
+    .withIndex("by_product", (q) =>
+      q.eq("productSupabaseId", productSupabaseId),
+    )
+    .collect();
+  const seen = new Set(scoped.map((r) => r._id));
+  return [...scoped, ...legacy.filter((r) => r.orgId == null && !seen.has(r._id))];
+}
+
+async function orgComboItems(
+  ctx: MutationCtx,
+  org: Org,
+  comboSupabaseId: string,
+): Promise<any[]> {
+  const scoped = await ctx.db
+    .query("catalogComboItems")
+    .withIndex("by_org_combo", (q) =>
+      q.eq("orgId", org._id).eq("comboSupabaseId", comboSupabaseId),
+    )
+    .collect();
+  if (org.slug !== "smokeshop") return scoped;
+  const legacy = await ctx.db
+    .query("catalogComboItems")
+    .withIndex("by_combo", (q) => q.eq("comboSupabaseId", comboSupabaseId))
+    .collect();
+  const seen = new Set(scoped.map((r) => r._id));
+  return [...scoped, ...legacy.filter((r) => r.orgId == null && !seen.has(r._id))];
+}
+
+async function trackedVariantForLine(
+  ctx: MutationCtx,
+  org: Org,
+  line: OrderLine,
+) {
   let variant: Doc<"catalogVariants"> | null = null;
   if (line.variantId) {
-    variant = await ctx.db
-      .query("catalogVariants")
-      .withIndex("by_supabase", (q) => q.eq("supabaseId", line.variantId!))
-      .unique();
+    const found = await findOrgDocBySupabase(
+      ctx,
+      "catalogVariants",
+      org,
+      line.variantId!,
+    );
+    variant = found && inOrg(found, org) ? found : null;
     if (variant && variant.productSupabaseId !== line.productId) {
       throw new ConvexError({ code: "VARIANT_PRODUCT_MISMATCH" });
     }
   } else {
-    const variants = await ctx.db
-      .query("catalogVariants")
-      .withIndex("by_product", (q) => q.eq("productSupabaseId", line.productId))
-      .collect();
+    const variants = await orgVariantsByProduct(ctx, org, line.productId);
     variant = variants.find((v) => v.isDefault) ?? variants[0] ?? null;
   }
   return variant && variant.trackInventory !== false ? variant : null;
@@ -137,7 +191,11 @@ export async function changeInventory(
   return { onHand: nextOnHand, reserved: nextReserved };
 }
 
-async function aggregateTrackedLines(ctx: MutationCtx, lines: OrderLine[]) {
+async function aggregateTrackedLines(
+  ctx: MutationCtx,
+  org: Org,
+  lines: OrderLine[],
+) {
   const quantities = new Map<string, { variant: Doc<"catalogVariants">; qty: number }>();
   const add = (variant: Doc<"catalogVariants">, qty: number) => {
     if (variant.trackInventory === false) return;
@@ -148,27 +206,25 @@ async function aggregateTrackedLines(ctx: MutationCtx, lines: OrderLine[]) {
     if (!Number.isSafeInteger(line.qty) || line.qty <= 0) {
       throw new ConvexError({ code: "INVALID_QUANTITY" });
     }
-    const variant = await trackedVariantForLine(ctx, line);
+    const variant = await trackedVariantForLine(ctx, org, line);
     if (variant) {
       add(variant, line.qty);
       continue;
     }
     // Combo order lines carry the combo UUID as productId and no variantId.
-    const combo = await ctx.db
-      .query("catalogCombos")
-      .withIndex("by_supabase", (q) => q.eq("supabaseId", line.productId))
-      .unique();
-    if (!combo) continue;
-    const comboItems = await ctx.db
-      .query("catalogComboItems")
-      .withIndex("by_combo", (q) => q.eq("comboSupabaseId", combo.supabaseId))
-      .collect();
+    // Combos resolve inside the order's org only.
+    const combo = await findOrgDocBySupabase(ctx, "catalogCombos", org, line.productId);
+    if (!combo || !inOrg(combo, org)) continue;
+    const comboItems = await orgComboItems(ctx, org, combo.supabaseId);
     for (const comboItem of comboItems) {
-      const comboVariant = await ctx.db
-        .query("catalogVariants")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", comboItem.variantSupabaseId))
-        .unique();
-      if (comboVariant) add(comboVariant, comboItem.quantity * line.qty);
+      const comboVariant = await findOrgDocBySupabase(
+        ctx,
+        "catalogVariants",
+        org,
+        comboItem.variantSupabaseId,
+      );
+      if (comboVariant && inOrg(comboVariant, org))
+        add(comboVariant, comboItem.quantity * line.qty);
     }
   }
   return [...quantities.values()];
@@ -181,7 +237,8 @@ export async function reserveOrderInventory(
   orderId: Id<"orders">,
   actor: string,
 ) {
-  for (const { variant, qty } of await aggregateTrackedLines(ctx, lines)) {
+  const org = await orgOf(ctx, orgId);
+  for (const { variant, qty } of await aggregateTrackedLines(ctx, org, lines)) {
     const balance = await getOrCreateBalance(ctx, orgId, variant, actor);
     if (balance.onHand - balance.reserved < qty) {
       throw new ConvexError({
@@ -208,8 +265,9 @@ export async function commitOrderInventory(
   actor: string,
 ) {
   if (order.kind !== "purchase" || order.inventoryState === "committed") return;
+  const org = await orgOf(ctx, order.orgId);
   const wasReserved = order.inventoryState === "reserved";
-  for (const { variant, qty } of await aggregateTrackedLines(ctx, order.items)) {
+  for (const { variant, qty } of await aggregateTrackedLines(ctx, org, order.items)) {
     await changeInventory(ctx, {
       orgId: order.orgId,
       variant,
@@ -233,7 +291,8 @@ export async function releaseOrderInventory(
   actor: string,
 ) {
   if (order.kind !== "purchase" || order.inventoryState !== "reserved") return;
-  for (const { variant, qty } of await aggregateTrackedLines(ctx, order.items)) {
+  const org = await orgOf(ctx, order.orgId);
+  for (const { variant, qty } of await aggregateTrackedLines(ctx, org, order.items)) {
     await changeInventory(ctx, {
       orgId: order.orgId,
       variant,
@@ -253,7 +312,8 @@ export async function returnOrderInventory(
   actor: string,
 ) {
   if (order.kind !== "purchase" || order.inventoryState !== "committed") return;
-  for (const { variant, qty } of await aggregateTrackedLines(ctx, order.items)) {
+  const org = await orgOf(ctx, order.orgId);
+  for (const { variant, qty } of await aggregateTrackedLines(ctx, org, order.items)) {
     await changeInventory(ctx, {
       orgId: order.orgId,
       variant,

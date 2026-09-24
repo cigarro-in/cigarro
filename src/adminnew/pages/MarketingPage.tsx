@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable } from '../components/shared/DataTable';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
@@ -161,7 +162,7 @@ export function MarketingPage() {
   const contacts = useQuery(api.marketing.listContacts, orgId ? { orgId, search: tab === 'send' ? sendSearch : search } : 'skip');
   const campaigns = useQuery(api.marketing.listCampaigns, orgId ? { orgId } : 'skip');
   const templates = useQuery(api.marketing.listTemplates, orgId ? { orgId } : 'skip');
-  const discounts = useQuery(api.discounts.listDiscountsForAdmin);
+  const discounts = useQuery(api.discounts.listDiscountsForAdmin, { orgSlug: ORG_SLUG });
   const sentIds = useQuery(
     api.marketing.sentContactIds,
     activeCampaignId ? { campaignId: activeCampaignId as never } : 'skip',

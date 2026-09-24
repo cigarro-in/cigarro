@@ -13,6 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
@@ -59,7 +60,7 @@ export function CategoryFormPage() {
     meta_description: ''
   });
 
-  const categoryRows = useQuery(api.adminCatalog.listCategoriesForAdmin, {});
+  const categoryRows = useQuery(api.adminCatalog.listCategoriesForAdmin, { orgSlug: ORG_SLUG });
   const createCategory = useMutation(api.adminCatalog.createCategory);
   const updateCategory = useMutation(api.adminCatalog.updateCategory);
   const removeCategory = useMutation(api.adminCatalog.deleteCategory);
@@ -138,16 +139,16 @@ export function CategoryFormPage() {
 
       let categoryId = id;
       if (isEditMode) {
-        await updateCategory({ supabaseId: id!, patch: args });
+        await updateCategory({ supabaseId: id!, patch: args, orgSlug: ORG_SLUG });
         setOpOk('Category updated successfully');
       } else {
-        const { supabaseId } = await createCategory(args);
+        const { supabaseId } = await createCategory({ ...args, orgSlug: ORG_SLUG });
         categoryId = supabaseId;
         setOpOk('Category created successfully');
       }
 
       // Replace product links (same replace-set semantics as before).
-      await linkProducts({ supabaseId: categoryId!, productSupabaseIds: selectedProductIds });
+      await linkProducts({ supabaseId: categoryId!, productSupabaseIds: selectedProductIds, orgSlug: ORG_SLUG });
 
       navigate('/admin/categories');
     } catch (error: any) {
@@ -169,7 +170,7 @@ export function CategoryFormPage() {
     if (!confirm('Are you sure you want to delete this category?')) return;
     setSaving(true);
     try {
-      await removeCategory({ supabaseId: id! });
+      await removeCategory({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Category deleted successfully');
       navigate('/admin/categories');
     } catch (error: any) {
@@ -232,11 +233,11 @@ export function CategoryFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-4">

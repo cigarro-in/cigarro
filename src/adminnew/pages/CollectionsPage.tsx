@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
@@ -28,7 +29,7 @@ export function CollectionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  const rows = useQuery(api.adminCatalog.listCollectionsForAdmin, {});
+  const rows = useQuery(api.adminCatalog.listCollectionsForAdmin, { orgSlug: ORG_SLUG });
   const removeCollection = useMutation(api.adminCatalog.deleteCollection);
   const setActive = useMutation(api.adminCatalog.setCollectionsActive);
 
@@ -56,7 +57,7 @@ export function CollectionsPage() {
     if (!confirm(`Delete ${collectionIds.length} collections?`)) return;
     try {
       for (const supabaseId of collectionIds) {
-        await removeCollection({ supabaseId });
+        await removeCollection({ supabaseId, orgSlug: ORG_SLUG });
       }
       setOpOk(`${collectionIds.length} collections deleted`);
       setSelectedCollections([]);
@@ -67,7 +68,7 @@ export function CollectionsPage() {
 
   const handleBulkStatusChange = async (collectionIds: string[], isActive: boolean) => {
     try {
-      await setActive({ supabaseIds: collectionIds, isActive });
+      await setActive({ supabaseIds: collectionIds, isActive, orgSlug: ORG_SLUG });
       setOpOk(`${collectionIds.length} collections ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCollections([]);
     } catch (error: any) {

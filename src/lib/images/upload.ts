@@ -89,6 +89,7 @@ export async function uploadImageToR2(
   if (opts.folder) form.append('folder', opts.folder);
   // SEO filename: item slug → `camel-yellow-packet-a1b2c3.webp`.
   if (opts.slug || fallbackName) form.append('slug', opts.slug || fallbackName);
+  form.append('alt', opts.alt || humanizeAlt(opts.slug || fallbackName));
   const res = await fetch('/api/images/upload', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -99,7 +100,7 @@ export async function uploadImageToR2(
   return {
     url: body.url,
     key: body.key,
-    alt: opts.alt || humanizeAlt(fallbackName),
+    alt: opts.alt || humanizeAlt(opts.slug || fallbackName),
     size: body.size ?? webp.size,
   };
 }
@@ -173,6 +174,7 @@ export interface R2Image {
   size: number;
   contentType: string;
   createdAt: string;
+  metadata?: Record<string, string>;
 }
 
 /** List the R2 image library (admin-gated). Pass cursor for next page. */

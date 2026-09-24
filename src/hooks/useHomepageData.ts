@@ -10,6 +10,7 @@ import { useHeroSlides, useSectionConfig, useBlogPosts } from './data/useContent
 import { useFullCatalog } from './data/useCatalog';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { ORG_SLUG } from '../lib/convex/org';
 
 // Wave 3: homepage composes entirely from Convex hooks (catalog + content).
 // No API hop, no Supabase fallback. Shapes match the legacy HomepageData
@@ -41,7 +42,7 @@ export function useHomepageData() {
   const { config: categoriesCfg, loading: categoriesLoading } =
     useSectionConfig('categories_section');
   const { posts: convexPosts, loading: blogLoading } = useBlogPosts(6);
-  const homepageComponents = useQuery(api.content.listHomepageComponents, {});
+  const homepageComponents = useQuery(api.content.listHomepageComponents, { orgSlug: ORG_SLUG });
 
   const isLoading =
     catalogLoading ||

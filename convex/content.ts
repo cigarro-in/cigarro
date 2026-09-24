@@ -1,10 +1,11 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { collectInOrg, inOrg, resolveOrg } from "./lib/org";
 
 // ---------- Wave 2: content reads (Supabase -> Convex) ----------
-// Content is GLOBAL and public: no orgId, no requireMember. These queries
-// back the blog, homepage heroes/config, and site settings. Catalog
-// PRODUCTS stay on Supabase until Wave 3 (byte-diff gates).
+// Content is ORG-SCOPED and public: every query takes the storefront orgSlug,
+// resolves it via organizations by_slug, and returns only that org's rows.
+// Pre-backfill rows (no orgId) read as the legacy smokeshop org's rows.
 
 const postShape = (p: any) => ({
   _id: p._id,
@@ -31,17 +32,43 @@ const postShape = (p: any) => ({
   updatedAt: p.updatedAt,
 });
 
+const byPublishedDesc = (a: any, b: any) =>
+  (b.publishedAt ?? 0) - (a.publishedAt ?? 0);
+
+async function orgPostsByStatus(
+  ctx: any,
+  org: any,
+  status: string,
+  limit: number,
+): Promise<any[]> {
+  const scoped = await ctx.db
+    .query("blogPosts")
+    .withIndex("by_org_status", (q: any) =>
+      q.eq("orgId", org._id).eq("status", status),
+    )
+    .order("desc")
+    .take(limit);
+  if (org.slug !== "smokeshop") return scoped;
+  const legacy = await ctx.db
+    .query("blogPosts")
+    .withIndex("by_status_published", (q: any) => q.eq("status", status))
+    .order("desc")
+    .take(limit);
+  const seen = new Set(scoped.map((r: any) => r._id));
+  return [
+    ...scoped,
+    ...legacy.filter((r: any) => r.orgId == null && !seen.has(r._id)),
+  ]
+    .sort(byPublishedDesc)
+    .slice(0, limit);
+}
+
 export const listBlogPosts = query({
-  args: { limit: v.optional(v.number()) },
+  args: { orgSlug: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("blogPosts")
-      .withIndex("by_status_published", (q) =>
-        q.eq("status", "published"),
-      )
-      .order("desc")
-      .take(args.limit ?? 50);
-    const cats = await ctx.db.query("blogCategories").collect();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await orgPostsByStatus(ctx, org, "published", args.limit ?? 50);
+    const cats = await collectInOrg(ctx, "blogCategories", org);
     const catBySlug = new Map(cats.map((c) => [c.slug, c]));
     return rows.map((p) => ({
       ...postShape(p),
@@ -52,44 +79,87 @@ export const listBlogPosts = query({
 });
 
 export const getBlogPostBySlug = query({
-  args: { slug: v.string() },
+  args: { orgSlug: v.string(), slug: v.string() },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const row = await ctx.db
       .query("blogPosts")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_org_slug", (q) =>
+        q.eq("orgId", org._id).eq("slug", args.slug),
+      )
       .unique();
-    if (!row || row.status !== "published") return null;
-    return postShape(row);
+    const legacy =
+      !row && org.slug === "smokeshop"
+        ? (
+            await ctx.db
+              .query("blogPosts")
+              .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+              .collect()
+          ).find((r: any) => r.orgId == null) ?? null
+        : null;
+    const found = row ?? legacy;
+    if (!found || found.status !== "published") return null;
+    return postShape(found);
   },
 });
 
 export const listRelatedPosts = query({
   args: {
+    orgSlug: v.string(),
     categorySlug: v.optional(v.string()),
     excludeSlug: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // by_category_status is [categorySlug, status, publishedAt]: Convex
-    // requires equality on the leading index field, so the no-category
-    // case must use by_status_published (never query an index without
-    // its leading field — it throws and trips the app ErrorBoundary).
+    const org = await resolveOrg(ctx, args.orgSlug);
+    // by_org_category is [orgId, categorySlug, status, publishedAt]: Convex
+    // requires equality on the leading index fields, so the no-category
+    // case must use by_org_status (never query an index without its leading
+    // field — it throws and trips the app ErrorBoundary).
     const limit = (args.limit ?? 3) + 1;
-    const rows = args.categorySlug
+    const scoped = args.categorySlug
       ? await ctx.db
           .query("blogPosts")
-          .withIndex("by_category_status", (q) =>
-            q.eq("categorySlug", args.categorySlug).eq("status", "published"),
+          .withIndex("by_org_category", (q) =>
+            q
+              .eq("orgId", org._id)
+              .eq("categorySlug", args.categorySlug)
+              .eq("status", "published"),
           )
           .order("desc")
           .take(limit)
       : await ctx.db
           .query("blogPosts")
-          .withIndex("by_status_published", (q) =>
-            q.eq("status", "published"),
+          .withIndex("by_org_status", (q) =>
+            q.eq("orgId", org._id).eq("status", "published"),
           )
           .order("desc")
           .take(limit);
+    let rows = scoped;
+    if (org.slug === "smokeshop") {
+      const legacy = args.categorySlug
+        ? await ctx.db
+            .query("blogPosts")
+            .withIndex("by_category_status", (q) =>
+              q.eq("categorySlug", args.categorySlug).eq("status", "published"),
+            )
+            .order("desc")
+            .take(limit)
+        : await ctx.db
+            .query("blogPosts")
+            .withIndex("by_status_published", (q) =>
+              q.eq("status", "published"),
+            )
+            .order("desc")
+            .take(limit);
+      const seen = new Set(scoped.map((r: any) => r._id));
+      rows = [
+        ...scoped,
+        ...legacy.filter((r: any) => r.orgId == null && !seen.has(r._id)),
+      ]
+        .sort(byPublishedDesc)
+        .slice(0, limit);
+    }
     return rows
       .filter((r) => r.slug !== args.excludeSlug)
       .slice(0, args.limit ?? 3)
@@ -98,12 +168,13 @@ export const listRelatedPosts = query({
 });
 
 export const listBlogCategories = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("blogCategories")
-      .withIndex("by_active_sort", (q) => q.eq("isActive", true))
-      .collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = (await collectInOrg(ctx, "blogCategories", org)).filter(
+      (c: any) => c.isActive,
+    );
+    rows.sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     return rows.map((c) => ({
       _id: c._id,
       slug: c.slug,
@@ -116,12 +187,13 @@ export const listBlogCategories = query({
 });
 
 export const listHeroSlides = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("heroSlides")
-      .withIndex("by_active_sort", (q) => q.eq("isActive", true))
-      .collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = (await collectInOrg(ctx, "heroSlides", org)).filter(
+      (s: any) => s.isActive,
+    );
+    rows.sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     return rows.map((s) => ({
       _id: s._id,
       title: s.title,
@@ -146,35 +218,47 @@ export const listHeroSlides = query({
 });
 
 export const getSectionConfig = query({
-  args: { name: v.string() },
+  args: { orgSlug: v.string(), name: v.string() },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const row = await ctx.db
       .query("sectionConfigurations")
-      .withIndex("by_name", (q) => q.eq("sectionName", args.name))
+      .withIndex("by_org_name", (q) =>
+        q.eq("orgId", org._id).eq("sectionName", args.name),
+      )
       .unique();
-    if (!row) return null;
+    const legacy =
+      !row && org.slug === "smokeshop"
+        ? (
+            await ctx.db
+              .query("sectionConfigurations")
+              .withIndex("by_name", (q) => q.eq("sectionName", args.name))
+              .collect()
+          ).find((r: any) => r.orgId == null) ?? null
+        : null;
+    const found = row ?? legacy;
+    if (!found || !inOrg(found, org)) return null;
     return {
-      sectionName: row.sectionName,
-      title: row.title,
-      subtitle: row.subtitle,
-      description: row.description,
-      backgroundImage: row.backgroundImage,
-      buttonText: row.buttonText,
-      buttonUrl: row.buttonUrl,
-      config: row.config,
-      maxItems: row.maxItems,
-      isEnabled: row.isEnabled,
+      sectionName: found.sectionName,
+      title: found.title,
+      subtitle: found.subtitle,
+      description: found.description,
+      backgroundImage: found.backgroundImage,
+      buttonText: found.buttonText,
+      buttonUrl: found.buttonUrl,
+      config: found.config,
+      maxItems: found.maxItems,
+      isEnabled: found.isEnabled,
     };
   },
 });
 
 export const listHomepageComponents = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("homepageComponentConfig")
-      .withIndex("by_order")
-      .collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await collectInOrg(ctx, "homepageComponentConfig", org);
+    rows.sort((a: any, b: any) => a.displayOrder - b.displayOrder);
     return rows.map((c) => ({
       componentName: c.componentName,
       config: c.config,
@@ -186,22 +270,35 @@ export const listHomepageComponents = query({
 });
 
 export const getSiteSettings = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const row = await ctx.db
       .query("siteSettings")
-      .withIndex("by_key", (q) => q.eq("key", "main"))
+      .withIndex("by_org_key", (q) =>
+        q.eq("orgId", org._id).eq("key", "main"),
+      )
       .unique();
-    if (!row) return null;
+    const legacy =
+      !row && org.slug === "smokeshop"
+        ? (
+            await ctx.db
+              .query("siteSettings")
+              .withIndex("by_key", (q) => q.eq("key", "main"))
+              .collect()
+          ).find((r: any) => r.orgId == null) ?? null
+        : null;
+    const found = row ?? legacy;
+    if (!found) return null;
     return {
-      siteName: row.siteName,
-      metaTitle: row.metaTitle,
-      metaDescription: row.metaDescription,
-      faviconUrl: row.faviconUrl,
-      activeTheme: row.activeTheme,
-      upiId: row.upiId,
-      shippingConfig: row.shippingConfig ?? null,
-      updatedAt: row.updatedAt,
+      siteName: found.siteName,
+      metaTitle: found.metaTitle,
+      metaDescription: found.metaDescription,
+      faviconUrl: found.faviconUrl,
+      activeTheme: found.activeTheme,
+      upiId: found.upiId,
+      shippingConfig: found.shippingConfig ?? null,
+      updatedAt: found.updatedAt,
     };
   },
 });

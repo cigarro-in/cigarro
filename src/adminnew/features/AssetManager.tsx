@@ -63,6 +63,27 @@ interface AssetFolder {
   path: string;
 }
 
+type CategoryId = 'products' | 'brands' | 'assets';
+
+// Fixed top-level categories (R2 prefixes under asset_images/). Uploads reuse
+// the same folder semantics as before — this only constrains the browsing
+// entry points instead of exposing arbitrary root folders.
+const CATEGORIES: { id: CategoryId; label: string; prefix: string }[] = [
+  { id: 'products', label: 'Product images', prefix: 'product_images/' },
+  { id: 'brands', label: 'Brand logos', prefix: 'brand_logos/' },
+  { id: 'assets', label: 'Assets', prefix: '' },
+];
+
+// Subfolders owned by the category tabs — hidden from the generic Assets
+// folder grid so the top level stays exactly the three categories.
+const RESERVED_ROOT_FOLDERS = new Set(['product_images', 'brand_logos']);
+
+function categoryForPrefix(prefix: string): CategoryId {
+  if (prefix.startsWith('product_images/')) return 'products';
+  if (prefix.startsWith('brand_logos/')) return 'brands';
+  return 'assets';
+}
+
 export function AssetManager() {
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -79,6 +100,7 @@ export function AssetManager() {
   const [keepOriginalResolution, setKeepOriginalResolution] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isCleaningUnused, setIsCleaningUnused] = useState(false);
   // Batch usage inventory (one query per ~100 assets, never N+1).
   const [usageByKey, setUsageByKey] = useState<Map<string, AssetUsage>>(new Map());
   const [usageLoading, setUsageLoading] = useState(false);
@@ -114,7 +136,7 @@ export function AssetManager() {
           content_type: item.contentType || 'unknown',
           created_at: item.createdAt,
           updated_at: item.createdAt,
-          metadata: null,
+          metadata: item.metadata ?? null,
           public_url: item.url
         }) as Asset)
       );
@@ -262,6 +284,57 @@ export function AssetManager() {
     }
   };
 
+  const handleCleanAllUnused = async () => {
+    if (isCleaningUnused || isBulkDeleting) return;
+    setIsCleaningUnused(true);
+    try {
+      const all = await collectAllR2Images();
+      if (all.length === 0) {
+        setOpOk('No assets found');
+        return;
+      }
+      const usage = await fetchUsageBatch(
+        convex,
+        all.map((asset) => ({ key: asset.path, url: asset.url })),
+      );
+      const unknown = all.filter((asset) => {
+        const total = usage.get(asset.path)?.total;
+        return total === undefined || total < 0;
+      });
+      if (unknown.length > 0) {
+        setOpError(`Usage could not be verified for ${unknown.length} asset(s); cleanup stopped`);
+        return;
+      }
+      const unused = all.filter((asset) => usage.get(asset.path)?.total === 0);
+      if (unused.length === 0) {
+        setOpOk('No unused assets found');
+        return;
+      }
+      if (!window.confirm(
+        `Delete ${unused.length} confirmed-unused asset(s) across all folders? In-use assets will be kept. This cannot be undone.`,
+      )) return;
+
+      let deleted = 0;
+      for (const asset of unused) {
+        try {
+          await deleteR2Image(asset.path);
+          deleted += 1;
+        } catch {
+          // The edge endpoint repeats the usage check and blocks races.
+        }
+      }
+      setSelectedIds([]);
+      await loadAssets();
+      if (deleted < unused.length)
+        setOpError(`Deleted ${deleted} of ${unused.length}; the rest were blocked or failed`);
+      else setOpOk(`Deleted ${deleted} unused asset(s) across all folders`);
+    } catch (error) {
+      setOpError(error instanceof Error ? error.message : 'Could not clean unused assets');
+    } finally {
+      setIsCleaningUnused(false);
+    }
+  };
+
   const handleReprocessAll = async () => {
     if (isReprocessing) return;
     // Walk the whole library first so the confirmation shows the real count.
@@ -277,9 +350,9 @@ export function AssetManager() {
         return;
       }
       const proceed = window.confirm(
-        `Reprocess ${todo.length} image(s) through the WebP pipeline and repoint every reference?` +
+        `Reprocess ${todo.length} image(s) through the WebP pipeline and repoint every reference? Originals are deleted after successful repointing.` +
           (skipped > 0 ? `\n${skipped} prior bulk output(s) will be skipped.` : '') +
-          `\n\nOld originals are kept for rollback — nothing is deleted.`,
+          `\nUnused originals are left for the all-folders cleanup action.`,
       );
       if (!proceed) return;
       const usage = await fetchUsageBatch(
@@ -399,6 +472,41 @@ export function AssetManager() {
     setCurrentFolder(parentPath === '/' ? '' : parentPath);
   };
 
+  const navigateToSegment = (index: number) => {
+    // index -1 → library root; otherwise the prefix through segments[index].
+    if (index < 0) setCurrentFolder('');
+    else setCurrentFolder(`${currentFolder.split('/').filter(Boolean).slice(0, index + 1).join('/')}/`);
+  };
+
+  const activeCategory = categoryForPrefix(currentFolder);
+  const segments = currentFolder.split('/').filter(Boolean);
+  const visibleFolders =
+    currentFolder === ''
+      ? folders.filter((f) => !RESERVED_ROOT_FOLDERS.has(f.name))
+      : folders;
+
+  // "Select unused" bulk cleanup: only keys with a confirmed zero usage
+  // count. Unknown (not yet checked / check failed) and in-use assets are
+  // never auto-selected.
+  const unusedCount = filteredAssets.filter(
+    (a) => usageByKey.get(a.path)?.total === 0,
+  ).length;
+  const handleSelectUnused = () => {
+    const ids = filteredAssets
+      .filter((a) => usageByKey.get(a.path)?.total === 0)
+      .map((a) => a.id);
+    if (ids.length === 0) {
+      setOpError(
+        usageLoading
+          ? 'Usage check still running — try again in a moment'
+          : 'No confirmed-unused assets in this view (unknown or in-use assets are never auto-selected)',
+      );
+      return;
+    }
+    setSelectedIds(ids);
+    setOpOk(`Selected ${ids.length} unused asset(s) for review`);
+  };
+
   return (
     <div className="min-h-screen bg-[var(--color-creme)]">
       {/* Header */}
@@ -490,28 +598,71 @@ export function AssetManager() {
 
       {/* Toolbar */}
       <AdminCard>
-        <AdminCardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Breadcrumb */}
-            <div className="flex items-center space-x-2 text-sm">
+        <AdminCardContent className="p-4 space-y-4">
+          {/* Fixed top-level categories */}
+          <div role="tablist" aria-label="Asset categories" className="flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => (
               <Button
-                variant="ghost"
+                key={c.id}
+                role="tab"
+                aria-selected={activeCategory === c.id}
+                variant={activeCategory === c.id ? 'default' : 'outline'}
                 size="sm"
-                onClick={navigateBack}
-                disabled={!currentFolder}
-                className="h-6 w-6 p-0"
+                onClick={() => setCurrentFolder(c.prefix)}
               >
-                <FolderOpen className="h-4 w-4" />
+                {c.label}
               </Button>
-              <span className="text-gray-500">/</span>
-              <span className="text-gray-700">
-                {currentFolder || 'Root'}
-              </span>
-            </div>
-
-            <div className="flex-1 flex items-center space-x-4">
-              {/* Search */}
-              <div className="relative flex-1 max-w-sm">
+            ))}
+          </div>
+          {/* Breadcrumb + Back */}
+          <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={navigateBack}
+              disabled={!currentFolder}
+              aria-label={currentFolder ? `Back to ${segments.slice(0, -1).join('/') || 'category'}` : 'Back'}
+            >
+              <FolderOpen className="mr-1 h-4 w-4" />
+              Back
+            </Button>
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-1">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => navigateToSegment(-1)}
+                  aria-current={currentFolder === '' ? 'page' : undefined}
+                  className={`rounded px-1 underline-offset-2 hover:underline ${currentFolder === '' ? 'font-medium text-gray-900' : 'text-canyon'}`}
+                >
+                  Library
+                </button>
+              </li>
+              {segments.map((seg, i) => {
+                const isLast = i === segments.length - 1;
+                return (
+                  <li key={`${seg}-${i}`} className="flex items-center gap-1">
+                    <span className="text-gray-400" aria-hidden="true">/</span>
+                    {isLast ? (
+                      <span aria-current="page" className="rounded px-1 font-medium text-gray-900">
+                        {seg}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigateToSegment(i)}
+                        className="rounded px-1 text-canyon underline-offset-2 hover:underline"
+                      >
+                        {seg}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Search */}
+            <div className="relative flex-1 w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search assets..."
@@ -536,11 +687,13 @@ export function AssetManager() {
               </Select>
 
               {/* View Mode */}
-              <div className="flex items-center space-x-1 border rounded-md">
+              <div className="flex items-center gap-1 border rounded-md self-start" role="group" aria-label="View mode">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
+                  aria-pressed={viewMode === 'grid'}
+                  aria-label="Grid view"
                   className="h-8 w-8 p-0"
                 >
                   <Grid3X3 className="h-4 w-4" />
@@ -549,76 +702,103 @@ export function AssetManager() {
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
+                  aria-pressed={viewMode === 'list'}
+                  aria-label="List view"
                   className="h-8 w-8 p-0"
                 >
                   <List className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
           </div>
         </AdminCardContent>
       </AdminCard>
 
-      {/* Bulk selection bar */}
-      {selectedIds.length > 0 && (
-        <AdminCard>
-          <AdminCardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium">
-                {selectedIds.length} selected
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setSelectedIds(filteredAssets.map((a) => a.id))
-                }
-              >
-                Select all ({filteredAssets.length})
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedIds([])}
-              >
-                Clear
-              </Button>
-              <div className="flex-1" />
-              <Button variant="outline" size="sm" onClick={handleBulkCopyUrls}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy URLs
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleBulkDelete}
-                disabled={isBulkDeleting}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {isBulkDeleting ? 'Deleting...' : `Delete (${selectedIds.length})`}
-              </Button>
-            </div>
-          </AdminCardContent>
-        </AdminCard>
-      )}
+      {/* Bulk selection bar — always visible so multiselect is discoverable */}
+      <AdminCard>
+        <AdminCardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium" role="status">
+              {selectedIds.length} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSelectedIds(filteredAssets.map((a) => a.id))
+              }
+              disabled={filteredAssets.length === 0}
+            >
+              Select all ({filteredAssets.length})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectUnused}
+              disabled={usageLoading || filteredAssets.length === 0}
+              title="Select only assets with a confirmed zero usage count — unknown or in-use assets are never auto-selected"
+            >
+              Select unused ({usageLoading ? '…' : unusedCount})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCleanAllUnused}
+              disabled={isCleaningUnused || isBulkDeleting || usageLoading}
+              title="Verify and delete unused assets across every folder"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isCleaningUnused ? 'Cleaning…' : 'Delete unused (all folders)'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedIds([])}
+              disabled={selectedIds.length === 0}
+            >
+              Clear
+            </Button>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkCopyUrls}
+              disabled={selectedIds.length === 0}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy URLs
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={selectedIds.length === 0 || isBulkDeleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isBulkDeleting ? 'Deleting...' : `Delete (${selectedIds.length})`}
+            </Button>
+          </div>
+        </AdminCardContent>
+      </AdminCard>
 
-      {/* Folders */}
-      {folders.length > 0 && (
+      {/* Subfolders within the active category */}
+      {visibleFolders.length > 0 && (
         <AdminCard>
           <AdminCardHeader>
             <AdminCardTitle className="text-lg">Folders</AdminCardTitle>
           </AdminCardHeader>
           <AdminCardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {folders.map((folder) => (
-                <div
+              {visibleFolders.map((folder) => (
+                <button
                   key={folder.name}
+                  type="button"
                   onClick={() => navigateToFolder(folder)}
-                  className="flex flex-col items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  aria-label={`Open folder ${folder.name}`}
+                  className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-canyon transition-colors"
                 >
-                  <FolderOpen className="h-8 w-8 text-canyon mb-2" />
+                  <FolderOpen className="h-8 w-8 text-canyon mb-2" aria-hidden="true" />
                   <span className="text-sm text-gray-700 text-center">{folder.name}</span>
-                </div>
+                </button>
               ))}
             </div>
           </AdminCardContent>
@@ -630,34 +810,43 @@ export function AssetManager() {
         <AdminCardHeader>
           <AdminCardTitle className="flex items-center justify-between">
             <span>Assets ({filteredAssets.length})</span>
-            {isLoading && <span className="text-sm text-gray-500">Loading...</span>}
+            {isLoading && (
+              <span role="status" className="text-sm text-gray-500">Loading…</span>
+            )}
           </AdminCardTitle>
         </AdminCardHeader>
         <AdminCardContent>
-          {viewMode === 'grid' ? (
+          {isLoading ? (
+            <div role="status" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4" aria-label="Loading assets">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="aspect-square bg-gray-100 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {filteredAssets.map((asset) => (
-                <div key={asset.id} className="group relative">
-                  <div
-                    className={`aspect-square bg-gray-100 rounded-lg overflow-hidden border ${selectedIds.includes(asset.id) ? 'ring-2 ring-canyon' : ''}`}
+                <div key={asset.id} className="group relative focus-within:ring-2 focus-within:ring-canyon rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAsset(asset);
+                      setShowPreview(true);
+                    }}
+                    aria-label={`Preview ${asset.name}`}
+                    className={`block w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border focus-visible:outline-2 focus-visible:outline-canyon ${selectedIds.includes(asset.id) ? 'ring-2 ring-canyon' : ''}`}
                   >
                     {asset.content_type.startsWith('image/') ? (
                       <ImageWithFallback
                         src={asset.public_url}
                         alt={asset.name}
                         className="w-full h-full object-cover"
-                        onClick={() => {
-                          setSelectedAsset(asset);
-                          setShowPreview(true);
-                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <span className="w-full h-full flex items-center justify-center">
                         {getFileIcon(asset.content_type)}
-                      </div>
+                      </span>
                     )}
-                  </div>
-                  
+                  </button>
                   <div className="mt-2">
                     <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
                     <p className="text-xs text-gray-500">{formatFileSize(asset.size)}</p>
@@ -675,21 +864,21 @@ export function AssetManager() {
                     })()}
                   </div>
 
-                  {/* Select */}
+                  {/* Select — always visible, never hover-only */}
                   <div
-                    className={`absolute top-2 left-2 ${selectedIds.includes(asset.id) ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
+                    className="absolute top-2 left-2"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Checkbox
                       checked={selectedIds.includes(asset.id)}
                       onCheckedChange={() => toggleSelect(asset.id)}
-                      className="bg-white"
+                      className="bg-white shadow"
                       aria-label={`Select ${asset.name}`}
                     />
                   </div>
 
-                  {/* Actions */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Actions — visible on hover or keyboard focus */}
+                  <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 bg-white/90">
@@ -728,7 +917,7 @@ export function AssetManager() {
           ) : (
             <div className="space-y-2">
               {filteredAssets.map((asset) => (
-                <div key={asset.id} className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 ${selectedIds.includes(asset.id) ? 'border-canyon bg-canyon/5' : ''}`}>
+                <div key={asset.id} className={`flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg hover:bg-gray-50 ${selectedIds.includes(asset.id) ? 'border-canyon bg-canyon/5' : ''}`}>
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       checked={selectedIds.includes(asset.id)}
@@ -775,22 +964,23 @@ export function AssetManager() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm" onClick={() => {
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" aria-label={`Preview ${asset.name}`} onClick={() => {
                       setSelectedAsset(asset);
                       setShowPreview(true);
                     }}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleCopyUrl(asset)}>
+                    <Button variant="ghost" size="sm" aria-label={`Copy URL for ${asset.name}`} onClick={() => handleCopyUrl(asset)}>
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDownload(asset)}>
+                    <Button variant="ghost" size="sm" aria-label={`Download ${asset.name}`} onClick={() => handleDownload(asset)}>
                       <Download className="h-4 w-4" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="sm" 
+                      aria-label={`Delete ${asset.name}`}
                       onClick={() => handleDeleteAsset(asset)}
                       className="text-red-600 hover:text-red-700"
                     >
@@ -803,10 +993,18 @@ export function AssetManager() {
           )}
 
           {filteredAssets.length === 0 && !isLoading && (
-            <div className="text-center py-8 text-gray-500">
-              <File className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-              <p>No assets found</p>
-              <p className="text-sm">Upload some files to get started</p>
+            <div className="text-center py-8 text-gray-500" role="status">
+              <File className="mx-auto h-12 w-12 text-gray-300 mb-4" aria-hidden="true" />
+              <p>
+                {assets.length === 0
+                  ? `No assets in ${CATEGORIES.find((c) => c.id === activeCategory)?.label} yet`
+                  : 'No assets match your search or filter'}
+              </p>
+              <p className="text-sm">
+                {assets.length === 0
+                  ? 'Upload files above — they will be saved to this category'
+                  : 'Try clearing the search or choosing a different type'}
+              </p>
             </div>
           )}
         </AdminCardContent>

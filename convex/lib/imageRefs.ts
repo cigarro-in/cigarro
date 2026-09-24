@@ -86,9 +86,11 @@ export function isBannerContext(
   return contexts.some((c) => BANNER_KINDS.has(c.kind));
 }
 
-/** Only outputs from this bulk action are skipped on repeat runs. */
+/** Only outputs from this bulk action are skipped on repeat runs.
+ *  Old keys carry a random tail (`-r-<24hex>-<rand>.webp`), new keys drop
+ *  it (`-r-<24hex>.webp`); the optional group keeps both recognized. */
 export function isPipelineOutput(pathOrKey: string): boolean {
-  return /-r-[a-f0-9]{24}-[a-z0-9]+\.webp$/i.test(pathOrKey || "");
+  return /-r-[a-f0-9]{24}(?:-[a-z0-9]+)?\.webp$/i.test(pathOrKey || "");
 }
 
 /** Replace matching entries in a string array (old-value compare). Returns

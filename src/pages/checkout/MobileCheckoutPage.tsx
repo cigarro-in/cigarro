@@ -22,6 +22,7 @@ import { useShippingMethods } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { convex } from '../../lib/convex/client';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 
@@ -230,7 +231,7 @@ export function MobileCheckoutPage() {
     const checkEligibility = async () => {
       if (!user?.id) return;
       try {
-        const gate = await convex.query(api.referrals.checkEligibility, {});
+        const gate = await convex.query(api.referrals.checkEligibility, { orgSlug: ORG_SLUG });
         if (gate.eligible) {
           // New user - eligible
           setIsReferralEligible(true);
@@ -258,6 +259,7 @@ export function MobileCheckoutPage() {
     setIsApplyingReferral(true);
     try {
       const data = await convex.mutation(api.referrals.attachReferralLate, {
+        orgSlug: ORG_SLUG,
         referredUserId: user!.id,
         referralCode: referralCode.trim()
       });
@@ -521,6 +523,7 @@ export function MobileCheckoutPage() {
       const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
 
       const result = await createConvexOrder({
+        orgSlug: ORG_SLUG,
         orgId: org._id,
         kind: 'purchase',
         items: buildConvexItems(),

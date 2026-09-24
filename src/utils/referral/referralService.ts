@@ -4,6 +4,7 @@
 
 import { convex } from '../../lib/convex/client';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import type {
   Referral,
   ReferralStats,
@@ -18,7 +19,7 @@ import type {
 // =====================================================
 export async function getUserReferral(_userId: string): Promise<Referral | null> {
   try {
-    return await convex.query(api.referrals.getMyReferral, {});
+    return await convex.query(api.referrals.getMyReferral, { orgSlug: ORG_SLUG });
   } catch (error) {
     console.error('Error fetching user referral:', error);
     return null;
@@ -32,8 +33,8 @@ export async function getUserReferralStats(_userId: string): Promise<ReferralSta
   try {
     // Existing users may never have visited the referral page before. Mint
     // their code lazily so the dashboard is usable for them as well.
-    await convex.mutation(api.referrals.ensureMyReferral, {});
-    const stats = await convex.query(api.referrals.getReferralStats, {});
+    await convex.mutation(api.referrals.ensureMyReferral, { orgSlug: ORG_SLUG });
+    const stats = await convex.query(api.referrals.getReferralStats, { orgSlug: ORG_SLUG });
     if (!stats) return null;
     if (!stats.referral_link && stats.referral_code) {
       stats.referral_link = generateReferralLink(stats.referral_code);
@@ -50,7 +51,7 @@ export async function getUserReferralStats(_userId: string): Promise<ReferralSta
 // =====================================================
 export async function getUserReferrals(_userId: string): Promise<ReferredUser[]> {
   try {
-    return await convex.query(api.referrals.getReferredUsers, {});
+    return await convex.query(api.referrals.getReferredUsers, { orgSlug: ORG_SLUG });
   } catch (error) {
     console.error('Error fetching user referrals:', error);
     return [];
@@ -65,6 +66,7 @@ export async function recordReferral(
 ): Promise<RecordReferralResponse> {
   try {
     const data = await convex.mutation(api.referrals.recordReferral, {
+      orgSlug: ORG_SLUG,
       referredUserId: params.referred_user_id,
       referralCode: params.referral_code.toUpperCase(),
       signupSource: params.signup_source || 'web',
@@ -92,6 +94,7 @@ export async function validateReferralCode(code: string): Promise<{
   try {
     const data = await convex.query(api.referrals.validateReferralCode, {
       code: code.toUpperCase(),
+      orgSlug: ORG_SLUG,
     });
     return data || {
       valid: false,
@@ -111,7 +114,7 @@ export async function validateReferralCode(code: string): Promise<{
 // =====================================================
 export async function getReferralLeaderboard(limit: number = 10): Promise<ReferralLeaderboard[]> {
   try {
-    return await convex.query(api.referrals.getLeaderboard, { limit });
+    return await convex.query(api.referrals.getLeaderboard, { limit, orgSlug: ORG_SLUG });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
     return [];
@@ -127,7 +130,7 @@ export async function checkIfUserWasReferred(_userId: string): Promise<{
   reward_pending?: number;
 }> {
   try {
-    return await convex.query(api.referrals.checkIfReferred, {});
+    return await convex.query(api.referrals.checkIfReferred, { orgSlug: ORG_SLUG });
   } catch (error) {
     console.error('Error checking referral status:', error);
     return { was_referred: false };

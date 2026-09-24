@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { changeInventory } from "./lib/inventory";
+import { findOrgDocBySupabase, inOrg } from "./lib/org";
 
 const paymentMethodV = v.union(
   v.literal("cash"),
@@ -122,6 +123,8 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { identity } = await requireOrgAdmin(ctx, args.orgId);
+    const org = await ctx.db.get(args.orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
     const prior = await ctx.db
       .query("invoices")
       .withIndex("by_org_idempotency", (q) =>
@@ -144,16 +147,11 @@ export const create = mutation({
           !Number.isSafeInteger(line.unitPricePaise) || line.unitPricePaise < 0 || line.unitPricePaise > 1000000000) {
         throw new ConvexError({ code: "INVALID_INVOICE_LINE" });
       }
-      const variant = await ctx.db
-        .query("catalogVariants")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", line.variantSupabaseId))
-        .unique();
-      if (!variant || !variant.isActive) throw new ConvexError({ code: "VARIANT_NOT_FOUND" });
-      const product = await ctx.db
-        .query("catalogProducts")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", variant.productSupabaseId))
-        .unique();
-      if (!product) throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
+      const variant = await findOrgDocBySupabase(ctx, "catalogVariants", org, line.variantSupabaseId);
+      if (!variant || !inOrg(variant, org) || !variant.isActive)
+        throw new ConvexError({ code: "VARIANT_NOT_FOUND" });
+      const product = await findOrgDocBySupabase(ctx, "catalogProducts", org, variant.productSupabaseId);
+      if (!product || !inOrg(product, org)) throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
       const lineTotalPaise = line.quantity * line.unitPricePaise;
       subtotalPaise += lineTotalPaise;
       if (!Number.isSafeInteger(subtotalPaise))
@@ -166,8 +164,6 @@ export const create = mutation({
     const taxPaise = Math.round((taxablePaise * args.taxRateBps) / 10000);
     const totalPaise = taxablePaise + taxPaise;
 
-    const org = await ctx.db.get(args.orgId);
-    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
     let settings = await ctx.db
       .query("invoiceSettings")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -256,12 +252,11 @@ export const voidInvoice = mutation({
     const { identity } = await requireOrgAdmin(ctx, invoice.orgId);
     if (invoice.status === "voided") return { voided: true };
     if (!reason.trim()) throw new ConvexError({ code: "VOID_REASON_REQUIRED" });
+    const org = await ctx.db.get(invoice.orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
     for (const item of invoice.items) {
-      const variant = await ctx.db
-        .query("catalogVariants")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", item.variantSupabaseId))
-        .unique();
-      if (!variant || variant.trackInventory === false) continue;
+      const variant = await findOrgDocBySupabase(ctx, "catalogVariants", org, item.variantSupabaseId);
+      if (!variant || !inOrg(variant, org) || variant.trackInventory === false) continue;
       await changeInventory(ctx, {
         orgId: invoice.orgId,
         variant,

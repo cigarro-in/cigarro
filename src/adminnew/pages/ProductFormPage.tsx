@@ -16,6 +16,7 @@ import { PageHeader } from '../components/shared/PageHeader';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { ProductFormData, VariantFormData, Brand, Category, generateSlug, calculateProfitMargin } from '../../types/product';
@@ -38,9 +39,9 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
   // Reference lists (public catalog reads) mapped to the {id, name} shapes
   // the dropdowns already expect — supabaseIds flow straight back on save.
-  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false });
-  const categoryRows = useQuery(api.catalog.listCategories, {});
-  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false, orgSlug: ORG_SLUG });
+  const categoryRows = useQuery(api.catalog.listCategories, { orgSlug: ORG_SLUG });
+  const collectionRows = useQuery(api.catalog.listCollections, { orgSlug: ORG_SLUG });
   const brands = (brandRows || []).map((b: any) => ({ id: b.supabaseId, name: b.name })) as Brand[];
   const categories = (categoryRows || []).map((c: any) => ({ id: c.supabaseId, name: c.name })) as Category[];
   const collections = (collectionRows || []).map((c: any) => ({ id: c.supabaseId, title: c.title }));
@@ -83,7 +84,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   // Edit loader: one Convex query (product + variants + join ids).
   const editData = useQuery(
     api.adminCatalog.getProductForEdit,
-    isEditMode && id ? { supabaseId: id } : 'skip'
+    isEditMode && id ? { supabaseId: id, orgSlug: ORG_SLUG } : 'skip'
   );
   const loading = isEditMode && editData === undefined;
 
@@ -326,6 +327,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
           : Math.max(0, Math.floor(Number(formData.review_count)));
 
       await saveProduct({
+        orgSlug: ORG_SLUG,
         supabaseId: isEditMode ? id : undefined,
         product: {
           name: formData.name.trim(),
@@ -391,7 +393,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     if (!confirm('Are you sure you want to delete this product?')) return;
     setSaving(true);
     try {
-      await removeProduct({ supabaseId: id! });
+      await removeProduct({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Product deleted successfully');
       navigate('/admin/products');
     } catch (error: any) {
@@ -457,11 +459,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
 
         {/* LEFT COLUMN */}
         <div className="space-y-6">

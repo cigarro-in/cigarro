@@ -8,6 +8,7 @@ import { useCart } from '../../hooks/useCart';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { formatPaiseINR } from '../../lib/convex/money';
 import QRCode from 'qrcode';
 import { motion } from 'framer-motion';
@@ -44,7 +45,7 @@ export function TransactionProcessingPage() {
   const org = useOrg();
   const order = useQuery(
     api.orders.getMine,
-    orderId ? { orderId } : 'skip',
+    orderId ? { orgSlug: ORG_SLUG, orderId } : 'skip',
   );
 
   const [qrCode, setQrCode] = useState<string>('');
@@ -158,7 +159,7 @@ export function TransactionProcessingPage() {
     setRetrying(true);
     setRetryError(null);
     try {
-      const result = await retryMutation({ oldOrderId: orderId });
+      const result = await retryMutation({ orgSlug: ORG_SLUG, oldOrderId: orderId });
       setRetrying(false);
       sessionStorage.setItem('pendingOrderId', String(result.orderId));
       navigate(`/transaction/${result.orderId}`);

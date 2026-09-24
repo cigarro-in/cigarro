@@ -14,6 +14,7 @@ import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ProductImportExport } from '../features/ProductImportExport';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 
 interface Product {
   id: string;
@@ -42,8 +43,8 @@ export function ProductsPage() {
 
   // Convex is the catalog source of truth; the list is reactive so imports
   // and edits refresh it with no manual refetch.
-  const rows = useQuery(api.adminCatalog.listProductsForAdmin, {});
-  const inventoryRows = useQuery(api.inventory.list, org ? { orgId: org._id } : 'skip');
+  const rows = useQuery(api.adminCatalog.listProductsForAdmin, { orgSlug: ORG_SLUG });
+  const inventoryRows = useQuery(api.inventory.list, org ? { orgId: org._id, orgSlug: ORG_SLUG } : 'skip');
   const inventoryByVariant = new Map((inventoryRows || []).map((row: any) => [row.variantSupabaseId, row]));
   const deleteProduct = useMutation(api.adminCatalog.deleteProduct);
   const setActive = useMutation(api.adminCatalog.setProductsActive);
@@ -79,7 +80,7 @@ export function ProductsPage() {
     if (!confirm(`Delete ${productIds.length} products?`)) return;
     try {
       for (const supabaseId of productIds) {
-        await deleteProduct({ supabaseId });
+        await deleteProduct({ supabaseId, orgSlug: ORG_SLUG });
       }
       setOpOk(`${productIds.length} products deleted`);
       setSelectedProducts([]);
@@ -90,7 +91,7 @@ export function ProductsPage() {
 
   const handleBulkStatusChange = async (productIds: string[], isActive: boolean) => {
     try {
-      await setActive({ supabaseIds: productIds, isActive });
+      await setActive({ supabaseIds: productIds, isActive, orgSlug: ORG_SLUG });
       setOpOk(`${productIds.length} products ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedProducts([]);
     } catch (error: any) {

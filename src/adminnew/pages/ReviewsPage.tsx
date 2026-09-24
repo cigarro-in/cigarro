@@ -7,6 +7,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
@@ -34,14 +35,14 @@ export function ReviewsPage() {
 
   const rows = useQuery(
     api.reviews.listReviewsForAdmin,
-    filter === 'all' ? {} : { approved: filter === 'approved' }
+    filter === 'all' ? { orgSlug: ORG_SLUG } : { approved: filter === 'approved', orgSlug: ORG_SLUG }
   );
   const setApproved = useMutation(api.reviews.setReviewApproved);
   const removeReview = useMutation(api.reviews.deleteReview);
   const addReview = useMutation(api.reviews.createReview);
   const loading = rows === undefined;
 
-  const products = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const products = useQuery(api.adminCatalog.listProductsForAdmin, { orgSlug: ORG_SLUG });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ productId: '', rating: 5, userName: '', title: '', comment: '' });
   const [saveAttempted, setSaveAttempted] = useState(false);
@@ -52,6 +53,7 @@ export function ReviewsPage() {
       setSaveAttempted(true);
       if (!form.productId) throw new Error('Pick a product');
       await addReview({
+        orgSlug: ORG_SLUG,
         productSupabaseId: form.productId,
         rating: form.rating,
         userName: form.userName || undefined,
@@ -81,7 +83,7 @@ export function ReviewsPage() {
       icon: Check,
       onClick: (ids: string[]) =>
         act(
-          () => Promise.all(ids.map((id) => setApproved({ id: id as any, isApproved: true }))).then(() => {}),
+          () => Promise.all(ids.map((id) => setApproved({ id: id as any, isApproved: true, orgSlug: ORG_SLUG }))).then(() => {}),
           `${ids.length} reviews approved`,
           'Failed to approve'
         )
@@ -93,7 +95,7 @@ export function ReviewsPage() {
       onClick: (ids: string[]) => {
         if (!confirm(`Delete ${ids.length} reviews?`)) return Promise.resolve();
         return act(
-          () => Promise.all(ids.map((id) => removeReview({ id: id as any }))).then(() => {}),
+          () => Promise.all(ids.map((id) => removeReview({ id: id as any, orgSlug: ORG_SLUG }))).then(() => {}),
           `${ids.length} reviews deleted`,
           'Failed to delete'
         );

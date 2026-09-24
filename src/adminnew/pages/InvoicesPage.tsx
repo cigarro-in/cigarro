@@ -79,7 +79,7 @@ export function InvoicesPage() {
         <Button variant="outline" onClick={() => setSettingsOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Invoice settings</Button>
         <Button onClick={() => navigate('/admin/invoices/new')}><FilePlus2 className="mr-2 h-4 w-4" />New invoice</Button>
       </PageHeader>
-      <div className="mx-auto max-w-[1600px] space-y-5 px-6 pt-6">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-6">
         <InlineStatus status={opStatus} />
         {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
         <div className="grid gap-4 sm:grid-cols-3">

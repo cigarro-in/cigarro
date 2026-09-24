@@ -7,6 +7,7 @@ import { useInlineStatus, InlineStatus } from '../../components/common/InlineSta
 import { api } from '../../../convex/_generated/api';
 import { formatPaiseINR, paiseToRupees, rupeesToPaise } from '../../lib/convex/money';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -40,7 +41,7 @@ export function InvoiceFormPage() {
   const org = useOrg();
   const navigate = useNavigate();
   const location = useLocation();
-  const inventory = useQuery(api.inventory.list, org && isNew ? { orgId: org._id } : 'skip') as InventoryOption[] | undefined;
+  const inventory = useQuery(api.inventory.list, org && isNew ? { orgId: org._id, orgSlug: ORG_SLUG } : 'skip') as InventoryOption[] | undefined;
   const invoice = useQuery(api.invoices.get, !isNew ? { invoiceId: id as any } : 'skip');
   const createInvoice = useMutation(api.invoices.create);
   const voidInvoice = useMutation(api.invoices.voidInvoice);
@@ -143,10 +144,10 @@ export function InvoiceFormPage() {
         <Button variant="outline" disabled={saving} onClick={() => save(false)}><Save className="mr-2 h-4 w-4" />Save</Button>
         <Button disabled={saving} onClick={() => save(true)}><Printer className="mr-2 h-4 w-4" />{saving ? 'Creating…' : 'Save & print'}</Button>
       </PageHeader>
-      <div className="mx-auto max-w-[1500px] px-6 pt-6">
+      <div className="mx-auto max-w-[1500px] px-6">
         <InlineStatus status={opStatus} />
       </div>
-      <div className="mx-auto grid max-w-[1500px] gap-6 px-6 pt-6 lg:grid-cols-[1fr_360px]">
+      <div className="mx-auto grid max-w-[1500px] gap-6 px-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <AdminCard><AdminCardHeader><AdminCardTitle>Customer</AdminCardTitle></AdminCardHeader><AdminCardContent><div className="grid gap-4 sm:grid-cols-2"><Field label="Customer name"><Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} /></Field><Field label="Phone"><Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></Field><Field label="Email"><Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} /></Field><Field label="Address"><Textarea rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} /></Field></div></AdminCardContent></AdminCard>
           <AdminCard><AdminCardHeader><AdminCardTitle>Items</AdminCardTitle></AdminCardHeader><AdminCardContent><div className="flex gap-2"><Select value={selectedVariant} onValueChange={setSelectedVariant}><SelectTrigger className="flex-1"><SelectValue placeholder="Choose a product variant" /></SelectTrigger><SelectContent>{(inventory ?? []).filter((row) => !lines.some((line) => line.variantSupabaseId === row.variantSupabaseId)).map((row) => <SelectItem key={row.variantSupabaseId} value={row.variantSupabaseId} disabled={row.trackInventory && row.available <= 0}>{row.productName} · {row.variantName} — {row.trackInventory ? `${row.available} available` : 'not tracked'}</SelectItem>)}</SelectContent></Select><Button onClick={addLine} disabled={!selectedVariant}><Plus className="mr-2 h-4 w-4" />Add</Button></div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
+import { ORG_SLUG } from '../lib/convex/org';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { CartItemWithVariant } from '../types/variants';
@@ -307,6 +308,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (productIds.length > 0) {
       const rows = await convex.query(api.catalog.productsBySupabaseIds, {
         ids: productIds,
+        orgSlug: ORG_SLUG,
       });
       for (const p of rows || []) productsById[p.id] = p;
     }
@@ -315,6 +317,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (comboIds.length > 0) {
       const rows = await convex.query(api.catalog.combosBySupabaseIds, {
         ids: comboIds,
+        orgSlug: ORG_SLUG,
       });
       for (const c of rows || []) combosById[c.id] = c;
     }

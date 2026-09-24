@@ -16,6 +16,7 @@ import {
 } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
@@ -68,13 +69,13 @@ export function BlogFormPage() {
   const populatedRef = useRef(false);
 
   // Public category list (slug-keyed now — Convex posts link by categorySlug).
-  const categoryRows = useQuery(api.content.listBlogCategories, {});
+  const categoryRows = useQuery(api.content.listBlogCategories, { orgSlug: ORG_SLUG });
   const categories: BlogCategory[] = (categoryRows || []).map((c: any) => ({
     slug: c.slug,
     name: c.name,
     color: c.color,
   }));
-  const postRows = useQuery(api.adminCatalog.listBlogPostsForAdmin, {});
+  const postRows = useQuery(api.adminCatalog.listBlogPostsForAdmin, { orgSlug: ORG_SLUG });
   const savePost = useMutation(api.adminCatalog.saveBlogPost);
   const removePost = useMutation(api.adminCatalog.deleteBlogPost);
 
@@ -172,6 +173,7 @@ export function BlogFormPage() {
       const slug = form.slug || generateSlug(form.title);
 
       await savePost({
+        orgSlug: ORG_SLUG,
         id: isEditing && post ? (post.id as any) : undefined,
         post: {
           slug,
@@ -209,7 +211,7 @@ export function BlogFormPage() {
     if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
 
     try {
-      await removePost({ id: post.id as any });
+      await removePost({ id: post.id as any, orgSlug: ORG_SLUG });
       setOpOk('Post deleted');
       navigate('/admin/blogs');
     } catch (error: any) {
@@ -249,11 +251,11 @@ export function BlogFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Post Content */}

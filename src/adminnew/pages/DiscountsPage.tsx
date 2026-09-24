@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { DataTable } from '../components/shared/DataTable';
@@ -40,7 +41,7 @@ export function DiscountsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  const rows = useQuery(api.discounts.listDiscountsForAdmin, {});
+  const rows = useQuery(api.discounts.listDiscountsForAdmin, { orgSlug: ORG_SLUG });
   const removeDiscount = useMutation(api.discounts.deleteDiscount);
   const setStatus = useMutation(api.discounts.setDiscountsStatus);
 
@@ -81,7 +82,7 @@ export function DiscountsPage() {
     if (!confirm(`Delete ${discountIds.length} discounts?`)) return;
     try {
       for (const id of discountIds) {
-        await removeDiscount({ id: id as any });
+        await removeDiscount({ id: id as any, orgSlug: ORG_SLUG });
       }
       setOpOk(`${discountIds.length} discounts deleted`);
       setSelectedDiscounts([]);
@@ -96,7 +97,7 @@ export function DiscountsPage() {
 
   const handleBulkStatusChange = async (discountIds: string[], isActive: boolean) => {
     try {
-      await setStatus({ ids: discountIds as any, isActive });
+      await setStatus({ ids: discountIds as any, isActive, orgSlug: ORG_SLUG });
       setOpOk(`${discountIds.length} discounts ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedDiscounts([]);
     } catch (error: any) {

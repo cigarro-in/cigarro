@@ -19,6 +19,7 @@ import {
 } from '../components/shared/AdminCard';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 
@@ -157,9 +158,9 @@ export function ProductImportExport({ products }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Reference lists for name → supabaseId resolution (public catalog reads).
-  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false });
-  const categoryRows = useQuery(api.catalog.listCategories, {});
-  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const brandRows = useQuery(api.catalog.listBrands, { activeOnly: false, orgSlug: ORG_SLUG });
+  const categoryRows = useQuery(api.catalog.listCategories, { orgSlug: ORG_SLUG });
+  const collectionRows = useQuery(api.catalog.listCollections, { orgSlug: ORG_SLUG });
   const saveProduct = useMutation(api.adminCatalog.saveProduct);
 
   const brands = (brandRows || []).map((b: any) => ({ id: b.supabaseId, name: b.name }));
@@ -442,6 +443,7 @@ export function ProductImportExport({ products }: Props) {
 
         try {
           await saveProduct({
+            orgSlug: ORG_SLUG,
             supabaseId: existing?.supabaseId,
             product: {
               name,

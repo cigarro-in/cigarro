@@ -127,7 +127,7 @@ export function DashboardPage() {
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-400 mx-auto space-y-6">
+      <div className="px-6 pb-6 max-w-400 mx-auto space-y-6">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Loading store stats">
             {[0, 1, 2, 3].map((i) => (

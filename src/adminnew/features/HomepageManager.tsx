@@ -19,6 +19,7 @@ import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -128,7 +129,7 @@ function SectionRow({
   const name = canon(component.component_name);
   const row = useQuery(
     api.content.getSectionConfig,
-    SECTION_TITLE_ROWS.includes(name) ? { name } : 'skip',
+    SECTION_TITLE_ROWS.includes(name) ? { name, orgSlug: ORG_SLUG } : 'skip',
   );
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -230,9 +231,9 @@ export function HomepageManager() {
 
   // Reactive Convex reads replace load + manual refresh (no Refresh button —
   // the list is always live).
-  const componentRows = useQuery(api.content.listHomepageComponents, {});
-  const slideRows = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
-  const collectionRows = useQuery(api.catalog.listCollections, {});
+  const componentRows = useQuery(api.content.listHomepageComponents, { orgSlug: ORG_SLUG });
+  const slideRows = useQuery(api.adminCatalog.listHeroSlidesForAdmin, { orgSlug: ORG_SLUG });
+  const collectionRows = useQuery(api.catalog.listCollections, { orgSlug: ORG_SLUG });
   const setComponent = useMutation(api.adminCatalog.saveHomepageComponent);
   const saveSection = useMutation(api.adminCatalog.saveSectionConfig);
   const patchSlide = useMutation(api.adminCatalog.saveHeroSlide);
@@ -290,7 +291,7 @@ export function HomepageManager() {
 
   const handleComponentToggle = async (componentName: string, enabled: boolean) => {
     try {
-      await setComponent({ componentName, patch: { isEnabled: enabled } });
+      await setComponent({ orgSlug: ORG_SLUG, componentName, patch: { isEnabled: enabled } });
       setOpOk(`Component ${enabled ? 'enabled' : 'disabled'}`);
       await invalidateStorefront();
     } catch (error: any) {
@@ -306,6 +307,7 @@ export function HomepageManager() {
   const handleCollectionLink = async (componentName: string, supabaseId: string) => {
     try {
       await setComponent({
+        orgSlug: ORG_SLUG,
         componentName,
         patch: supabaseId ? { sectionId: supabaseId } : { sectionId: null },
       });
@@ -323,7 +325,7 @@ export function HomepageManager() {
       return;
     }
     try {
-      await saveSection({ sectionName, patch: { title: title.trim() } });
+      await saveSection({ orgSlug: ORG_SLUG, sectionName, patch: { title: title.trim() } });
       setOpOk('Section title updated');
       await invalidateStorefront();
     } catch (error: any) {
@@ -335,7 +337,7 @@ export function HomepageManager() {
   const handleSlideToggle = async (slideId: string, isActive: boolean) => {
     try {
       const slide = heroSlides.find((s) => s.id === slideId);
-      await patchSlide({ id: slideId as any, slide: { isActive, sortOrder: slide?.sort_order ?? 0 } });
+      await patchSlide({ orgSlug: ORG_SLUG, id: slideId as any, slide: { isActive, sortOrder: slide?.sort_order ?? 0 } });
       setOpOk(`Slide ${isActive ? 'activated' : 'deactivated'}`);
       await invalidateStorefront();
     } catch (error: any) {
@@ -348,7 +350,7 @@ export function HomepageManager() {
     if (!confirm(`Delete slide "${title}"?`)) return;
 
     try {
-      await removeSlide({ id: slideId as any });
+      await removeSlide({ orgSlug: ORG_SLUG, id: slideId as any });
       setOpOk('Slide deleted');
       await invalidateStorefront();
     } catch (error: any) {
@@ -369,7 +371,7 @@ export function HomepageManager() {
 
     try {
       for (let i = 0; i < newSlides.length; i++) {
-        await patchSlide({ id: newSlides[i].id as any, slide: { isActive: newSlides[i].is_active, sortOrder: i } });
+        await patchSlide({ orgSlug: ORG_SLUG, id: newSlides[i].id as any, slide: { isActive: newSlides[i].is_active, sortOrder: i } });
       }
       setOpOk('Slide order updated');
       await invalidateStorefront();

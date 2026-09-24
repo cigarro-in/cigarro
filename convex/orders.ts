@@ -3,6 +3,12 @@ import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
 import { requireIdentity, requireMember } from "./lib/auth";
+import {
+  assertOrgMatch,
+  findOrgDocBySupabase,
+  inOrg,
+  resolveOrg,
+} from "./lib/org";
 import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf } from "./lib/ids";
 import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
@@ -29,16 +35,30 @@ const DEFAULT_SHIPPING_RUPEES: Record<string, number> = {
 
 async function resolveShippingPricePaise(
   ctx: MutationCtx,
+  org: { _id: Id<"organizations">; slug: string },
   method: string | undefined,
 ): Promise<number> {
   const selectedMethod = method ?? "standard";
   if (!(selectedMethod in DEFAULT_SHIPPING_RUPEES))
     throw new ConvexError({ code: "INVALID_SHIPPING_METHOD" });
 
-  const settings = await ctx.db
-    .query("siteSettings")
-    .withIndex("by_key", (q) => q.eq("key", "main"))
-    .unique();
+  // This org's shipping config only — never another tenant's. Legacy
+  // (pre-backfill) rows read as smokeshop's; otherwise defaults apply.
+  const settings =
+    (await ctx.db
+      .query("siteSettings")
+      .withIndex("by_org_key", (q) =>
+        q.eq("orgId", org._id).eq("key", "main"),
+      )
+      .unique()) ??
+    (org.slug === "smokeshop"
+      ? (
+          await ctx.db
+            .query("siteSettings")
+            .withIndex("by_key", (q) => q.eq("key", "main"))
+            .collect()
+        ).find((r) => (r as any).orgId == null) ?? null
+      : null);
   const configured = settings?.shippingConfig as Record<string, any> | undefined;
   const override = configured?.[selectedMethod];
   if (override && typeof override === "object" && override.enabled === false)
@@ -54,6 +74,7 @@ async function resolveShippingPricePaise(
 
 async function resolveDiscount(
   ctx: MutationCtx,
+  org: { _id: Id<"organizations">; slug: string },
   discountId: Id<"discounts"> | undefined,
   items: Doc<"orders">["items"],
   cartTotalPaise: number,
@@ -64,6 +85,7 @@ async function resolveDiscount(
   const now = Date.now();
   if (
     !discount ||
+    !inOrg(discount as any, org) ||
     !discount.is_active ||
     (discount.start_date != null && discount.start_date > now) ||
     (discount.end_date != null && discount.end_date < now) ||
@@ -195,26 +217,50 @@ async function chooseUniqueLuckyPaise(
 
 async function pricePurchaseItems(
   ctx: MutationCtx,
+  org: { _id: Id<"organizations">; slug: string },
   items: Doc<"orders">["items"],
 ): Promise<Doc<"orders">["items"]> {
   const priced = [];
   for (const item of items) {
     if (!Number.isInteger(item.qty) || item.qty <= 0)
       throw new ConvexError({ code: "INVALID_QTY" });
-    let product = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_supabase", (q) => q.eq("supabaseId", item.productId))
-      .unique();
-    if (product?.isActive) {
+    // Catalog pricing resolves inside the order's org only — a productId from
+    // another tenant (or a forged UUID) must never price here.
+    const product = await findOrgDocBySupabase(
+      ctx,
+      "catalogProducts",
+      org,
+      item.productId,
+    );
+    if (product && inOrg(product, org) && product?.isActive) {
       let variant = item.variantId
-        ? await ctx.db.query("catalogVariants").withIndex("by_supabase", (q) => q.eq("supabaseId", item.variantId!)).unique()
+        ? await findOrgDocBySupabase(ctx, "catalogVariants", org, item.variantId!)
         : null;
+      if (variant && !inOrg(variant, org)) variant = null;
       if (!variant) {
         const variants = await ctx.db
           .query("catalogVariants")
-          .withIndex("by_product", (q) => q.eq("productSupabaseId", product!.supabaseId))
+          .withIndex("by_org_product", (q: any) =>
+            q.eq("orgId", org._id).eq("productSupabaseId", product!.supabaseId),
+          )
           .collect();
-        variant = variants.find((row) => row.isDefault) ?? variants[0] ?? null;
+        const legacy =
+          org.slug === "smokeshop"
+            ? (
+                await ctx.db
+                  .query("catalogVariants")
+                  .withIndex("by_product", (q: any) =>
+                    q.eq("productSupabaseId", product!.supabaseId),
+                  )
+                  .collect()
+              ).filter((r: any) => r.orgId == null)
+            : [];
+        const seen = new Set(variants.map((r: any) => r._id));
+        const all = [
+          ...variants,
+          ...legacy.filter((r: any) => !seen.has(r._id)),
+        ];
+        variant = all.find((row) => row.isDefault) ?? all[0] ?? null;
       }
       if (!variant || !variant.isActive || variant.productSupabaseId !== product.supabaseId)
         throw new ConvexError({ code: "INVALID_PRODUCT_VARIANT" });
@@ -233,11 +279,14 @@ async function pricePurchaseItems(
       });
       continue;
     }
-    const combo = await ctx.db
-      .query("catalogCombos")
-      .withIndex("by_supabase", (q) => q.eq("supabaseId", item.productId))
-      .unique();
-    if (!combo?.isActive) throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
+    const combo = await findOrgDocBySupabase(
+      ctx,
+      "catalogCombos",
+      org,
+      item.productId,
+    );
+    if (!combo || !inOrg(combo, org) || !combo?.isActive)
+      throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
     const comboImage = (combo as any).image ?? (combo as any).galleryImages?.[0];
     priced.push({
       productId: combo.supabaseId,
@@ -357,6 +406,7 @@ export async function freeSlot(
 
 export const createOrder = mutation({
   args: {
+    orgSlug: v.string(),
     orgId: v.id("organizations"),
     kind: orderKind,
     items: v.array(orderItemV),
@@ -374,10 +424,10 @@ export const createOrder = mutation({
     shippingPricePaise: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
-    const org = await ctx.db.get(args.orgId);
-    if (!org || !org.active)
-      throw new ConvexError({ code: "ORG_INACTIVE" });
+    const org = await resolveOrg(ctx, args.orgSlug);
+    assertOrgMatch(args.orgId, org);
+    const { userId } = await requireMember(ctx, org._id);
+    if (!org.active) throw new ConvexError({ code: "ORG_INACTIVE" });
 
     const retrySource = args.retryOfOrderId
       ? await ctx.db.get(args.retryOfOrderId)
@@ -428,7 +478,7 @@ export const createOrder = mutation({
         throw new ConvexError({ code: "EMPTY_CART" });
       if (!args.address)
         throw new ConvexError({ code: "ADDRESS_REQUIRED" });
-      orderItems = await pricePurchaseItems(ctx, args.items);
+      orderItems = await pricePurchaseItems(ctx, org, args.items);
     } else if (args.kind === "wallet_load") {
       if (args.items.length !== 1 || args.items[0].qty !== 1) {
         throw new ConvexError({ code: "INVALID_WALLET_LOAD" });
@@ -451,6 +501,7 @@ export const createOrder = mutation({
     const discount = args.kind === "purchase"
       ? await resolveDiscount(
           ctx,
+          org,
           args.discountId,
           orderItems,
           cartTotal,
@@ -467,7 +518,7 @@ export const createOrder = mutation({
       ? (args.shippingMethod ?? "standard")
       : undefined;
     const shippingPricePaise = args.kind === "purchase"
-      ? await resolveShippingPricePaise(ctx, resolvedShippingMethod)
+      ? await resolveShippingPricePaise(ctx, org, resolvedShippingMethod)
       : 0;
     const orderTotal = cartTotal + shippingPricePaise;
 
@@ -680,12 +731,15 @@ async function linkLatestDebitToOrder(
 
 export const cancelOrder = mutation({
   args: {
+    orgSlug: v.string(),
     orderId: v.id("orders"),
     userOpenedUpiApp: v.boolean(),
   },
-  handler: async (ctx, { orderId, userOpenedUpiApp }) => {
+  handler: async (ctx, { orgSlug, orderId, userOpenedUpiApp }) => {
     const order = await ctx.db.get(orderId);
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
+    const org = await resolveOrg(ctx, orgSlug);
+    assertOrgMatch(order.orgId, org);
     const { userId } = await requireMember(ctx, order.orgId);
     if (order.userId !== userId)
       throw new ConvexError({ code: "FORBIDDEN" });
@@ -720,9 +774,9 @@ export const cancelOrder = mutation({
         state: "quarantined",
         quarantinedAt: Date.now(),
       });
-      const org = (await ctx.db.get(order.orgId))!;
+      const cancelOrg = (await ctx.db.get(order.orgId))!;
       await ctx.scheduler.runAfter(
-        org.quarantineMs,
+        cancelOrg.quarantineMs,
         internal.payments.releaseQuarantine,
         { slotId: order.slotId },
       );
@@ -733,10 +787,12 @@ export const cancelOrder = mutation({
 });
 
 export const retryOrder = mutation({
-  args: { oldOrderId: v.id("orders") },
-  handler: async (ctx, { oldOrderId }): Promise<any> => {
+  args: { orgSlug: v.string(), oldOrderId: v.id("orders") },
+  handler: async (ctx, { orgSlug, oldOrderId }): Promise<any> => {
     const old = await ctx.db.get(oldOrderId);
     if (!old) throw new ConvexError({ code: "NOT_FOUND" });
+    const org = await resolveOrg(ctx, orgSlug);
+    assertOrgMatch(old.orgId, org);
     const { userId } = await requireMember(ctx, old.orgId);
     if (old.userId !== userId)
       throw new ConvexError({ code: "FORBIDDEN" });
@@ -768,9 +824,9 @@ export const retryOrder = mutation({
     // so the retry keeps the whole discount: worst case the new order is up
     // to 99p cheaper than the original — never more expensive, never a
     // matching hazard.
-    const org = await ctx.db.get(old.orgId);
     const luckyOn = (org as any)?.luckyEnabled ?? true;
     return await ctx.runMutation(api.orders.createOrder, {
+      orgSlug,
       orgId: old.orgId,
       kind: old.kind,
       items: old.items,
@@ -786,10 +842,12 @@ export const retryOrder = mutation({
 // ---------- Queries ----------
 
 export const getMine = query({
-  args: { orderId: v.id("orders") },
-  handler: async (ctx, { orderId }) => {
+  args: { orgSlug: v.string(), orderId: v.id("orders") },
+  handler: async (ctx, { orgSlug, orderId }) => {
     const order = await ctx.db.get(orderId);
     if (!order) return null;
+    const org = await resolveOrg(ctx, orgSlug);
+    if (order.orgId !== org._id) return null;
     const identity = await requireIdentity(ctx);
     if (order.userId !== identity.subject) return null;
     return order;
@@ -798,15 +856,18 @@ export const getMine = query({
 
 export const listMyOrders = query({
   args: {
+    orgSlug: v.string(),
     orgId: v.id("organizations"),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { orgId, limit }) => {
+  handler: async (ctx, { orgSlug, orgId, limit }) => {
+    const org = await resolveOrg(ctx, orgSlug);
+    assertOrgMatch(orgId, org);
     const identity = await requireIdentity(ctx);
     return await ctx.db
       .query("orders")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", orgId).eq("userId", identity.subject),
+        q.eq("orgId", org._id).eq("userId", identity.subject),
       )
       .order("desc")
       .take(limit ?? 25);

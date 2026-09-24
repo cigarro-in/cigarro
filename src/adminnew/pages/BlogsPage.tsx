@@ -19,6 +19,7 @@ import {
 } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -49,7 +50,7 @@ export function BlogsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, {});
+  const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, { orgSlug: ORG_SLUG });
   const removePost = useMutation(api.adminCatalog.deleteBlogPost);
   const setStatus = useMutation(api.adminCatalog.setBlogPostsStatus);
 
@@ -89,7 +90,7 @@ export function BlogsPage() {
     if (!confirm(`Delete ${postIds.length} posts? This cannot be undone.`)) return;
     try {
       for (const id of postIds) {
-        await removePost({ id: id as any });
+        await removePost({ id: id as any, orgSlug: ORG_SLUG });
       }
       setOpOk(`${postIds.length} posts deleted`);
       setSelectedPosts([]);
@@ -100,7 +101,7 @@ export function BlogsPage() {
 
   const handleBulkStatusChange = async (postIds: string[], status: 'draft' | 'published' | 'archived') => {
     try {
-      await setStatus({ ids: postIds as any, status });
+      await setStatus({ ids: postIds as any, status, orgSlug: ORG_SLUG });
       setOpOk(`${postIds.length} posts updated to ${status}`);
       setSelectedPosts([]);
     } catch (error: any) {

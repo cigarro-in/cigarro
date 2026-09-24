@@ -5,6 +5,7 @@ import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
+import { ORG_SLUG } from '../../../lib/convex/org';
 import { ImageWithFallback } from '../../../components/ui/ImageWithFallback';
 import { formatINR } from '../../../utils/currency';
 
@@ -32,7 +33,7 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
 
   // One Convex query replaces both Supabase fetches; selection resolves
   // from the same rows (ids are supabaseIds end to end).
-  const rows = useQuery(api.adminCatalog.listProductsForAdmin, {});
+  const rows = useQuery(api.adminCatalog.listProductsForAdmin, { orgSlug: ORG_SLUG });
   const loading = rows === undefined;
 
   const products: Product[] = useMemo(

@@ -12,6 +12,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
@@ -66,7 +67,7 @@ export function BrandFormPage() {
     meta_description: ''
   });
 
-  const brandRows = useQuery(api.adminCatalog.listBrandsForAdmin, {});
+  const brandRows = useQuery(api.adminCatalog.listBrandsForAdmin, { orgSlug: ORG_SLUG });
   const createBrand = useMutation(api.adminCatalog.createBrand);
   const updateBrand = useMutation(api.adminCatalog.updateBrand);
   const removeBrand = useMutation(api.adminCatalog.deleteBrand);
@@ -147,10 +148,10 @@ export function BrandFormPage() {
       };
 
       if (isEditMode) {
-        await updateBrand({ supabaseId: id!, patch: args });
+        await updateBrand({ supabaseId: id!, patch: args, orgSlug: ORG_SLUG });
         setOpOk('Brand updated successfully');
       } else {
-        await createBrand(args);
+        await createBrand({ ...args, orgSlug: ORG_SLUG });
         setOpOk('Brand created successfully');
       }
 
@@ -174,7 +175,7 @@ export function BrandFormPage() {
     if (!confirm('Are you sure you want to delete this brand?')) return;
     setSaving(true);
     try {
-      await removeBrand({ supabaseId: id! });
+      await removeBrand({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Brand deleted successfully');
       navigate('/admin/brands');
     } catch (error: any) {
@@ -241,11 +242,11 @@ export function BrandFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
+      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-4">

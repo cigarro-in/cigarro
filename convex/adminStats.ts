@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
+import { collectInOrg } from "./lib/org";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -73,8 +74,12 @@ export const getDashboardStats = query({
       }
     }
 
-    const products = await ctx.db.query("catalogProducts").collect();
-    const variants = await ctx.db.query("catalogVariants").collect();
+    const org = await ctx.db.get(orgId);
+    if (!org) return null;
+    const [products, variants] = await Promise.all([
+      collectInOrg(ctx, "catalogProducts", org),
+      collectInOrg(ctx, "catalogVariants", org),
+    ]);
     const inventory = await ctx.db
       .query("inventoryBalances")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

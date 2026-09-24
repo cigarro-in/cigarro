@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 
 // Theme-safe catalog reads (Wave 3: Convex). Shapes mirror the legacy
 // Supabase rows — snake_case, Supabase UUID ids, ISO timestamps, explicit
@@ -144,7 +145,7 @@ function buildMaps(bundle: any) {
 // so a fresh object per render would retrigger them infinitely.
 export function useFullCatalog() {
   const org = useOrg();
-  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgId: org._id } : 'skip');
+  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgSlug: ORG_SLUG } : 'skip');
   return useMemo(() => {
     if (!bundle) {
       return {
@@ -177,7 +178,7 @@ export function useCatalogProduct(slug: string | undefined) {
   const org = useOrg();
   const detail = useQuery(
     api.catalog.getProductBySlug,
-    slug && org ? { slug, orgId: org._id } : 'skip',
+    slug && org ? { slug, orgSlug: ORG_SLUG } : 'skip',
   );
   return useMemo(() => {
     if (detail === undefined) return { product: null, loading: true as boolean };
@@ -198,6 +199,6 @@ export function useCatalogProduct(slug: string | undefined) {
 // Combos are an empty table in prod: keep the legacy call-site contract
 // (list) without a Supabase dependency.
 export function useCatalogCombos() {
-  const rows = useQuery(api.catalog.listCombos, { activeOnly: true });
+  const rows = useQuery(api.catalog.listCombos, { activeOnly: true, orgSlug: ORG_SLUG });
   return useMemo(() => ({ combos: rows ?? [] }), [rows]);
 }

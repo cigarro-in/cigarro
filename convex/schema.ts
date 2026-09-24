@@ -551,10 +551,11 @@ export default defineSchema({
   }).index("by_org_user", ["orgId", "userId"]),
 
   // ---- Wave 2: content tables (Supabase -> Convex) ----
-  // Content is GLOBAL (no orgId): one catalog, one blog, one homepage.
-  // Tenant scoping applies to user/order/wallet data only; if a second
-  // tenant ever needs its own catalog, add orgId here + backfill.
+  // ORG-SCOPED content: every row carries the owning orgId (optional until
+  // the org backfill runs; new writes always set it). Public reads filter by
+  // the slug-resolved org; admin writes require that org's admin.
   blogCategories: defineTable({
+    orgId: v.optional(v.id("organizations")),
     slug: v.string(),
     name: v.string(),
     color: v.optional(v.string()),
@@ -563,9 +564,12 @@ export default defineSchema({
     sortOrder: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
-    .index("by_active_sort", ["isActive", "sortOrder"]),
+    .index("by_active_sort", ["isActive", "sortOrder"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"]),
 
   blogPosts: defineTable({
+    orgId: v.optional(v.id("organizations")),
     slug: v.string(),
     title: v.string(),
     excerpt: v.optional(v.string()),
@@ -592,9 +596,14 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_status_published", ["status", "publishedAt"])
-    .index("by_category_status", ["categorySlug", "status", "publishedAt"]),
+    .index("by_category_status", ["categorySlug", "status", "publishedAt"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_status", ["orgId", "status", "publishedAt"])
+    .index("by_org_category", ["orgId", "categorySlug", "status", "publishedAt"]),
 
   heroSlides: defineTable({
+    orgId: v.optional(v.id("organizations")),
     title: v.optional(v.string()),
     subtitle: v.optional(v.string()),
     suptitle: v.optional(v.string()),
@@ -613,9 +622,12 @@ export default defineSchema({
     textPosition: v.optional(v.string()),
     sortOrder: v.number(),
     isActive: v.boolean(),
-  }).index("by_active_sort", ["isActive", "sortOrder"]),
+  })
+    .index("by_active_sort", ["isActive", "sortOrder"])
+    .index("by_org", ["orgId"]),
 
   sectionConfigurations: defineTable({
+    orgId: v.optional(v.id("organizations")),
     sectionName: v.string(),
     title: v.optional(v.string()),
     subtitle: v.optional(v.string()),
@@ -626,9 +638,13 @@ export default defineSchema({
     config: v.optional(v.any()),
     maxItems: v.optional(v.number()),
     isEnabled: v.optional(v.boolean()),
-  }).index("by_name", ["sectionName"]),
+  })
+    .index("by_name", ["sectionName"])
+    .index("by_org", ["orgId"])
+    .index("by_org_name", ["orgId", "sectionName"]),
 
   homepageComponentConfig: defineTable({
+    orgId: v.optional(v.id("organizations")),
     componentName: v.string(),
     config: v.optional(v.any()),
     isEnabled: v.boolean(),
@@ -636,10 +652,13 @@ export default defineSchema({
     sectionId: v.optional(v.string()),
   })
     .index("by_order", ["displayOrder"])
-    .index("by_component", ["componentName"]),
+    .index("by_component", ["componentName"])
+    .index("by_org", ["orgId"])
+    .index("by_org_component", ["orgId", "componentName"]),
 
   siteSettings: defineTable({
-    key: v.string(), // singleton: key = "main"
+    orgId: v.optional(v.id("organizations")),
+    key: v.string(), // per-org singleton: key = "main"
     siteName: v.optional(v.string()),
     metaTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
@@ -652,15 +671,20 @@ export default defineSchema({
     shippingConfig: v.optional(v.any()),
     updatedAt: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
-  }).index("by_key", ["key"]),
+  })
+    .index("by_key", ["key"])
+    .index("by_org", ["orgId"])
+    .index("by_org_key", ["orgId", "key"]),
 
   // ---- Wave 3: catalog (migrating off Supabase) ----
   // Authorship moves to Convex; Supabase stays a read replica during soak.
   // Money in catalog tables is RUPEES (numbers, as in Supabase); integer
   // PAISE applies only at the order/wallet boundary (rupeesToPaise).
   // supabaseId preserves the original UUID for idempotent backfill + join
-  // rebuild; slugs keep uniqueness via indexes (enforced in mutations).
+  // rebuild; slugs keep uniqueness PER ORG via by_org_slug (enforced in
+  // mutations). orgId optional until the org backfill runs; new writes set it.
   catalogBrands: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     name: v.string(),
     slug: v.string(),
@@ -678,9 +702,13 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_supabase", ["supabaseId"])
-    .index("by_active_sort", ["isActive", "sortOrder"]),
+    .index("by_active_sort", ["isActive", "sortOrder"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_supabase", ["orgId", "supabaseId"]),
 
   catalogCategories: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     name: v.string(),
     slug: v.string(),
@@ -695,9 +723,13 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
-    .index("by_supabase", ["supabaseId"]),
+    .index("by_supabase", ["supabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_supabase", ["orgId", "supabaseId"]),
 
   catalogProducts: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     name: v.string(),
     slug: v.string(),
@@ -718,9 +750,15 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_supabase", ["supabaseId"])
     .index("by_brand_active", ["brandSupabaseId", "isActive"])
-    .index("by_active_created", ["isActive", "createdAt"]),
+    .index("by_active_created", ["isActive", "createdAt"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_supabase", ["orgId", "supabaseId"])
+    .index("by_org_brand_active", ["orgId", "brandSupabaseId", "isActive"])
+    .index("by_org_active", ["orgId", "isActive", "createdAt"]),
 
   catalogVariants: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     productSupabaseId: v.string(),
     variantName: v.string(),
@@ -742,17 +780,26 @@ export default defineSchema({
   })
     .index("by_supabase", ["supabaseId"])
     .index("by_product", ["productSupabaseId"])
-    .index("by_product_slug", ["productSupabaseId", "variantSlug"]),
+    .index("by_product_slug", ["productSupabaseId", "variantSlug"])
+    .index("by_org", ["orgId"])
+    .index("by_org_supabase", ["orgId", "supabaseId"])
+    .index("by_org_product", ["orgId", "productSupabaseId"])
+    .index("by_org_product_slug", ["orgId", "productSupabaseId", "variantSlug"]),
 
   catalogProductCategories: defineTable({
+    orgId: v.optional(v.id("organizations")),
     productSupabaseId: v.string(),
     categorySupabaseId: v.string(),
     order: v.optional(v.number()),
   })
     .index("by_product", ["productSupabaseId"])
-    .index("by_category", ["categorySupabaseId"]),
+    .index("by_category", ["categorySupabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_product", ["orgId", "productSupabaseId"])
+    .index("by_org_category", ["orgId", "categorySupabaseId"]),
 
   catalogCollections: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     title: v.string(),
     slug: v.string(),
@@ -768,17 +815,25 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
-    .index("by_supabase", ["supabaseId"]),
+    .index("by_supabase", ["supabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_supabase", ["orgId", "supabaseId"]),
 
   catalogCollectionProducts: defineTable({
+    orgId: v.optional(v.id("organizations")),
     collectionSupabaseId: v.string(),
     productSupabaseId: v.string(),
     sortOrder: v.optional(v.number()),
   })
     .index("by_collection", ["collectionSupabaseId"])
-    .index("by_product", ["productSupabaseId"]),
+    .index("by_product", ["productSupabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_collection", ["orgId", "collectionSupabaseId"])
+    .index("by_org_product", ["orgId", "productSupabaseId"]),
 
   catalogCombos: defineTable({
+    orgId: v.optional(v.id("organizations")),
     supabaseId: v.string(),
     name: v.string(),
     slug: v.string(),
@@ -793,21 +848,29 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
-    .index("by_supabase", ["supabaseId"]),
+    .index("by_supabase", ["supabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"])
+    .index("by_org_supabase", ["orgId", "supabaseId"]),
 
   catalogComboItems: defineTable({
+    orgId: v.optional(v.id("organizations")),
     comboSupabaseId: v.string(),
     variantSupabaseId: v.string(),
     quantity: v.number(),
     sortOrder: v.optional(v.number()),
-  }).index("by_combo", ["comboSupabaseId"]),
+  })
+    .index("by_combo", ["comboSupabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_combo", ["orgId", "comboSupabaseId"]),
 
   // ---------- Wave 7: commercial discounts (Supabase -> Convex) ----------
-  // GLOBAL (no orgId), like catalog. Money in RUPEES (cart totals are
+  // ORG-SCOPED (codes unique per org). Money in RUPEES (cart totals are
   // rupees); paise only at the order boundary. Dates as ms timestamps.
   // Field names stay snake_case to match the Supabase shape the admin
   // UI and checkout already speak.
   discounts: defineTable({
+    orgId: v.optional(v.id("organizations")),
     name: v.string(),
     code: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -826,14 +889,19 @@ export default defineSchema({
     is_active: v.boolean(),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
-  }).index("by_code", ["code"]),
+  })
+    .index("by_code", ["code"])
+    .index("by_org", ["orgId"])
+    .index("by_org_code", ["orgId", "code"]),
 
   // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
-  // GLOBAL (no orgId). userId = stable identity (Supabase sub, same as users
-  // table). Codes are shareable by design; validation stays public, personal
-  // reads enforce subject match. Money in RUPEES; dates as ms timestamps.
-  // Field names stay snake_case to match the shape the app already speaks.
+  // ORG-SCOPED: one row per user per org. userId = stable identity (Supabase
+  // sub, same as users table). Codes are shareable by design; validation stays
+  // public (scoped by orgSlug), personal reads enforce subject match. Money in
+  // RUPEES; dates as ms timestamps. Field names stay snake_case to match the
+  // shape the app already speaks.
   referrals: defineTable({
+    orgId: v.optional(v.id("organizations")),
     userId: v.string(),
     referralCode: v.string(),
     totalReferrals: v.number(),
@@ -856,7 +924,11 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_code", ["referralCode"])
-    .index("by_referrer", ["referredByUserId"]),
+    .index("by_referrer", ["referredByUserId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_user", ["orgId", "userId"])
+    .index("by_org_code", ["orgId", "referralCode"])
+    .index("by_org_referrer", ["orgId", "referredByUserId"]),
 
   // ---------- Marketing: WhatsApp deeplink blasts (admin) ----------
   // Contacts are org-scoped, deduped by normalized phone (digits only,
@@ -923,9 +995,10 @@ export default defineSchema({
 
   // ---------- Wave 10: product reviews, Convex-native ----------
   // Never existed in Supabase in usable form (product_reviews dropped by
-  // migration 076), so no backfill: rows start here. GLOBAL, like catalog.
+  // migration 076), so no backfill: rows start here. ORG-SCOPED, like catalog.
   // userId = stable identity. Only approved rows are public.
   productReviews: defineTable({
+    orgId: v.optional(v.id("organizations")),
     productSupabaseId: v.string(),
     userId: v.string(),
     userName: v.optional(v.string()),
@@ -937,5 +1010,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_product", ["productSupabaseId"])
-    .index("by_user_product", ["userId", "productSupabaseId"]),
+    .index("by_user_product", ["userId", "productSupabaseId"])
+    .index("by_org", ["orgId"])
+    .index("by_org_product", ["orgId", "productSupabaseId"])
+    .index("by_org_user_product", ["orgId", "userId", "productSupabaseId"]),
 });

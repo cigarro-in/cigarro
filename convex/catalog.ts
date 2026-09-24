@@ -1,10 +1,20 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import {
+  collectInOrg,
+  findOrgDocBySlug,
+  findOrgDocBySupabase,
+  inOrg,
+  requireOrgAdminBySlug,
+  resolveOrg,
+} from "./lib/org";
 
 // ---------- Wave 3: catalog reads (Supabase -> Convex) ----------
-// Catalog is GLOBAL and public: no orgId, no requireMember. Money fields
-// are RUPEES (numbers, as in Supabase); paise conversion happens only at
-// the order boundary (rupeesToPaise on createOrder).
+// Catalog is ORG-SCOPED and public: every query takes the storefront orgSlug,
+// resolves it via organizations by_slug, and returns only that org's rows.
+// Money fields are RUPEES (numbers, as in Supabase); paise conversion happens
+// only at the order boundary (rupeesToPaise on createOrder). Pre-backfill rows
+// (no orgId) read as the legacy smokeshop org's rows.
 
 const brandShape = (b: any) => ({
   _id: b._id,
@@ -80,19 +90,10 @@ const variantShape = (x: any, available?: number) => ({
   isActive: x.isActive,
 });
 
-async function publicVariantShapes(ctx: any, variants: any[], orgId?: any) {
-  let scopedOrgId = orgId;
-  if (!scopedOrgId) {
-    const defaultOrg = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q: any) => q.eq("slug", "smokeshop"))
-      .unique();
-    scopedOrgId = defaultOrg?._id;
-  }
-  if (!scopedOrgId) return variants.map((x) => variantShape(x));
+async function publicVariantShapes(ctx: any, org: any, variants: any[]) {
   const balances = await ctx.db
     .query("inventoryBalances")
-    .withIndex("by_org", (q: any) => q.eq("orgId", scopedOrgId))
+    .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
     .collect();
   const byVariant = new Map(balances.map((b: any) => [b.variantSupabaseId, b]));
   return variants.map((x) => {
@@ -102,105 +103,148 @@ async function publicVariantShapes(ctx: any, variants: any[], orgId?: any) {
   });
 }
 
+async function orgVariantsByProduct(
+  ctx: any,
+  org: any,
+  productSupabaseId: string,
+): Promise<any[]> {
+  const scoped = await ctx.db
+    .query("catalogVariants")
+    .withIndex("by_org_product", (q: any) =>
+      q.eq("orgId", org._id).eq("productSupabaseId", productSupabaseId),
+    )
+    .collect();
+  if (org.slug !== "smokeshop") return scoped;
+  const legacy = await ctx.db
+    .query("catalogVariants")
+    .withIndex("by_product", (q: any) =>
+      q.eq("productSupabaseId", productSupabaseId),
+    )
+    .collect();
+  const seen = new Set(scoped.map((r: any) => r._id));
+  return [
+    ...scoped,
+    ...legacy.filter((r: any) => r.orgId == null && !seen.has(r._id)),
+  ];
+}
+
+async function orgActiveProducts(
+  ctx: any,
+  org: any,
+  limit: number,
+): Promise<any[]> {
+  const scoped = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_org_active", (q: any) =>
+      q.eq("orgId", org._id).eq("isActive", true),
+    )
+    .order("desc")
+    .take(limit);
+  if (org.slug !== "smokeshop") return scoped;
+  const legacy = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_active_created", (q: any) => q.eq("isActive", true))
+    .order("desc")
+    .take(limit);
+  const seen = new Set(scoped.map((r: any) => r._id));
+  return [...scoped, ...legacy.filter((r: any) => r.orgId == null && !seen.has(r._id))]
+    .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .slice(0, limit);
+}
+
 export const listBrands = query({
-  args: { activeOnly: v.optional(v.boolean()) },
+  args: { orgSlug: v.string(), activeOnly: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    if (args.activeOnly === false) {
-      return (await ctx.db.query("catalogBrands").collect()).map(brandShape);
-    }
-    const rows = await ctx.db
-      .query("catalogBrands")
-      .withIndex("by_active_sort", (q) => q.eq("isActive", true))
-      .collect();
-    return rows.map(brandShape);
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await collectInOrg(ctx, "catalogBrands", org);
+    if (args.activeOnly === false) return rows.map(brandShape);
+    return rows
+      .filter((b: any) => b.isActive)
+      .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      .map(brandShape);
   },
 });
 
 export const getBrandBySlug = query({
-  args: { slug: v.string() },
+  args: { orgSlug: v.string(), slug: v.string() },
   handler: async (ctx, args) => {
-    const row = await ctx.db
-      .query("catalogBrands")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const row = await findOrgDocBySlug(ctx, "catalogBrands", org, args.slug);
     return row ? brandShape(row) : null;
   },
 });
 
 export const listCategories = query({
-  args: {},
-  handler: async (ctx) => {
-    return (await ctx.db.query("catalogCategories").collect()).map(
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    return (await collectInOrg(ctx, "catalogCategories", org)).map(
       categoryShape,
     );
   },
 });
 
 export const listProducts = query({
-  args: { limit: v.optional(v.number()), activeOnly: v.optional(v.boolean()) },
+  args: {
+    orgSlug: v.string(),
+    limit: v.optional(v.number()),
+    activeOnly: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     if (args.activeOnly === false) {
-      const all = await ctx.db.query("catalogProducts").collect();
+      const all = await collectInOrg(ctx, "catalogProducts", org);
       return all.slice(0, args.limit ?? 100).map(productShape);
     }
-    const rows = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_active_created", (q) => q.eq("isActive", true))
-      .order("desc")
-      .take(args.limit ?? 100);
+    const rows = await orgActiveProducts(ctx, org, args.limit ?? 100);
     return rows.map(productShape);
   },
 });
 
 export const getProductBySlug = query({
-  args: { slug: v.string(), orgId: v.optional(v.id("organizations")) },
+  args: { orgSlug: v.string(), slug: v.string() },
   handler: async (ctx, args) => {
-    const product = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const product = await findOrgDocBySlug(
+      ctx,
+      "catalogProducts",
+      org,
+      args.slug,
+    );
     if (!product) return null;
-    const variants = await ctx.db
-      .query("catalogVariants")
-      .withIndex("by_product", (q) =>
-        q.eq("productSupabaseId", product.supabaseId),
-      )
-      .collect();
+    const variants = await orgVariantsByProduct(ctx, org, product.supabaseId);
     let brand = null;
     if (product.brandSupabaseId) {
-      const b = await ctx.db
-        .query("catalogBrands")
-        .withIndex("by_supabase", (q) =>
-          q.eq("supabaseId", product.brandSupabaseId as string),
-        )
-        .unique();
+      const b = await findOrgDocBySupabase(
+        ctx,
+        "catalogBrands",
+        org,
+        product.brandSupabaseId as string,
+      );
       if (b) brand = brandShape(b);
     }
     return {
       product: productShape(product),
-      variants: await publicVariantShapes(ctx, variants, args.orgId),
+      variants: await publicVariantShapes(ctx, org, variants),
       brand,
     };
   },
 });
 
 export const listVariantsByProduct = query({
-  args: { productSupabaseId: v.string(), orgId: v.optional(v.id("organizations")) },
+  args: { orgSlug: v.string(), productSupabaseId: v.string() },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("catalogVariants")
-      .withIndex("by_product", (q) =>
-        q.eq("productSupabaseId", args.productSupabaseId),
-      )
-      .collect();
-    return await publicVariantShapes(ctx, rows, args.orgId);
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await orgVariantsByProduct(ctx, org, args.productSupabaseId);
+    return await publicVariantShapes(ctx, org, rows);
   },
 });
 
 export const listCollections = query({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("catalogCollections").collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await collectInOrg(ctx, "catalogCollections", org);
     return rows.map((c) => ({
       _id: c._id,
       supabaseId: c.supabaseId,
@@ -220,9 +264,10 @@ export const listCollections = query({
 });
 
 export const listCombos = query({
-  args: { activeOnly: v.optional(v.boolean()) },
+  args: { orgSlug: v.string(), activeOnly: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    const rows = await ctx.db.query("catalogCombos").collect();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await collectInOrg(ctx, "catalogCombos", org);
     const list = (args.activeOnly === false ? rows : rows.filter((r) => r.isActive)).map(
       (c) => ({
         _id: c._id,
@@ -244,10 +289,11 @@ export const listCombos = query({
   },
 });
 
-// Verification helper: row counts per catalog table.
+// Verification helper: row counts per catalog table, scoped to the org.
 export const catalogCounts = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const tables = [
       "catalogBrands",
       "catalogCategories",
@@ -261,17 +307,31 @@ export const catalogCounts = query({
     ] as const;
     const out: Record<string, number> = {};
     for (const t of tables) {
-      const rows = await ctx.db.query(t).take(2000);
-      out[t] = rows.length < 2000 ? rows.length : -1;
+      const rows = await ctx.db
+        .query(t)
+        .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
+        .take(2000);
+      let n = rows.length;
+      if (org.slug === "smokeshop" && n < 2000) {
+        const legacy = (await ctx.db.query(t).take(2000)).filter(
+          (r: any) => r.orgId == null,
+        );
+        n += legacy.length;
+        if (legacy.length === 2000) n = -1;
+        else if (rows.length === 2000) n = -1;
+      } else if (n === 2000) {
+        n = -1;
+      }
+      out[t] = n;
     }
     return out;
   },
 });
 
 // ---------- TEMPORARY backfill (delete after Wave 3 verification) ----------
-// Idempotent upserts keyed by supabaseId (joins: full replace per call).
-// Driver script passes camelCase docs with ms timestamps; Supabase UUIDs
-// ride along as supabaseId so joins rebuild exactly.
+// Idempotent upserts keyed by (orgId, supabaseId) (joins: full replace per
+// org per call). Driver script passes camelCase docs with ms timestamps;
+// Supabase UUIDs ride along as supabaseId so joins rebuild exactly.
 const optStr = (v: any) => (v === null || v === undefined ? undefined : v);
 const optNum = (v: any) =>
   v === null || v === undefined || !Number.isFinite(Number(v))
@@ -280,6 +340,7 @@ const optNum = (v: any) =>
 
 export const backfillCatalog = mutation({
   args: {
+    orgSlug: v.string(),
     brands: v.optional(v.array(v.any())),
     categories: v.optional(v.array(v.any())),
     products: v.optional(v.array(v.any())),
@@ -291,6 +352,7 @@ export const backfillCatalog = mutation({
     comboItems: v.optional(v.array(v.any())),
   },
   handler: async (ctx, args) => {
+    const { orgId } = await requireOrgAdminBySlug(ctx, args.orgSlug);
     const counts: Record<string, number> = {};
     const upsertBySupabase = async (
       table:
@@ -304,10 +366,13 @@ export const backfillCatalog = mutation({
     ) => {
       const ex = await ctx.db
         .query(table)
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", doc.supabaseId))
+        .withIndex("by_org_supabase", (q) =>
+          q.eq("orgId", orgId).eq("supabaseId", doc.supabaseId),
+        )
         .unique();
-      if (ex) await ctx.db.patch(ex._id, doc);
-      else await ctx.db.insert(table, doc);
+      // Patch stamps orgId so legacy global rows heal into this org.
+      if (ex) await ctx.db.patch(ex._id, { ...doc, orgId });
+      else await ctx.db.insert(table, { ...doc, orgId });
     };
 
     for (const b of args.brands ?? []) {
@@ -423,12 +488,16 @@ export const backfillCatalog = mutation({
       });
       counts.combos = (counts.combos ?? 0) + 1;
     }
-    // Joins: delete-then-insert per call (backfill runs whole-table).
+    // Joins: delete-then-insert per org per call (backfill runs whole-table).
     if (args.productCategories !== undefined) {
-      const existing = await ctx.db.query("catalogProductCategories").collect();
+      const existing = await ctx.db
+        .query("catalogProductCategories")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect();
       for (const r of existing) await ctx.db.delete(r._id);
       for (const j of args.productCategories) {
         await ctx.db.insert("catalogProductCategories", {
+          orgId,
           productSupabaseId: j.productSupabaseId,
           categorySupabaseId: j.categorySupabaseId,
           order: optNum(j.order),
@@ -437,10 +506,14 @@ export const backfillCatalog = mutation({
       }
     }
     if (args.collectionProducts !== undefined) {
-      const existing = await ctx.db.query("catalogCollectionProducts").collect();
+      const existing = await ctx.db
+        .query("catalogCollectionProducts")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect();
       for (const r of existing) await ctx.db.delete(r._id);
       for (const j of args.collectionProducts) {
         await ctx.db.insert("catalogCollectionProducts", {
+          orgId,
           collectionSupabaseId: j.collectionSupabaseId,
           productSupabaseId: j.productSupabaseId,
           sortOrder: optNum(j.sortOrder),
@@ -449,10 +522,14 @@ export const backfillCatalog = mutation({
       }
     }
     if (args.comboItems !== undefined) {
-      const existing = await ctx.db.query("catalogComboItems").collect();
+      const existing = await ctx.db
+        .query("catalogComboItems")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect();
       for (const r of existing) await ctx.db.delete(r._id);
       for (const j of args.comboItems) {
         await ctx.db.insert("catalogComboItems", {
+          orgId,
           comboSupabaseId: j.comboSupabaseId,
           variantSupabaseId: j.variantSupabaseId,
           quantity: Number(j.quantity ?? 1),
@@ -467,33 +544,25 @@ export const backfillCatalog = mutation({
 
 // ---------- Prerender / sitemap support (byte-diff gates) ----------
 // These queries return exactly what the edge generators need so the swap
-// is data-source-only: templates stay untouched.
+// is data-source-only: templates stay untouched. All scoped by orgSlug.
 
-async function brandNameBySupabaseId(ctx: any, brandSupabaseId?: string) {
+async function brandNameBySupabaseId(ctx: any, org: any, brandSupabaseId?: string) {
   if (!brandSupabaseId) return null;
-  const b = await ctx.db
-    .query("catalogBrands")
-    .withIndex("by_supabase", (q: any) => q.eq("supabaseId", brandSupabaseId))
-    .unique();
+  const b = await findOrgDocBySupabase(ctx, "catalogBrands", org, brandSupabaseId);
   return b ? { name: b.name, slug: b.slug } : null;
 }
 
 // Sitemap: active products with images + updatedAt, categories, brands.
 export const sitemapCatalog = query({
-  args: {},
-  handler: async (ctx) => {
-    const products = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_active_created", (q) => q.eq("isActive", true))
-      .collect();
+  args: { orgSlug: v.string() },
+  handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const products = (await orgActiveProducts(ctx, org, 5000)).filter(
+      (p: any) => p.slug,
+    );
     const withImages = [];
     for (const p of products) {
-      const variants = await ctx.db
-        .query("catalogVariants")
-        .withIndex("by_product", (q) =>
-          q.eq("productSupabaseId", p.supabaseId),
-        )
-        .collect();
+      const variants = await orgVariantsByProduct(ctx, org, p.supabaseId);
       const images = variants
         .filter((x) => x.isActive !== false)
         .flatMap((x) => x.images ?? [])
@@ -507,14 +576,13 @@ export const sitemapCatalog = query({
       });
     }
     const categories = (
-      await ctx.db.query("catalogCategories").collect()
+      await collectInOrg(ctx, "catalogCategories", org)
     ).map((c) => ({ slug: c.slug, updatedAt: c.updatedAt }));
     const brands = (
-      await ctx.db
-        .query("catalogBrands")
-        .withIndex("by_active_sort", (q) => q.eq("isActive", true))
-        .collect()
-    ).map((b) => ({ slug: b.slug, updatedAt: b.updatedAt }));
+      await collectInOrg(ctx, "catalogBrands", org)
+    )
+      .filter((b: any) => b.isActive)
+      .map((b) => ({ slug: b.slug, updatedAt: b.updatedAt }));
     return { products: withImages, categories, brands };
   },
 });
@@ -522,16 +590,18 @@ export const sitemapCatalog = query({
 // Related-product links for PDP prerender (same-brand first is done in the
 // template; this returns the candidate pool with brand names).
 export const relatedProductLinks = query({
-  args: { excludeSlug: v.string(), limit: v.optional(v.number()) },
+  args: {
+    orgSlug: v.string(),
+    excludeSlug: v.string(),
+    limit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_active_created", (q) => q.eq("isActive", true))
-      .take(args.limit ?? 50);
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const rows = await orgActiveProducts(ctx, org, args.limit ?? 50);
     const out = [];
     for (const p of rows) {
       if (p.slug === args.excludeSlug) continue;
-      const brand = await brandNameBySupabaseId(ctx, p.brandSupabaseId);
+      const brand = await brandNameBySupabaseId(ctx, org, p.brandSupabaseId);
       out.push({ slug: p.slug, name: p.name, brandName: brand?.name ?? null });
     }
     return out;
@@ -539,27 +609,46 @@ export const relatedProductLinks = query({
 });
 
 export const getCategoryDetail = query({
-  args: { slug: v.string() },
+  args: { orgSlug: v.string(), slug: v.string() },
   handler: async (ctx, args) => {
-    const category = await ctx.db
-      .query("catalogCategories")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const category = await findOrgDocBySlug(
+      ctx,
+      "catalogCategories",
+      org,
+      args.slug,
+    );
     if (!category) return null;
     const joins = await ctx.db
       .query("catalogProductCategories")
-      .withIndex("by_category", (q) =>
-        q.eq("categorySupabaseId", category.supabaseId),
+      .withIndex("by_org_category", (q) =>
+        q.eq("orgId", org._id).eq("categorySupabaseId", category.supabaseId),
       )
       .take(20);
+    const legacyJoins =
+      org.slug === "smokeshop"
+        ? (
+            await ctx.db
+              .query("catalogProductCategories")
+              .withIndex("by_category", (q) =>
+                q.eq("categorySupabaseId", category.supabaseId),
+              )
+              .take(20)
+          ).filter((j: any) => j.orgId == null)
+        : [];
+    const seen = new Set(joins.map((j: any) => j.productSupabaseId));
+    const allJoins = [
+      ...joins,
+      ...legacyJoins.filter((j: any) => !seen.has(j.productSupabaseId)),
+    ].slice(0, 20);
     const products = [];
-    for (const j of joins) {
-      const p = await ctx.db
-        .query("catalogProducts")
-        .withIndex("by_supabase", (q) =>
-          q.eq("supabaseId", j.productSupabaseId),
-        )
-        .unique();
+    for (const j of allJoins) {
+      const p = await findOrgDocBySupabase(
+        ctx,
+        "catalogProducts",
+        org,
+        j.productSupabaseId,
+      );
       if (p && p.isActive && p.slug) products.push({ slug: p.slug, name: p.name });
     }
     return { category: categoryShape(category), products };
@@ -567,22 +656,37 @@ export const getCategoryDetail = query({
 });
 
 export const getBrandDetail = query({
-  args: { slug: v.string() },
+  args: { orgSlug: v.string(), slug: v.string() },
   handler: async (ctx, args) => {
-    const brand = await ctx.db
-      .query("catalogBrands")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const brand = await findOrgDocBySlug(ctx, "catalogBrands", org, args.slug);
     if (!brand || !brand.isActive) return null;
     const rows = await ctx.db
       .query("catalogProducts")
-      .withIndex("by_brand_active", (q) =>
-        q.eq("brandSupabaseId", brand.supabaseId).eq("isActive", true),
+      .withIndex("by_org_brand_active", (q) =>
+        q
+          .eq("orgId", org._id)
+          .eq("brandSupabaseId", brand.supabaseId)
+          .eq("isActive", true),
       )
       .take(12);
+    let list = rows;
+    if (org.slug === "smokeshop" && list.length < 12) {
+      const legacy = await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_brand_active", (q) =>
+          q.eq("brandSupabaseId", brand.supabaseId).eq("isActive", true),
+        )
+        .take(12);
+      const seen = new Set(list.map((p: any) => p._id));
+      list = [
+        ...list,
+        ...legacy.filter((p: any) => p.orgId == null && !seen.has(p._id)),
+      ].slice(0, 12);
+    }
     return {
       brand: brandShape(brand),
-      products: rows
+      products: list
         .filter((p) => p.slug)
         .map((p) => ({ slug: p.slug, name: p.name })),
     };
@@ -594,22 +698,23 @@ export const getBrandDetail = query({
 // edge layer maps them to the exact legacy Supabase shapes (snake_case,
 // UUID ids, ISO timestamps, explicit nulls) so API JSON stays identical.
 export const fullCatalog = query({
-  args: { orgId: v.optional(v.id("organizations")) },
+  args: { orgSlug: v.string() },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const [products, variants, brands, categories, productCategories, combos, collections, collectionProducts] =
       await Promise.all([
-        ctx.db.query("catalogProducts").collect(),
-        ctx.db.query("catalogVariants").collect(),
-        ctx.db.query("catalogBrands").collect(),
-        ctx.db.query("catalogCategories").collect(),
-        ctx.db.query("catalogProductCategories").collect(),
-        ctx.db.query("catalogCombos").collect(),
-        ctx.db.query("catalogCollections").collect(),
-        ctx.db.query("catalogCollectionProducts").collect(),
+        collectInOrg(ctx, "catalogProducts", org),
+        collectInOrg(ctx, "catalogVariants", org),
+        collectInOrg(ctx, "catalogBrands", org),
+        collectInOrg(ctx, "catalogCategories", org),
+        collectInOrg(ctx, "catalogProductCategories", org),
+        collectInOrg(ctx, "catalogCombos", org),
+        collectInOrg(ctx, "catalogCollections", org),
+        collectInOrg(ctx, "catalogCollectionProducts", org),
       ]);
     return {
       products: products.map(productShape),
-      variants: await publicVariantShapes(ctx, variants, args.orgId),
+      variants: await publicVariantShapes(ctx, org, variants),
       brands: brands.map(brandShape),
       categories: categories.map(categoryShape),
       collections: collections.map((c) => ({
@@ -647,20 +752,15 @@ export const fullCatalog = query({
 // Cart rehydration: lean server lines carry Supabase UUIDs; resolve them to
 // the exact legacy row shapes (snake_case) so useCart logic is untouched.
 export const productsBySupabaseIds = query({
-  args: { ids: v.array(v.string()) },
+  args: { orgSlug: v.string(), ids: v.array(v.string()) },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const out = [];
     for (const id of args.ids.slice(0, 100)) {
-      const p = await ctx.db
-        .query("catalogProducts")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", id))
-        .unique();
-      if (!p) continue;
-      const variants = await ctx.db
-        .query("catalogVariants")
-        .withIndex("by_product", (q) => q.eq("productSupabaseId", p.supabaseId))
-        .collect();
-      const brand = await brandNameBySupabaseId(ctx, p.brandSupabaseId);
+      const p = await findOrgDocBySupabase(ctx, "catalogProducts", org, id);
+      if (!p || !inOrg(p, org)) continue;
+      const variants = await orgVariantsByProduct(ctx, org, p.supabaseId);
+      const brand = await brandNameBySupabaseId(ctx, org, p.brandSupabaseId);
       out.push({
         id: p.supabaseId,
         name: p.name,
@@ -684,15 +784,13 @@ export const productsBySupabaseIds = query({
 });
 
 export const combosBySupabaseIds = query({
-  args: { ids: v.array(v.string()) },
+  args: { orgSlug: v.string(), ids: v.array(v.string()) },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const out = [];
     for (const id of args.ids.slice(0, 100)) {
-      const c = await ctx.db
-        .query("catalogCombos")
-        .withIndex("by_supabase", (q) => q.eq("supabaseId", id))
-        .unique();
-      if (c)
+      const c = await findOrgDocBySupabase(ctx, "catalogCombos", org, id);
+      if (c && inOrg(c, org))
         out.push({
           id: c.supabaseId,
           name: c.name,

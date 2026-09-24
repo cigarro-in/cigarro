@@ -11,6 +11,7 @@ import { formatINR } from '../../utils/currency';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { rupeesToPaise, paiseToRupees } from '../../lib/convex/money';
 
 const REASON_LABELS: Record<string, string> = {
@@ -72,6 +73,7 @@ export function WalletPage() {
           : `wallet-load-${Date.now()}-${Math.random().toString(36).slice(2)}`
       );
       const result = await createOrder({
+        orgSlug: ORG_SLUG,
         orgId: org._id,
         kind: 'wallet_load',
         idempotencyKey,

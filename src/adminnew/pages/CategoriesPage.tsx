@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
@@ -28,7 +29,7 @@ export function CategoriesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  const rows = useQuery(api.adminCatalog.listCategoriesForAdmin, {});
+  const rows = useQuery(api.adminCatalog.listCategoriesForAdmin, { orgSlug: ORG_SLUG });
   const removeCategory = useMutation(api.adminCatalog.deleteCategory);
   const setActive = useMutation(api.adminCatalog.setCategoriesActive);
 
@@ -56,7 +57,7 @@ export function CategoriesPage() {
     if (!confirm(`Delete ${categoryIds.length} categories?`)) return;
     try {
       for (const supabaseId of categoryIds) {
-        await removeCategory({ supabaseId });
+        await removeCategory({ supabaseId, orgSlug: ORG_SLUG });
       }
       setOpOk(`${categoryIds.length} categories deleted`);
       setSelectedCategories([]);
@@ -67,7 +68,7 @@ export function CategoriesPage() {
 
   const handleBulkStatusChange = async (categoryIds: string[], isActive: boolean) => {
     try {
-      await setActive({ supabaseIds: categoryIds, isActive });
+      await setActive({ supabaseIds: categoryIds, isActive, orgSlug: ORG_SLUG });
       setOpOk(`${categoryIds.length} categories ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCategories([]);
     } catch (error: any) {

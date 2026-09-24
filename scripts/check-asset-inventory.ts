@@ -43,9 +43,36 @@ async function main() {
   assert.equal(isBannerContext([{ kind: "variant" }]), false);
 
   // Existing WebP sources still get a pass; only bulk outputs are skipped.
+  // Old keys have a random tail, new keys drop it (`-r-<24hex>.webp`).
   assert.equal(isPipelineOutput("asset_images/a-b123.webp"), false);
   assert.equal(isPipelineOutput("asset_images/a-r-0123456789abcdef01234567-abc123.webp"), true);
+  assert.equal(isPipelineOutput("asset_images/a-r-0123456789abcdef01234567.webp"), true);
+  assert.equal(isPipelineOutput("asset_images/a-r-0123456789abcdef01234567extra.webp"), false);
+  assert.equal(isPipelineOutput("asset_images/a-r-0123456789abcdef0123456.webp"), false);
   assert.equal(isPipelineOutput("asset_images/a.jpg"), false);
+
+  // Upload naming: plain <slug>.<ext> then -2/-3, race-safe create-only put.
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const uploadEdge = readFileSync(join(root, "functions/api/images/upload.js"), "utf8");
+  assert.match(uploadEdge, /etagDoesNotMatch/, "uploads use conditional create-only put");
+  assert.match(uploadEdge, /\$\{base\}-\$\{n\}/, "collisions retry with numeric suffix");
+  assert.doesNotMatch(uploadEdge, /Math\.random/, "no random tail on ordinary assets");
+  const reprocessSrc = readFileSync(join(root, "src/lib/images/reprocess.ts"), "utf8");
+  assert.match(
+    reprocessSrc,
+    /\(\?:-\[a-z0-9\]\+\)\?/,
+    "reprocess lookup covers old (-r-<hash>-<rand>) and new (-r-<hash>) keys",
+  );
+  assert.ok(
+    reprocessSrc.indexOf("api.adminCatalog.repointImageRefs") <
+      reprocessSrc.indexOf("await deleteR2Image(asset.path)"),
+    "the source is deleted only after references are repointed",
+  );
+  assert.match(reprocessSrc, /usage\.total === 0[\s\S]*?Unused; remove with bulk cleanup/);
+  assert.match(reprocessSrc, /isPipelineOutput\(a\.path\)/, "processed outputs are skipped on reruns");
+  const assetManager = readFileSync(join(root, "src/adminnew/features/AssetManager.tsx"), "utf8");
+  assert.match(assetManager, /Delete unused \(all folders\)/);
+  assert.match(assetManager, /usage\.get\(asset\.path\)\?\.total === 0/);
 
   // Repoint helpers: old-value compare, null/undefined = no patch.
   assert.deepEqual(
@@ -66,9 +93,12 @@ async function main() {
 
   // Order item snapshots (orderItemV.image) are inventoried: any hit counts
   // (deletes stay fail-closed) and repoint moves them with exact matching.
-  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const catalog = readFileSync(join(root, "convex/adminCatalog.ts"), "utf8");
-  assert.match(catalog, /ctx\.db\.query\("orders"\)\.collect\(\)/, "inventory scans orders");
+  assert.match(
+    catalog,
+    /query\("orders"\)[\s\S]*?withIndex\("by_org_user", \(q: any\) => q\.eq\("orgId", org\._id\)\)/,
+    "inventory scans only this org's orders",
+  );
   assert.match(
     catalog,
     /kind: "order"[\s\S]*?mutable: false/,

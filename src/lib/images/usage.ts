@@ -1,6 +1,7 @@
 // Batch usage inventory for the R2 asset grid (single query per ~100 assets).
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { ORG_SLUG } from "../convex/org";
 
 export interface UsageContext {
   kind: string;
@@ -29,6 +30,7 @@ export async function fetchUsageBatch(
     try {
       const rows = await convex.query(api.adminCatalog.imageUsageBatch, {
         refs: chunk.map((r) => ({ key: r.key, url: r.url })),
+        orgSlug: ORG_SLUG,
       });
       for (const r of rows) out.set(r.key, r as AssetUsage);
     } catch {

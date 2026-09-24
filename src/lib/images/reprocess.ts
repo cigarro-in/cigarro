@@ -1,10 +1,11 @@
-// Bulk reprocess: every R2 image → browser WebP pipeline → repoint refs.
-// Old originals stay in R2 (rollback/cleanup); nothing is deleted here.
+// Bulk reprocess: convert, repoint every reference, then delete the original.
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { ORG_SLUG } from "../convex/org";
 import {
   fetchRemoteBytes,
   listR2Images,
+  deleteR2Image,
   uploadImageToR2,
   type R2Image,
 } from "./upload";
@@ -22,6 +23,7 @@ export interface ReprocessResult {
   status: "repointed" | "skipped" | "failed";
   newUrl?: string;
   patchedRefs?: number;
+  deletedOriginal?: boolean;
   reason?: string;
 }
 
@@ -46,7 +48,7 @@ export async function collectAllR2Images(): Promise<R2Image[]> {
       cursor = page.cursor;
     } while (cursor);
   }
-  return all;
+  return [...new Map(all.map((asset) => [asset.id, asset])).values()];
 }
 
 async function sourceMarker(key: string): Promise<string> {
@@ -65,13 +67,18 @@ export async function reprocessOne(
 ): Promise<ReprocessResult> {
   if (!usage || usage.total < 0)
     return { asset, status: "failed", reason: "Usage check unavailable; no references changed" };
+  if (usage.total === 0)
+    return { asset, status: "skipped", reason: "Unused; remove with bulk cleanup" };
   const contexts = usage?.contexts ?? [];
   try {
     let newUrl = existingUrl;
     if (!newUrl) {
       const bytes = await fetchRemoteBytes(asset.url);
       const banner = isBannerContext(contexts);
-      const folder = asset.path.slice("asset_images/".length).split("/").slice(0, -1).join("/");
+      const tenantPrefix = `asset_images/orgs/${ORG_SLUG}/`;
+      const folder = asset.path.startsWith(tenantPrefix)
+        ? asset.path.slice(tenantPrefix.length).split("/").slice(0, -1).join("/")
+        : asset.path.slice("asset_images/".length).split("/").slice(0, -1).join("/");
       const stem = slugFromContexts(contexts.filter((c) => c.mutable), asset.name).slice(0, 30);
       const uploaded = await uploadImageToR2(bytes, {
         folder: folder || undefined,
@@ -88,11 +95,20 @@ export async function reprocessOne(
       oldKey: asset.path,
       oldUrl: asset.url,
       newUrl,
+      orgSlug: ORG_SLUG,
     });
     const n = Object.values(patched as Record<string, number>).reduce((a, b) => a + b, 0);
-    if (existingUrl && n === 0)
-      return { asset, status: "skipped", reason: "already reprocessed", newUrl };
-    return { asset, status: "repointed", newUrl, patchedRefs: n };
+    // R2 rechecks usage server-side before deletion. If any reference was
+    // missed or changed concurrently, deletion fails and the original stays.
+    await deleteR2Image(asset.path);
+    return {
+      asset,
+      status: existingUrl && n === 0 ? "skipped" : "repointed",
+      reason: existingUrl && n === 0 ? "Reused output; removed old original" : undefined,
+      newUrl,
+      patchedRefs: n,
+      deletedOriginal: true,
+    };
   } catch (e) {
     return { asset, status: "failed", reason: e instanceof Error ? e.message : "Reprocess failed" };
   }
@@ -111,7 +127,10 @@ export async function reprocessAll(
     const asset = targets[i];
     onProgress({ done: i, total: targets.length, current: asset.name });
     const marker = await sourceMarker(asset.path);
-    const existing = outputs.find((a) => a.name.includes(`-r-${marker}-`));
+    // Exact marker match (anchored, optional old random tail) so reruns are
+    // idempotent without cross-matching a different source's hash.
+    const markerRe = new RegExp(`-r-${marker}(?:-[a-z0-9]+)?\\.webp$`, "i");
+    const existing = outputs.find((a) => markerRe.test(a.path));
     results.push(await reprocessOne(convex, asset, usage.get(asset.path), marker, existing?.url));
   }
   onProgress({ done: targets.length, total: targets.length, current: "" });

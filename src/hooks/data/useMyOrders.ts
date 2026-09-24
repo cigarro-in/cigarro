@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { useAuth } from '../useAuth';
 import { paiseToRupees } from '../../lib/convex/money';
 import { getProductImageUrl } from '../../lib/images/urls';
@@ -176,7 +177,7 @@ export function useMyOrders(options: UseMyOrdersOptions = {}): UseMyOrdersResult
   const org = useOrg();
   const raw = useQuery(
     api.orders.listMyOrders,
-    org && user ? { orgId: org._id, limit: options.limit ?? 50 } : 'skip',
+    org && user ? { orgId: org._id, orgSlug: ORG_SLUG, limit: options.limit ?? 50 } : 'skip',
   );
   // Shared catalog subscription (deduped with search/header) for the legacy
   // image fallback. Snapshot-first, so live catalog edits can't rewrite

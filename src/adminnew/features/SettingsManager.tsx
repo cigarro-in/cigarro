@@ -7,6 +7,7 @@ import { useInlineStatus, InlineStatus } from '../../components/common/InlineSta
 import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { ORG_SLUG } from '../../lib/convex/org';
 import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check, Truck } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { DEFAULT_SHIPPING_METHODS, mergeShippingMethods, toShippingConfig, type ShippingMethod } from '../../lib/shipping';
@@ -74,7 +75,7 @@ export function SettingsManager() {
     timestamp: string;
   } | null>(null);
 
-  const serverSettings = useQuery(api.content.getSiteSettings, {});
+  const serverSettings = useQuery(api.content.getSiteSettings, { orgSlug: ORG_SLUG });
   const saveSettings = useMutation(api.adminCatalog.saveSiteSettings);
   const populatedRef = useRef(false);
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>(DEFAULT_SHIPPING_METHODS);
@@ -258,6 +259,7 @@ export function SettingsManager() {
     try {
       // updatedBy stamps server-side from the Convex identity.
       await saveSettings({
+        orgSlug: ORG_SLUG,
         siteName: settings.site_name?.trim() || undefined,
         faviconUrl: settings.favicon_url?.trim() || undefined,
         metaTitle: settings.meta_title?.trim() || undefined,
@@ -280,7 +282,7 @@ export function SettingsManager() {
     if (newThemeId === themeId) return;
     setIsSavingTheme(newThemeId);
     try {
-      await saveSettings({ activeTheme: newThemeId });
+      await saveSettings({ orgSlug: ORG_SLUG, activeTheme: newThemeId });
       setTheme(newThemeId);
       setSettings(prev => ({ ...prev, active_theme: newThemeId }));
       setOpOk(`Switched to ${availableThemes.find(t => t.id === newThemeId)?.name}`);
