@@ -286,6 +286,7 @@ export function BrandFormPage() {
                 <SingleImagePicker
                   value={formData.logo_url[0] || null}
                   onChange={(url) => handleChange({ logo_url: url ? [url] : [] })}
+                  searchHint={formData.name ? `${formData.name} brand logo` : undefined}
                 />
               </div>
 

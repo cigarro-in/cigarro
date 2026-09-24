@@ -13,27 +13,39 @@ async function sessionToken(): Promise<string | null> {
   return getAccessToken();
 }
 
-/** Decode any image → resize → WebP blob (metadata-free by redraw). */
+/** Decode any image → (square-crop) → resize → WebP blob (metadata-free by redraw). */
 export async function convertToWebp(
   input: File | Blob,
   maxDim = MAX_DIM,
   quality = WEBP_QUALITY,
+  square = true,
 ): Promise<Blob> {
   const bitmap = await createImageBitmap(input);
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const w = Math.max(1, Math.round(bitmap.width * scale));
-  const h = Math.max(1, Math.round(bitmap.height * scale));
+  // Center-crop to square so catalog tiles are uniform.
+  let sx = 0;
+  let sy = 0;
+  let side = 0;
+  if (square) {
+    side = Math.min(bitmap.width, bitmap.height);
+    sx = Math.round((bitmap.width - side) / 2);
+    sy = Math.round((bitmap.height - side) / 2);
+  }
+  const srcW = square ? side : bitmap.width;
+  const srcH = square ? side : bitmap.height;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const w = Math.max(1, Math.round(srcW * scale));
+  const h = Math.max(1, Math.round(srcH * scale));
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas unavailable');
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  ctx.drawImage(bitmap, sx, sy, srcW, srcH, 0, 0, w, h);
   bitmap.close();
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/webp', quality),
   );
-  if (!blob) throw new Error('WebP conversion failed');
+  if (!blob || blob.type !== 'image/webp') throw new Error('WebP conversion failed');
   return blob;
 }
 
@@ -59,11 +71,18 @@ export interface R2UploadResult {
 /** Convert + upload one image to R2 via the admin-gated edge endpoint. */
 export async function uploadImageToR2(
   input: File | Blob,
-  opts: { folder?: string; alt?: string; filename?: string; slug?: string } = {},
+  opts: {
+    folder?: string;
+    alt?: string;
+    filename?: string;
+    slug?: string;
+    /** Keep source width, height and aspect ratio (still encode as WebP). */
+    keepOriginalResolution?: boolean;
+  } = {},
 ): Promise<R2UploadResult> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
-  const webp = await convertToWebp(input);
+  const webp = await convertToWebp(input, opts.keepOriginalResolution ? Infinity : MAX_DIM, WEBP_QUALITY, !opts.keepOriginalResolution);
   const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');
@@ -106,6 +125,46 @@ export async function uploadRawToR2(
   return { url: body.url, key: body.key, size: body.size ?? input.size };
 }
 
+/**
+ * Fetch remote image bytes through the admin-gated `/api/images/fetch`
+ * proxy (SSRF-guarded, image-type + size bounded server-side). Avoids
+ * browser CORS failures on hotlinked sources and keeps untrusted bytes
+ * off the client until they go through the WebP pipeline below.
+ */
+export async function fetchRemoteBytes(url: string): Promise<Blob> {
+  const token = await sessionToken();
+  if (!token) throw new Error('Not signed in');
+  const res = await fetch(`/api/images/fetch?url=${encodeURIComponent(url)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Fetch failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('Not an image');
+  return blob;
+}
+
+/**
+ * Import one remote (web-search) image into R2 through the SAME browser
+ * WebP pipeline as local uploads: square-crop, resize, compress, SEO
+ * filename, alt. This is the only remote-import path pickers should use.
+ */
+export async function importRemoteImageToR2(
+  url: string,
+  opts: { folder?: string; slug?: string; alt?: string; keepOriginalResolution?: boolean } = {},
+): Promise<R2UploadResult> {
+  const bytes = await fetchRemoteBytes(url);
+  return uploadImageToR2(bytes, {
+    folder: opts.folder,
+    slug: opts.slug || url.split('/').pop() || 'image',
+    alt: opts.alt || (opts.slug ? humanizeAlt(opts.slug) : humanizeAlt(url.split('/').pop() || '')),
+    filename: url.split('/').pop() || 'image.jpg',
+    keepOriginalResolution: opts.keepOriginalResolution,
+  });
+}
+
 export interface R2Image {
   id: string;
   name: string;
@@ -116,19 +175,22 @@ export interface R2Image {
   createdAt: string;
 }
 
-/** List the R2 image library (admin-gated). */
-export async function listR2Images(prefix = 'asset_images/'): Promise<{
+/** List the R2 image library (admin-gated). Pass cursor for next page. */
+export async function listR2Images(prefix = 'asset_images/', cursor?: string): Promise<{
   images: R2Image[];
   folders: { name: string; path: string }[];
+  cursor?: string;
 }> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
-  const res = await fetch(`/api/images/upload?prefix=${encodeURIComponent(prefix)}`, {
+  const qs = new URLSearchParams({ prefix });
+  if (cursor) qs.set('cursor', cursor);
+  const res = await fetch(`/api/images/upload?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Library unavailable');
-  return { images: body.images || [], folders: body.folders || [] };
+  return { images: body.images || [], folders: body.folders || [], cursor: body.cursor };
 }
 
 /** Delete one R2 object by key (admin-gated). */

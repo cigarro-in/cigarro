@@ -292,6 +292,7 @@ export function CollectionFormPage() {
                 <SingleImagePicker
                   value={formData.image_url[0] || null}
                   onChange={(url) => handleChange({ image_url: url ? [url] : [] })}
+                  searchHint={formData.title ? `${formData.title} collection` : undefined}
                 />
               </div>
 

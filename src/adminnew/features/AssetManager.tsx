@@ -35,11 +35,13 @@ import {
   SelectValue 
 } from '../../components/ui/select';
 import { Checkbox } from '../../components/ui/checkbox';
-import { api } from '../../../convex/_generated/api';
 import { listR2Images, deleteR2Image, uploadImageToR2, uploadRawToR2 } from '../../lib/images/upload';
 import { confirmImageDelete } from '../../lib/images/guard';
+import { fetchUsageBatch, usageSummary, type AssetUsage } from '../../lib/images/usage';
+import { collectAllR2Images, reprocessAll, type ReprocessProgress, type ReprocessResult } from '../../lib/images/reprocess';
+import { isPipelineOutput } from '../../../convex/lib/imageRefs';
 import { useConvex } from 'convex/react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { formatFileSize } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -62,6 +64,7 @@ interface AssetFolder {
 }
 
 export function AssetManager() {
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [currentFolder, setCurrentFolder] = useState('');
@@ -73,8 +76,17 @@ export function AssetManager() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [keepOriginalResolution, setKeepOriginalResolution] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  // Batch usage inventory (one query per ~100 assets, never N+1).
+  const [usageByKey, setUsageByKey] = useState<Map<string, AssetUsage>>(new Map());
+  const [usageLoading, setUsageLoading] = useState(false);
+  // Bulk WebP reprocess state.
+  const [isReprocessing, setIsReprocessing] = useState(false);
+  const [reprocessProgress, setReprocessProgress] = useState<ReprocessProgress | null>(null);
+  const [reprocessResults, setReprocessResults] = useState<ReprocessResult[] | null>(null);
+  const [showReprocessReport, setShowReprocessReport] = useState(false);
 
   useEffect(() => {
     loadAssets();
@@ -83,9 +95,16 @@ export function AssetManager() {
 
   const loadAssets = async () => {
     setIsLoading(true);
+    setUsageByKey(new Map());
     try {
       // R2 library under asset_images/ (admin-gated edge endpoint).
-      const { images } = await listR2Images(`asset_images/${currentFolder || ''}`);
+      const images = [];
+      let cursor: string | undefined;
+      do {
+        const page = await listR2Images(`asset_images/${currentFolder || ''}`, cursor);
+        images.push(...page.images);
+        cursor = page.cursor;
+      } while (cursor);
       setAssets(
         images.map((item) => ({
           id: item.id,
@@ -102,9 +121,20 @@ export function AssetManager() {
       // Prune selections that no longer exist (folder change / delete).
       const live = new Set(images.map((item) => item.id));
       setSelectedIds((prev) => prev.filter((id) => live.has(id)));
+      // Batch usage inventory for the visible folder (single round trip).
+      setUsageLoading(true);
+      try {
+        const usage = await fetchUsageBatch(
+          convex,
+          images.map((item) => ({ key: item.path, url: item.url })),
+        );
+        setUsageByKey(usage);
+      } finally {
+        setUsageLoading(false);
+      }
     } catch (error) {
       console.error('Error loading assets:', error);
-      toast.error('Failed to load assets');
+      setOpError('Failed to load assets');
     } finally {
       setIsLoading(false);
     }
@@ -112,8 +142,14 @@ export function AssetManager() {
 
   const loadFolders = async () => {
     try {
-      const { folders: r2folders } = await listR2Images(`asset_images/${currentFolder || ''}`);
-      setFolders(r2folders.map((f) => ({ name: f.name, path: `${currentFolder || ''}${f.name}/` })));
+      const names = new Set<string>();
+      let cursor: string | undefined;
+      do {
+        const page = await listR2Images(`asset_images/${currentFolder || ''}`, cursor);
+        page.folders.forEach((f) => names.add(f.name));
+        cursor = page.cursor;
+      } while (cursor);
+      setFolders([...names].map((name) => ({ name, path: `${currentFolder || ''}${name}/` })));
     } catch (error) {
       console.error('Error loading folders:', error);
     }
@@ -131,7 +167,7 @@ export function AssetManager() {
       const uploadPromises = Array.from(files).map(async (file, index) => {
         // Images: WebP + metadata stripped + compressed. Other assets raw.
         if (file.type.startsWith('image/')) {
-          await uploadImageToR2(file, { folder: folder || undefined, slug: file.name });
+          await uploadImageToR2(file, { folder: folder || undefined, slug: file.name, keepOriginalResolution });
         } else {
           await uploadRawToR2(file, { folder: folder || undefined });
         }
@@ -142,12 +178,12 @@ export function AssetManager() {
 
       await Promise.all(uploadPromises);
       
-      toast.success(`Successfully uploaded ${files.length} file(s)`);
+      setOpOk(`Successfully uploaded ${files.length} file(s)`);
       await loadAssets();
       await loadFolders();
     } catch (error) {
       console.error('Error uploading files:', error);
-      toast.error('Failed to upload files');
+      setOpError('Failed to upload files');
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -167,37 +203,37 @@ export function AssetManager() {
   const handleBulkDelete = async () => {
     const targets = assets.filter((a) => selectedIds.includes(a.id));
     if (targets.length === 0 || isBulkDeleting) return;
-    // One usage check per asset, then a single confirm. Assets still
-    // referenced by variants are skipped, never force-deleted in bulk.
+    // Fail-closed: refresh the batch inventory first; unknown usage blocks,
+    // referenced assets are skipped, never force-deleted in bulk.
     setIsBulkDeleting(true);
     try {
-      const usage = await Promise.all(
-        targets.map(async (a) => {
-          try {
-            const u = await convex.query(api.adminCatalog.imageUsage, {
-              key: a.path,
-              url: a.public_url,
-            });
-            return { asset: a, total: u.total as number };
-          } catch {
-            return { asset: a, total: -1 };
-          }
-        })
+      const fresh = await fetchUsageBatch(
+        convex,
+        targets.map((a) => ({ key: a.path, url: a.public_url })),
       );
-      const blocked = usage.filter((u) => u.total !== 0);
-      const deletable = usage.filter((u) => u.total === 0).map((u) => u.asset);
+      setUsageByKey((prev) => new Map([...prev, ...fresh]));
+      const rows = targets.map((a) => ({ asset: a, usage: fresh.get(a.path) }));
+      const unknown = rows.filter((r) => !r.usage || r.usage.total === -1);
+      if (unknown.length > 0) {
+        setOpError(
+          `Usage check failed for ${unknown.length} asset(s) — delete blocked. Try again.`,
+        );
+        return;
+      }
+      const blocked = rows.filter((r) => (r.usage?.total ?? -1) !== 0);
+      const deletable = rows.filter((r) => r.usage?.total === 0).map((r) => r.asset);
       if (deletable.length === 0) {
-        toast.error('All selected assets are still used by product variants — nothing to delete');
+        setOpError('All selected assets are still in use — nothing to delete');
         return;
       }
       if (blocked.length > 0) {
         const names = blocked
           .slice(0, 5)
-          .map((u) => `• ${u.asset.name}`)
+          .map((r) => `• ${r.asset.name}`)
           .join('\n');
         const more = blocked.length > 5 ? `\n…+${blocked.length - 5} more` : '';
         const proceed = window.confirm(
-          `${blocked.length} of ${targets.length} asset(s) are still used by product variants and will be skipped:\n${names}${more}\n\nDelete the other ${deletable.length}?`
+          `${blocked.length} of ${targets.length} asset(s) are still in use and will be skipped:\n${names}${more}\n\nDelete the other ${deletable.length}?`
         );
         if (!proceed) return;
       } else if (
@@ -217,12 +253,54 @@ export function AssetManager() {
       }
       setSelectedIds([]);
       await loadAssets();
-      if (failed > 0) toast.error(`Deleted ${deletable.length - failed} of ${deletable.length} assets`);
+      if (failed > 0) setOpError(`Deleted ${deletable.length - failed} of ${deletable.length} assets`);
       else if (blocked.length > 0)
-        toast.success(`Deleted ${deletable.length} assets, skipped ${blocked.length} in use`);
-      else toast.success(`Deleted ${deletable.length} assets`);
+        setOpOk(`Deleted ${deletable.length} assets, skipped ${blocked.length} in use`);
+      else setOpOk(`Deleted ${deletable.length} assets`);
     } finally {
       setIsBulkDeleting(false);
+    }
+  };
+
+  const handleReprocessAll = async () => {
+    if (isReprocessing) return;
+    // Walk the whole library first so the confirmation shows the real count.
+    setIsReprocessing(true);
+    setReprocessResults(null);
+    try {
+      setReprocessProgress({ done: 0, total: 0, current: 'Listing all R2 images…' });
+      const all = await collectAllR2Images();
+      const todo = all.filter((a) => !isPipelineOutput(a.path));
+      const skipped = all.length - todo.length;
+      if (all.length === 0) {
+        setOpError('No R2 images found to reprocess');
+        return;
+      }
+      const proceed = window.confirm(
+        `Reprocess ${todo.length} image(s) through the WebP pipeline and repoint every reference?` +
+          (skipped > 0 ? `\n${skipped} prior bulk output(s) will be skipped.` : '') +
+          `\n\nOld originals are kept for rollback — nothing is deleted.`,
+      );
+      if (!proceed) return;
+      const usage = await fetchUsageBatch(
+        convex,
+        all.map((a) => ({ key: a.path, url: a.url })),
+      );
+      setUsageByKey((prev) => new Map([...prev, ...usage]));
+      const results = await reprocessAll(convex, all, usage, setReprocessProgress);
+      setReprocessResults(results);
+      setShowReprocessReport(true);
+      const ok = results.filter((r) => r.status === 'repointed').length;
+      const skip = results.filter((r) => r.status === 'skipped').length;
+      const fail = results.filter((r) => r.status === 'failed').length;
+      await loadAssets();
+      if (fail > 0) setOpError(`Reprocessed ${ok} of ${todo.length} (${skip} skipped, ${fail} failed — see report)`);
+      else setOpOk(`Reprocessed ${ok} image(s)${skip > 0 ? `, ${skip} prior outputs skipped` : ''}`);
+    } catch (e) {
+      setOpError(e instanceof Error ? e.message : 'Reprocess failed');
+    } finally {
+      setIsReprocessing(false);
+      setReprocessProgress(null);
     }
   };
 
@@ -231,14 +309,14 @@ export function AssetManager() {
       .filter((a) => selectedIds.includes(a.id) && a.public_url)
       .map((a) => a.public_url as string);
     if (urls.length === 0) {
-      toast.error('No URLs to copy');
+      setOpError('No URLs to copy');
       return;
     }
     try {
       await navigator.clipboard.writeText(urls.join('\n'));
-      toast.success(`Copied ${urls.length} URL(s)`);
+      setOpOk(`Copied ${urls.length} URL(s)`);
     } catch {
-      toast.error('Failed to copy URLs');
+      setOpError('Failed to copy URLs');
     }
   };
 
@@ -250,11 +328,11 @@ export function AssetManager() {
     try {
       await deleteR2Image(asset.path);
 
-      toast.success('Asset deleted successfully');
+      setOpOk('Asset deleted successfully');
       await loadAssets();
     } catch (error) {
       console.error('Error deleting asset:', error);
-      toast.error('Failed to delete asset');
+      setOpError('Failed to delete asset');
     }
   };
 
@@ -263,10 +341,10 @@ export function AssetManager() {
 
     try {
       await navigator.clipboard.writeText(asset.public_url);
-      toast.success('URL copied to clipboard');
+      setOpOk('URL copied to clipboard');
     } catch (error) {
       console.error('Error copying URL:', error);
-      toast.error('Failed to copy URL');
+      setOpError('Failed to copy URL');
     }
   };
 
@@ -286,7 +364,7 @@ export function AssetManager() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading asset:', error);
-      toast.error('Failed to download asset');
+      setOpError('Failed to download asset');
     }
   };
 
@@ -331,6 +409,14 @@ export function AssetManager() {
         <Button variant="outline" onClick={loadAssets}>
           Refresh
         </Button>
+        <Button
+          variant="outline"
+          onClick={handleReprocessAll}
+          disabled={isReprocessing}
+          title="Reprocess all R2 images through the WebP pipeline and repoint every reference (old originals kept)"
+        >
+          {isReprocessing ? 'Reprocessing…' : 'Reprocess all to WebP'}
+        </Button>
         <label className="cursor-pointer">
           <Button className="bg-canyon hover:bg-canyon/90 text-creme">
             <Upload className="mr-2 h-4 w-4" />
@@ -347,6 +433,42 @@ export function AssetManager() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
+        {/* Reprocess progress */}
+        {(isReprocessing || reprocessProgress || reprocessResults) && (
+          <AdminCard>
+            <AdminCardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <div className="bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-canyon h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: reprocessProgress && reprocessProgress.total > 0
+                          ? `${(reprocessProgress.done / reprocessProgress.total) * 100}%`
+                          : '0%',
+                      }}
+                    />
+                  </div>
+                </div>
+                <span className="text-sm text-gray-600">
+                  {reprocessProgress && reprocessProgress.total > 0
+                    ? `${reprocessProgress.done}/${reprocessProgress.total} — ${reprocessProgress.current}`
+                    : reprocessProgress?.current || 'Working…'}
+                </span>
+                {reprocessResults && (
+                  <Button variant="outline" size="sm" onClick={() => setShowReprocessReport(true)}>
+                    View report
+                  </Button>
+                )}
+              </div>
+            </AdminCardContent>
+          </AdminCard>
+        )}
+        <label className="flex items-center gap-2 text-sm text-[var(--color-dark)]">
+          <input type="checkbox" checked={keepOriginalResolution} onChange={(e) => setKeepOriginalResolution(e.target.checked)} />
+          Keep original image dimensions (skip square crop and resize)
+        </label>
         {/* Upload Progress */}
         {isUploading && (
         <AdminCard>
@@ -539,6 +661,18 @@ export function AssetManager() {
                   <div className="mt-2">
                     <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
                     <p className="text-xs text-gray-500">{formatFileSize(asset.size)}</p>
+                    {(() => {
+                      const u = usageByKey.get(asset.path);
+                      const inUse = u !== undefined && u.total !== 0;
+                      return (
+                        <p
+                          className={`text-xs mt-0.5 truncate ${u === undefined || u.total === -1 ? 'text-gray-400' : inUse ? 'text-amber-700 font-medium' : 'text-green-700'}`}
+                          title={u ? usageSummary(u) : undefined}
+                        >
+                          {usageLoading && u === undefined ? 'Checking usage…' : usageSummary(u)}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   {/* Select */}
@@ -626,6 +760,18 @@ export function AssetManager() {
                       <p className="text-sm text-gray-500">
                         {formatFileSize(asset.size)} • {asset.content_type}
                       </p>
+                      {(() => {
+                        const u = usageByKey.get(asset.path);
+                        const inUse = u !== undefined && u.total !== 0;
+                        return (
+                          <p
+                            className={`text-xs mt-0.5 ${u === undefined || u.total === -1 ? 'text-gray-400' : inUse ? 'text-amber-700 font-medium' : 'text-green-700'}`}
+                            title={u ? usageSummary(u) : undefined}
+                          >
+                            {usageLoading && u === undefined ? 'Checking usage…' : usageSummary(u)}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -666,6 +812,49 @@ export function AssetManager() {
         </AdminCardContent>
       </AdminCard>
 
+      {/* Reprocess report */}
+      <Dialog open={showReprocessReport} onOpenChange={setShowReprocessReport}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Reprocess report</DialogTitle>
+          </DialogHeader>
+          {reprocessResults && (
+            <div className="space-y-2 max-h-96 overflow-auto text-sm">
+              <p className="text-gray-600">
+                {reprocessResults.filter((r) => r.status === 'repointed').length} repointed •{' '}
+                {reprocessResults.filter((r) => r.status === 'skipped').length} skipped •{' '}
+                {reprocessResults.filter((r) => r.status === 'failed').length} failed
+              </p>
+              {reprocessResults
+                .filter((r) => r.status !== 'repointed')
+                .map((r) => (
+                  <div key={r.asset.id} className="flex items-center justify-between gap-2 border rounded p-2">
+                    <span className="truncate">{r.asset.name}</span>
+                    <span className={r.status === 'failed' ? 'text-red-600' : 'text-gray-500'}>
+                      {r.status === 'failed' ? `Failed: ${r.reason}` : `Skipped: ${r.reason}`}
+                    </span>
+                  </div>
+                ))}
+              {reprocessResults.filter((r) => r.status === 'repointed').length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-gray-600">
+                    Show repointed ({reprocessResults.filter((r) => r.status === 'repointed').length})
+                  </summary>
+                  {reprocessResults
+                    .filter((r) => r.status === 'repointed')
+                    .map((r) => (
+                      <div key={r.asset.id} className="flex items-center justify-between gap-2 border rounded p-2 mt-1">
+                        <span className="truncate">{r.asset.name}</span>
+                        <span className="text-green-700">→ {r.patchedRefs} ref(s)</span>
+                      </div>
+                    ))}
+                </details>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl">
@@ -700,15 +889,26 @@ export function AssetManager() {
                   <span className="font-medium">Created:</span> {new Date(selectedAsset.created_at).toLocaleDateString()}
                 </div>
                 <div>
-                  <span className="font-medium">URL:</span> 
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <span className="font-medium">URL:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleCopyUrl(selectedAsset)}
                     className="ml-2"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium">Usage:</span>{' '}
+                  {(() => {
+                    const u = usageByKey.get(selectedAsset.path);
+                    return (
+                      <span title={u ? usageSummary(u) : undefined}>
+                        {usageLoading && u === undefined ? 'Checking…' : usageSummary(u)}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

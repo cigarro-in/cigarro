@@ -16,9 +16,9 @@ import { Input } from '../../../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../../components/common/InlineStatus';
 import { cn } from '../../../components/ui/utils';
-import { uploadImageToR2, listR2Images, deleteR2Image } from '../../../lib/images/upload';
+import { uploadImageToR2, importRemoteImageToR2, listR2Images, deleteR2Image } from '../../../lib/images/upload';
 import { confirmImageDelete } from '../../../lib/images/guard';
 import { useConvex } from 'convex/react';
 
@@ -69,6 +69,8 @@ export interface ImagePickerProps {
   className?: string;
   /** Hint for web search (e.g., product name) */
   searchHint?: string;
+  /** Initial choice for preserving source dimensions. */
+  keepOriginalResolution?: boolean;
 }
 
 // ============================================================================
@@ -115,7 +117,8 @@ export function ImagePicker({
   placeholder = 'Select image',
   disabled = false,
   className,
-  searchHint = ''
+  searchHint = '',
+  keepOriginalResolution: defaultKeepOriginalResolution = false
 }: ImagePickerProps) {
   // State
   const [internalOpen, setInternalOpen] = useState(false);
@@ -131,6 +134,8 @@ export function ImagePicker({
   const [webSearchQuery, setWebSearchQuery] = useState('');
   const [webSearchResults, setWebSearchResults] = useState<{ url: string; thumbnail: string; title?: string }[]>([]);
   const [webSearchLoading, setWebSearchLoading] = useState(false);
+  const [keepOriginalResolution, setKeepOriginalResolution] = useState(defaultKeepOriginalResolution);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -191,7 +196,7 @@ export function ImagePicker({
       );
     } catch (error) {
       console.error('Error loading images:', error);
-      toast.error('Failed to load images');
+      setOpError('Failed to load images');
     } finally {
       setLoading(false);
     }
@@ -232,7 +237,7 @@ export function ImagePicker({
     }
 
     if (errors.length > 0) {
-      errors.forEach(err => toast.error(err));
+      setOpError(errors.join('\n'));
     }
 
     if (validFiles.length === 0) return;
@@ -246,22 +251,24 @@ export function ImagePicker({
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
         try {
-          // Browser pipeline: WebP + metadata stripped + compressed, then R2.
-          // searchHint (e.g. product name) becomes the SEO filename when set.
+          // Browser pipeline: WebP + square-crop + metadata stripped +
+          // compressed, then R2. searchHint (e.g. product name) becomes the
+          // SEO filename when set.
           const uploaded = await uploadImageToR2(file, {
             folder: folder || undefined,
             slug: searchHint || undefined,
+            keepOriginalResolution,
           });
           uploadedUrls.push(uploaded.url);
         } catch {
-          toast.error(`Failed to upload ${file.name}`);
+          setOpError(`Failed to upload ${file.name}`);
           continue;
         }
         setUploadProgress(((i + 1) / validFiles.length) * 100);
       }
 
       if (uploadedUrls.length > 0) {
-        toast.success(`Uploaded ${uploadedUrls.length} image(s)`);
+        setOpOk(`Uploaded ${uploadedUrls.length} image(s)`);
 
         // Auto-select uploaded images
         if (multiple) {
@@ -277,7 +284,7 @@ export function ImagePicker({
       }
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Upload failed');
+      setOpError('Upload failed');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -293,14 +300,14 @@ export function ImagePicker({
     }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
     if (files.length > 0) {
       uploadFiles(files);
     }
-  }, []);
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -323,7 +330,7 @@ export function ImagePicker({
       } else if (selectedUrls.length < maxImages) {
         setSelectedUrls([...selectedUrls, url]);
       } else {
-        toast.error(`Maximum ${maxImages} images allowed`);
+        setOpError(`Maximum ${maxImages} images allowed`);
       }
     } else {
       setSelectedUrls([url]);
@@ -335,8 +342,7 @@ export function ImagePicker({
   const deleteImage = async (e: React.MouseEvent, image: StorageImage) => {
     e.stopPropagation(); // Prevent selection when clicking delete
 
-    // Block-or-warn when a variant still references this key (orphaned
-    // cards render the "No Image" placeholder).
+    // Fail-closed: referenced keys are blocked, unknown usage blocks too.
     if (!(await confirmImageDelete(convex, { key: image.path, url: image.url, name: image.name }))) return;
 
     try {
@@ -347,73 +353,71 @@ export function ImagePicker({
         setSelectedUrls(selectedUrls.filter(u => u !== image.url));
       }
 
-      toast.success('Image deleted');
+      setOpOk('Image deleted');
       loadImages(); // Refresh library
     } catch (err) {
       console.error('Failed to delete image:', err);
-      toast.error('Failed to delete image');
+      setOpError('Failed to delete image');
     }
   };
 
   const handleConfirmSelection = async () => {
     // Check if any selected URLs are external (not on our CDN)
     const isExternalUrl = (url: string) => {
-      return !url.includes('cdn.cigarro.in') && !url.startsWith('blob:');
+      try { return new URL(url).hostname !== 'cdn.cigarro.in'; }
+      catch { return true; }
     };
 
     const externalUrls = selectedUrls.filter(isExternalUrl);
     const localUrls = selectedUrls.filter(u => !isExternalUrl(u));
 
     let finalUrls = [...localUrls];
+    const failedUrls: string[] = [];
 
-    // Upload external images via server-side processing
+    // Remote (web-search) picks go through the SAME browser WebP pipeline
+    // as local uploads: bytes via the admin-gated fetch proxy, then
+    // square-crop → WebP → SEO filename → R2. Nothing is stored raw.
     if (externalUrls.length > 0) {
       setUploading(true);
       setUploadProgress(10);
 
       try {
-        // Use our Cloudflare Function to download and upload images
-        const apiBase = import.meta.env?.DEV ? 'https://cigarro.in' : '';
-        const endpoint = `${apiBase}/api/images/process`;
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            urls: externalUrls,
-            folder: folder || '',
-          }),
-        });
-        setUploadProgress(80);
-
-        const responseText = await response.text();
-        if (!response.ok) {
-          throw new Error(`Server processing failed: ${response.status} - ${responseText}`);
+        const uploadedUrls: string[] = [];
+        for (let i = 0; i < externalUrls.length; i++) {
+          try {
+            const uploaded = await importRemoteImageToR2(externalUrls[i], {
+              folder: folder || undefined,
+              slug: searchHint || undefined,
+              alt: searchHint || undefined,
+              keepOriginalResolution,
+            });
+            uploadedUrls.push(uploaded.url);
+          } catch (err) {
+            console.warn('[ImagePicker] Remote import failed:', externalUrls[i], err);
+            failedUrls.push(externalUrls[i]);
+          }
+          setUploadProgress(10 + Math.round(((i + 1) / externalUrls.length) * 90));
         }
-
-        const data = JSON.parse(responseText);
-        // Collect successfully uploaded URLs
-        const uploadedUrls = (data.images || [])
-          .filter((img: { uploaded?: string }) => img.uploaded)
-          .map((img: { uploaded: string }) => img.uploaded);
         finalUrls = [...localUrls, ...uploadedUrls];
-        if (data.failed > 0) {
-          console.warn('[ImagePicker] Some uploads failed:', data.failed);
-          toast.warning(`${data.processed} uploaded, ${data.failed} failed`);
+        if (failedUrls.length > 0) {
+          setSelectedUrls([...finalUrls, ...failedUrls]);
+          setOpError(`${uploadedUrls.length} uploaded, ${failedUrls.length} failed. Remove or retry failed images.`);
         }
-
-        setUploadProgress(100);
 
         // Refresh library to show new images
         loadImages();
 
       } catch (err) {
-        console.error('[ImagePicker] Server-side upload failed:', err);
-        toast.error('Failed to process images. Please try again.');
+        console.error('[ImagePicker] Remote import failed:', err);
+        setOpError('Failed to process images. Please try again.');
+        return;
       } finally {
         setUploading(false);
         setUploadProgress(0);
       }
     }
+
+    if (failedUrls.length > 0) return;
 
     // Return the final URLs
     if (finalUrls.length > 0) {
@@ -422,7 +426,7 @@ export function ImagePicker({
       } else {
         onChange(finalUrls[0] || '');
       }
-      toast.success(`${finalUrls.length} image(s) selected`);
+      setOpOk(`${finalUrls.length} image(s) selected`);
     }
 
     setIsOpen(false);
@@ -675,11 +679,11 @@ export function ImagePicker({
       if (data.images && data.images.length > 0) {
         setWebSearchResults(data.images);
       } else {
-        toast.error('No images found. Try a different search term.');
+        setOpError('No images found. Try a different search term.');
       }
     } catch (error) {
       console.error('Web search failed:', error);
-      toast.error('Search failed. Please try again.');
+      setOpError('Search failed. Please try again.');
     } finally {
       setWebSearchLoading(false);
     }
@@ -773,6 +777,12 @@ export function ImagePicker({
   // ============================================================================
 
   const renderContent = () => (
+    <div className="space-y-3">
+    <InlineStatus status={opStatus} />
+    <label className="flex items-center gap-2 text-sm text-[var(--color-dark)]">
+      <input type="checkbox" checked={keepOriginalResolution} onChange={(e) => setKeepOriginalResolution(e.target.checked)} />
+      Keep original dimensions (skip square crop and resize)
+    </label>
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'library' | 'upload' | 'search')}>
       <TabsList className="grid w-full grid-cols-3 mb-4">
         <TabsTrigger value="library" className="flex items-center gap-2">
@@ -804,6 +814,7 @@ export function ImagePicker({
         {renderSearch()}
       </TabsContent>
     </Tabs>
+    </div>
   );
 
   // ============================================================================
@@ -950,6 +961,9 @@ export interface SingleImagePickerProps {
   folder?: string;
   disabled?: boolean;
   className?: string;
+  /** Context for web search + SEO filename (e.g., brand/category/hero name) */
+  searchHint?: string;
+  keepOriginalResolution?: boolean;
 }
 
 export function SingleImagePicker({
@@ -958,7 +972,9 @@ export function SingleImagePicker({
   bucket,
   folder,
   disabled,
-  className
+  className,
+  searchHint = '',
+  keepOriginalResolution = false
 }: SingleImagePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -980,7 +996,7 @@ export function SingleImagePicker({
           <>
             <img
               src={value}
-              alt="Selected"
+              alt={searchHint || 'Selected image'}
               className="w-full h-full object-cover"
             />
             {/* Hover overlay */}
@@ -1007,6 +1023,8 @@ export function SingleImagePicker({
         onOpenChange={setOpen}
         disabled={disabled}
         trigger={<></>}
+        searchHint={searchHint}
+        keepOriginalResolution={keepOriginalResolution}
       />
     </>
   );
@@ -1025,6 +1043,7 @@ export interface MultipleImagePickerProps {
   className?: string;
   /** Hint for web search (e.g., product name) */
   searchHint?: string;
+  keepOriginalResolution?: boolean;
 }
 
 export function MultipleImagePicker({
@@ -1035,7 +1054,8 @@ export function MultipleImagePicker({
   folder,
   disabled,
   className,
-  searchHint = ''
+  searchHint = '',
+  keepOriginalResolution = false
 }: MultipleImagePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -1126,6 +1146,7 @@ export function MultipleImagePicker({
         disabled={disabled}
         trigger={<></>}
         searchHint={searchHint}
+        keepOriginalResolution={keepOriginalResolution}
       />
     </>
   );

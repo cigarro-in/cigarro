@@ -22,9 +22,9 @@ import {
     X,
     AlertCircle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../../components/common/InlineStatus';
 import { cn } from '../../../components/ui/utils';
-import { uploadImageToR2 } from '../../../lib/images/upload';
+import { importRemoteImageToR2 } from '../../../lib/images/upload';
 
 // ============================================================================
 // TYPES
@@ -98,17 +98,13 @@ async function uploadImageFromUrl(
     productName: string,
 ): Promise<string | null> {
     try {
-        // Fetch the image directly (most CDNs allow CORS for images)
-        const response = await fetch(imageUrl, { mode: 'cors' });
-        const blob = await response.blob();
-
-        // Browser pipeline: WebP + metadata stripped + compressed → R2.
-        // Folder keeps product images together under the library root.
-        const uploaded = await uploadImageToR2(blob, {
+        // Bytes via the admin-gated fetch proxy (no browser CORS risk), then
+        // the SAME WebP pipeline as local upload: square-crop → WebP →
+        // SEO filename → R2. Folder keeps product images together.
+        const uploaded = await importRemoteImageToR2(imageUrl, {
             folder: 'product_images',
             slug: productName,
             alt: productName,
-            filename: imageUrl.split('/').pop() || 'image.jpg',
         });
         return uploaded.url;
     } catch (error) {
@@ -138,6 +134,7 @@ export function ProductImageSearchModal({
     const [savedProducts, setSavedProducts] = useState<SavedProduct[]>([]);
     const [currentProductIndex, setCurrentProductIndex] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
     // Browse mode: products without images
     const productsWithoutImages = products.filter(
@@ -228,7 +225,7 @@ export function ProductImageSearchModal({
         ]);
 
         try {
-            // Upload images directly to Supabase
+            // Upload images to R2 via the browser WebP pipeline
             const uploadedUrls: string[] = [];
 
             for (const imageUrl of selectedImages) {
@@ -250,7 +247,7 @@ export function ProductImageSearchModal({
                     )
                 );
 
-                toast.success(`Added ${uploadedUrls.length} image(s) to ${currentProduct.name}`);
+                setOpOk(`Added ${uploadedUrls.length} image(s) to ${currentProduct.name}`);
 
                 // Callback
                 if (onImagesAdded) {
@@ -272,7 +269,7 @@ export function ProductImageSearchModal({
                     p.productId === currentProduct.id ? { ...p, status: 'error' } : p
                 )
             );
-            toast.error(`Failed to save images for ${currentProduct.name}`);
+            setOpError(`Failed to save images for ${currentProduct.name}`);
         } finally {
             setIsSaving(false);
         }
@@ -383,6 +380,9 @@ export function ProductImageSearchModal({
                     </div>
                 </DialogHeader>
 
+                <div className="px-4 pt-3">
+                    <InlineStatus status={opStatus} />
+                </div>
                 {/* No product state */}
                 {!currentProduct ? (
                     <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">

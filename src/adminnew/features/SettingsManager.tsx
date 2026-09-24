@@ -423,6 +423,7 @@ export function SettingsManager() {
                     setSettings(prev => ({ ...prev, favicon_url: url || '' }));
                     setIsDirty(true);
                   }}
+                  searchHint={settings.site_name ? `${settings.site_name} favicon` : undefined}
                 />
                 <p className="text-xs text-[var(--color-dark)]/50">
                   Recommended: 32x32px or 64x64px .ico or .png

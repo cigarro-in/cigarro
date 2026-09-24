@@ -277,6 +277,7 @@ export function CategoryFormPage() {
                 <SingleImagePicker
                   value={formData.image[0] || null}
                   onChange={(url) => handleChange({ image: url ? [url] : [] })}
+                  searchHint={formData.name ? `${formData.name} category` : undefined}
                 />
               </div>
             </AdminCardContent>

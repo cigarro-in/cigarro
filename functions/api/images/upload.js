@@ -3,7 +3,7 @@ import { requiredConvexUrl } from '../../lib/env.js';
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
  * - GET  /api/images/upload?prefix=asset_images/  → { images: [{name,key,url,size,uploaded}], folders: [..] }
- * - POST /api/images/upload (multipart: file, folder?) → { url, key, alt, size }
+ * - POST /api/images/upload (multipart: file, folder?) → { url, key, size }
  * - DELETE /api/images/upload?key=asset_images/... → { success: true }
  *
  * Admin-gated: Authorization Bearer <own ES256 JWT (cigarro_token)>, verified against
@@ -86,11 +86,12 @@ export async function onRequest(context) {
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
 
-  // ---- List (library browser) ----
+  // ---- List (library browser; cursor-paginated for bulk walks) ----
   if (request.method === 'GET') {
     const prefix = String(url.searchParams.get('prefix') || LIB_PREFIX);
     if (!prefix.startsWith(LIB_PREFIX)) return json({ error: 'Bad prefix' }, 400);
-    const listed = await bucket.list({ prefix, limit: 500 });
+    const cursor = url.searchParams.get('cursor') || undefined;
+    const listed = await bucket.list({ prefix, limit: 500, cursor });
     const images = [];
     const folderSet = new Set();
     for (const obj of listed.objects || []) {
@@ -112,7 +113,9 @@ export async function onRequest(context) {
       });
     }
     images.sort((a, b) => (b.createdAt < a.createdAt ? -1 : 1));
-    return json({ images, folders: [...folderSet].map((name) => ({ name, path: `${prefix}${name}/` })) });
+    const out = { images, folders: [...folderSet].map((name) => ({ name, path: `${prefix}${name}/` })) };
+    if (listed.truncated) out.cursor = listed.cursor;
+    return json(out);
   }
 
   // ---- Upload ----
@@ -126,18 +129,26 @@ export async function onRequest(context) {
     if (!file || typeof file.arrayBuffer !== 'function')
       return json({ error: 'file (multipart) is required' }, 400);
     const mime = String(file.type || 'application/octet-stream');
-    if (!raw && !mime.startsWith('image/'))
-      return json({ error: 'Only image uploads allowed (or raw=true)' }, 400);
+    if (raw && mime.startsWith('image/'))
+      return json({ error: 'Images must use the WebP upload flow' }, 400);
+    if (!raw && mime !== 'image/webp')
+      return json({ error: 'Converted WebP image required' }, 400);
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length === 0 || bytes.length > MAX_BYTES)
       return json({ error: 'File empty or over 10MB' }, 400);
+    if (!raw && !(bytes.length >= 12 &&
+      String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+      String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'))
+      return json({ error: 'Invalid WebP image' }, 400);
     const ext = raw
       ? (String(file.name || 'bin').split('.').pop() || 'bin').toLowerCase().slice(0, 10)
       : 'webp';
+    if (raw && /^(webp|jpe?g|png|gif|avif|svg)$/.test(ext))
+      return json({ error: 'Images must use the WebP upload flow' }, 400);
     const rand = Math.random().toString(36).substring(2, 8);
     // SEO filename: item slug when the caller knows it, random suffix keeps
     // keys unique (`camel-yellow-packet-a1b2c3.webp`).
-    const stem = slugify(form?.get('slug')) || `${Date.now()}`;
+    const stem = slugify(String(form?.get('slug') || '').replace(/\.(jpe?g|png|gif|webp|avif)$/i, '')) || `${Date.now()}`;
     const key = `${LIB_PREFIX}${folder ? folder + '/' : ''}${stem}-${rand}.${ext}`;
     await bucket.put(key, bytes, {
       httpMetadata: {
@@ -152,6 +163,22 @@ export async function onRequest(context) {
   if (request.method === 'DELETE') {
     const key = String(url.searchParams.get('key') || '');
     if (!key.startsWith(LIB_PREFIX)) return json({ error: 'Bad key' }, 400);
+    const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
+    let usage;
+    try {
+      const check = await fetch(`${requiredConvexUrl(env)}/api/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ path: 'adminCatalog:imageUsage', args: { key, url: `${cdn}/${key}` }, format: 'json' }),
+      });
+      const body = await check.json();
+      if (!check.ok || body?.status !== 'success' || typeof body.value?.total !== 'number')
+        return json({ error: 'Usage check unavailable; delete blocked' }, 503);
+      usage = body.value.total;
+    } catch {
+      return json({ error: 'Usage check unavailable; delete blocked' }, 503);
+    }
+    if (usage !== 0) return json({ error: 'Asset is in use; delete blocked', usage }, 409);
     await bucket.delete(key);
     return json({ success: true });
   }

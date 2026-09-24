@@ -354,6 +354,7 @@ export function BlogFormPage() {
               <SingleImagePicker
                 value={form.featured_image || null}
                 onChange={(url) => setForm(prev => ({ ...prev, featured_image: url || '' }))}
+                searchHint={form.title ? `${form.title} blog` : undefined}
               />
             </AdminCardContent>
           </AdminCard>

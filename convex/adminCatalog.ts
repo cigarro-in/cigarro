@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireIdentity } from "./lib/auth";
+import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
 
 // ---------- Wave 5: catalog + content authorship (Supabase -> Convex) ----------
 // Catalog/content tables are GLOBAL (no orgId). Writes are gated on owner or
@@ -94,41 +95,231 @@ export const listProductsForAdmin = query({
   },
 });
 
-// Which catalog rows still reference an R2 object. The admin image library
-// deletes by key with no other guard; deleting a referenced key orphans the
-// variant → storefront cards fall back to the "No Image" placeholder.
-// Public read like the catalog (returns names only, no pricing).
+// Full R2 reference inventory. Tables are scanned field-by-field and
+// repointImageRefs updates matching fields, including image URLs in order
+// item snapshots. Embedded blog content and homepage/section config are
+// replaced only for exact old URLs/keys.
+// ponytail: full scans suit the current small catalog; add a reference index
+// only when these collections approach Convex query limits.
+async function imageRows(ctx: any) {
+  const [products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders] = await Promise.all([
+    ctx.db.query("catalogProducts").collect(),
+    ctx.db.query("catalogVariants").collect(),
+    ctx.db.query("catalogBrands").collect(),
+    ctx.db.query("catalogCategories").collect(),
+    ctx.db.query("catalogCollections").collect(),
+    ctx.db.query("catalogCombos").collect(),
+    ctx.db.query("blogPosts").collect(),
+    ctx.db.query("heroSlides").collect(),
+    ctx.db.query("sectionConfigurations").collect(),
+    ctx.db.query("homepageComponentConfig").collect(),
+    ctx.db.query("siteSettings").collect(),
+    ctx.db.query("carts").collect(),
+    ctx.db.query("orders").collect(),
+  ]);
+  return { products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders };
+}
+
+async function collectImageUsage(
+  ctx: any,
+  key: string,
+  url?: string,
+  rows?: Awaited<ReturnType<typeof imageRows>>,
+): Promise<{ contexts: UsageContext[]; mutableTotal: number; historicalTotal: number }> {
+  const r = rows ?? await imageRows(ctx);
+  const hits = (s: unknown) => matchesRef(s, key, url);
+  const contexts: UsageContext[] = [];
+  let mutableTotal = 0;
+  let historicalTotal = 0;
+  const push = (c: UsageContext, count = 1) => {
+    if (c.mutable) mutableTotal += count;
+    else historicalTotal += count;
+    if (contexts.length < 10) contexts.push(c);
+  };
+
+  const nameById = new Map(r.products.map((p: any) => [p.supabaseId, p.name]));
+  for (const x of r.variants) {
+    const count = (x.images || []).filter(hits).length;
+    if (count)
+      push({
+        kind: "variant",
+        label: nameById.get(x.productSupabaseId) ?? x.productSupabaseId,
+        detail: x.variantName,
+        mutable: true,
+      }, count);
+  }
+  for (const b of r.brands) {
+    if (hits(b.logoUrl)) push({ kind: "brand", label: b.name, detail: "logo", mutable: true });
+  }
+  for (const c of r.categories) {
+    if (hits(c.image)) push({ kind: "category", label: c.name, detail: "image", mutable: true });
+  }
+  for (const c of r.collections) {
+    if (hits(c.imageUrl)) push({ kind: "collection", label: c.title, detail: "image", mutable: true });
+  }
+  for (const c of r.combos) {
+    if (hits(c.image)) push({ kind: "combo", label: c.name, detail: "image", mutable: true });
+    const count = (c.galleryImages || []).filter(hits).length;
+    if (count) push({ kind: "combo", label: c.name, detail: "gallery", mutable: true }, count);
+  }
+  for (const p of r.blogs) {
+    if (hits(p.featuredImage))
+      push({ kind: "blog", label: p.title, detail: "featured image", mutable: true });
+    if (hits(p.ogImage)) push({ kind: "blog", label: p.title, detail: "og image", mutable: true });
+    if (replaceEmbeddedRef(p.content, key, url, "") !== null)
+      push({ kind: "blog", label: p.title, detail: "content", mutable: true });
+  }
+  for (const s of r.heroes) {
+    for (const f of ["imageUrl", "mobileImageUrl", "productImageUrl", "smallImageUrl"] as const) {
+      if (hits((s as any)[f]))
+        push({ kind: "hero", label: s.title || "hero slide", detail: f, mutable: true });
+    }
+  }
+  for (const s of r.sections) {
+    if (hits(s.backgroundImage))
+      push({ kind: "section", label: s.sectionName, detail: "background", mutable: true });
+    if (replaceDeepRefs(s.config, key, url, "") !== null)
+      push({ kind: "section", label: s.sectionName, detail: "config", mutable: true });
+  }
+  for (const site of r.sites) {
+    if (hits(site.faviconUrl)) push({ kind: "site", label: "site settings", detail: "favicon", mutable: true });
+  }
+  for (const c of r.components) {
+    if (replaceDeepRefs(c.config, key, url, "") !== null)
+      push({ kind: "homepage-config", label: c.componentName, detail: "config", mutable: true });
+  }
+  for (const cart of r.carts) {
+    if (hits(cart.imageUrl)) push({ kind: "cart", label: cart.name, detail: "cart image", mutable: true });
+  }
+  for (const o of r.orders) {
+    const n = (o.items || []).filter((i: any) => hits(i.image)).length;
+    if (n > 0) {
+      push({ kind: "order", label: o.displayOrderId || "order", detail: `${n} item image(s)`, mutable: true }, n);
+    }
+  }
+  return { contexts, mutableTotal, historicalTotal };
+}
+
+// Single-asset usage (kept for backward compat: usedBy/total shape + contexts).
 export const imageUsage = query({
   args: { key: v.string(), url: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await requireCatalogAdmin(ctx);
-    const base = args.key.split("/").pop() || args.key;
-    const hits = (s: unknown) =>
-      typeof s === "string" &&
-      (s === args.key ||
-        s === args.url ||
-        s.endsWith(`/${args.key}`) ||
-        (base.length > 0 && s.endsWith(`/${base}`)));
+    const { contexts, mutableTotal, historicalTotal } = await collectImageUsage(ctx, args.key, args.url);
+    const usedBy = contexts
+      .filter((c) => c.mutable && c.kind === "variant")
+      .map((c) => ({ productName: c.label, variantName: c.detail ?? "" }));
+    return { usedBy, total: mutableTotal + historicalTotal, mutableTotal, historicalTotal, contexts };
+  },
+});
+
+// Batch inventory: one round trip for the whole asset grid (no N+1).
+export const imageUsageBatch = query({
+  args: { refs: v.array(v.object({ key: v.string(), url: v.optional(v.string()) })) },
+  handler: async (ctx, { refs }) => {
+    await requireCatalogAdmin(ctx);
+    if (refs.length > 200) throw new ConvexError({ code: "BATCH_TOO_LARGE" });
+    const rows = await imageRows(ctx);
+    const out = [];
+    for (const r of refs) {
+      const { contexts, mutableTotal, historicalTotal } = await collectImageUsage(ctx, r.key, r.url, rows);
+      out.push({ key: r.key, total: mutableTotal + historicalTotal, mutableTotal, historicalTotal, contexts });
+    }
+    return out;
+  },
+});
+
+// Repoint every mutable reference from an old R2 URL/key to a reprocessed one.
+// Old-value compare per field: concurrent edits that already changed a field
+// are left untouched. Old originals stay in R2 for rollback and cleanup.
+export const repointImageRefs = mutation({
+  args: { oldKey: v.string(), oldUrl: v.optional(v.string()), newUrl: v.string() },
+  handler: async (ctx, { oldKey, oldUrl, newUrl }) => {
+    await requireCatalogAdmin(ctx);
+    if (!oldKey.startsWith("asset_images/") || !newUrl.startsWith("https://cdn.cigarro.in/asset_images/"))
+      throw new ConvexError({ code: "BAD_IMAGE_REFERENCE" });
+    const hits = (s: unknown) => matchesRef(s, oldKey, oldUrl);
+    const patched: Record<string, number> = {};
+    const bump = (k: string) => {
+      patched[k] = (patched[k] ?? 0) + 1;
+    };
     const products = await ctx.db.query("catalogProducts").collect();
-    const nameById = new Map(products.map((p) => [p.supabaseId, p.name]));
-    const variants = await ctx.db.query("catalogVariants").collect();
-    const usedBy = [];
-    let total = 0;
-    for (const x of variants) {
-      const image = (x.images || []).find(hits);
-      if (!image) continue;
-      total += 1;
-      if (usedBy.length < 10) {
-        usedBy.push({
-          productSupabaseId: x.productSupabaseId,
-          productName: nameById.get(x.productSupabaseId) ?? x.productSupabaseId,
-          variantSupabaseId: x.supabaseId,
-          variantName: x.variantName,
-          image,
-        });
+    const productNames = new Map(products.map((p) => [p.supabaseId, p.name]));
+    for (const x of await ctx.db.query("catalogVariants").collect()) {
+      const images = x.images || [];
+      if (!images.some(hits)) continue;
+      const productName = productNames.get(x.productSupabaseId);
+      const imageAltText = x.imageAltText?.trim() || [productName, x.variantName].filter(Boolean).join(" ");
+      await ctx.db.patch(x._id, {
+        images: images.map((s: string) => (hits(s) ? newUrl : s)),
+        ...(x.imageAltText?.trim() ? {} : { imageAltText }),
+        updatedAt: Date.now(),
+      });
+      bump("variants");
+    }
+    const scalarTables: Array<{ table: any; fields: string[]; label: string }> = [
+      { table: "catalogBrands", fields: ["logoUrl"], label: "brands" },
+      { table: "catalogCategories", fields: ["image"], label: "categories" },
+      { table: "catalogCollections", fields: ["imageUrl"], label: "collections" },
+      { table: "catalogCombos", fields: ["image"], label: "combos" },
+      { table: "blogPosts", fields: ["featuredImage", "ogImage"], label: "blogPosts" },
+      {
+        table: "heroSlides",
+        fields: ["imageUrl", "mobileImageUrl", "productImageUrl", "smallImageUrl"],
+        label: "heroSlides",
+      },
+      { table: "sectionConfigurations", fields: ["backgroundImage"], label: "sections" },
+      { table: "siteSettings", fields: ["faviconUrl"], label: "siteSettings" },
+    ];
+    for (const { table, fields, label } of scalarTables) {
+      for (const row of await ctx.db.query(table).collect()) {
+        const patch: Record<string, string> = {};
+        for (const f of fields) if (hits((row as any)[f])) patch[f] = newUrl;
+        if (Object.keys(patch).length === 0) continue;
+        await ctx.db.patch(row._id, patch);
+        bump(label);
       }
     }
-    return { usedBy, total };
+    for (const c of await ctx.db.query("catalogCombos").collect()) {
+      const gallery = c.galleryImages || [];
+      if (!gallery.some(hits)) continue;
+      await ctx.db.patch(c._id, {
+        galleryImages: gallery.map((s: string) => (hits(s) ? newUrl : s)),
+        updatedAt: Date.now(),
+      });
+      bump("combosGallery");
+    }
+    for (const p of await ctx.db.query("blogPosts").collect()) {
+      const content = replaceEmbeddedRef(p.content, oldKey, oldUrl, newUrl);
+      if (content === null) continue;
+      await ctx.db.patch(p._id, { content, updatedAt: Date.now() });
+      bump("blogContent");
+    }
+    for (const s of await ctx.db.query("sectionConfigurations").collect()) {
+      const config = replaceDeepRefs(s.config, oldKey, oldUrl, newUrl);
+      if (config === null) continue;
+      await ctx.db.patch(s._id, { config });
+      bump("sectionConfig");
+    }
+    for (const c of await ctx.db.query("homepageComponentConfig").collect()) {
+      const config = replaceDeepRefs(c.config, oldKey, oldUrl, newUrl);
+      if (config === null) continue;
+      await ctx.db.patch(c._id, { config });
+      bump("homepageConfig");
+    }
+    for (const cart of await ctx.db.query("carts").collect()) {
+      if (!hits(cart.imageUrl)) continue;
+      await ctx.db.patch(cart._id, { imageUrl: newUrl, updatedAt: Date.now() });
+      bump("carts");
+    }
+    for (const order of await ctx.db.query("orders").collect()) {
+      if (!order.items.some((item) => hits(item.image))) continue;
+      await ctx.db.patch(order._id, {
+        items: order.items.map((item) => (hits(item.image) ? { ...item, image: newUrl } : item)),
+      });
+      bump("orders");
+    }
+    return { patched };
   },
 });
 

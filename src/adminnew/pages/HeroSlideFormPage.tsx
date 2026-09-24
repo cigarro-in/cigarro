@@ -347,6 +347,7 @@ export function HeroSlideFormPage() {
                 <SingleImagePicker
                   value={form.product_image_url || null}
                   onChange={(url) => setForm(prev => ({ ...prev, product_image_url: url || '' }))}
+                  searchHint={form.product_name ? `${form.product_name} cigarette pack` : undefined}
                 />
               </div>
             </AdminCardContent>
@@ -454,6 +455,8 @@ export function HeroSlideFormPage() {
               <SingleImagePicker
                 value={form.image_url || null}
                 onChange={(url) => setForm(prev => ({ ...prev, image_url: url || '' }))}
+                searchHint={form.title ? `${form.title} hero banner` : undefined}
+                keepOriginalResolution
               />
               <ReqError show={saveAttempted && !form.image_url}>
                 A desktop image is required
@@ -473,6 +476,8 @@ export function HeroSlideFormPage() {
               <SingleImagePicker
                 value={form.mobile_image_url || null}
                 onChange={(url) => setForm(prev => ({ ...prev, mobile_image_url: url || '' }))}
+                searchHint={form.title ? `${form.title} hero banner mobile` : undefined}
+                keepOriginalResolution
               />
               <p className="text-xs text-[var(--color-dark)]/60 mt-2">
                 Optional. Recommended: 768x600px
