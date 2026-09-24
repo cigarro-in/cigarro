@@ -21,7 +21,7 @@ export function PageHeader({ title, description, children, backUrl, search }: Pa
 
   return (
     <div className="sticky top-0 z-20 bg-[var(--color-creme)] border-b border-[var(--color-coyote)]">
-      <div className="w-full px-6 py-4 flex items-center justify-between gap-4">
+      <div className="w-full px-6 pt-0 pb-4 flex items-center justify-between gap-4">
         {/* Left Section: Navigation & Title */}
         <div className="flex items-center gap-4 min-w-0">
           <div className="flex items-center gap-4 min-w-0">
