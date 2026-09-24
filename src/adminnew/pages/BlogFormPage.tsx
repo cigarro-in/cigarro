@@ -119,8 +119,8 @@ export function BlogFormPage() {
       published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : null,
       reading_time: data.readingTime ?? null,
       view_count: data.viewCount ?? 0,
-      created_at: '',
-      updated_at: '',
+      created_at: new Date(data._creationTime).toISOString(),
+      updated_at: new Date(data.updatedAt ?? data._creationTime).toISOString(),
     });
     setForm({
       title: data.title || '',

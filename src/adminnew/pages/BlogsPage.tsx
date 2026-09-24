@@ -68,12 +68,8 @@ export function BlogsPage() {
     category_id: p.categorySlug ?? null,
     published_at: p.publishedAt ? new Date(p.publishedAt).toISOString() : null,
     view_count: p.viewCount ?? 0,
-    created_at: p.publishedAt
-      ? new Date(p.publishedAt).toISOString()
-      : p.updatedAt
-        ? new Date(p.updatedAt).toISOString()
-        : '',
-    updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : '',
+    created_at: new Date(p._creationTime).toISOString(),
+    updated_at: new Date(p.updatedAt ?? p._creationTime).toISOString(),
     category: p.category,
   }));
   const loading = rows === undefined;

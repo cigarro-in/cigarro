@@ -26,38 +26,8 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
-          // Cache product images (R2 CDN + legacy Supabase storage during transition)
-          {
-            urlPattern: /^https:\/\/.*\.r2\.dev\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'r2-images',
-              expiration: {
-                maxEntries: 300,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/cdn\.cigarro\.in\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'r2-images',
-              expiration: {
-                maxEntries: 300,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          // Legacy Supabase storage pattern removed 2026-09-11: all DB image
-          // URLs now resolve to R2 (cdn.cigarro.in). Old cached entries in
-          // users' browsers simply stop matching and age out.
+          // CDN images load directly. Intercepting cross-origin image requests
+          // here can make Workbox reject otherwise healthy R2 responses.
           // Cache API responses (homepage data, products, etc.)
           {
             urlPattern: /\/api\/(homepage-data|products|categories|brands)/i,
