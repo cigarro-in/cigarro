@@ -96,13 +96,12 @@ export const listProductsForAdmin = query({
 });
 
 // Full R2 reference inventory. Tables are scanned field-by-field and
-// repointImageRefs updates matching fields, including image URLs in order
-// item snapshots. Embedded blog content and homepage/section config are
-// replaced only for exact old URLs/keys.
+// repointImageRefs updates matching fields. Embedded blog content and
+// homepage/section config are replaced only for exact old URLs/keys.
 // ponytail: full scans suit the current small catalog; add a reference index
 // only when these collections approach Convex query limits.
 async function imageRows(ctx: any) {
-  const [products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders] = await Promise.all([
+  const [products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts] = await Promise.all([
     ctx.db.query("catalogProducts").collect(),
     ctx.db.query("catalogVariants").collect(),
     ctx.db.query("catalogBrands").collect(),
@@ -115,9 +114,8 @@ async function imageRows(ctx: any) {
     ctx.db.query("homepageComponentConfig").collect(),
     ctx.db.query("siteSettings").collect(),
     ctx.db.query("carts").collect(),
-    ctx.db.query("orders").collect(),
   ]);
-  return { products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders };
+  return { products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts };
 }
 
 async function collectImageUsage(
@@ -190,12 +188,6 @@ async function collectImageUsage(
   }
   for (const cart of r.carts) {
     if (hits(cart.imageUrl)) push({ kind: "cart", label: cart.name, detail: "cart image", mutable: true });
-  }
-  for (const o of r.orders) {
-    const n = (o.items || []).filter((i: any) => hits(i.image)).length;
-    if (n > 0) {
-      push({ kind: "order", label: o.displayOrderId || "order", detail: `${n} item image(s)`, mutable: true }, n);
-    }
   }
   return { contexts, mutableTotal, historicalTotal };
 }
@@ -311,13 +303,6 @@ export const repointImageRefs = mutation({
       if (!hits(cart.imageUrl)) continue;
       await ctx.db.patch(cart._id, { imageUrl: newUrl, updatedAt: Date.now() });
       bump("carts");
-    }
-    for (const order of await ctx.db.query("orders").collect()) {
-      if (!order.items.some((item) => hits(item.image))) continue;
-      await ctx.db.patch(order._id, {
-        items: order.items.map((item) => (hits(item.image) ? { ...item, image: newUrl } : item)),
-      });
-      bump("orders");
     }
     return { patched };
   },

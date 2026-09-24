@@ -72,7 +72,7 @@ export async function reprocessOne(
       const bytes = await fetchRemoteBytes(asset.url);
       const banner = isBannerContext(contexts);
       const folder = asset.path.slice("asset_images/".length).split("/").slice(0, -1).join("/");
-      const stem = slugFromContexts(contexts.filter((c) => c.mutable && c.kind !== "order"), asset.name).slice(0, 30);
+      const stem = slugFromContexts(contexts.filter((c) => c.mutable), asset.name).slice(0, 30);
       const uploaded = await uploadImageToR2(bytes, {
         folder: folder || undefined,
         slug: `${stem}-r-${marker}`,
