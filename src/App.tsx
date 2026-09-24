@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useLayoutEffect, Suspense } from 'react';
 import { BrowserRouter as Router, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AgeVerification } from './components/auth/AgeVerification';
@@ -206,14 +206,14 @@ function AppContent() {  const { user } = useAuth();
     () => localStorage.getItem('ageVerified') === 'true' && getConsent() === null
   );
 
-  // Add/remove admin-page class to body for conditional styling
-  useEffect(() => {
-    if (isAdminPath) {
+  // Apply before paint: storefront top padding must not shift the admin host.
+  useLayoutEffect(() => {
+    if (isAdminHost || isAdminPath) {
       document.body.classList.add('admin-page');
     } else {
       document.body.classList.remove('admin-page');
     }
-  }, [isAdminPath]);
+  }, [isAdminHost, isAdminPath]);
 
   if (!isAgeVerified) {
     const ThemedAgeGate = theme.slots.AgeVerification;
