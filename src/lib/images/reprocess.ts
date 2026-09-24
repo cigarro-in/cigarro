@@ -10,7 +10,7 @@ import {
   type R2Image,
 } from "./upload";
 import { type AssetUsage } from "./usage";
-import { slugFromContexts, isBannerContext, isPipelineOutput } from "../../../convex/lib/imageRefs";
+import { slugFromContexts, isBannerContext, isLegacyPipelineOutput } from "../../../convex/lib/imageRefs";
 
 export interface ReprocessProgress {
   done: number;
@@ -82,9 +82,10 @@ export async function reprocessOne(
       const stem = slugFromContexts(contexts.filter((c) => c.mutable), asset.name).slice(0, 30);
       const uploaded = await uploadImageToR2(bytes, {
         folder: folder || undefined,
-        slug: `${stem}-r-${marker}`,
+        slug: stem,
         alt: contexts[0]?.label || asset.name,
         filename: asset.name,
+        pipelineSource: marker,
         keepOriginalResolution: banner,
       });
       newUrl = uploaded.url;
@@ -121,20 +122,29 @@ export async function reprocessAll(
   onProgress: (p: ReprocessProgress) => void,
 ): Promise<ReprocessResult[]> {
   const results: ReprocessResult[] = [];
-  const outputs = assets.filter((a) => isPipelineOutput(a.path));
-  const targets = assets.filter((a) => !isPipelineOutput(a.path));
-  for (let i = 0; i < targets.length; i++) {
-    const asset = targets[i];
-    onProgress({ done: i, total: targets.length, current: asset.name });
+  const processed = assets.filter((a) => Boolean(a.metadata?.pipelineSource));
+  const legacyOutputs = assets.filter(
+    (a) => !a.metadata?.pipelineSource && isLegacyPipelineOutput(a.path),
+  );
+  const targets = assets.filter(
+    (a) => !a.metadata?.pipelineSource && !isLegacyPipelineOutput(a.path),
+  );
+  const work = [...targets, ...legacyOutputs];
+  for (let i = 0; i < work.length; i++) {
+    const asset = work[i];
+    onProgress({ done: i, total: work.length, current: asset.name });
     const marker = await sourceMarker(asset.path);
-    // Exact marker match (anchored, optional old random tail) so reruns are
-    // idempotent without cross-matching a different source's hash.
+    // Match old hash-suffixed outputs or metadata-tagged outputs from an
+    // interrupted earlier run, without putting the hash in the visible name.
     const markerRe = new RegExp(`-r-${marker}(?:-[a-z0-9]+)?\\.webp$`, "i");
-    const existing = outputs.find((a) => markerRe.test(a.path));
+    const existing = assets.find(
+      (a) => a.id !== asset.id &&
+        (a.metadata?.pipelineSource === marker || markerRe.test(a.path)),
+    );
     results.push(await reprocessOne(convex, asset, usage.get(asset.path), marker, existing?.url));
   }
-  onProgress({ done: targets.length, total: targets.length, current: "" });
-  for (const asset of outputs)
+  onProgress({ done: work.length, total: work.length, current: "" });
+  for (const asset of processed)
     results.push({ asset, status: "skipped", reason: "bulk output" });
   return results;
 }

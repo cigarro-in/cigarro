@@ -76,6 +76,8 @@ export async function uploadImageToR2(
     alt?: string;
     filename?: string;
     slug?: string;
+    /** Internal source marker stored as metadata, never exposed in the key. */
+    pipelineSource?: string;
     /** Keep source width, height and aspect ratio (still encode as WebP). */
     keepOriginalResolution?: boolean;
   } = {},
@@ -89,6 +91,7 @@ export async function uploadImageToR2(
   if (opts.folder) form.append('folder', opts.folder);
   // SEO filename: item slug → `camel-yellow-packet-a1b2c3.webp`.
   if (opts.slug || fallbackName) form.append('slug', opts.slug || fallbackName);
+  if (opts.pipelineSource) form.append('pipelineSource', opts.pipelineSource);
   form.append('alt', opts.alt || humanizeAlt(opts.slug || fallbackName));
   const res = await fetch('/api/images/upload', {
     method: 'POST',

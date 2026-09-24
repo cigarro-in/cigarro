@@ -39,7 +39,6 @@ import { listR2Images, deleteR2Image, uploadImageToR2, uploadRawToR2 } from '../
 import { confirmImageDelete } from '../../lib/images/guard';
 import { fetchUsageBatch, usageSummary, type AssetUsage } from '../../lib/images/usage';
 import { collectAllR2Images, reprocessAll, type ReprocessProgress, type ReprocessResult } from '../../lib/images/reprocess';
-import { isPipelineOutput } from '../../../convex/lib/imageRefs';
 import { useConvex } from 'convex/react';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -343,7 +342,7 @@ export function AssetManager() {
     try {
       setReprocessProgress({ done: 0, total: 0, current: 'Listing all R2 images…' });
       const all = await collectAllR2Images();
-      const todo = all.filter((a) => !isPipelineOutput(a.path));
+      const todo = all.filter((a) => !a.metadata?.pipelineSource);
       const skipped = all.length - todo.length;
       if (all.length === 0) {
         setOpError('No R2 images found to reprocess');

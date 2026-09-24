@@ -185,6 +185,12 @@ export async function onRequest(context) {
     const sourceName = String(form?.get('slug') || (raw ? file.name : '') || '').replace(/\.[^.]+$/, '');
     const stem = slugify(sourceName) || `${Date.now()}`;
     const base = `${tenantPrefix}${folder ? folder + '/' : ''}${stem}`;
+    const pipelineSource = String(form?.get('pipelineSource') || '');
+    if (pipelineSource && !/^[a-f0-9]{24}$/.test(pipelineSource))
+      return json({ error: 'Invalid pipeline marker' }, 400);
+    const customMetadata = {};
+    if (form?.get('alt')) customMetadata.alt = String(form.get('alt')).slice(0, 300);
+    if (pipelineSource) customMetadata.pipelineSource = pipelineSource;
     const meta = {
       httpMetadata: {
         contentType: raw ? mime : 'image/webp',
@@ -192,7 +198,7 @@ export async function onRequest(context) {
       },
       // Create-only: R2 returns null when the key already exists.
       onlyIf: { etagDoesNotMatch: '*' },
-      ...(form?.get('alt') ? { customMetadata: { alt: String(form.get('alt')).slice(0, 300) } } : {}),
+      ...(Object.keys(customMetadata).length ? { customMetadata } : {}),
     };
     let key = null;
     for (let n = 1; n <= 100; n++) {
