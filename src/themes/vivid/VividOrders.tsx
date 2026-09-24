@@ -70,8 +70,17 @@ function OrderRow({ order }: { order: NormalizedOrder }) {
       to={`/orders?id=${order.id}`}
       className="vv-card p-4 flex items-center gap-4 hover:border-[var(--vv-border-strong)]"
     >
-      <div className="w-11 h-11 rounded-full bg-[var(--vv-bg-inset)] text-[var(--vv-fg-muted)] grid place-items-center flex-shrink-0">
-        <Icon className="w-5 h-5" />
+      <div className="w-11 h-11 rounded-full bg-[var(--vv-bg-inset)] text-[var(--vv-fg-muted)] grid place-items-center flex-shrink-0 overflow-hidden">
+        {order.items[0] ? (
+          <img
+            src={order.items[0].imageUrl}
+            alt={order.items[0].name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Icon className="w-5 h-5" />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">

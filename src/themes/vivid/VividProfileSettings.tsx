@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { SEOHead } from '../../components/seo/SEOHead';
@@ -13,6 +13,7 @@ export function VividProfileSettings() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   useEffect(() => {
     if (!user) {
@@ -32,9 +33,9 @@ export function VividProfileSettings() {
       // (Phase 1 spine) via useMyProfile. Email is read-only here (contact
       // support to change), mirroring the classic settings page.
       await updateDisplayName(name || undefined);
-      toast.success('Profile updated');
+      setOpOk('Profile updated');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update');
+      setOpError(err instanceof Error ? err.message : 'Failed to update');
     } finally {
       setSaving(false);
     }
@@ -51,6 +52,7 @@ export function VividProfileSettings() {
         </header>
 
         <form onSubmit={handleSave} className="vv-surface p-5 space-y-5">
+          <InlineStatus status={opStatus} />
           <div>
             <label className="vv-label">Name</label>
             <input

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ArrowRight, Star, Package } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
 
@@ -21,6 +21,7 @@ export function BrandsPage() {
   const location = useLocation();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   // Wave 3: brands + counts from the Convex catalog (same shapes).
   const { products, brands: catalogBrands, loading } = useFullCatalog();
 
@@ -56,7 +57,7 @@ export function BrandsPage() {
       setBrands(filteredBrands);
     } catch (error) {
       console.error('Error fetching brands:', error);
-      toast.error('Failed to load brands');
+      setOpError('Failed to load brands');
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +116,9 @@ export function BrandsPage() {
 
         {/* Brands Grid */}
         <div className="main-container pb-20">
+          <div className="mb-8">
+            <InlineStatus status={opStatus} />
+          </div>
           {brands.length === 0 ? (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}

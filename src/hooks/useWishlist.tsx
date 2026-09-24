@@ -3,7 +3,6 @@ import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { toast } from 'sonner';
 
 // Phase 1 complete: wishlist lives in Convex for signed-in users,
 // localStorage for guests. No Supabase paths remain.
@@ -14,6 +13,7 @@ interface WishlistContextType {
   clearWishlist: () => Promise<void>;
   wishlistCount: number;
   isLoading: boolean;
+  wishlistError: string | null;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
@@ -32,6 +32,7 @@ function readLocalWishlist(): string[] {
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const [localItems, setLocalItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState<string | null>(null);
   const { user } = useAuth();
   const org = useOrg();
 
@@ -61,11 +62,12 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
   const toggleWishlist = async (productId: string): Promise<void> => {
     setIsLoading(true);
+    setWishlistError(null);
 
     try {
       if (useConvexPath) {
         await convexToggle({ orgId: org!._id, productId });
-        // No toast: the heart fills/unfills in place.
+        // No status: the heart fills/unfills in place.
         window.dispatchEvent(new Event('wishlistUpdated'));
         return;
       }
@@ -79,10 +81,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       setLocalItems(next);
       localStorage.setItem('wishlist', JSON.stringify(next));
       window.dispatchEvent(new Event('wishlistUpdated'));
-      // No toast: the heart fills/unfills in place.
+      // No status: the heart fills/unfills in place.
     } catch (error) {
       console.error('Error toggling wishlist:', error);
-      toast.error('Failed to update wishlist');
+      setWishlistError('Failed to update wishlist');
     } finally {
       setIsLoading(false);
     }
@@ -90,21 +92,22 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
   const clearWishlist = async (): Promise<void> => {
     setIsLoading(true);
+    setWishlistError(null);
 
     try {
       if (useConvexPath) {
         await convexClear({ orgId: org!._id });
         window.dispatchEvent(new Event('wishlistUpdated'));
-        // No toast: the emptied list is the confirmation.
+        // No status: the emptied list is the confirmation.
         return;
       }
       localStorage.setItem('wishlist', JSON.stringify([]));
       setLocalItems([]);
       window.dispatchEvent(new Event('wishlistUpdated'));
-      // No toast: the emptied list is the confirmation.
+      // No status: the emptied list is the confirmation.
     } catch (error) {
       console.error('Error clearing wishlist:', error);
-      toast.error('Failed to clear wishlist');
+      setWishlistError('Failed to clear wishlist');
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +121,8 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         toggleWishlist,
         clearWishlist,
         wishlistCount,
-        isLoading
+        isLoading,
+        wishlistError
       }}
     >
       {children}

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { Ban, FileCheck2, Plus, Printer, Save, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { api } from '../../../convex/_generated/api';
 import { formatPaiseINR, paiseToRupees, rupeesToPaise } from '../../lib/convex/money';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -58,6 +58,7 @@ export function InvoiceFormPage() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   const idempotencyKey = useRef(crypto.randomUUID());
   const printed = useRef(false);
 
@@ -90,10 +91,10 @@ export function InvoiceFormPage() {
 
   const save = async (printAfter: boolean) => {
     if (!org) return;
-    if (!customerName.trim()) return toast.error('Customer name is required');
-    if (lines.length === 0) return toast.error('Add at least one item');
+    if (!customerName.trim()) { setOpError('Customer name is required'); return; }
+    if (lines.length === 0) { setOpError('Add at least one item'); return; }
     const invalid = lines.find((line) => !Number.isInteger(line.quantity) || line.quantity <= 0 || line.quantity > line.available || line.unitPriceRupees < 0);
-    if (invalid) return toast.error(`${invalid.productName} has an invalid quantity or insufficient available stock`);
+    if (invalid) { setOpError(`${invalid.productName} has an invalid quantity or insufficient available stock`); return; }
     setSaving(true);
     try {
       const result = await createInvoice({
@@ -114,7 +115,7 @@ export function InvoiceFormPage() {
       navigate(`/admin/invoices/${result.invoiceId}${printAfter ? '?print=1' : ''}`);
     } catch (error: any) {
       const code = error?.data?.code;
-      toast.error(code === 'INSUFFICIENT_STOCK' ? 'Stock changed while creating this invoice. Review the available quantities and try again.' : error?.message || 'Could not create invoice');
+      setOpError(code === 'INSUFFICIENT_STOCK' ? 'Stock changed while creating this invoice. Review the available quantities and try again.' : error?.message || 'Could not create invoice');
     } finally { setSaving(false); }
   };
 
@@ -126,14 +127,14 @@ export function InvoiceFormPage() {
     try {
       await voidInvoice({ invoiceId: invoice._id, reason: reason.trim() });
       setMessage('Invoice voided and stock restored');
-    } catch (error: any) { toast.error(error?.message || 'Could not void invoice'); }
+    } catch (error: any) { setOpError(error?.message || 'Could not void invoice'); }
     finally { setSaving(false); }
   };
 
   if (!isNew) {
     if (invoice === undefined) return <div className="p-12 text-center text-gray-500">Loading invoice…</div>;
     if (invoice === null) return <div className="p-12 text-center text-gray-500">Invoice not found</div>;
-    return <div className="min-h-screen bg-slate-100 pb-16"><PageHeader title={invoice.invoiceNumber} description={`Invoice for ${invoice.customerName}`} backUrl="/admin/invoices"><Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / save PDF</Button>{invoice.status !== 'voided' && <Button variant="destructive" disabled={saving} onClick={voidCurrent}><Ban className="mr-2 h-4 w-4" />Void & restore stock</Button>}</PageHeader>{message && <div className="mx-auto mt-5 max-w-[210mm] rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}<div className="px-4 pt-7"><InvoiceDocument invoice={invoice} /></div></div>;
+    return <div className="min-h-screen bg-slate-100 pb-16"><PageHeader title={invoice.invoiceNumber} description={`Invoice for ${invoice.customerName}`} backUrl="/admin/invoices"><Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / save PDF</Button>{invoice.status !== 'voided' && <Button variant="destructive" disabled={saving} onClick={voidCurrent}><Ban className="mr-2 h-4 w-4" />Void & restore stock</Button>}</PageHeader><div className="mx-auto mt-5 max-w-[210mm]"><InlineStatus status={opStatus} /></div>{message && <div className="mx-auto mt-5 max-w-[210mm] rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}<div className="px-4 pt-7"><InvoiceDocument invoice={invoice} /></div></div>;
   }
 
   return (
@@ -142,6 +143,9 @@ export function InvoiceFormPage() {
         <Button variant="outline" disabled={saving} onClick={() => save(false)}><Save className="mr-2 h-4 w-4" />Save</Button>
         <Button disabled={saving} onClick={() => save(true)}><Printer className="mr-2 h-4 w-4" />{saving ? 'Creating…' : 'Save & print'}</Button>
       </PageHeader>
+      <div className="mx-auto max-w-[1500px] px-6 pt-6">
+        <InlineStatus status={opStatus} />
+      </div>
       <div className="mx-auto grid max-w-[1500px] gap-6 px-6 pt-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <AdminCard><AdminCardHeader><AdminCardTitle>Customer</AdminCardTitle></AdminCardHeader><AdminCardContent><div className="grid gap-4 sm:grid-cols-2"><Field label="Customer name"><Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} /></Field><Field label="Phone"><Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></Field><Field label="Email"><Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} /></Field><Field label="Address"><Textarea rows={2} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} /></Field></div></AdminCardContent></AdminCard>

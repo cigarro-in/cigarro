@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { useWishlist } from '../../hooks/useWishlist';
-import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { getProductImageUrl } from '../../lib/images/urls';
@@ -153,7 +152,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     if (onAddToCart) {
       // Pass default variant ID if available
       onAddToCart(product, defaultVariant?.id);
-      toast.success(`${product.name} added to cart`);
+      // No status: the drop-to-cart animation + cart badge update are the
+      // confirmation (callers surface failures via their own InlineStatus).
       // trigger mobile-only drop-to-cart animation
       animateDropToCart();
       // trigger cart icon animation after 2 second delay
@@ -214,7 +214,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <img
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             src={!imageError ? getProductImageUrl(defaultVariant?.images?.[0] || product.product_variants?.[0]?.images?.[0]) : getProductImageUrl()}
-            alt={product.name}
+            alt={defaultVariant?.image_alt_text || product.name}
             onError={() => setImageError(true)}
             ref={imgRef}
             loading="lazy"

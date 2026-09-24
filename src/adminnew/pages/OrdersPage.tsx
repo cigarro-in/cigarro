@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Phone } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { formatINR } from '../../utils/currency';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -62,6 +62,7 @@ export function OrdersPage() {
 
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const loading = convexOrders === undefined;
 
@@ -111,10 +112,10 @@ export function OrdersPage() {
           }),
         ),
       );
-      toast.success(`${orderIds.length} orders marked paid`);
+      setOpOk(`${orderIds.length} orders marked paid`);
       setSelectedOrders([]);
     } catch (error: any) {
-      toast.error(error?.data?.code || 'Failed to mark paid');
+      setOpError(error?.data?.code || 'Failed to mark paid');
     }
   };
 
@@ -125,10 +126,10 @@ export function OrdersPage() {
           voidOrder({ orderId: id as any, reason: 'bulk void by admin' }),
         ),
       );
-      toast.success(`${orderIds.length} orders voided`);
+      setOpOk(`${orderIds.length} orders voided`);
       setSelectedOrders([]);
     } catch (error: any) {
-      toast.error(error?.data?.code || 'Failed to void orders');
+      setOpError(error?.data?.code || 'Failed to void orders');
     }
   };
 
@@ -265,6 +266,7 @@ export function OrdersPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={orders}
           columns={columns}

@@ -17,7 +17,7 @@ import {
   ArrowRight,
   Heart
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../components/ui/utils';
 
@@ -25,14 +25,15 @@ export default function ReferralPage() {
   const { stats, referredUsers, wasReferred, loading, copyLink, shareLink } = useReferral();
   const [copying, setCopying] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const handleCopyLink = async () => {
     setCopying(true);
     const success = await copyLink();
     if (success) {
-      toast.success('Invitation copied to clipboard');
+      setOpOk('Invitation copied to clipboard');
     } else {
-      toast.error('Failed to copy link');
+      setOpError('Failed to copy link');
     }
     setTimeout(() => setCopying(false), 1000);
   };
@@ -41,7 +42,7 @@ export default function ReferralPage() {
     setSharing(true);
     const success = await shareLink();
     if (!success) {
-      toast.error('Failed to open share menu');
+      setOpError('Failed to open share menu');
     }
     setSharing(false);
   };
@@ -143,6 +144,9 @@ export default function ReferralPage() {
           <p className="text-center text-xs text-muted-foreground mt-6 opacity-60">
             Tap the card to copy your code instantly
           </p>
+          <div className="mt-4">
+            <InlineStatus status={opStatus} />
+          </div>
         </motion.div>
 
         {/* Stats Grid - Zen Stones */}

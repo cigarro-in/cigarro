@@ -178,7 +178,7 @@ http.route({
 //
 // The {{link}} variable in WhatsApp copy expands to this URL. It logs the
 // tap (per-contact click counts feed campaignStats) and 302s to the shop.
-// Unknown/expired ids still redirect â€” a customer never sees an error page.
+// Unknown/expired ids still redirect — a customer never sees an error page.
 http.route({
   path: "/m",
   method: "GET",
@@ -246,7 +246,7 @@ function isSafeRedirect(url: string): boolean {
 function oauthPage(ok: boolean, detail: string | null): Response {
   const title = ok ? "Gmail connected" : "Connect failed";
   const body = ok
-    ? `<p><b>${escapeHtml(detail ?? "Inbox")} is connected.</b></p><p>Return to Payment Settings and flip on polling.</p>`
+    ? `<p><b>${escapeHtml(detail ?? "Inbox")} is connected.</b></p><p>Return to Payment Settings — pending orders now auto-confirm.</p>`
     : `<p>${escapeHtml(detail ?? "Something went wrong.")}</p><p>Go back and try again.</p>`;
   return new Response(
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +

@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { Drawer } from 'vaul';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Pencil } from 'lucide-react';
-import { toast } from 'sonner';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog';
 import { useAuth, AuthError, newAuthCorrelationId } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useOTPWidget } from '../../hooks/useOTPWidget';
@@ -55,7 +54,7 @@ function classifyWidgetError(message: string): AuthErrorKind {
   const m = message.toLowerCase();
   if (/expir/.test(m)) return 'expired';
   if (/throttl|too many|try again later|blocked|limit/.test(m)) return 'send_failed';
-  if (/network|timeout|took too long|not ready|load/.test(m)) return 'network';
+  if (/network|timeout|took too long|not ready|load|http failure|unknown error|failed to fetch|fetch failed/.test(m)) return 'network';
   if (/send|resend/.test(m)) return 'send_failed';
   if (/invalid|wrong|incorrect|mismatch|not match|failed/.test(m)) return 'invalid_code';
   return 'unknown';
@@ -70,10 +69,25 @@ function friendlyWidgetMessage(kind: AuthErrorKind, raw: string): string {
     case 'network':
       return 'Network hiccup — try again.';
     case 'send_failed':
-      return raw;
+      return friendlySendFailureMessage(raw);
     default:
       return raw || 'Verification failed — try again.';
   }
+}
+
+// Send-OTP failures stay on the phone step with a Retry button, so the
+// message must be actionable on its own. The widget surfaces transport
+// failures verbatim (e.g. "Http failure response for
+// https://api.msg91.com/api/v5/widget/sendOtp: 0 Unknown Error" when CSP
+// or the network blocks the call) — translate those to plain language and
+// keep short human messages as-is.
+function friendlySendFailureMessage(raw: string): string {
+  const m = (raw || '').toLowerCase();
+  if (/http failure|0 unknown error|unknown error|failed to fetch|csp|blocked by|network|timeout|took too long|not ready|econn|enotfound/.test(m)) {
+    return "Couldn't reach the SMS service — check your connection and try again.";
+  }
+  if (raw && raw.length <= 120 && !/https?:\/\//.test(raw)) return raw;
+  return "Couldn't send the code — try again.";
 }
 
 function toInlineError(kind: AuthErrorKind, message: string, code?: string): InlineError {
@@ -119,6 +133,10 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
   const otpInputRef = useRef<HTMLInputElement | null>(null);
   const verifyAttemptedFor = useRef<string | null>(null);
   const lastToken = useRef<{ phone: string; countryCode: string; token: string } | null>(null);
+  // Mirrors `step` for the MSG91 global failure callback, which can fire for
+  // either a send failure (phone step) or a verification failure (otp step).
+  const stepRef = useRef<Step>('phone');
+  stepRef.current = step;
 
   const focusOtp = useCallback(() => {
     setTimeout(() => otpInputRef.current?.focus({ preventScroll: true }), 60);
@@ -127,6 +145,16 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
   const handleWidgetError = useCallback(
     (message: string) => {
       const kind = classifyWidgetError(message);
+      // Step-aware: the singleton widget's global failure callback fires for
+      // send failures too. On the phone step a send/network failure must stay
+      // here with the actionable inline Retry — never jump to the OTP step.
+      // Verification errors (wrong/expired code) keep the OTP step below.
+      if (stepRef.current === 'phone' && (kind === 'send_failed' || kind === 'network')) {
+        const friendly = friendlySendFailureMessage(message);
+        setAuthError(toInlineError('send_failed', friendly));
+        setSubmitting(false);
+        return;
+      }
       setAuthError(toInlineError(kind, friendlyWidgetMessage(kind, message)));
       setSubmitting(false);
       if (kind !== 'expired') {
@@ -269,8 +297,10 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
         focusOtp();
       },
       onFailed: (msg) => {
-        setAuthError(toInlineError('send_failed', msg));
-        toast.error(msg);
+        // Stays on the phone step (no step change here) — the inline error
+        // below carries the Retry action.
+        const friendly = friendlySendFailureMessage(msg);
+        setAuthError(toInlineError('send_failed', friendly));
       },
     });
   };
@@ -326,8 +356,10 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
         focusOtp();
       },
       onFailed: (msg) => {
-        setAuthError(toInlineError('send_failed', msg));
-        toast.error(msg);
+        // Stays on the otp step (no step change here) — the inline error
+        // below carries the resend action via handleErrorRetry.
+        const friendly = friendlySendFailureMessage(msg);
+        setAuthError(toInlineError('send_failed', friendly));
       },
     });
   };
@@ -526,6 +558,8 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-[var(--vv-bg-elevated,#fff7e9)] border-[var(--vv-border,#ded3bf)] text-[var(--vv-fg,#433c35)]">
+        <DialogTitle className="sr-only">Sign in</DialogTitle>
+        <DialogDescription className="sr-only">Phone verification</DialogDescription>
         <div className="h-1 w-full bg-gradient-to-r from-[var(--vv-brand,#8c4630)] via-[var(--vv-brand-hover,#6e3524)] to-[var(--vv-accent,#dea138)]" />
         <div className="px-6 py-5">{body}</div>
       </DialogContent>

@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Product, useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Button } from '../../components/ui/button';
 import { getProductImageUrl } from '../../lib/images/urls';
 
@@ -32,13 +32,14 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
 }, ref) => {
   const [imageError, setImageError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { status: itemStatus, setError: setItemError } = useInlineStatus();
 
   const handleRemove = async () => {
     try {
       await onRemove(product.id);
       setShowDeleteConfirm(false);
     } catch (error) {
-      toast.error('Failed to remove item');
+      setItemError('Failed to remove item');
     }
   };
 
@@ -120,6 +121,7 @@ const WishlistItem = React.forwardRef<HTMLDivElement, WishlistItemProps>(({
             <p className="text-sm text-muted-foreground mb-3">
               Remove "{product.name}" from your wishlist?
             </p>
+            <InlineStatus status={itemStatus} />
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -175,7 +177,8 @@ export function WishlistPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
-  const { wishlistItems, toggleWishlist, clearWishlist: clearWishlistHook } = useWishlist();
+  const { wishlistItems, toggleWishlist, clearWishlist: clearWishlistHook, wishlistError } = useWishlist();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   // Wave 3: rich product rows come from the Convex catalog (same shapes).
   const { products: catalogProducts, loading: catalogLoading } = useFullCatalog();
 
@@ -202,7 +205,7 @@ export function WishlistPage() {
       setWishlistProducts(rows as Product[]);
     } catch (error) {
       console.error('Error loading wishlist:', error);
-      toast.error('Failed to load wishlist products');
+      setOpError('Failed to load wishlist products');
       setWishlistProducts([]);
     } finally {
       setIsLoading(false);
@@ -216,16 +219,16 @@ export function WishlistPage() {
       // and fetchWishlistProducts will be called via useEffect
     } catch (error) {
       console.error('Error removing from wishlist:', error);
-      toast.error('Failed to remove from wishlist');
+      setOpError('Failed to remove from wishlist');
     }
   };
 
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add to cart');
+      setOpError('Failed to add to cart');
     }
   };
 
@@ -236,7 +239,7 @@ export function WishlistPage() {
       // and fetchWishlistProducts will be called via useEffect
     } catch (error) {
       console.error('Error clearing wishlist:', error);
-      toast.error('Failed to clear wishlist');
+      setOpError('Failed to clear wishlist');
     }
   };
 
@@ -249,7 +252,7 @@ export function WishlistPage() {
       });
     } else {
       navigator.clipboard.writeText(window.location.href);
-      toast.success('Wishlist link copied to clipboard');
+      setOpOk('Wishlist link copied to clipboard');
     }
   };
 
@@ -332,6 +335,9 @@ export function WishlistPage() {
 
         {/* Content */}
         <div className="main-container pb-16">
+          <div className="max-w-3xl mx-auto mb-4">
+            <InlineStatus status={wishlistError ? { kind: 'error' as const, message: wishlistError } : opStatus} />
+          </div>
           {wishlistProducts.length === 0 ? (
             <EmptyWishlist />
           ) : (

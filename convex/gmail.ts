@@ -10,22 +10,31 @@ import {
 } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
 import { mergeSenders } from "./appConfig";
+import {
+  buildOrderPollOffsets,
+  isTerminalOrderStatus,
+} from "./lib/pollSchedule";
 
-// ---------- Gmail OAuth inbox poller — the single payment-verification feed ----------
-// One Google account (the founder's inbox receiving bank alerts) polled on a
-// cron. Secrets stay in Convex env, never in the DB:
+// ---------- Gmail OAuth inbox checks — the event-driven payment-verification feed ----------
+// One Google account (the founder's inbox receiving bank alerts). There is no
+// permanent cron: every check is order-triggered (creation backoff, customer
+// wake/refresh, post-expiry reconciliation) or a manual admin "Check inbox
+// now". A connected inbox means checks can run — there is no enable toggle.
+// Secrets stay in Convex env, never in the DB:
 //   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN
 // Founder one-time dance: Google Cloud OAuth client + gmail.readonly scope,
-// paste the refresh token into BOTH Convex deployments' env.
+// then one-click Connect stores the refresh token server-side.
 //
-// Design: stateless. Each poll runs messages.list with a `from:` search query
+// Design: stateless. Each check runs messages.list with a `from:` search query
 // and ingests every hit; ingestBankEmail dedupes by gmailMessageId, so
-// re-polling the same window is safe. No historyId cursor, nothing to seed or
+// re-checking the same window is safe. No historyId cursor, nothing to seed or
 // reseed (the old history.list approach needed constant plumbing: historyIds
 // expire after ~7 days and history.list silently ignores the `q` filter).
+// Every non-manual check verifies pending work exists BEFORE touching the
+// Gmail API, so idle orgs and terminal orders cost zero Gmail calls.
 
 const SINGLETON = "singleton";
-const WAKE_THROTTLE_MS = 3 * 60 * 1000;
+const WAKE_THROTTLE_MS = 30 * 1000;
 
 async function getConfig(ctx: any) {
   return await ctx.db
@@ -148,17 +157,24 @@ export function buildPollQuery(senders: string[], extra?: string | null): string
 export const pollInbox = internalAction({
   args: {
     orgId: v.optional(v.id("organizations")),
+    orderId: v.optional(v.id("orders")),
     maxMessages: v.optional(v.number()),
+    // Poll epoch for scheduled chains: the creation chain schedules with the
+    // order's generation, wake/refresh bumps it and reschedules. A stale
+    // scheduled job exits before any Gmail call. Manual/reconcile never carry
+    // one and always run (subject to their own guards).
+    generation: v.optional(v.number()),
     reason: v.optional(
       v.union(
         v.literal("scheduled"),
         v.literal("wake"),
         v.literal("refresh"),
         v.literal("manual"),
+        v.literal("reconcile"),
       ),
     ),
   },
-  handler: async (ctx, { orgId, maxMessages, reason }): Promise<any> => {
+  handler: async (ctx, { orgId, orderId, maxMessages, generation, reason }): Promise<any> => {
     const mode = reason ?? "scheduled";
     const clientId = process.env.GMAIL_CLIENT_ID;
     const clientSecret = process.env.GMAIL_CLIENT_SECRET;
@@ -167,14 +183,50 @@ export const pollInbox = internalAction({
 
     const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, {});
     // One-click Connect stores the token in the DB; env var stays as fallback.
+    // Connected inbox == event-driven checks can run. No enable toggle.
     const refreshToken = cfg?.refreshToken ?? process.env.GMAIL_REFRESH_TOKEN;
     if (!refreshToken) return { skipped: "gmail not connected" };
     const targetOrgId = orgId ?? cfg?.orgId;
-    if (mode !== "manual" && !cfg?.enabled) return { skipped: "poll disabled" };
     if (!targetOrgId) return { skipped: "no org bound" };
 
-    // Idle-skip scheduled polls when nothing is awaiting payment.
-    if (mode === "scheduled") {
+    // Order-scoped guard: terminal orders stop their chain before any Gmail
+    // call. Reconcile checks intentionally run post-expiry (late-payment
+    // catch); manual admin checks always run.
+    if (orderId) {
+      const st: any = await ctx.runQuery(internal.gmail.getOrderState, {
+        orderId,
+      });
+      if (!st) return { skipped: "order_not_found" };
+      if (
+        isTerminalOrderStatus(st.status) &&
+        mode !== "manual" &&
+        mode !== "reconcile"
+      ) {
+        return { skipped: "order_terminal", status: st.status };
+      }
+      // Epoch invalidation: wake/refresh restarts the early backoff with a
+      // fresh generation, so jobs from the superseded chain exit here — before
+      // the pending-work check and well before any Gmail API call. Manual and
+      // reconcile checks carry no generation and are unaffected.
+      if (
+        generation !== undefined &&
+        mode !== "manual" &&
+        mode !== "reconcile" &&
+        (st.generation ?? 0) !== generation
+      ) {
+        return { skipped: "stale_generation", status: st.status };
+      }
+    }
+
+    // No Gmail calls without pending work. Reconcile also covers
+    // recently-expired orders inside the late-payment window.
+    if (mode === "reconcile") {
+      const anyWork: boolean = await ctx.runQuery(
+        internal.gmail.hasReconcilableOrders,
+        { orgId: targetOrgId },
+      );
+      if (!anyWork) return { skipped: "no_pending_orders" };
+    } else if (mode !== "manual") {
       const anyPending: boolean = await ctx.runQuery(
         internal.gmail.hasPendingOrders,
         { orgId: targetOrgId },
@@ -239,7 +291,8 @@ export const pollInbox = internalAction({
   },
 });
 
-// Manual trigger from Payment Settings ("Check inbox now"). Same path as cron.
+// Manual trigger from Payment Settings ("Check inbox now"). Same path as the
+// order-triggered checks, but always runs (no pending-work skip).
 export const triggerPoll = action({
   args: { maxMessages: v.optional(v.number()) },
   handler: async (ctx, args): Promise<any> => {
@@ -395,7 +448,6 @@ export const disconnectGmail = mutation({
       await ctx.db.patch(cfg._id, {
         gmailRefreshToken: undefined,
         gmailAccountEmail: undefined,
-        gmailPollEnabled: false,
         updatedAt: Date.now(),
         updatedBy: identity.subject,
       });
@@ -433,16 +485,42 @@ export const wake = mutation({
       };
     }
 
-    await ctx.db.patch(orderId, { lastWakeAt: now });
+    // Fresh order (creation chain still inside its first throttle window):
+    // that chain already covers every offset until expiry, so re-arming here
+    // would just double-schedule. Run one immediate check on the current
+    // epoch and leave the chain alone — no coverage lost, no fan-out.
+    if (now - order.createdAt < WAKE_THROTTLE_MS) {
+      await ctx.db.patch(orderId, { lastWakeAt: now });
+      await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, {
+        orgId: order.orgId,
+        orderId,
+        reason: source,
+        generation: order.pollGeneration ?? 0,
+      });
+      return { poked: true };
+    }
 
-    await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, {
-      orgId: order.orgId,
-      reason: source,
-    });
-    await ctx.scheduler.runAfter(15_000, internal.gmail.pollInbox, {
-      orgId: order.orgId,
-      reason: source,
-    });
+    // Bumping the epoch retires any in-flight creation chain: its jobs carry
+    // the old generation and exit as stale before touching the Gmail API.
+    const nextGen = (order.pollGeneration ?? 0) + 1;
+    await ctx.db.patch(orderId, { lastWakeAt: now, pollGeneration: nextGen });
+
+    // Immediate check plus a full backoff (re)start bounded to the order's
+    // remaining timeout, so returning from the UPI app or hitting refresh
+    // re-arms fast verification AND keeps steady coverage to expiry. The
+    // bumped generation retires the creation chain (stale jobs exit pre-API);
+    // each scheduled check still skips (with zero Gmail calls) if the order
+    // turns terminal. No offset exceeds the remaining timeout.
+    const check = { orgId: order.orgId, orderId, reason: source, generation: nextGen } as const;
+    await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, { ...check });
+    const org: any = await ctx.db.get(order.orgId);
+    const timeoutMs = org?.slotTimeoutMs ?? 10 * 60 * 1000;
+    const remaining = timeoutMs - (now - order.createdAt);
+    if (remaining > 0) {
+      for (const ms of buildOrderPollOffsets(remaining)) {
+        await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, { ...check });
+      }
+    }
 
     return { poked: true };
   },
@@ -461,12 +539,46 @@ export const hasPendingOrders = internalQuery({
   },
 });
 
+export const getOrderState = internalQuery({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) return null;
+    return { status: order.status, orgId: order.orgId, generation: order.pollGeneration ?? 0 };
+  },
+});
+
+// True when a reconcile check could still match something: a pending order,
+// or an order expired inside the late-payment (quarantine) window.
+export const hasReconcilableOrders = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const pending = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status", (q) =>
+        q.eq("orgId", orgId).eq("status", "pending"),
+      )
+      .first();
+    if (pending) return true;
+    const org: any = await ctx.db.get(orgId);
+    const quarantineMs = org?.quarantineMs ?? 20 * 60 * 1000;
+    const cutoff = Date.now() - quarantineMs;
+    const expired = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status", (q) =>
+        q.eq("orgId", orgId).eq("status", "expired"),
+      )
+      .order("desc")
+      .first();
+    return !!expired && (expired.terminalAt ?? 0) >= cutoff;
+  },
+});
+
 export const getPollConfigInternal = internalQuery({
   args: {},
   handler: async (ctx) => {
     const cfg = await getConfig(ctx);
     return {
-      enabled: cfg?.gmailPollEnabled ?? false,
       query: cfg?.gmailQuery ?? null,
       orgId: cfg?.gmailOrgId ?? null,
       senders: mergeSenders(cfg?.bankSenders),
@@ -485,7 +597,6 @@ export const getGmailStatus = query({
     const hasDbToken = !!cfg?.gmailRefreshToken;
     const hasEnvToken = !!process.env.GMAIL_REFRESH_TOKEN;
     return {
-      enabled: cfg?.gmailPollEnabled ?? false,
       query: cfg?.gmailQuery ?? null,
       effectiveQuery: cfg?.gmailQuery?.trim()
         ? cfg.gmailQuery.trim()
@@ -517,7 +628,6 @@ async function requirePaymentsAdmin(ctx: any) {
 
 export const setGmailConfig = mutation({
   args: {
-    enabled: v.optional(v.boolean()),
     query: v.optional(v.string()),
     orgId: v.optional(v.id("organizations")),
   },
@@ -526,7 +636,6 @@ export const setGmailConfig = mutation({
     const now = Date.now();
     const cfg = await getConfig(ctx);
     const patch: any = { updatedAt: now, updatedBy: identity.subject };
-    if (args.enabled !== undefined) patch.gmailPollEnabled = args.enabled;
     if (args.query !== undefined) patch.gmailQuery = args.query.trim() || undefined;
     if (args.orgId !== undefined) patch.gmailOrgId = args.orgId;
     if (!cfg) {

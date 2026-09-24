@@ -20,7 +20,7 @@ import { Badge } from '../../components/ui/badge';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 
 interface HomepageComponent {
@@ -132,6 +132,7 @@ function SectionRow({
   );
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { status: rowStatus, setError: setRowError } = useInlineStatus();
   const linked = LINKABLE_SECTIONS.has(name) && !!component.section_id;
   const showTitle = SECTION_TITLE_ROWS.includes(name) && name !== 'hero_section' && !linked;
   if (row === undefined && showTitle) {
@@ -141,7 +142,7 @@ function SectionRow({
   const dirty = draft !== null && draft.trim() !== (row?.title || '');
   const saveTitle = async () => {
     if (!current.trim()) {
-      toast.error('Title cannot be empty');
+      setRowError('Title cannot be empty');
       return;
     }
     setSaving(true);
@@ -154,6 +155,7 @@ function SectionRow({
   };
   return (
     <div className="p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] space-y-3">
+      <InlineStatus status={rowStatus} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {sectionIcon(name)}
@@ -224,6 +226,7 @@ function SectionRow({
 
 export function HomepageManager() {
   const navigate = useNavigate();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // Reactive Convex reads replace load + manual refresh (no Refresh button —
   // the list is always live).
@@ -288,11 +291,11 @@ export function HomepageManager() {
   const handleComponentToggle = async (componentName: string, enabled: boolean) => {
     try {
       await setComponent({ componentName, patch: { isEnabled: enabled } });
-      toast.success(`Component ${enabled ? 'enabled' : 'disabled'}`);
+      setOpOk(`Component ${enabled ? 'enabled' : 'disabled'}`);
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error toggling component:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle component');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle component');
     }
   };
 
@@ -306,26 +309,26 @@ export function HomepageManager() {
         componentName,
         patch: supabaseId ? { sectionId: supabaseId } : { sectionId: null },
       });
-      toast.success(supabaseId ? 'Collection linked' : 'Collection unlinked');
+      setOpOk(supabaseId ? 'Collection linked' : 'Collection unlinked');
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error linking collection:', error);
-      toast.error('Failed to link collection');
+      setOpError('Failed to link collection');
     }
   };
 
   const handleSectionTitle = async (sectionName: string, title: string) => {
     if (!title.trim()) {
-      toast.error('Title cannot be empty');
+      setOpError('Title cannot be empty');
       return;
     }
     try {
       await saveSection({ sectionName, patch: { title: title.trim() } });
-      toast.success('Section title updated');
+      setOpOk('Section title updated');
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error saving section title:', error);
-      toast.error('Failed to update title');
+      setOpError('Failed to update title');
     }
   };
 
@@ -333,11 +336,11 @@ export function HomepageManager() {
     try {
       const slide = heroSlides.find((s) => s.id === slideId);
       await patchSlide({ id: slideId as any, slide: { isActive, sortOrder: slide?.sort_order ?? 0 } });
-      toast.success(`Slide ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`Slide ${isActive ? 'activated' : 'deactivated'}`);
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error toggling slide:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle slide');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to toggle slide');
     }
   };
 
@@ -346,11 +349,11 @@ export function HomepageManager() {
 
     try {
       await removeSlide({ id: slideId as any });
-      toast.success('Slide deleted');
+      setOpOk('Slide deleted');
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error deleting slide:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete slide');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete slide');
     }
   };
 
@@ -368,11 +371,11 @@ export function HomepageManager() {
       for (let i = 0; i < newSlides.length; i++) {
         await patchSlide({ id: newSlides[i].id as any, slide: { isActive: newSlides[i].is_active, sortOrder: i } });
       }
-      toast.success('Slide order updated');
+      setOpOk('Slide order updated');
       await invalidateStorefront();
     } catch (error: any) {
       console.error('Error reordering slides:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to reorder slides');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to reorder slides');
     }
   };
 
@@ -387,6 +390,7 @@ export function HomepageManager() {
       </PageHeader>
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+        <InlineStatus status={opStatus} />
         {/* Hero Slides Section */}
         <AdminCard>
           <AdminCardHeader className="flex flex-row items-center justify-between">

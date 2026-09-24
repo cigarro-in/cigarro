@@ -13,7 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
 interface Category {
@@ -48,6 +48,7 @@ export function CategoryFormPage() {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
@@ -75,7 +76,7 @@ export function CategoryFormPage() {
     populatedRef.current = true;
     const data: any = categoryRows.find((c: any) => c.supabaseId === id);
     if (!data) {
-      toast.error('Category not found');
+      setOpError('Category not found');
       navigate('/admin/categories');
       return;
     }
@@ -120,7 +121,7 @@ export function CategoryFormPage() {
   const handleSubmit = async () => {
     setSaveAttempted(true);
     if (!formData.name.trim()) {
-      toast.error('Category name is required');
+      setOpError('Category name is required');
       return;
     }
 
@@ -138,11 +139,11 @@ export function CategoryFormPage() {
       let categoryId = id;
       if (isEditMode) {
         await updateCategory({ supabaseId: id!, patch: args });
-        toast.success('Category updated successfully');
+        setOpOk('Category updated successfully');
       } else {
         const { supabaseId } = await createCategory(args);
         categoryId = supabaseId;
-        toast.success('Category created successfully');
+        setOpOk('Category created successfully');
       }
 
       // Replace product links (same replace-set semantics as before).
@@ -152,7 +153,7 @@ export function CategoryFormPage() {
     } catch (error: any) {
       console.error('Error saving category:', error);
       const code = error?.data?.code;
-      toast.error(
+      setOpError(
         code === 'SLUG_TAKEN'
           ? 'Slug is taken by another category'
           : code === 'NOT_CATALOG_ADMIN'
@@ -169,11 +170,11 @@ export function CategoryFormPage() {
     setSaving(true);
     try {
       await removeCategory({ supabaseId: id! });
-      toast.success('Category deleted successfully');
+      setOpOk('Category deleted successfully');
       navigate('/admin/categories');
     } catch (error: any) {
       console.error('Error deleting category:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete category');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete category');
     } finally {
       setSaving(false);
     }
@@ -230,6 +231,10 @@ export function CategoryFormPage() {
           )}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         

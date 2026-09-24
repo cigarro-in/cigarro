@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -60,6 +60,7 @@ export function DiscountFormPage() {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const row = useQuery(
     api.discounts.getDiscountForEdit,
@@ -130,12 +131,12 @@ export function DiscountFormPage() {
   const handleSubmit = async () => {
     setSaveAttempted(true);
     if (!formData.name.trim()) {
-      toast.error('Discount name is required');
+      setOpError('Discount name is required');
       return;
     }
 
     if (formData.type !== 'cart_value' && formData.value <= 0) {
-      toast.error('Discount value must be greater than 0');
+      setOpError('Discount value must be greater than 0');
       return;
     }
 
@@ -159,16 +160,16 @@ export function DiscountFormPage() {
 
       if (isEditMode) {
         await saveDiscount({ id: id as any, ...payload });
-        toast.success('Discount updated successfully');
+        setOpOk('Discount updated successfully');
       } else {
         await saveDiscount(payload);
-        toast.success('Discount created successfully');
+        setOpOk('Discount created successfully');
       }
 
       navigate('/admin/discounts');
     } catch (error: any) {
       console.error('Error saving discount:', error);
-      toast.error(
+      setOpError(
         error?.data?.code === 'CODE_TAKEN'
           ? 'That coupon code is already in use'
           : error?.data?.code === 'NOT_DISCOUNT_ADMIN'
@@ -185,11 +186,11 @@ export function DiscountFormPage() {
     setSaving(true);
     try {
       await removeDiscount({ id: id as any });
-      toast.success('Discount deleted successfully');
+      setOpOk('Discount deleted successfully');
       navigate('/admin/discounts');
     } catch (error: any) {
       console.error('Error deleting discount:', error);
-      toast.error(
+      setOpError(
         error?.data?.code === 'NOT_DISCOUNT_ADMIN'
           ? 'Admin access required'
           : 'Failed to delete discount'
@@ -275,6 +276,10 @@ export function DiscountFormPage() {
           )}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         

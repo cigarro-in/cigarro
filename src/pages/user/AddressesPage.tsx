@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useAuth } from '../../hooks/useAuth';
 import { useAddresses } from '../../lib/convex/useAddresses';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Address } from '../../components/checkout/address/AddressCard';
 import { AddressForm } from '../../components/checkout/address/AddressForm';
 import { AddressCard } from '../../components/checkout/address/AddressCard';
@@ -24,6 +24,7 @@ export function AddressesPage() {
   } = useAddresses(user);
   const [legacyAddresses, setLegacyAddresses] = useState<Address[]>([]);
   const [legacyLoading, setLegacyLoading] = useState(true);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const shownAddresses = legacyAddresses;
   const isLoading = legacyLoading;
@@ -42,7 +43,7 @@ export function AddressesPage() {
       setLegacyAddresses(rows);
     } catch (error) {
       console.error('Error fetching addresses:', error);
-      toast.error('Failed to load addresses');
+      setOpError('Failed to load addresses');
     } finally {
       setLegacyLoading(false);
     }
@@ -64,13 +65,13 @@ export function AddressesPage() {
         label: addressData.label,
         is_default: (addressData as any).is_default,
       });
-      toast.success(addressData.id ? 'Address updated' : 'Address added');
+      setOpOk(addressData.id ? 'Address updated' : 'Address added');
       await fetchAddresses();
       setView('list');
       setEditingAddress(null);
     } catch (err) {
       console.error('Error saving address:', err);
-      toast.error('Failed to save address');
+      setOpError('Failed to save address');
     }
   };
 
@@ -79,11 +80,11 @@ export function AddressesPage() {
 
       try {
           await storeDeleteAddress(id);
-          toast.success('Address deleted');
+          setOpOk('Address deleted');
           fetchAddresses();
       } catch (error) {
           console.error('Error deleting address:', error);
-          toast.error('Failed to delete address');
+          setOpError('Failed to delete address');
       }
   };
 
@@ -122,6 +123,9 @@ export function AddressesPage() {
         </div>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-4">
+            <InlineStatus status={opStatus} />
+          </div>
           {view === 'list' ? (
             <>
               {shownAddresses.length === 0 ? (

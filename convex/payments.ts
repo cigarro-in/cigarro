@@ -5,6 +5,7 @@ import { MutationCtx, internalMutation } from "./_generated/server";
 import { parseWithTemplates, parseBankEmail } from "./lib/email";
 import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
+import { RECONCILE_OFFSETS_MS } from "./lib/pollSchedule";
 import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory } from "./lib/inventory";
 
@@ -46,6 +47,17 @@ export const expireHeldSlot = internalMutation({
         internal.payments.releaseQuarantine,
         { slotId: order.slotId },
       );
+    }
+
+    // Sparse order-triggered post-expiry reconciliation: catch a late UPI
+    // credit inside the quarantine window (auto late-paid / wallet credit).
+    // Each check skips (zero Gmail calls) when nothing is reconcilable.
+    for (const ms of RECONCILE_OFFSETS_MS) {
+      await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, {
+        orgId: order.orgId,
+        orderId,
+        reason: "reconcile",
+      });
     }
   },
 });

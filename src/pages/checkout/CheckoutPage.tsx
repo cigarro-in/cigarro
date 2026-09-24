@@ -13,7 +13,8 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { useAddresses, FlatAddress } from '../../lib/convex/useAddresses';
 import { useConvex } from 'convex/react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { useCurrentLocation } from '../../hooks/useCurrentLocation';
 import { formatINR } from '../../utils/currency';
 import { useMutation } from 'convex/react';
 import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
@@ -109,6 +110,7 @@ export function CheckoutPage() {
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [isAddressSectionCollapsed, setIsAddressSectionCollapsed] = useState(true);
   const [isOrderProcessing, setIsOrderProcessing] = useState(false);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   
   // Discount-related state
   const [couponCode, setCouponCode] = useState('');
@@ -305,7 +307,7 @@ export function CheckoutPage() {
       
       if (discount && discount.is_applicable) {
         setAppliedDiscount(discount);
-        // No toast: the coupon row + total update in place; success is visible.
+        // No status: the coupon row + total update in place; success is visible.
       } else {
         setDiscountError(discount?.reason || 'Coupon not applicable');
       }
@@ -321,7 +323,7 @@ export function CheckoutPage() {
     setAppliedDiscount(null);
     setCouponCode('');
     setDiscountError('');
-    // No toast: the coupon row disappears and the total updates in place.
+    // No status: the coupon row disappears and the total updates in place.
   };
 
   const preloadQRCode = async () => {
@@ -449,9 +451,9 @@ export function CheckoutPage() {
 
         setFormData(prev => ({
           ...prev,
-          city: office.District || prev.city,
-          state: office.State || prev.state,
-          country: office.Country || prev.country
+          city: prev.city || office.District || prev.city,
+          state: prev.state || office.State || prev.state,
+          country: prev.country || office.Country || prev.country
         }));
 
         // Set country code to +91 for Indian PIN codes (only if not already set)
@@ -466,7 +468,7 @@ export function CheckoutPage() {
           state: '',
           pincode: ''
         }));
-        // No toast: city/state filling in IS the confirmation.
+        // No status: city/state filling in IS the confirmation.
       } catch (error) {
         console.error('Error fetching location from pincode:', error);
         setValidationErrors(prev => ({
@@ -477,98 +479,62 @@ export function CheckoutPage() {
     }
   };
 
+  const { locate } = useCurrentLocation();
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
-    
+
     try {
-      if (!navigator.geolocation) {
-        toast.error('Location services not supported on this device');
+      // Shared path: device position + server-side reverse geocode.
+      const res = await locate();
+      if (!res.ok) {
+        setOpError(res.message);
         return;
       }
-
-      // Request location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (error) => reject(error),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      });
-
-      const { latitude, longitude } = position.coords;
-      setCurrentLocationData({ lat: latitude, lng: longitude });
-      // No toast: the spinner + fields filling in are the feedback.
-
-      // Use Nominatim for reverse geocoding
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch address details');
+      const addr = res.value;
+      // Real device fix only — never 0,0. Absent coords leave the previous
+      // fix (or none) in place so saves never persist a zero position.
+      if (Number.isFinite(res.coords.lat) && Number.isFinite(res.coords.lon)) {
+        setCurrentLocationData({ lat: res.coords.lat, lng: res.coords.lon });
       }
+      // No status: the spinner + fields filling in are the feedback.
 
-      const data = await response.json();
-      
-      if (data && data.address) {
-        const addr = data.address;
-        
-        // Extract components
-        const pincode = addr.postcode || '';
-        
-        // Construct address line
-        const addressParts = [];
-        if (addr.house_number) addressParts.push(addr.house_number);
-        if (addr.building) addressParts.push(addr.building);
-        if (addr.road) addressParts.push(addr.road);
-        if (addr.suburb) addressParts.push(addr.suburb);
-        if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
-        
-        const formattedAddress = addressParts.join(', ');
+      const pincode = addr.pincode || '';
 
-        // Update form data
-        setFormData(prev => ({
-          ...prev,
-          address: formattedAddress,
-          pincode: pincode,
-          // Clear city/state/country to be filled by pincode lookup
-          city: '',
-          state: '',
-          country: 'India'
-        }));
-        
-        // Clear validation errors
-        setValidationErrors(prev => ({
-          ...prev,
-          address: '',
-          pincode: pincode ? '' : prev.pincode,
-          city: '',
-          state: ''
-        }));
-        
-        // Mark as new address since location was detected
-        setIsNewAddress(true);
-        setSelectedSavedAddress('');
-        setEditingAddressId(null);
+      // Update form data (blanks only — typed values survive, including
+      // city/state which the pincode lookup below fills when still blank)
+      setFormData(prev => ({
+        ...prev,
+        address: prev.address || addr.address || prev.address,
+        pincode: prev.pincode || pincode || prev.pincode,
+        city: prev.city || addr.city || prev.city,
+        state: prev.state || addr.state || prev.state,
+        country: 'India'
+      }));
 
-        // Trigger pincode lookup to fill city/state automatically
-        if (pincode && pincode.length === 6) {
-          await fetchLocationFromPincode(pincode);
-        }
-        // No toast: the form fields filling in IS the confirmation.
-      } else {
-        throw new Error('Incomplete address data received');
+      // Clear validation errors only for fields that now hold a value
+      const hasCity = Boolean(formData.city || addr.city);
+      const hasState = Boolean(formData.state || addr.state);
+      setValidationErrors(prev => ({
+        ...prev,
+        address: '',
+        pincode: pincode ? '' : prev.pincode,
+        city: hasCity ? '' : prev.city,
+        state: hasState ? '' : prev.state
+      }));
+
+      // Mark as new address since location was detected
+      setIsNewAddress(true);
+      setSelectedSavedAddress('');
+      setEditingAddressId(null);
+
+      // Trigger pincode lookup to fill city/state automatically
+      if (pincode && pincode.length === 6) {
+        await fetchLocationFromPincode(pincode);
       }
-
+      // No status: the form fields filling in IS the confirmation.
     } catch (error: any) {
       console.error('Location error:', error);
-      let errorMessage = 'Failed to get location';
-      
-      if (error.code === 1) errorMessage = 'Location permission denied';
-      if (error.code === 2) errorMessage = 'Location unavailable';
-      if (error.code === 3) errorMessage = 'Location request timed out';
-      
-      toast.error(errorMessage);
+      setOpError('Failed to get location');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -595,10 +561,10 @@ export function CheckoutPage() {
         userProvidedAddress: addressData.userProvidedAddress || addressData.address,
       } as FlatAddress);
       loadSavedAddresses(true); // Skip auto-fill when saving new address
-      // No toast: the address list updating is the confirmation.
+      // No status: the address list updating is the confirmation.
     } catch (error: any) {
       console.error('Error saving address:', error);
-      toast.error(error?.message || 'Failed to save address');
+      setOpError(error?.message || 'Failed to save address');
     }
   };
 
@@ -643,10 +609,10 @@ export function CheckoutPage() {
       await setStoreDefaultAddress(addressId);
       // Reload addresses
       await loadSavedAddresses(true); // Skip auto-fill when updating primary address
-      // No toast: the primary badge moving is the confirmation.
+      // No status: the primary badge moving is the confirmation.
     } catch (error) {
       console.error('Error setting primary address:', error);
-      toast.error('Failed to set primary address');
+      setOpError('Failed to set primary address');
     }
   };
 
@@ -662,14 +628,14 @@ export function CheckoutPage() {
 
     try {
       await deleteStoreAddress(addressId);
-      // No toast: the row disappearing is the confirmation.
+      // No status: the row disappearing is the confirmation.
       loadSavedAddresses(true); // Skip auto-fill when deleting address
       // Clear selection if this address was selected
       if (selectedSavedAddress === addressId) {
         setSelectedSavedAddress('');
       }
     } catch {
-      toast.error('Failed to delete address');
+      setOpError('Failed to delete address');
     }
   };
 
@@ -725,7 +691,7 @@ export function CheckoutPage() {
         latitude: currentLocationData?.lat,
         longitude: currentLocationData?.lng,
       } as FlatAddress);
-      // No toast: order success screen is confirmation enough; saving is silent.
+      // No status: order success screen is confirmation enough; saving is silent.
       // Reload addresses to update the UI
       await loadSavedAddresses(true);
     } catch (error) {
@@ -759,7 +725,7 @@ export function CheckoutPage() {
     // Check for duplicates
     const isDuplicate = await checkForDuplicateAddress();
     if (isDuplicate) {
-      // No toast: the save-suggestion row just hides; nothing changed.
+      // No status: the save-suggestion row just hides; nothing changed.
       setShowSaveSuggestion(false);
       return;
     }
@@ -795,7 +761,7 @@ export function CheckoutPage() {
         setIsAddressSectionCollapsed(true);
         setEditingAddressId(null);
         loadSavedAddresses(true);
-        // No toast: the form closing + address selected is the confirmation.
+        // No status: the form closing + address selected is the confirmation.
         return;
       }
 
@@ -813,7 +779,7 @@ export function CheckoutPage() {
         userProvidedAddress: formData.address,
       } as FlatAddress);
 
-      // No toast: the save-suggestion row hiding is the confirmation.
+      // No status: the save-suggestion row hiding is the confirmation.
       setShowSaveSuggestion(false);
       setIsNewAddress(false);
       // Close the new-address loop with the just-saved address selected.
@@ -823,7 +789,7 @@ export function CheckoutPage() {
       loadSavedAddresses(true);
     } catch (error: any) {
       console.error('Failed to save address:', error);
-      toast.error(`Failed to save address: ${error?.message || 'Unknown error'}`);
+      setOpError(`Failed to save address: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -885,11 +851,11 @@ export function CheckoutPage() {
 
   const handlePaymentConfirmation = async () => {
     if (!user) {
-      toast.error('Please log in to complete your order');
+      setOpError('Please log in to complete your order');
       return;
     }
     if (!org) {
-      toast.error('Store is loading. Please try again in a moment.');
+      setOpError('Store is loading. Please try again in a moment.');
       return;
     }
     setIsProcessingPayment(true);
@@ -945,7 +911,7 @@ export function CheckoutPage() {
         })
       );
       if (convexItems.some((it, i) => it.unitPricePaise !== rupeesToPaise(Number((items[i] as any).variant_price ?? (items[i] as any).combo_price ?? (items[i] as any).price ?? 0)))) {
-        // No toast: prices refresh silently; the summary re-renders with them.
+        // No status: prices refresh silently; the summary re-renders with them.
       }
 
       const result = await createConvexOrder({
@@ -993,7 +959,7 @@ export function CheckoutPage() {
           : code === 'ORG_INACTIVE'
           ? 'Store is currently unavailable.'
           : 'Failed to process order. Please try again.';
-      toast.error(msg);
+      setOpError(msg);
       setIsOrderProcessing(false);
     } finally {
       setIsProcessingPayment(false);
@@ -1003,7 +969,7 @@ export function CheckoutPage() {
   const sendPaymentLink = async (method: 'email' | 'sms') => {
     const contact = method === 'email' ? paymentLinkEmail : paymentLinkPhone;
     if (!contact) {
-      toast.error(`Please enter ${method === 'email' ? 'email address' : 'phone number'}`);
+      setOpError(`Please enter ${method === 'email' ? 'email address' : 'phone number'}`);
       return;
     }
     
@@ -1014,10 +980,10 @@ export function CheckoutPage() {
     
     try {
       await navigator.clipboard.writeText(upiURL);
-      // No toast: clipboard write is user-initiated + visible; skip the noise.
+      // No status: clipboard write is user-initiated + visible; skip the noise.
     } catch (error) {
       console.error('Failed to copy link:', error);
-      toast.error('Failed to copy payment link');
+      setOpError('Failed to copy payment link');
     }
   };
 
@@ -1105,6 +1071,9 @@ export function CheckoutPage() {
 
           {/* Main Content Area */}
           <div className="flex-1">
+            <div className="mb-4">
+              <InlineStatus status={opStatus} />
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
@@ -1295,6 +1264,7 @@ export function CheckoutPage() {
                 return null;
               })()}
             </div>
+            <p className="text-[10px] text-muted-foreground">Location lookup by © OpenStreetMap contributors</p>
 
                 {/* Address Form Fields */}
                 <div>
@@ -1681,9 +1651,9 @@ export function CheckoutPage() {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
                             const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             navigator.clipboard.writeText(upiURL).catch(() => {
-                              toast.error('Copy failed — long-press the QR instead');
+                              setOpError('Copy failed — long-press the QR instead');
                             });
-                            // No success toast: clipboard write is user-initiated.
+                            // No success status: clipboard write is user-initiated.
                           }}
                           className="w-full"
                         >

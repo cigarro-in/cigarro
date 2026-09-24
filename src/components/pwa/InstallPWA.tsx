@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Share, PlusSquare } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -66,7 +65,7 @@ export const InstallPWA = ({ mobile, className, onCloseMenu }: InstallPWAProps) 
     if (outcome === 'accepted') {
       setSupportsPWA(false);
       if (onCloseMenu) onCloseMenu();
-      toast.success('App installed successfully!');
+      // No status: the installed app + disappearing button are the confirmation.
     }
   };
 

@@ -3,7 +3,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -44,6 +44,7 @@ interface PerformanceResult {
 }
 
 export function SettingsManager() {
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const [settings, setSettings] = useState<SiteSettings>({
     id: 1,
     site_name: '',
@@ -107,13 +108,13 @@ export function SettingsManager() {
       // Fetch the sitemap to trigger regeneration (it's dynamically generated)
       const response = await fetch('/sitemap.xml', { cache: 'no-store' });
       if (response.ok) {
-        toast.success('Sitemap regenerated successfully');
+        setOpOk('Sitemap regenerated successfully');
       } else {
         throw new Error('Failed to regenerate sitemap');
       }
     } catch (error) {
       console.error('Error regenerating sitemap:', error);
-      toast.error('Failed to regenerate sitemap');
+      setOpError('Failed to regenerate sitemap');
     } finally {
       setIsRegeneratingSitemap(false);
     }
@@ -128,10 +129,10 @@ export function SettingsManager() {
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
 
-      toast.success('Cache cleared successfully');
+      setOpOk('Cache cleared successfully');
     } catch (error) {
       console.error('Error clearing cache:', error);
-      toast.error('Failed to clear cache');
+      setOpError('Failed to clear cache');
     } finally {
       setIsClearingCache(false);
     }
@@ -141,12 +142,11 @@ export function SettingsManager() {
     const isProduction = window.location.hostname === 'cigarro.in';
 
     if (!isProduction) {
-      toast.info('⚠️ Cloudflare cache purge only works in production.\n\nIn development, there is no CDN cache - all data loads fresh from Convex.', { duration: 5000 });
+      setOpOk('Cloudflare cache purge only works in production. In development, there is no CDN cache - all data loads fresh from Convex.');
       return;
     }
 
     setIsPurgingCloudflare(true);
-    const loading = toast.loading('Purging Cloudflare cache...');
 
     try {
       const own = getAccessToken();
@@ -158,21 +158,19 @@ export function SettingsManager() {
         },
       });
       const data = await response.json();
-      toast.dismiss(loading);
       
       if (response.ok && data.success) {
         const successCount = data.results?.filter((r: any) => r.success).length || 0;
         const totalCount = data.results?.length || 0;
         const modeNote = data.mode === 'warm' ? ' (warmed — add purge credentials for true purges)' : '';
-        toast.success(`Cloudflare cache purged! ${successCount}/${totalCount} endpoints cleared${modeNote}.`, { duration: 4000 });
+        setOpOk(`Cloudflare cache purged! ${successCount}/${totalCount} endpoints cleared${modeNote}.`);
       } else {
         console.error('Cache purge failed:', data);
-        toast.error(data.error || 'Failed to purge Cloudflare cache');
+        setOpError(data.error || 'Failed to purge Cloudflare cache');
       }
     } catch (error) {
       console.error('Cache purge error:', error);
-      toast.dismiss(loading);
-      toast.error('Failed to purge Cloudflare cache. Check console for details.');
+      setOpError('Failed to purge Cloudflare cache. Check console for details.');
     } finally {
       setIsPurgingCloudflare(false);
     }
@@ -184,7 +182,6 @@ export function SettingsManager() {
     try {
       // Always test the live HTTP endpoints (same signal in dev and prod —
       // no direct-DB branch, so no Supabase dependency here).
-      const loading = toast.loading('Testing CDN performance...');
 
       const endpoints = [
         { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
@@ -226,7 +223,6 @@ export function SettingsManager() {
           }
         }
 
-        toast.dismiss(loading);
         const validResults = results.filter(r => r.time > 0);
         const avgTime = validResults.length > 0 ? Math.round(validResults.reduce((sum, r) => sum + r.time, 0) / validResults.length) : 0;
         const hitCount = results.filter(r => r.cacheStatus === 'HIT').length;
@@ -239,10 +235,10 @@ export function SettingsManager() {
           timestamp: new Date().toLocaleTimeString()
         });
 
-        toast.success(`CDN Performance: Average ${avgTime}ms, ${hitCount}/${results.length} cache hits`, { duration: 4000 });
+        setOpOk(`CDN Performance: Average ${avgTime}ms, ${hitCount}/${results.length} cache hits`);
     } catch (error) {
       console.error('Performance test error:', error);
-      toast.error('Failed to test performance');
+      setOpError('Failed to test performance');
     } finally {
       setIsTestingPerformance(false);
     }
@@ -253,7 +249,7 @@ export function SettingsManager() {
     if (settings.upi_id && settings.upi_id.trim()) {
       const upiPattern = /^[\w.-]+@[\w.-]+$/;
       if (!upiPattern.test(settings.upi_id.trim())) {
-        toast.error('Invalid UPI ID format. Expected format: username@provider');
+        setOpError('Invalid UPI ID format. Expected format: username@provider');
         return;
       }
     }
@@ -270,11 +266,11 @@ export function SettingsManager() {
         shippingConfig: toShippingConfig(shippingMethods),
       });
 
-      toast.success('Settings updated successfully');
+      setOpOk('Settings updated successfully');
       setIsDirty(false);
     } catch (error: any) {
       console.error('Error updating settings:', error);
-      toast.error(`Failed to update settings: ${error?.data?.code || error.message || 'Unknown error'}`);
+      setOpError(`Failed to update settings: ${error?.data?.code || error.message || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -287,9 +283,9 @@ export function SettingsManager() {
       await saveSettings({ activeTheme: newThemeId });
       setTheme(newThemeId);
       setSettings(prev => ({ ...prev, active_theme: newThemeId }));
-      toast.success(`Switched to ${availableThemes.find(t => t.id === newThemeId)?.name}`);
+      setOpOk(`Switched to ${availableThemes.find(t => t.id === newThemeId)?.name}`);
     } catch (error: any) {
-      toast.error(`Failed to switch theme: ${error?.data?.code || error.message || 'Unknown error'}`);
+      setOpError(`Failed to switch theme: ${error?.data?.code || error.message || 'Unknown error'}`);
     } finally {
       setIsSavingTheme(null);
     }
@@ -356,6 +352,7 @@ export function SettingsManager() {
       </PageHeader>
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+        <InlineStatus status={opStatus} />
         {/* Storefront Theme */}
         <AdminCard>
           <AdminCardHeader>

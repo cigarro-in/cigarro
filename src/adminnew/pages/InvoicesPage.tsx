@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { FilePlus2, FileText, ReceiptIndianRupee, Settings2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { api } from '../../../convex/_generated/api';
 import { formatPaiseINR } from '../../lib/convex/money';
 import { useOrg } from '../../lib/convex/useOrg';
@@ -37,6 +37,7 @@ export function InvoicesPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   const [form, setForm] = useState({ prefix: 'INV', businessName: '', address: '', phone: '', email: '', gstin: '', terms: '', accentColor: '#9a4f2d' });
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export function InvoicesPage() {
       setSettingsOpen(false);
       setMessage('Invoice design and business details updated');
     } catch (error: any) {
-      toast.error(error?.message || 'Could not save invoice settings');
+      setOpError(error?.message || 'Could not save invoice settings');
     } finally { setSaving(false); }
   };
 
@@ -79,6 +80,7 @@ export function InvoicesPage() {
         <Button onClick={() => navigate('/admin/invoices/new')}><FilePlus2 className="mr-2 h-4 w-4" />New invoice</Button>
       </PageHeader>
       <div className="mx-auto max-w-[1600px] space-y-5 px-6 pt-6">
+        <InlineStatus status={opStatus} />
         {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
         <div className="grid gap-4 sm:grid-cols-3">
           <Summary icon={FileText} label="Invoices created" value={(invoices ?? []).length.toLocaleString('en-IN')} />

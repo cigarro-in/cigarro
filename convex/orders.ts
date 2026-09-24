@@ -6,6 +6,7 @@ import { requireIdentity, requireMember } from "./lib/auth";
 import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf } from "./lib/ids";
 import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
+import { buildOrderPollOffsets } from "./lib/pollSchedule";
 import { addressV, orderItemV, orderKind } from "./schema";
 import { creditWallet, debitWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
@@ -217,12 +218,18 @@ async function pricePurchaseItems(
       }
       if (!variant || !variant.isActive || variant.productSupabaseId !== product.supabaseId)
         throw new ConvexError({ code: "INVALID_PRODUCT_VARIANT" });
+      // Snapshot the sold variant's image key so order history never depends
+      // on later catalog edits. Optional: legacy rows predate it.
+      const variantImage = (variant as any).images?.[0];
       priced.push({
         productId: product.supabaseId,
         variantId: variant.supabaseId,
         name: `${product.name} · ${variant.variantName}`,
         qty: item.qty,
         unitPricePaise: rupeesToPaise(variant.priceRupees),
+        ...(typeof variantImage === "string" && variantImage
+          ? { image: variantImage }
+          : {}),
       });
       continue;
     }
@@ -231,11 +238,15 @@ async function pricePurchaseItems(
       .withIndex("by_supabase", (q) => q.eq("supabaseId", item.productId))
       .unique();
     if (!combo?.isActive) throw new ConvexError({ code: "PRODUCT_NOT_FOUND" });
+    const comboImage = (combo as any).image ?? (combo as any).galleryImages?.[0];
     priced.push({
       productId: combo.supabaseId,
       name: combo.name,
       qty: item.qty,
       unitPricePaise: rupeesToPaise(combo.comboPriceRupees),
+      ...(typeof comboImage === "string" && comboImage
+        ? { image: comboImage }
+        : {}),
     });
   }
   return priced;
@@ -622,19 +633,19 @@ export const createOrder = mutation({
       { orderId },
     );
 
-    // Schedule 5 Gmail polls — the poller idle-skips when nothing is pending,
-    // and ingest dedupes by messageId, so overlapping polls are safe.
-    const pokeOffsets = [
-      30_000,
-      90_000,
-      3 * 60_000,
-      6 * 60_000,
-      9 * 60_000 + 45_000,
-    ];
-    for (const ms of pokeOffsets) {
+    // Event-driven Gmail checks for this order: early backoff
+    // (5s,12s,25s,45s,75s,120s, filtered to the order timeout) then a bounded
+    // 60s cadence up to the order timeout. Each check carries the order's
+    // poll generation — a customer wake/refresh bumps it, so this chain goes
+    // stale instead of doubling calls. Each check skips (zero Gmail calls)
+    // when nothing is pending, and the chain stops once the order turns
+    // terminal. Ingest dedupes by messageId, so overlapping checks are safe.
+    for (const ms of buildOrderPollOffsets(org.slotTimeoutMs)) {
       await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, {
         orgId: args.orgId,
+        orderId,
         reason: "scheduled",
+        generation: 0,
       });
     }
 

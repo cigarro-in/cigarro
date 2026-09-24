@@ -5,7 +5,7 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Trash2, ArrowLeft, ShoppingCart, Package, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Button } from '../../components/ui/button';
 import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
@@ -38,6 +38,7 @@ interface CartItemProps {
 const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, updateQuantity, removeFromCart, isLoading }, ref) => {
   const [imageError, setImageError] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { status: itemStatus, setError: setItemError } = useInlineStatus();
 
   const handleQuantityChange = async (newQuantity: number) => {
     if (newQuantity < 1) return;
@@ -45,18 +46,18 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
       await updateQuantity(item.id, newQuantity, item.variant_id, item.combo_id);
     } catch (error) {
       console.error('❌ Failed to update quantity:', error);
-      toast.error('Failed to update quantity');
+      setItemError('Failed to update quantity');
     }
   };
 
   const handleRemove = async () => {
     try {
       await removeFromCart(item.id, item.variant_id, item.combo_id);
-      // No toast: the row animates out; removal is self-evident.
+      // No status: the row animates out; removal is self-evident.
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error('❌ Failed to remove item:', error);
-      toast.error('Failed to remove item');
+      setItemError('Failed to remove item');
     }
   };
 
@@ -71,6 +72,7 @@ const CartItem = React.forwardRef<HTMLDivElement, CartItemProps>(({ item, update
       exit={{ opacity: 0, x: -100 }}
       className="group relative bg-card border-2 border-border/40 rounded-xl p-4 shadow-sm hover:border-accent/40 transition-all duration-300"
     >
+      <InlineStatus status={itemStatus} />
       <div className="flex gap-4">
         {/* Product Image */}
         <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-muted/20 rounded-lg overflow-hidden flex-shrink-0 border border-border/20">
@@ -316,9 +318,9 @@ export default function CartPage() {
                 {/* Cart Items List */}
                 <div className="lg:col-span-8 space-y-4">
                   <AnimatePresence mode="popLayout">
-                    {items.map((item, index) => (
+                    {items.map((item) => (
                       <CartItem
-                        key={`${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}-${index}`}
+                        key={`${item.id}-${item.variant_id || 'base'}-${item.combo_id || 'none'}`}
                         item={item}
                         updateQuantity={updateQuantity}
                         removeFromCart={removeFromCart}

@@ -16,7 +16,7 @@ import { PageHeader } from '../components/shared/PageHeader';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { ProductFormData, VariantFormData, Brand, Category, generateSlug, calculateProfitMargin } from '../../types/product';
 
@@ -34,6 +34,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   const [deletedVariantIds, setDeletedVariantIds] = useState<string[]>([]);
   const [imageSearchOpen, setImageSearchOpen] = useState(false);
   const [imageSearchVariantIndex, setImageSearchVariantIndex] = useState<number | null>(null);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // Reference lists (public catalog reads) mapped to the {id, name} shapes
   // the dropdowns already expect — supabaseIds flow straight back on save.
@@ -103,7 +104,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     if (!isEditMode || !editData || populatedRef.current) return;
     populatedRef.current = true;
     if (!editData) {
-      toast.error('Product not found');
+      setOpError('Product not found');
       navigate('/admin/products');
       return;
     }
@@ -287,18 +288,18 @@ export function ProductFormPage({ }: ProductFormPageProps) {
   const handleSubmit = async () => {
     setSaveAttempted(true);
     if (!formData.name.trim()) {
-      toast.error('Product name is required');
+      setOpError('Product name is required');
       return;
     }
 
     const defaultVariant = formData.variants.find(v => v.is_default);
     if (!defaultVariant) {
-      toast.error('At least one default variant is required');
+      setOpError('At least one default variant is required');
       return;
     }
 
     if (defaultVariant.price <= 0) {
-      toast.error('Default variant price must be greater than 0');
+      setOpError('Default variant price must be greater than 0');
       return;
     }
 
@@ -368,13 +369,13 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         collectionSupabaseIds: formData.collections,
       });
 
-      toast.success(isEditMode ? 'Product updated successfully' : 'Product created successfully');
+      setOpOk(isEditMode ? 'Product updated successfully' : 'Product created successfully');
 
       navigate('/admin/products');
     } catch (error: any) {
       console.error('Error saving product:', error);
       const code = error?.data?.code;
-      toast.error(
+      setOpError(
         code === 'SLUG_TAKEN'
           ? 'Slug is taken by another product'
           : code === 'NOT_CATALOG_ADMIN'
@@ -391,11 +392,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     setSaving(true);
     try {
       await removeProduct({ supabaseId: id! });
-      toast.success('Product deleted successfully');
+      setOpOk('Product deleted successfully');
       navigate('/admin/products');
     } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete product');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete product');
     } finally {
       setSaving(false);
     }
@@ -455,6 +456,10 @@ export function ProductFormPage({ }: ProductFormPageProps) {
           )}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
 

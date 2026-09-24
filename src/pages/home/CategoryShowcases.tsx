@@ -2,7 +2,7 @@ import React from 'react';
 import { Package, Leaf, Flame } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { CategoryWithProducts } from '../../types/home';
 
 const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -19,14 +19,15 @@ interface CategoryShowcasesProps {
 
 export function CategoryShowcases({ categoriesWithProducts = [], isLoading = false }: CategoryShowcasesProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleAddToCart = async (product: any) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add item to cart');
+      setOpError('Failed to add item to cart');
     }
   };
 
@@ -41,6 +42,9 @@ export function CategoryShowcases({ categoriesWithProducts = [], isLoading = fal
 
   return (
     <section className="py-6 bg-creme">
+      <div className="max-w-3xl mx-auto mb-6 px-4">
+        <InlineStatus status={opStatus} />
+      </div>
       <div className="space-y-12">
         {categoriesWithProducts.map((category) => (
           <CategoryProductRow 

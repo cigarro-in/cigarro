@@ -13,7 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
 interface Collection {
@@ -50,6 +50,7 @@ export function CollectionFormPage() {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const [formData, setFormData] = useState<CollectionFormData>({
     title: '',
@@ -84,7 +85,7 @@ export function CollectionFormPage() {
     populatedRef.current = true;
     const data: any = collectionRows.find((c: any) => c.supabaseId === id);
     if (!data) {
-      toast.error('Collection not found');
+      setOpError('Collection not found');
       navigate('/admin/collections');
       return;
     }
@@ -131,7 +132,7 @@ export function CollectionFormPage() {
   const handleSubmit = async () => {
     setSaveAttempted(true);
     if (!formData.title.trim()) {
-      toast.error('Collection title is required');
+      setOpError('Collection title is required');
       return;
     }
 
@@ -152,13 +153,13 @@ export function CollectionFormPage() {
         },
         productSupabaseIds: selectedProductIds,
       });
-      toast.success(isEditMode ? 'Collection updated successfully' : 'Collection created successfully');
+      setOpOk(isEditMode ? 'Collection updated successfully' : 'Collection created successfully');
 
       navigate('/admin/collections');
     } catch (error: any) {
       console.error('Error saving collection:', error);
       const code = error?.data?.code;
-      toast.error(
+      setOpError(
         code === 'SLUG_TAKEN'
           ? 'Slug is taken by another collection'
           : code === 'NOT_CATALOG_ADMIN'
@@ -175,11 +176,11 @@ export function CollectionFormPage() {
     setSaving(true);
     try {
       await removeCollection({ supabaseId: id! });
-      toast.success('Collection deleted successfully');
+      setOpOk('Collection deleted successfully');
       navigate('/admin/collections');
     } catch (error: any) {
       console.error('Error deleting collection:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collection');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collection');
     } finally {
       setSaving(false);
     }
@@ -236,6 +237,10 @@ export function CollectionFormPage() {
           )}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         

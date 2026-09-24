@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
@@ -14,6 +14,7 @@ export function VividWishlist() {
   const [loading, setLoading] = useState(true);
   // Wave 3: wishlist rows from the Convex catalog (same shapes).
   const { products: catalogProducts, loading: catalogLoading } = useFullCatalog();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   useEffect(() => {
     if (catalogLoading) return;
@@ -44,9 +45,9 @@ export function VividWishlist() {
     if (!confirm('Clear your entire wishlist?')) return;
     try {
       await clearWishlist();
-      toast.success('Wishlist cleared');
+      setOpOk('Wishlist cleared');
     } catch {
-      toast.error('Failed to clear wishlist');
+      setOpError('Failed to clear wishlist');
     }
   };
 
@@ -71,6 +72,8 @@ export function VividWishlist() {
             </button>
           )}
         </header>
+
+        <InlineStatus status={opStatus} />
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -56,7 +56,7 @@ Themes own:
 
 - New admin pages: create in `src/adminnew/pages/`, export from `pages/index.ts`, add to `ADMIN_ROUTES` in `AdminRouter.tsx`, add to `NAVIGATION_CONFIG` in `AdminSidebar.tsx`.
 - Never introduce `<theme>Xxx.tsx` files that fetch data. Extract a hook first.
-- Use `sonner` `toast` for user-facing errors; surface Convex error codes via `error?.data?.code`.
+- Never use toasts (`sonner` is banned under `src/` — see `scripts/check-no-toasts.mjs`); surface user-facing errors inline via `InlineStatus` and include Convex error codes via `error?.data?.code`.
 - Before committing schema changes, run `npx convex deploy`. Schema changes are NOT live until deployed.
 
 ## Known deferred items

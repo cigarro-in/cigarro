@@ -124,6 +124,9 @@ export const orderItemV = v.object({
   name: v.string(),
   qty: v.number(),
   unitPricePaise: v.number(),
+  // Image snapshot at order creation (variant/product image key). Optional
+  // for legacy rows; views fall back to the catalog via useMyOrders.
+  image: v.optional(v.string()),
 });
 
 export default defineSchema({
@@ -217,6 +220,7 @@ export default defineSchema({
     idempotencyKey: v.optional(v.string()),  // client-provided; prevents double-create on retry
     extraCreditsPaise: v.optional(v.number()), // sum of duplicate/over-payments credited beyond this order
     lastWakeAt: v.optional(v.number()),      // throttle for customer wake/refresh polls
+    pollGeneration: v.optional(v.number()), // epoch for scheduled inbox checks; wake bumps it so stale chains exit
     // Inventory is reserved while payment is pending, committed when paid,
     // and released when an unpaid order terminates. Optional for legacy rows.
     inventoryState: v.optional(v.union(
@@ -352,12 +356,26 @@ export default defineSchema({
     .index("by_org_user_time", ["orgId", "userId", "createdAt"])
     .index("by_org_order", ["orgId", "relatedOrderId"]),
 
+  // App-wide Nominatim upstream reservation (public max: absolute 1
+  // req/sec for the whole application). One row (key = "nominatim") holds
+  // the last reservation timestamp; the internal mutation in
+  // convex/geocode.ts reads + writes it atomically, so concurrent actions
+  // serialize on this row. Kept separate from appConfig so unrelated admin
+  // writes never contend with geocode reservations.
+  geocodeUpstreamSlots: defineTable({
+    key: v.string(),
+    lastReservedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   // Platform-wide singleton config. One row expected; use `key = "singleton"`.
   appConfig: defineTable({
     key: v.string(),
     bankSenders: v.optional(v.array(v.string())), // e.g. ["@hdfcbank.bank.in", "@icicibank.com"]
     // Gmail OAuth poller (the payment-verification feed). Secrets live in
     // Convex env (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN), never here.
+    // Legacy: the polling enable-toggle was removed. Checks are event-driven
+    // and run whenever the inbox is connected. Field kept (optional) so old
+    // rows validate; nothing reads it.
     gmailPollEnabled: v.optional(v.boolean()),
     gmailQuery: v.optional(v.string()),
     gmailOrgId: v.optional(v.id("organizations")),
@@ -843,7 +861,7 @@ export default defineSchema({
   // ---------- Marketing: WhatsApp deeplink blasts (admin) ----------
   // Contacts are org-scoped, deduped by normalized phone (digits only,
   // e.g. "9188XXXXXXXX"). Sends are click-to-chat deeplinks
-  // (https://wa.me/<phone>?text=...), recorded per open â€” no BSP involved.
+  // (https://wa.me/<phone>?text=...), recorded per open — no BSP involved.
   marketingContacts: defineTable({
     orgId: v.id("organizations"),
     phone: v.string(),
@@ -862,7 +880,7 @@ export default defineSchema({
     orgId: v.id("organizations"),
     name: v.string(),
     // Supports {{name}} {{firstname}} {{city}} {{phone}} {{code}} {{link}}.
-    // Snapshot of the template at send time â€” later template edits don't
+    // Snapshot of the template at send time — later template edits don't
     // rewrite history.
     message: v.string(),
     templateId: v.optional(v.id("marketingTemplates")),

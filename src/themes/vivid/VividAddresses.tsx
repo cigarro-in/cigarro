@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Pencil, Trash2, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyAddresses } from '../../hooks/data/useMyAddresses';
 import { SEOHead } from '../../components/seo/SEOHead';
@@ -20,6 +20,7 @@ export function VividAddresses() {
   } = useMyAddresses();
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Address | null>(null);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   useEffect(() => {
     if (!user) {
@@ -51,10 +52,10 @@ export function VividAddresses() {
         is_default: (data as any).is_default,
       });
     } catch {
-      toast.error('Failed to save');
+      setOpError('Failed to save');
       return;
     }
-    toast.success(data.id ? 'Address updated' : 'Address added');
+    setOpOk(data.id ? 'Address updated' : 'Address added');
     await reloadStore();
     setView('list');
     setEditing(null);
@@ -66,10 +67,10 @@ export function VividAddresses() {
     try {
       await storeDeleteAddress(id);
     } catch {
-      toast.error('Failed to delete');
+      setOpError('Failed to delete');
       return;
     }
-    toast.success('Address deleted');
+    setOpOk('Address deleted');
     reloadStore();
   }
 
@@ -96,6 +97,8 @@ export function VividAddresses() {
             </button>
           )}
         </header>
+
+        <InlineStatus status={opStatus} />
 
         {view === 'form' ? (
           <div className="vv-surface p-5">

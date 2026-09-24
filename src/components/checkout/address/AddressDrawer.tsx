@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { memo } from 'react';
 import {
   Drawer,
@@ -11,7 +11,8 @@ import { AddressList } from './AddressList';
 import { AddressForm } from './AddressForm';
 import { Address } from './AddressCard';
 import { useAddresses } from '../../../lib/convex/useAddresses';
-import { toast } from 'sonner';
+import { useMyProfile } from '../../../hooks/data/useMyProfile';
+import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
 import { Button } from '../../ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '../../ui/utils';
@@ -38,6 +39,19 @@ export const AddressDrawer = memo(function AddressDrawer({
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const { saveAddress } = useAddresses(user);
+  // Single normalized profile contract: Convex users first, session
+  // fallback. Memoized on values so late profile arrival seeds the form
+  // once without churning the object identity.
+  const { profileName, profilePhone10 } = useMyProfile();
+  const newAddressDefaults = useMemo(
+    () => ({
+      full_name:
+        profileName || user?.email?.split('@')[0] || '',
+      phone: profilePhone10 || '',
+    }),
+    [profileName, profilePhone10, user?.email]
+  );
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   const handleSaveAddress = async (addressData: Address) => {
     if (!user) return;
 
@@ -56,7 +70,7 @@ export const AddressDrawer = memo(function AddressDrawer({
       });
       const savedData = { ...addressData, ...saved } as Address;
 
-      // No toast: the drawer returns to the list with the address selected.
+      // No status: the drawer returns to the list with the address selected.
 
       await onAddressesUpdate();
 
@@ -67,7 +81,7 @@ export const AddressDrawer = memo(function AddressDrawer({
       onOpenChange(false);
     } catch (err) {
       console.error('Error saving address:', err);
-      toast.error('Failed to save address');
+      setOpError('Failed to save address');
     }
   };
 
@@ -119,6 +133,9 @@ export const AddressDrawer = memo(function AddressDrawer({
         </DrawerHeader>
 
         <div className="p-4 overflow-y-auto flex-1 bg-creme">
+          <div className="mb-3">
+            <InlineStatus status={opStatus} />
+          </div>
           {view === 'list' ? (
             <AddressList
               addresses={savedAddresses}
@@ -140,10 +157,7 @@ export const AddressDrawer = memo(function AddressDrawer({
             <AddressForm
               userId={user?.id}
               initialData={editingAddress}
-              defaultValues={{
-                full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0],
-                phone: user?.user_metadata?.phone || ''
-              }}
+              defaultValues={newAddressDefaults}
               onSave={handleSaveAddress}
               onCancel={handleBack}
             />

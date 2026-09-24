@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Separator } from '../ui/separator';
 import { Switch } from '../ui/switch';
 import { formatINR } from '../../utils/currency';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 
 interface OrderSummaryProps {
   items: any[];
@@ -38,29 +38,31 @@ export function OrderSummary({
 }: OrderSummaryProps) {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const handleApplyCustomAmount = () => {
     const amount = parseFloat(customAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
+      setOpError('Please enter a valid amount');
       return;
     }
     if (amount > walletBalance) {
-      toast.error(`Amount cannot exceed wallet balance (${formatINR(walletBalance)})`);
+      setOpError(`Amount cannot exceed wallet balance (${formatINR(walletBalance)})`);
       return;
     }
     if (amount > getFinalTotal()) {
-      toast.error(`Amount cannot exceed order total (${formatINR(getFinalTotal())})`);
+      setOpError(`Amount cannot exceed order total (${formatINR(getFinalTotal())})`);
       return;
     }
     setWalletAmountToUse(amount);
     setShowCustomInput(false);
     setCustomAmount('');
-    // No toast: the wallet deduction line item renders in place.
+    // No status: the wallet deduction line item renders in place.
   };
 
   return (
     <div className="space-y-3">
+      <InlineStatus status={opStatus} />
       <div className="flex justify-between text-sm">
         <span>Subtotal ({items.length} items)</span>
         <span>{formatINR(totalPrice)}</span>
@@ -109,7 +111,7 @@ export function OrderSummary({
                 onCheckedChange={(checked) => {
                   if (checked) {
                     setWalletAmountToUse(Math.min(walletBalance, getFinalTotal()));
-                    // No toast: the deduction line item appears in place.
+                    // No status: the deduction line item appears in place.
                   } else {
                     setWalletAmountToUse(0);
                     setShowCustomInput(false);

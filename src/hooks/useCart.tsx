@@ -89,10 +89,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const convex = useConvex();
   // Mirror of items for mutation closures. Rapid +/- taps used to build
   // each persist from a stale `items` snapshot, so the second full-replace
-  // overwrote the first (lost updates). Mutators read/write the ref and
-  // persists run through a FIFO queue — ponytail: in-memory chain, no lib.
+  // overwrote the first (lost updates). Mutators read/write the ref.
+  //
+  // Latest-intent model (Phase 6): every optimistic mutation bumps
+  // localVersion. Server snapshots older than the newest intent are ignored
+  // (they predate an in-flight persist); ackedVersion advances only when a
+  // server snapshot matches local state — that confirmation path never
+  // rehydrates, so no second visual count/animation. Persists coalesce:
+  // rapid taps schedule one drain writing the latest ref state instead of
+  // one full-replace mutation per tap. On failure the drain reconciles to
+  // authoritative state only when no newer user intent arrived meanwhile,
+  // and acks the abandoned intent only after that reconcile succeeds —
+  // otherwise local state is preserved untouched and the caller rethrows
+  // for its row-level inline error.
   const itemsRef = useRef<CartItem[]>([]);
-  const opQueue = useRef<Promise<void>>(Promise.resolve());
+  const localVersion = useRef(0);
+  const ackedVersion = useRef(0);
+  const persistState = useRef({
+    inFlight: false,
+    queued: false,
+    waiters: [] as Array<{ resolve: () => void; reject: (e: unknown) => void }>,
+  });
 
   const setItemsSync = (next: CartItem[]) => {
     itemsRef.current = next;
@@ -113,10 +130,79 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await persistAllConvex(snapshot);
   };
 
-  const enqueuePersist = (snapshot: CartItem[]): Promise<void> => {
-    const run = opQueue.current.then(() => persistSnapshot(snapshot));
-    opQueue.current = run.catch(() => {});
-    return run;
+  const enqueuePersist = (): Promise<void> => {
+    const st = persistState.current;
+    if (st.inFlight) {
+      // Coalesced tap: the drain will persist our newer snapshot; join it
+      // so this caller still observes success/failure for its row error.
+      st.queued = true;
+      return new Promise<void>((resolve, reject) => {
+        st.waiters.push({ resolve, reject });
+      });
+    }
+    st.inFlight = true;
+    const run = (async () => {
+      // Trailing-edge coalescing: always persist the LATEST snapshot, so
+      // ten rapid taps produce ~1 server write, not ten.
+      do {
+        st.queued = false;
+        await persistSnapshot(itemsRef.current);
+      } while (st.queued);
+    })();
+    return run.then(
+      () => {
+        st.inFlight = false;
+        const ws = st.waiters;
+        st.waiters = [];
+        ws.forEach((w) => w.resolve());
+      },
+      async (error) => {
+        st.inFlight = false;
+        // Race-safe recovery: abandon only the intent that actually failed.
+        // failedVersion pins the newest intent at failure time. If the user
+        // tapped again while the persist (or the reload below) was in
+        // flight, localVersion has moved past it and the server snapshot is
+        // stale relative to that newer intent — applying it would clobber
+        // fresh optimistic changes, so skip the reconcile and keep local
+        // state. The ack below runs only after a successful reconcile, so a
+        // failed reload preserves local state and never marks intent acked
+        // (without it, external server updates would be ignored forever by
+        // the serverCartSig intent guard). Rethrow in all cases so the
+        // caller's inline row error renders.
+        const failedVersion = localVersion.current;
+        if (useConvexPath && org) {
+          try {
+            const lines = await convex.query(api.userState.listCart, {
+              orgId: org._id,
+            });
+            const serverItems = await rehydrateLines(
+              (lines ?? []).map((l) => ({
+                productId: l.productId,
+                variantId: l.variantId,
+                comboId: l.comboId,
+                name: l.name,
+                variantName: l.variantName,
+                unitPriceRupees: l.unitPriceRupees,
+                qty: l.qty,
+                imageUrl: l.imageUrl,
+              }))
+            );
+            // Second gate: intent may have arrived *during* the reload
+            // fetch, after the check above — apply only if still quiet.
+            if (localVersion.current === failedVersion) {
+              setItemsSync(serverItems);
+              ackedVersion.current = failedVersion;
+            }
+          } catch {
+            /* keep optimistic state, never ack */
+          }
+        }
+        const ws = st.waiters;
+        st.waiters = [];
+        ws.forEach((w) => w.reject(error));
+        throw error;
+      }
+    );
   };
   const useConvexPath = !!user && !!org;
   const convexAdd = useMutation(api.userState.addToCart);
@@ -169,12 +255,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
-  // Adopt server-side changes (other tabs/devices) when our local state is
-  // untouched by an in-flight optimistic update. Keyed on line count + total
-  // quantity so identical carts never trigger a reload loop. Never adopts an
+  // Adopt server-side changes (other tabs/devices) only when we hold no
+  // unconfirmed local intent. Keyed on line count + total quantity so
+  // identical carts never trigger a reload loop. Never adopts an
   // EMPTY server snapshot while we hold local items: the empty middle of a
   // non-atomic replace must not wipe the UI (that was the self-wipe bug —
   // replaceCart is atomic now, this guard covers legacy races + clearCart).
+  //
+  // Intent guard (Phase 6): a server snapshot that differs from local while
+  // localVersion != ackedVersion is definitionally stale (our persist hasn't
+  // echoed yet) — reconciling now would flash old quantities and replay
+  // animations. A matching snapshot just confirms intent, no rehydrate.
   const serverCartSig = (convexLineCount ?? [])
     .map((l) => `${l.variantId || ''}:${l.comboId || ''}:${l.productId}:${l.qty}`)
     .sort()
@@ -186,9 +277,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .map((i) => `${i.variant_id || ''}:${i.combo_id || ''}:${i.id}:${i.quantity}`)
       .sort()
       .join('|');
-    if (localSig !== serverCartSig) {
-      loadCart();
+    if (localSig === serverCartSig) {
+      ackedVersion.current = localVersion.current;
+      return;
     }
+    if (localVersion.current !== ackedVersion.current) return;
+    loadCart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverCartSig]);
 
@@ -394,7 +488,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Failed to load cart:', error);
-        setItemsSync([]);
+        // Keep optimistic/local state on failure: wiping to [] would
+        // discard unconfirmed intent, and a failed load must never count
+        // as acknowledgement of it.
       }
     }
   };
@@ -452,20 +548,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       newItems = [...previous, newItem];
     }
 
-    // Update UI immediately
+    // Update UI immediately (one render per tap)
     setItemsSync(newItems);
+    localVersion.current += 1;
 
     // Dispatch event to auto-show mini cart
     window.dispatchEvent(new CustomEvent('cartItemAdded'));
 
-    // Persist in FIFO order — concurrent taps queue instead of racing.
+    // Persist coalesced — concurrent taps join the drain instead of racing.
     // Analytics stays outside the revert scope: a tracking failure must
     // never roll back a persisted cart.
     try {
-      await enqueuePersist(newItems);
+      await enqueuePersist();
     } catch (error) {
-      // Revert on error
-      setItemsSync(previous);
+      // Drain already reconciled to authoritative state; rethrow for the
+      // caller's inline row error.
       console.error('Failed to save cart:', error);
       throw error;
     }
@@ -525,14 +622,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Update UI immediately, persist in FIFO order.
+    // Update UI immediately, persist coalesced.
     setItemsSync(newItems);
+    localVersion.current += 1;
 
     try {
-      await enqueuePersist(newItems);
+      await enqueuePersist();
     } catch (error) {
-      // Revert on error
-      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
@@ -552,14 +648,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       !(item.id === productId && item.variant_id === variantId && item.combo_id === comboId)
     );
 
-    // Update UI immediately, persist in FIFO order.
+    // Update UI immediately, persist coalesced.
     setItemsSync(newItems);
+    localVersion.current += 1;
 
     try {
-      await enqueuePersist(newItems);
+      await enqueuePersist();
     } catch (error) {
-      // Revert on error
-      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
@@ -595,14 +690,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         : item
     );
 
-    // Update UI immediately, persist in FIFO order.
+    // Update UI immediately, persist coalesced.
     setItemsSync(newItems);
+    localVersion.current += 1;
 
     try {
-      await enqueuePersist(newItems);
+      await enqueuePersist();
     } catch (error) {
-      // Revert on error
-      setItemsSync(previous);
       console.error('Failed to save cart:', error);
       throw error;
     }
@@ -620,7 +714,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const snapshot: CartItem[] = [];
       setItemsSync(snapshot);
-      await enqueuePersist(snapshot);
+      localVersion.current += 1;
+      await enqueuePersist();
     } finally {
       setIsLoading(false);
     }

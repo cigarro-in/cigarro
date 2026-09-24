@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/badge';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useCatalogProduct, useFullCatalog, useCatalogCombos } from '../../hooks/data/useCatalog';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { VariantSelector } from '../../components/variants/VariantSelector';
 import { ComboDisplayComponent } from '../../components/variants/VariantSelector';
@@ -79,7 +79,8 @@ function ProductPage() {
   const brandSectionRef = useRef<HTMLDivElement>(null);
   const recommendedSectionRef = useRef<HTMLDivElement>(null);
   const { addToCart, addVariantToCart, addComboToCart, isLoading } = useCart();
-  const { isWishlisted, toggleWishlist, isLoading: wishlistLoading } = useWishlist();
+  const { isWishlisted, toggleWishlist, isLoading: wishlistLoading, wishlistError } = useWishlist();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // GA4 view_item: once per product slug, with the offered variant's price.
   // NOTE: this hook must live here with the other hooks — never after the
@@ -287,7 +288,7 @@ function ProductPage() {
       variantToAdd.stock != null &&
       Number(variantToAdd.stock) <= 0
     ) {
-      toast.error(`${variantToAdd.variant_name || 'This variant'} is out of stock.`);
+      setOpError(`${variantToAdd.variant_name || 'This variant'} is out of stock.`);
       return;
     }
 
@@ -298,7 +299,7 @@ function ProductPage() {
         // Add variant to cart
 
         await addVariantToCart(product, selectedVariant, quantity);
-        toast.success(`Added ${quantity}x ${product.name} (${selectedVariant.variant_name}) to cart`);
+        setOpOk(`Added ${quantity}x ${product.name} (${selectedVariant.variant_name}) to cart`);
       } else {
         // Add default variant to cart
 
@@ -326,7 +327,7 @@ function ProductPage() {
           };
           await addToCart(productForCart as any, quantity);
         }
-        toast.success(`Added ${quantity}x ${product.name} to cart`);
+        setOpOk(`Added ${quantity}x ${product.name} to cart`);
       }
       
       // Trigger drop-to-cart animation
@@ -343,7 +344,7 @@ function ProductPage() {
       
     } catch (error) {
       console.error('Error adding to cart:', error);
-      toast.error('Failed to add to cart. Please try again.');
+      setOpError('Failed to add to cart. Please try again.');
     } finally {
       setIsAddingToCart(false);
     }
@@ -352,9 +353,9 @@ function ProductPage() {
   const handleAddComboToCart = async (combo: ProductCombo) => {
     try {
       await addComboToCart(combo, quantity);
-      toast.success(`${combo.name} (x${quantity}) added to cart`);
+      setOpOk(`${combo.name} (x${quantity}) added to cart`);
     } catch (error) {
-      toast.error('Failed to add combo to cart');
+      setOpError('Failed to add combo to cart');
     }
   };
 
@@ -674,7 +675,7 @@ function ProductPage() {
                   <div key={index} className="w-full h-full flex-shrink-0">
                     <ImageWithFallback
                       src={img}
-                      alt={`${product.name} - Image ${index + 1}`}
+                      alt={`${selectedVariant?.image_alt_text || product.name} - view ${index + 1}`}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -1024,7 +1025,7 @@ function ProductPage() {
                   <div className="aspect-square overflow-hidden bg-white rounded-2xl">
                     <ImageWithFallback
                       src={gallery[activeImage]}
-                      alt={product.name}
+                      alt={selectedVariant?.image_alt_text || product.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     
@@ -1063,7 +1064,7 @@ function ProductPage() {
                       >
                         <ImageWithFallback 
                           src={img} 
-                          alt={`${product.name} thumbnail ${index + 1}`} 
+                          alt={`${selectedVariant?.image_alt_text || product.name} thumbnail ${index + 1}`}
                           className="w-full h-full object-cover" 
                         />
                       </button>
@@ -1149,6 +1150,7 @@ function ProductPage() {
                     </div>
 
                     {/* Add to Cart Button - Fixed and properly styled */}
+                    <InlineStatus status={wishlistError ? { kind: 'error' as const, message: wishlistError } : opStatus} />
                     <button
                       onClick={handleAddToCart}
                       disabled={isAddingToCart || offerOutOfStock}
@@ -1327,6 +1329,7 @@ function ProductPage() {
               </div>
 
               {/* Add to Cart Button */}
+              <InlineStatus status={wishlistError ? { kind: 'error' as const, message: wishlistError } : opStatus} />
               <motion.button
                 type="button"
                 onClick={(e) => {

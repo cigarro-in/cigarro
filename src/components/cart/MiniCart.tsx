@@ -5,7 +5,7 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatINR } from '../../utils/currency';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 import { QuantityStepper } from './QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
 
@@ -19,6 +19,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
   const { user } = useAuth();
   const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const handleProceedToCheckout = () => {
     onClose();
@@ -30,11 +31,11 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
   };
 
   const handleRemoveItem = (productId: string, variantId?: string, comboId?: string) => {
-    removeFromCart(productId, variantId, comboId).catch(() => toast.error('Failed to remove item'));
+    removeFromCart(productId, variantId, comboId).catch(() => setOpError('Failed to remove item'));
   };
 
   const handleQuantityChange = (productId: string, next: number, variantId?: string, comboId?: string) => {
-    updateQuantity(productId, next, variantId, comboId).catch(() => toast.error('Failed to update quantity'));
+    updateQuantity(productId, next, variantId, comboId).catch(() => setOpError('Failed to update quantity'));
   };
 
   return (
@@ -54,10 +55,12 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
               onMouseLeave={onClose}
             >
               <div className="mini-cart__inner bg-creme border border-coyote rounded-[5px] overflow-y-auto w-full h-full">
+                <div className="px-[21px] pt-[14px]">
+                  <InlineStatus status={opStatus} />
+                </div>
                 {items.length === 0 ? (
                   <div className="p-6 text-center">
-                    <p className="text-dark font-sans text-lg mb-4">Your cart is empty</p>
-                    <Link
+                    <p className="text-dark font-sans text-lg mb-4">Your cart is empty</p>                    <Link
                       to="/products"
                       className="inline-block bg-dark text-creme-light px-6 py-2 rounded-full font-medium hover:bg-creme-light hover:text-dark transition-colors duration-300 text-sm uppercase tracking-wide"
                       onClick={onClose}
@@ -74,7 +77,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                         const itemId = item.id || `unknown-${index}`;
                         const variantId = item.variant_id || 'base';
                         const comboId = item.combo_id || 'none';
-                        const itemKey = `cart-item-${itemId}-${variantId}-${comboId}-${index}`;
+                        const itemKey = `cart-item-${itemId}-${variantId}-${comboId}`;
                         
                         return (
                           <div key={itemKey} className="mini-cart__product flex p-[18px_7px_18px_21px] border-b border-coyote">
@@ -166,8 +169,13 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
             </motion.div>
 
             {/* Mobile Cart Sidebar - Standardized Mobile Sidebar */}
-            <div
-              className="md:hidden fixed inset-0 z-[99999] transition-opacity duration-300 opacity-100 pointer-events-auto"
+            <motion.div
+              key="mobile-cart-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden fixed inset-0 z-[99999] pointer-events-auto"
               onClick={onClose}
             >
               {/* Backdrop */}
@@ -175,9 +183,9 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
 
               {/* Right-side drawer - Standardized Mobile Sidebar */}
               <motion.div
-                initial={{ transform: 'translateX(100%)' }}
-                animate={{ transform: 'translateX(0%)' }}
-                exit={{ transform: 'translateX(100%)' }}
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
                 className="fixed right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-background border-l border-border shadow-xl flex flex-col"
                 role="dialog"
@@ -205,6 +213,9 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
 
                 {/* SCROLLABLE CONTENT */}
                 <div className="flex-1 overflow-y-auto overscroll-y-bounce">
+                  <div className="px-4 pt-4">
+                    <InlineStatus status={opStatus} />
+                  </div>
                   {items.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/20 flex items-center justify-center">
@@ -223,7 +234,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                           const itemId = item.id || `unknown-${index}`;
                           const variantId = item.variant_id || 'base';
                           const comboId = item.combo_id || 'none';
-                          const itemKey = `mobile-cart-item-${itemId}-${variantId}-${comboId}-${index}`;
+                          const itemKey = `mobile-cart-item-${itemId}-${variantId}-${comboId}`;
                           
                           return (
                             <div key={itemKey} className="flex items-center gap-3 p-3 rounded-lg border border-border/20 hover:border-border/40 transition-colors">
@@ -325,7 +336,7 @@ export function MiniCart({ isVisible, onClose }: MiniCartProps) {
                   </div>
                 )}
               </motion.div>
-            </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>

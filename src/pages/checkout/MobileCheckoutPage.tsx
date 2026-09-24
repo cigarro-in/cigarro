@@ -11,7 +11,8 @@ import { AddressDrawer } from '../../components/checkout/address/AddressDrawer';
 import { Address } from '../../components/checkout/address/AddressCard';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { useMyProfile, toPhone10 } from '../../hooks/data/useMyProfile';
 import { formatINR } from '../../utils/currency';
 import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/images/urls';
@@ -67,24 +68,19 @@ export function MobileCheckoutPage() {
   const normalizeString = (value: unknown): string | undefined =>
     typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 
-  const userMetadata = ((user as unknown) as { user_metadata?: Record<string, unknown> })?.user_metadata ?? {};
-
-  const metadataNameFromParts = normalizeString(
-    [userMetadata.first_name, userMetadata.last_name]
-      .filter(Boolean)
-      .join(' ')
-  );
+  // Single normalized profile contract first (Convex users), session
+  // fallback. (Legacy auth-metadata reads removed: own-JWT sessions carry
+  // no user_metadata, so they could never prefill.)
+  const { profileName, profilePhone10 } = useMyProfile();
 
   const defaultUserName =
-    normalizeString(userMetadata.full_name) ??
-    normalizeString(userMetadata.name) ??
-    metadataNameFromParts ??
+    profileName ||
+    normalizeString(user?.name) ||
     (user?.email ? user.email.split('@')[0] : 'Customer');
 
   const defaultUserPhone =
-    normalizeString(userMetadata.phone) ??
-    normalizeString(userMetadata.contact) ??
-    '';
+    profilePhone10 ||
+    toPhone10(user?.phone);
 
   // URL params for effects
   const searchParams = new URLSearchParams(window.location.search);
@@ -145,7 +141,7 @@ export function MobileCheckoutPage() {
   useEffect(() => {
     if (urlRetryParam && !retryOrderData) {
       console.warn('⚠️ Retry param present but session data missing. Redirecting to orders.');
-      toast.error('Retry session expired. Please try again.');
+      setOpError('Retry session expired. Please try again.');
       navigate('/orders');
     }
   }, [urlRetryParam, retryOrderData, navigate]);
@@ -205,6 +201,7 @@ export function MobileCheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState('standard');
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   // Wallet state
   const [walletBalance, setWalletBalance] = useState(0);
@@ -254,7 +251,7 @@ export function MobileCheckoutPage() {
 
   const handleApplyReferral = async () => {
     if (!referralCode.trim()) {
-      toast.error('Please enter a referral code');
+      setOpError('Please enter a referral code');
       return;
     }
 
@@ -266,23 +263,23 @@ export function MobileCheckoutPage() {
       });
 
       if (data.success) {
-        // No toast: the "Referral code activated" line renders in place.
+        // No status: the "Referral code activated" line renders in place.
         setReferralApplied(true);
         setShowReferralInput(false);
         setReferralCode('');
       } else {
         if (data.error === 'User already referred') {
-          toast.error('Not eligible for referral code');
+          setOpError('Not eligible for referral code');
           setIsReferralEligible(false);
         } else if (data.error === 'Invalid referral code' || data.error === 'Cannot refer yourself') {
-          toast.error('Invalid referral code');
+          setOpError('Invalid referral code');
         } else {
-          toast.error('Failed to apply referral code');
+          setOpError('Failed to apply referral code');
         }
       }
     } catch (error) {
       console.error('Error applying referral:', error);
-      toast.error('Failed to apply referral code');
+      setOpError('Failed to apply referral code');
     } finally {
       setIsApplyingReferral(false);
     }
@@ -447,7 +444,7 @@ export function MobileCheckoutPage() {
   // Validate and apply coupon
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
-      toast.error('Please enter a coupon code');
+      setOpError('Please enter a coupon code');
       return;
     }
 
@@ -457,13 +454,13 @@ export function MobileCheckoutPage() {
 
       if (result.isValid && result.discount) {
         setAppliedDiscount(result.discount);
-        // No toast: the "✓ Coupon applied" line + total update in place.
+        // No status: the "✓ Coupon applied" line + total update in place.
       } else {
-        toast.error(result.message || 'Invalid coupon code');
+        setOpError(result.message || 'Invalid coupon code');
       }
     } catch (error) {
       console.error('Error validating coupon:', error);
-      toast.error('Failed to validate coupon');
+      setOpError('Failed to validate coupon');
     } finally {
       setIsValidatingCoupon(false);
     }
@@ -486,16 +483,16 @@ export function MobileCheckoutPage() {
   // Convex handles wallet split, UPI URL generation, slot allocation, and verification.
   const handlePayment = async () => {
     if (!selectedAddress) {
-      toast.error('Please select a delivery address');
+      setOpError('Please select a delivery address');
       setShowAddressDialog(true);
       return;
     }
     if (!user) {
-      toast.error('Please sign in to continue');
+      setOpError('Please sign in to continue');
       return;
     }
     if (!org) {
-      toast.error('Store is loading. Please try again in a moment.');
+      setOpError('Store is loading. Please try again in a moment.');
       return;
     }
 
@@ -571,7 +568,7 @@ export function MobileCheckoutPage() {
           : code === 'ORG_INACTIVE'
           ? 'Store is currently unavailable.'
           : 'Payment failed. Please try again.';
-      toast.error(msg);
+      setOpError(msg);
       setIsCompletingOrder(false);
       isNavigatingRef.current = false;
     } finally {
@@ -640,13 +637,14 @@ export function MobileCheckoutPage() {
 
       {/* Main Content */}
       <div className="p-4 space-y-4">
+        <InlineStatus status={opStatus} />
         {/* Items Card */}
         <Card className="border-2 border-border/40 bg-card shadow-md">
           <CardContent className="p-4">
             <h3 className="font-serif text-lg mb-4">Order Items ({items.length})</h3>
             <div className="space-y-4">
               {items.map((item: any) => (
-                <div key={`${item.id}-${item.variant_id || 'default'}`} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-border/20">
+                <div key={`${item.id}-${item.variant_id || 'default'}-${item.combo_id || 'none'}`} className="flex items-center gap-3 p-3 bg-background rounded-lg border border-border/20">
                   <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted/20 flex-shrink-0">
                     <img
                       src={getProductImageUrl(item.image || item.gallery_images?.[0] || item.product_variants?.[0]?.images?.[0])}

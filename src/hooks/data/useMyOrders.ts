@@ -4,6 +4,8 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useAuth } from '../useAuth';
 import { paiseToRupees } from '../../lib/convex/money';
+import { getProductImageUrl } from '../../lib/images/urls';
+import { useFullCatalog } from './useCatalog';
 
 export type OrderUiStatus =
   | 'pending'
@@ -20,6 +22,9 @@ export interface NormalizedOrderItem {
   name: string;
   qty: number;
   unitPrice: number;
+  // Always resolved: snapshot → catalog fallback → placeholder. Views must
+  // not rebuild this chain (no direct getProductImageUrl on raw items).
+  imageUrl: string;
 }
 
 export interface NormalizedOrder {
@@ -77,7 +82,28 @@ function deriveUiStatus(o: any): OrderUiStatus {
   }
 }
 
-function normalize(o: any): NormalizedOrder {
+// Data-layer image resolution shared by every order surface (customer +
+// classic page). Snapshot wins; legacy rows fall back to the live catalog
+// (sold variant → default variant → product image); nothing → placeholder.
+export function resolveOrderItemImageUrl(
+  snapshotImage: unknown,
+  productId: string,
+  variantId: string | undefined,
+  products: Array<{ id: string; image?: string | null; product_variants?: Array<{ id: string; images?: string[]; is_default?: boolean }> }>,
+): string {
+  if (typeof snapshotImage === 'string' && snapshotImage) {
+    return getProductImageUrl(snapshotImage);
+  }
+  const p = products.find((x) => x.id === productId);
+  const vs = p?.product_variants ?? [];
+  const v =
+    vs.find((x) => x.id === variantId) ??
+    vs.find((x) => x.is_default) ??
+    vs[0];
+  return getProductImageUrl(v?.images?.[0] ?? p?.image ?? undefined);
+}
+
+function normalize(o: any, products: Array<{ id: string; image?: string | null; product_variants?: Array<{ id: string; images?: string[]; is_default?: boolean }> }>): NormalizedOrder {
   const rawNumber = o.orderNumber;
   const orderNumber =
     typeof rawNumber === 'number' && Number.isInteger(rawNumber) && rawNumber >= 10000 && rawNumber <= 99999
@@ -103,6 +129,7 @@ function normalize(o: any): NormalizedOrder {
       name: it.name,
       qty: it.qty,
       unitPrice: paiseToRupees(it.unitPricePaise),
+      imageUrl: resolveOrderItemImageUrl(it.image, it.productId, it.variantId, products),
     })),
     itemsCount: (o.items || []).length,
     subtotal: paiseToRupees(o.cartTotalPaise),
@@ -151,14 +178,18 @@ export function useMyOrders(options: UseMyOrdersOptions = {}): UseMyOrdersResult
     api.orders.listMyOrders,
     org && user ? { orgId: org._id, limit: options.limit ?? 50 } : 'skip',
   );
+  // Shared catalog subscription (deduped with search/header) for the legacy
+  // image fallback. Snapshot-first, so live catalog edits can't rewrite
+  // history thumbnails.
+  const { products } = useFullCatalog();
 
   const orders = useMemo(() => {
     if (!raw) return [];
-    const normalized = raw.map(normalize);
+    const normalized = raw.map((o) => normalize(o, products));
     return options.kind
       ? normalized.filter((o) => o.kind === options.kind)
       : normalized;
-  }, [raw, options.kind]);
+  }, [raw, options.kind, products]);
 
   return {
     orders,

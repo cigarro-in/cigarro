@@ -16,7 +16,7 @@ import {
 } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
@@ -64,6 +64,7 @@ export function BlogFormPage() {
   const [saving, setSaving] = useState(false);
   const [post, setPost] = useState<BlogPost | null>(null);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const populatedRef = useRef(false);
 
   // Public category list (slug-keyed now — Convex posts link by categorySlug).
@@ -97,7 +98,7 @@ export function BlogFormPage() {
     populatedRef.current = true;
     const data: any = postRows.find((p: any) => p._id === id);
     if (!data) {
-      toast.error('Post not found');
+      setOpError('Post not found');
       navigate('/admin/blogs');
       return;
     }
@@ -162,7 +163,7 @@ export function BlogFormPage() {
   const handleSave = async () => {
     setSaveAttempted(true);
     if (!form.title.trim()) {
-      toast.error('Post title is required');
+      setOpError('Post title is required');
       return;
     }
 
@@ -187,16 +188,16 @@ export function BlogFormPage() {
           metaDescription: form.meta_description.trim() || undefined,
         },
       });
-      toast.success(isEditing ? 'Post updated successfully' : 'Post created successfully');
+      setOpOk(isEditing ? 'Post updated successfully' : 'Post created successfully');
 
       navigate('/admin/blogs');
     } catch (error: any) {
       console.error('Error saving post:', error);
       const code = error?.data?.code;
       if (code === 'SLUG_TAKEN') {
-        toast.error('A post with this slug already exists');
+        setOpError('A post with this slug already exists');
       } else {
-        toast.error(error?.message || 'Failed to save post');
+        setOpError(error?.message || 'Failed to save post');
       }
     } finally {
       setSaving(false);
@@ -209,11 +210,11 @@ export function BlogFormPage() {
 
     try {
       await removePost({ id: post.id as any });
-      toast.success('Post deleted');
+      setOpOk('Post deleted');
       navigate('/admin/blogs');
     } catch (error: any) {
       console.error('Error deleting post:', error);
-      toast.error(error?.message || 'Failed to delete post');
+      setOpError(error?.message || 'Failed to delete post');
     }
   };
 
@@ -247,6 +248,10 @@ export function BlogFormPage() {
           {saving ? 'Saving...' : 'Save Post'}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         {/* Left Column - Main Content */}

@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
@@ -38,6 +38,7 @@ export function DiscountsPage() {
   const navigate = useNavigate();
   const [selectedDiscounts, setSelectedDiscounts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(api.discounts.listDiscountsForAdmin, {});
   const removeDiscount = useMutation(api.discounts.deleteDiscount);
@@ -82,10 +83,10 @@ export function DiscountsPage() {
       for (const id of discountIds) {
         await removeDiscount({ id: id as any });
       }
-      toast.success(`${discountIds.length} discounts deleted`);
+      setOpOk(`${discountIds.length} discounts deleted`);
       setSelectedDiscounts([]);
     } catch (error: any) {
-      toast.error(
+      setOpError(
         error?.data?.code === 'NOT_DISCOUNT_ADMIN'
           ? 'Admin access required'
           : 'Failed to delete discounts'
@@ -96,10 +97,10 @@ export function DiscountsPage() {
   const handleBulkStatusChange = async (discountIds: string[], isActive: boolean) => {
     try {
       await setStatus({ ids: discountIds as any, isActive });
-      toast.success(`${discountIds.length} discounts ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`${discountIds.length} discounts ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedDiscounts([]);
     } catch (error: any) {
-      toast.error(
+      setOpError(
         error?.data?.code === 'NOT_DISCOUNT_ADMIN'
           ? 'Admin access required'
           : 'Failed to update status'
@@ -264,6 +265,7 @@ export function DiscountsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={discounts}
           columns={columns}

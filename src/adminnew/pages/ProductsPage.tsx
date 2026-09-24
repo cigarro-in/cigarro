@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { formatINR } from '../../utils/currency';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -38,6 +38,7 @@ export function ProductsPage() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // Convex is the catalog source of truth; the list is reactive so imports
   // and edits refresh it with no manual refetch.
@@ -80,20 +81,20 @@ export function ProductsPage() {
       for (const supabaseId of productIds) {
         await deleteProduct({ supabaseId });
       }
-      toast.success(`${productIds.length} products deleted`);
+      setOpOk(`${productIds.length} products deleted`);
       setSelectedProducts([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete products');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete products');
     }
   };
 
   const handleBulkStatusChange = async (productIds: string[], isActive: boolean) => {
     try {
       await setActive({ supabaseIds: productIds, isActive });
-      toast.success(`${productIds.length} products ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`${productIds.length} products ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedProducts([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 
@@ -233,6 +234,7 @@ export function ProductsPage() {
       </Dialog>
       
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={products}
           columns={columns}

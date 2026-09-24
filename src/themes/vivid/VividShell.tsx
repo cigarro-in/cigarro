@@ -18,7 +18,8 @@ export function VividShell({ children }: Props) {
   const hideBottomNav =
     location.pathname.startsWith('/checkout') ||
     location.pathname.startsWith('/mobile-checkout') ||
-    location.pathname.startsWith('/desktop-checkout');
+    location.pathname.startsWith('/desktop-checkout') ||
+    location.pathname.startsWith('/transaction');
 
   const onSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

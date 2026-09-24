@@ -2,19 +2,22 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, Trash2 } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { QuantityStepper } from '../../components/cart/QuantityStepper';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { getProductImageUrl } from '../../lib/images/urls';
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export function VividCartPanel() {
   const { items, totalPrice, totalItems, updateQuantity, removeFromCart } = useCart();
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   return (
     <aside className="vv-card sticky top-20 overflow-hidden">
       <div className="px-4 py-3 border-b border-[var(--color-border)]">
         <h3 className="text-[var(--color-foreground)] font-bold text-base">Cart {totalItems > 0 && `(${totalItems})`}</h3>
       </div>
+
+      <div className="px-4 pt-3"><InlineStatus status={opStatus} /></div>
 
       {items.length === 0 ? (
         <div className="px-4 py-10 text-center">
@@ -33,7 +36,7 @@ export function VividCartPanel() {
               const price = item.variant_price || item.combo_price || item.price || 0;
               const image = (item as any).image || (item as any).variant_images?.[0];
               return (
-                <div key={`${item.id}-${item.variant_id || ''}`} className="p-3 flex gap-3 items-center">
+                <div key={`${item.id}-${item.variant_id || ''}-${item.combo_id || ''}`} className="p-3 flex gap-3 items-center">
                   <div className="w-12 h-12 rounded-md overflow-hidden bg-[var(--color-surface-2)] flex-shrink-0">
                     <img src={getProductImageUrl(image)} alt={item.name} className="w-full h-full object-cover" />
                   </div>
@@ -44,7 +47,7 @@ export function VividCartPanel() {
                       quantity={item.quantity}
                       onChange={(next) =>
                         updateQuantity(item.id, next, item.variant_id, item.combo_id).catch(() =>
-                          toast.error('Failed to update quantity'),
+                          setOpError('Failed to update quantity'),
                         )
                       }
                       min={0}

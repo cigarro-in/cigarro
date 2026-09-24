@@ -22,13 +22,10 @@ import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
 import { ThemeProvider, useTheme } from './themes';
-import { Toaster } from 'sonner';
 
-// Errors-only toast policy: success/info toasts were deleted at the call
-// sites (checkout/admin/storefront) because every one of them duplicated
-// inline UI feedback. The Toaster stays mounted for toast.error only —
-// removing it would swallow real failure messages. Do NOT re-add
-// toast.success/info/message calls; render the state in place instead.
+// Phase 3: no toasts anywhere. All success/failure feedback renders inline
+// in the owning component via useInlineStatus/<InlineStatus/>. Do NOT
+// re-add sonner or toast calls; render the state in place instead.
 
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
@@ -306,7 +303,6 @@ export default function App() {
               <CartProvider>
                 <ThemeProvider>
                   <AppContent />
-                  <Toaster richColors closeButton position="top-center" />
                 </ThemeProvider>
               </CartProvider>
             </WishlistProvider>

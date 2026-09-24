@@ -141,7 +141,7 @@ const Hero = memo(function Hero({
                             <img 
                               className="w-full mx-auto object-cover aspect-square" 
                               src={currentSlideData.product_image_url} 
-                              alt="" 
+                              alt={currentSlideData.product_name}
                               width="400" 
                               height="400"
                             />

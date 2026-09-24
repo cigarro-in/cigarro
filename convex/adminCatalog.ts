@@ -97,11 +97,15 @@ export const listProductsForAdmin = query({
 
 // Full R2 reference inventory. Tables are scanned field-by-field and
 // repointImageRefs updates matching fields. Embedded blog content and
-// homepage/section config are replaced only for exact old URLs/keys.
+// homepage/section config are replaced only for exact old URLs/keys. Order
+// item image snapshots count too (any hit blocks deletes, fail-closed); the
+// repoint loop below moves them with exact old-value matching so old
+// originals stay cleanable. Reads tolerate pre-schema rows (image optional).
 // ponytail: full scans suit the current small catalog; add a reference index
-// only when these collections approach Convex query limits.
+// only when these collections approach Convex query limits (orders first —
+// it grows unboundedly while the rest stay small).
 async function imageRows(ctx: any) {
-  const [products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts] = await Promise.all([
+  const [products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders] = await Promise.all([
     ctx.db.query("catalogProducts").collect(),
     ctx.db.query("catalogVariants").collect(),
     ctx.db.query("catalogBrands").collect(),
@@ -114,8 +118,9 @@ async function imageRows(ctx: any) {
     ctx.db.query("homepageComponentConfig").collect(),
     ctx.db.query("siteSettings").collect(),
     ctx.db.query("carts").collect(),
+    ctx.db.query("orders").collect(),
   ]);
-  return { products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts };
+  return { products, variants, brands, categories, collections, combos, blogs, heroes, sections, components, sites, carts, orders };
 }
 
 async function collectImageUsage(
@@ -188,6 +193,21 @@ async function collectImageUsage(
   }
   for (const cart of r.carts) {
     if (hits(cart.imageUrl)) push({ kind: "cart", label: cart.name, detail: "cart image", mutable: true });
+  }
+  // Order item snapshots are history (mutable: false — no admin form edits
+  // them), but any hit still counts: deletes stay fail-closed while an order
+  // references the asset. Missing `image` on pre-schema rows reads as
+  // undefined and never matches.
+  for (const o of r.orders ?? []) {
+    const items = Array.isArray((o as any).items) ? (o as any).items : [];
+    const count = items.filter((it: any) => hits(it?.image)).length;
+    if (count)
+      push({
+        kind: "order",
+        label: (o as any).displayOrderId ?? String((o as any)._id),
+        detail: "item snapshot",
+        mutable: false,
+      }, count);
   }
   return { contexts, mutableTotal, historicalTotal };
 }
@@ -303,6 +323,18 @@ export const repointImageRefs = mutation({
       if (!hits(cart.imageUrl)) continue;
       await ctx.db.patch(cart._id, { imageUrl: newUrl, updatedAt: Date.now() });
       bump("carts");
+    }
+    // Order item snapshots: the single deliberate exception to "history is
+    // never patched". Thumbnails are display-only (money untouched), exact
+    // old-value match per item, and moving them lets old originals become
+    // unreferenced for cleanup. Pre-schema rows (no `image`) never match.
+    for (const o of await ctx.db.query("orders").collect()) {
+      const items = Array.isArray((o as any).items) ? (o as any).items : [];
+      if (!items.some((it: any) => hits(it?.image))) continue;
+      await ctx.db.patch(o._id, {
+        items: items.map((it: any) => (hits(it?.image) ? { ...it, image: newUrl } : it)),
+      });
+      bump("orders");
     }
     return { patched };
   },

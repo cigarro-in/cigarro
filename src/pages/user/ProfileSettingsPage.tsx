@@ -11,7 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 
 export function ProfileSettingsPage() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export function ProfileSettingsPage() {
   const org = useOrg();
   const convexUpsertUser = useMutation(api.userState.upsertUser);
   const [isLoading, setIsLoading] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -49,10 +50,10 @@ export function ProfileSettingsPage() {
         phone: formData.phone || undefined,
       });
 
-      toast.success('Profile updated successfully');
+      setOpOk('Profile updated successfully');
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      toast.error(error.message || 'Failed to update profile');
+      setOpError(error.message || 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }
@@ -107,6 +108,7 @@ export function ProfileSettingsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">Used for shipping and order updates.</p>
               </div>
+              <InlineStatus status={opStatus} />
               <Button 
                 onClick={handleUpdateProfile} 
                 disabled={isLoading}

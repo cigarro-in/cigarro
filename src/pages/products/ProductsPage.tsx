@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -65,6 +65,7 @@ export function ProductsPage() {
   const [isDragging, setIsDragging] = useState(false);
   
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // Wave 3: products + filter facets from the Convex catalog (same shapes
   // the API/Supabase paths produced). Filtering stays client-side.
@@ -126,7 +127,7 @@ export function ProductsPage() {
         console.error('Loading timeout - setting loading to false');
         setIsLoading(false);
         setIsInitialLoad(false);
-        toast.error('Loading timeout. Please refresh the page.');
+        setOpError('Loading timeout. Please refresh the page.');
       }
     }, 10000); // 10 second timeout
 
@@ -281,7 +282,7 @@ export function ProductsPage() {
       setProducts(products);
     } catch (error) {
       console.error('Error filtering products:', error);
-      toast.error('Failed to load products');
+      setOpError('Failed to load products');
     } finally {
       setIsLoading(false); // Add this line to fix the loading issue
     }
@@ -290,9 +291,9 @@ export function ProductsPage() {
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add to cart');
+      setOpError('Failed to add to cart');
     }
   };
 
@@ -741,6 +742,9 @@ export function ProductsPage() {
 
             {/* Products Grid */}
             <div className="flex-1 relative">
+              <div className="mb-4">
+                <InlineStatus status={opStatus} />
+              </div>
 
             {displayedProducts.length === 0 ? (
               <div className="text-center py-16">

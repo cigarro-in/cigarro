@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -26,6 +26,7 @@ export function CollectionsPage() {
   const navigate = useNavigate();
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(api.adminCatalog.listCollectionsForAdmin, {});
   const removeCollection = useMutation(api.adminCatalog.deleteCollection);
@@ -57,20 +58,20 @@ export function CollectionsPage() {
       for (const supabaseId of collectionIds) {
         await removeCollection({ supabaseId });
       }
-      toast.success(`${collectionIds.length} collections deleted`);
+      setOpOk(`${collectionIds.length} collections deleted`);
       setSelectedCollections([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collections');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collections');
     }
   };
 
   const handleBulkStatusChange = async (collectionIds: string[], isActive: boolean) => {
     try {
       await setActive({ supabaseIds: collectionIds, isActive });
-      toast.success(`${collectionIds.length} collections ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`${collectionIds.length} collections ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCollections([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 
@@ -200,6 +201,7 @@ export function CollectionsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={collections}
           columns={columns}

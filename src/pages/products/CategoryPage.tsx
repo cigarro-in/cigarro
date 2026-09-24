@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Product } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Grid3X3, Grid2X2, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
@@ -37,6 +37,7 @@ export function CategoryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
   const [showMobileSort, setShowMobileSort] = useState(false);
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const isProductsPage = location.pathname === '/products';
 
@@ -85,7 +86,7 @@ export function CategoryPage() {
       setProducts(rows as Product[]);
     } catch (error) {
       console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
+      setOpError('Failed to load products');
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +120,7 @@ export function CategoryPage() {
       setProducts(categoryProducts as Product[]);
     } catch (error) {
       console.error('Error fetching category:', error);
-      toast.error('Failed to load category');
+      setOpError('Failed to load category');
     } finally {
       setIsLoading(false);
     }
@@ -128,9 +129,9 @@ export function CategoryPage() {
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add to cart');
+      setOpError('Failed to add to cart');
     }
   };
 
@@ -218,6 +219,9 @@ export function CategoryPage() {
 
         {/* Controls Bar */}
         <div className="main-container px-4 md:px-8 py-6">
+          <div className="mb-4">
+            <InlineStatus status={opStatus} />
+          </div>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             {/* Product Count */}
             <p className="text-dark/60 font-sans text-sm">

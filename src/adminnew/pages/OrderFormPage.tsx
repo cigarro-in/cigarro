@@ -18,7 +18,8 @@ import { Textarea } from '../../components/ui/textarea';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { getProductImageUrl } from '../../lib/images/urls';
 import { formatINR } from '../../utils/currency';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
@@ -73,6 +74,7 @@ export function OrderFormPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingUrl, setTrackingUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   useEffect(() => {
     if (!order) return;
@@ -113,9 +115,9 @@ export function OrderFormPage() {
     setSaving(true);
     try {
       await markPaid({ orderId: order._id, reference: `admin:${new Date().toISOString()}` });
-      toast.success('Marked paid');
+      setOpOk('Marked paid');
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed');
+      setOpError(e?.data?.code || 'Failed');
     } finally {
       setSaving(false);
     }
@@ -126,9 +128,9 @@ export function OrderFormPage() {
     setSaving(true);
     try {
       await voidOrder({ orderId: order._id, reason: 'admin void from order page' });
-      toast.success('Voided');
+      setOpOk('Voided');
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed');
+      setOpError(e?.data?.code || 'Failed');
     } finally {
       setSaving(false);
     }
@@ -145,9 +147,9 @@ export function OrderFormPage() {
     setSaving(true);
     try {
       await refund({ orderId: order._id, toWallet, restock });
-      toast.success('Refund recorded');
+      setOpOk('Refund recorded');
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed');
+      setOpError(e?.data?.code || 'Failed');
     } finally {
       setSaving(false);
     }
@@ -157,9 +159,9 @@ export function OrderFormPage() {
     setSaving(true);
     try {
       await updateShipping({ orderId: order._id, shippingStatus: next });
-      toast.success(`Shipping → ${next}`);
+      setOpOk(`Shipping → ${next}`);
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed');
+      setOpError(e?.data?.code || 'Failed');
     } finally {
       setSaving(false);
     }
@@ -175,9 +177,9 @@ export function OrderFormPage() {
         trackingUrl: trackingUrl.trim() || undefined,
         shippingNotes: notes.trim() || undefined,
       });
-      toast.success('Tracking saved');
+      setOpOk('Tracking saved');
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed');
+      setOpError(e?.data?.code || 'Failed');
     } finally {
       setSaving(false);
     }
@@ -205,6 +207,10 @@ export function OrderFormPage() {
           </Badge>
         )}
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_360px] gap-6 mt-6">
         {/* LEFT */}
@@ -248,8 +254,17 @@ export function OrderFormPage() {
               <div className="space-y-4">
                 {order.items.map((item, idx) => (
                   <div key={idx} className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                      <Package className="h-5 w-5 text-gray-400" />
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+                      {(item as any).image ? (
+                        <img
+                          src={getProductImageUrl((item as any).image)}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-5 w-5 text-gray-400" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="font-medium">{item.name}</div>

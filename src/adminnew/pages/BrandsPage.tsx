@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -26,6 +26,7 @@ export function BrandsPage() {
   const navigate = useNavigate();
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(api.adminCatalog.listBrandsForAdmin, {});
   const removeBrand = useMutation(api.adminCatalog.deleteBrand);
@@ -58,10 +59,10 @@ export function BrandsPage() {
       for (const supabaseId of brandIds) {
         await removeBrand({ supabaseId });
       }
-      toast.success(`${brandIds.length} brands deleted`);
+      setOpOk(`${brandIds.length} brands deleted`);
       setSelectedBrands([]);
     } catch (error: any) {
-      toast.error(
+      setOpError(
         error?.data?.code === 'BRAND_IN_USE'
           ? 'A brand with products cannot be deleted'
           : error?.data?.code === 'NOT_CATALOG_ADMIN'
@@ -74,10 +75,10 @@ export function BrandsPage() {
   const handleBulkStatusChange = async (brandIds: string[], isActive: boolean) => {
     try {
       await setActive({ supabaseIds: brandIds, isActive });
-      toast.success(`${brandIds.length} brands ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`${brandIds.length} brands ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedBrands([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 
@@ -183,6 +184,7 @@ export function BrandsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={brands}
           columns={columns}

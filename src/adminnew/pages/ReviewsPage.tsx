@@ -7,7 +7,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { Req, ReqError } from '../components/shared/requiredFields';
@@ -30,6 +30,7 @@ export function ReviewsPage() {
   const [filter, setFilter] = useState<'pending' | 'approved' | 'all'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(
     api.reviews.listReviewsForAdmin,
@@ -65,10 +66,10 @@ export function ReviewsPage() {
   const act = async (fn: () => Promise<unknown>, ok: string, fail: string) => {
     try {
       await fn();
-      toast.success(ok);
+      setOpOk(ok);
       setSelected([]);
     } catch (error: any) {
-      toast.error(
+      setOpError(
         error?.data?.code === 'NOT_REVIEWS_ADMIN' ? 'Admin access required' : fail
       );
     }
@@ -168,6 +169,7 @@ export function ReviewsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <div>
           <Button size="sm" onClick={() => { setSaveAttempted(false); setShowForm((s) => !s); }}>
             <Plus className="w-4 h-4 mr-1" /> Add review

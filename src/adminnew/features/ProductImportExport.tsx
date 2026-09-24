@@ -20,7 +20,7 @@ import {
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 
 /* ============================================================
    Sheet schema — one row per variant, rows sharing Name = one
@@ -147,6 +147,7 @@ interface Props {
 }
 
 export function ProductImportExport({ products }: Props) {
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<SheetRow[] | null>(null);
@@ -186,10 +187,10 @@ export function ProductImportExport({ products }: Props) {
         return out;
       });
       setRows(clean);
-      toast.success(`${clean.length} row${clean.length === 1 ? '' : 's'} parsed`);
+      setOpOk(`${clean.length} row${clean.length === 1 ? '' : 's'} parsed`);
     } catch (err) {
       console.error(err);
-      toast.error('Could not parse the file. Expected XLSX or CSV.');
+      setOpError('Could not parse the file. Expected XLSX or CSV.');
     } finally {
       setParsing(false);
     }
@@ -313,10 +314,10 @@ export function ProductImportExport({ products }: Props) {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Products');
       XLSX.writeFile(wb, `cigarro-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
+      setOpOk(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message || 'Export failed');
+      setOpError(err?.message || 'Export failed');
     } finally {
       setWorking(false);
     }
@@ -481,14 +482,14 @@ export function ProductImportExport({ products }: Props) {
         // Convex list is reactive — no manual refresh needed.
         await invalidateStorefront();
       }
-      toast.success(
+      setOpOk(
         `${result.productsCreated + result.productsUpdated} product${
           result.productsCreated + result.productsUpdated === 1 ? '' : 's'
         } processed (${result.productsCreated} new, ${result.productsUpdated} updated)`
       );
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message || 'Import failed');
+      setOpError(err?.message || 'Import failed');
     } finally {
       setWorking(false);
     }
@@ -496,6 +497,7 @@ export function ProductImportExport({ products }: Props) {
 
   return (
     <div className="space-y-6">
+      <InlineStatus status={opStatus} />
       {/* Export */}
       <AdminCard>
         <AdminCardHeader>

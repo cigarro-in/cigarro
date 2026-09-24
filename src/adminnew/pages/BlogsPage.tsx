@@ -19,7 +19,7 @@ import {
 } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -47,6 +47,7 @@ export function BlogsPage() {
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, {});
   const removePost = useMutation(api.adminCatalog.deleteBlogPost);
@@ -90,20 +91,20 @@ export function BlogsPage() {
       for (const id of postIds) {
         await removePost({ id: id as any });
       }
-      toast.success(`${postIds.length} posts deleted`);
+      setOpOk(`${postIds.length} posts deleted`);
       setSelectedPosts([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete posts');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete posts');
     }
   };
 
   const handleBulkStatusChange = async (postIds: string[], status: 'draft' | 'published' | 'archived') => {
     try {
       await setStatus({ ids: postIds as any, status });
-      toast.success(`${postIds.length} posts updated to ${status}`);
+      setOpOk(`${postIds.length} posts updated to ${status}`);
       setSelectedPosts([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update posts');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update posts');
     }
   };
 
@@ -218,6 +219,7 @@ export function BlogsPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         {/* Filters */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">

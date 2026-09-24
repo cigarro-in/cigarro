@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { useCart } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../../components/products/ProductCard';
 import { SectionConfig, HomepageProduct } from '../../types/home';
@@ -17,6 +17,7 @@ export const FeaturedProducts = memo(function FeaturedProducts({
   isLoading = false 
 }: FeaturedProductsProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   
@@ -32,11 +33,11 @@ export const FeaturedProducts = memo(function FeaturedProducts({
   const handleAddToCart = useCallback(async (product: HomepageProduct) => {
     try {
       await addToCart(product as any, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch {
-      toast.error('Failed to add item to cart');
+      setOpError('Failed to add item to cart');
     }
-  }, [addToCart]);
+  }, [addToCart, setOpOk, setOpError]);
 
   // Optimized scroll handler using IntersectionObserver for center item detection
   useEffect(() => {
@@ -92,6 +93,9 @@ export const FeaturedProducts = memo(function FeaturedProducts({
           <h2 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">
             {sectionConfig.title}
           </h2>
+        </div>
+        <div className="max-w-3xl mx-auto mb-6 px-4">
+          <InlineStatus status={opStatus} />
         </div>
 
         {/* Products Grid - Mobile: Infinite Carousel, Desktop: Centered Trio */}

@@ -35,7 +35,7 @@ import { Badge } from '../../components/ui/badge';
 import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -126,6 +126,7 @@ export function ProfilePage() {
   const { wishlistItems } = useWishlist();
   const [wishlistCount, setWishlistCount] = useState(0);
   const [activeTierIndex, setActiveTierIndex] = useState(0);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const convexOrders = useQuery(
     api.orders.listMyOrders,
@@ -193,10 +194,10 @@ export function ProfilePage() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      toast.success('Signed out successfully');
+      setOpOk('Signed out successfully');
       navigate('/');
     } catch (error) {
-      toast.error('Failed to sign out');
+      setOpError('Failed to sign out');
     }
   };
 
@@ -596,7 +597,7 @@ export function ProfilePage() {
 
                   {/* Payment Methods */}
                   <button
-                    onClick={() => toast.info('Payment methods coming soon!')}
+                    onClick={() => setOpOk('Payment methods coming soon!')}
                     className="w-full flex items-center justify-between p-4 rounded-lg border border-border/30 hover:border-accent/50 hover:bg-muted/10 transition-all group"
                   >
                     <div className="flex items-center gap-3">
@@ -667,6 +668,9 @@ export function ProfilePage() {
 
             {/* Sign Out Button */}
             <div className="pt-4">
+              <div className="mb-4">
+                <InlineStatus status={opStatus} />
+              </div>
               <Button
                 onClick={handleSignOut}
                 variant="outline"

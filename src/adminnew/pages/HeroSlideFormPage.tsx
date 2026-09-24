@@ -15,7 +15,7 @@ import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 
 interface HeroSlideFormData {
   title: string;
@@ -66,6 +66,7 @@ export function HeroSlideFormPage() {
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const populatedRef = useRef(false);
 
   const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, {});
@@ -79,7 +80,7 @@ export function HeroSlideFormPage() {
     if (isEditMode && id) {
       const data: any = slides.find((s: any) => s._id === id);
       if (!data) {
-        toast.error('Slide not found');
+        setOpError('Slide not found');
         navigate('/admin/homepage');
         return;
       }
@@ -113,11 +114,11 @@ export function HeroSlideFormPage() {
   const handleSave = async () => {
     setSaveAttempted(true);
     if (!form.title.trim()) {
-      toast.error('Title is required');
+      setOpError('Title is required');
       return;
     }
     if (!form.image_url) {
-      toast.error('Image is required');
+      setOpError('Image is required');
       return;
     }
 
@@ -145,13 +146,13 @@ export function HeroSlideFormPage() {
           sortOrder: form.sort_order,
         },
       });
-      toast.success(isEditMode ? 'Slide updated' : 'Slide created');
+      setOpOk(isEditMode ? 'Slide updated' : 'Slide created');
 
       await invalidateStorefront();
       navigate('/admin/homepage');
     } catch (error: any) {
       console.error('Error saving slide:', error);
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to save slide');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to save slide');
     } finally {
       setSaving(false);
     }
@@ -164,12 +165,12 @@ export function HeroSlideFormPage() {
     setSaving(true);
     try {
       await removeSlide({ id: id as any });
-      toast.success('Slide deleted');
+      setOpOk('Slide deleted');
       await invalidateStorefront();
       navigate('/admin/homepage');
     } catch (error: any) {
       console.error('Error deleting slide:', error);
-      toast.error('Failed to delete slide');
+      setOpError('Failed to delete slide');
     } finally {
       setSaving(false);
     }
@@ -210,6 +211,10 @@ export function HeroSlideFormPage() {
           {saving ? 'Saving...' : 'Save Slide'}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         {/* Left Column - Main Content */}

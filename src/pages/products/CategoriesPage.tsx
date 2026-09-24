@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { Product } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { ShoppingCart, Star, Plus } from 'lucide-react';
@@ -23,6 +23,7 @@ export function CategoriesPage() {
   const location = useLocation();
   const [categories, setCategories] = useState<CategoryWithProducts[]>([]);
   const { addToCart, isLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   // Wave 3: categories + join + products from the Convex catalog.
   const { products, categories: catalogCategories, productCategories, loading } =
     useFullCatalog();
@@ -48,7 +49,7 @@ export function CategoriesPage() {
       setCategories(transformedCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories.');
+      setOpError('Failed to load categories.');
     }
   }, [loading, products, catalogCategories, productCategories]);
 
@@ -56,9 +57,9 @@ export function CategoriesPage() {
     e.stopPropagation(); // Prevent click from bubbling up to the parent link
     try {
       await addToCart(product);
-      toast.success(`${product.name} added to cart`);
+      setOpOk(`${product.name} added to cart`);
     } catch (error) {
-      toast.error('Failed to add to cart');
+      setOpError('Failed to add to cart');
     }
   };
 
@@ -77,6 +78,9 @@ export function CategoriesPage() {
             <p className="font-sans-premium text-lg text-muted-foreground mt-4">
               Explore our curated categories of premium products.
             </p>
+          </div>
+          <div className="mb-8">
+            <InlineStatus status={opStatus} />
           </div>
 
         <div className="space-y-16">

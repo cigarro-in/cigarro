@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { recordReferral, checkIfUserWasReferred } from '../../utils/referral/referralService';
-import { toast } from 'sonner';
 
 export function ReferralTracker() {
   const { user } = useAuth();
@@ -27,11 +26,7 @@ export function ReferralTracker() {
           });
 
           if (result.success) {
-            if (result.referrer_name) {
-              toast.success(`Referral applied! You'll get ₹100 after your first order, referred by ${result.referrer_name}`);
-            } else {
-              toast.success('Referral code applied successfully!');
-            }
+            // No status: background tracker, renders null — the wallet credit is the confirmation.
             // Only clear if successful
             sessionStorage.removeItem('referral_code');
           } else {

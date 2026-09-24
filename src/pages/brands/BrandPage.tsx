@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User, Globe } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
@@ -38,6 +38,7 @@ export function BrandPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   // Wave 3: brand + products resolve from the Convex catalog (same shapes
   // the Supabase fallback produced). No API-hop, no Supabase.
   const { products: catalogProducts, brands: catalogBrands, loading: catalogLoading } =
@@ -85,7 +86,7 @@ export function BrandPage() {
       );
     } catch (error) {
       console.error('Error fetching brand data:', error);
-      toast.error('Failed to load brand information');
+      setOpError('Failed to load brand information');
     } finally {
       setIsLoading(false);
     }
@@ -94,9 +95,9 @@ export function BrandPage() {
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add to cart');
+      setOpError('Failed to add to cart');
     }
   };
 
@@ -248,6 +249,9 @@ export function BrandPage() {
 
         {/* Products Section */}
         <div className="main-container py-12 md:py-16">
+          <div className="mb-6">
+            <InlineStatus status={opStatus} />
+          </div>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h2 className="text-2xl md:text-3xl font-serif text-dark">{brand.name} Products</h2>

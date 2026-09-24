@@ -3,7 +3,8 @@ import { MapPin, Loader2, Navigation, Home, Building2, GraduationCap, Hotel, Che
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { Address } from './AddressCard';
 import { cn } from '../../ui/utils';
 
@@ -43,7 +44,11 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
+  // Prefill fills EMPTY name/phone fields only: profile data arriving late
+  // (async) must never wipe what the customer already typed. Editing an
+  // existing address always wins over defaults.
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -56,8 +61,8 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     } else if (defaultValues) {
       setFormData(prev => ({
         ...prev,
-        full_name: defaultValues.full_name || prev.full_name,
-        phone: defaultValues.phone || prev.phone
+        full_name: prev.full_name || defaultValues.full_name || prev.full_name,
+        phone: prev.phone || defaultValues.phone || prev.phone
       }));
     }
   }, [initialData, defaultValues]);
@@ -95,7 +100,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
       });
     } catch (error) {
       console.error('Error saving address:', error);
-      toast.error('Failed to save address');
+      setOpError('Failed to save address');
     } finally {
       setIsSaving(false);
     }
@@ -112,9 +117,9 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
         setFormData(prev => ({
           ...prev,
-          city: office.District || prev.city,
-          state: office.State || prev.state,
-          country: office.Country || prev.country
+          city: prev.city || office.District || prev.city,
+          state: prev.state || office.State || prev.state,
+          country: prev.country || office.Country || prev.country
         }));
         setErrors(prev => ({ ...prev, pincode: '', city: '', state: '' }));
       } catch (error) {
@@ -123,51 +128,35 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     }
   };
 
+  const { locate } = useCurrentLocation();
+
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
     try {
-      if (!navigator.geolocation) throw new Error('Location not supported');
-
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { 
-          enableHighAccuracy: true, 
-          timeout: 10000 
-        });
-      });
-
-      const { latitude, longitude } = position.coords;
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-
-      if (!response.ok) throw new Error('Geocoding failed');
-      const data = await response.json();
-
-      if (data?.address) {
-        const addr = data.address;
-        const parts = [
-          addr.house_number,
-          addr.building,
-          addr.road,
-          addr.suburb,
-          addr.neighbourhood
-        ].filter(Boolean);
-
-        setFormData(prev => ({
-          ...prev,
-          address: parts.join(', '),
-          pincode: addr.postcode || prev.pincode,
-          city: addr.city || addr.town || addr.village || '',
-          state: addr.state || '',
-          country: 'India' // Force India as per business logic
-        }));
-
-        if (addr.postcode) fetchLocationFromPincode(addr.postcode);
-        // No toast: the form fields filling in IS the confirmation.
+      // Shared path: device position + server-side reverse geocode with
+      // coded inline errors. Manual entry below always stays available.
+      const res = await locate();
+      if (!res.ok) {
+        setOpError(res.message);
+        return;
       }
+      const addr = res.value;
+
+      // Fill blanks only — never overwrite what the customer typed.
+      setFormData(prev => ({
+        ...prev,
+        address: prev.address || addr.address || prev.address,
+        pincode: prev.pincode || addr.pincode || prev.pincode,
+        city: prev.city || addr.city || prev.city,
+        state: prev.state || addr.state || prev.state,
+        country: 'India' // Force India as per business logic
+      }));
+
+      if (addr.pincode) fetchLocationFromPincode(addr.pincode);
+      // No status: the form fields filling in IS the confirmation.
     } catch (error) {
       console.error('Location error:', error);
-      toast.error('Could not fetch location');
+      setOpError('Could not fetch location');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -175,6 +164,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
   return (
     <div className="space-y-6 py-2">
+      <InlineStatus status={opStatus} />
       {/* Use Current Location Button */}
       <Button
         type="button"
@@ -186,6 +176,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
         {isLoadingLocation ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Navigation className="w-4 h-4 mr-2" />}
         Use Current Location
       </Button>
+      <p className="text-[10px] text-center text-muted-foreground -mt-4">Location lookup by © OpenStreetMap contributors</p>
 
       <div className="space-y-4">
         <div>

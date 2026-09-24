@@ -115,6 +115,7 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
               brand: getBrandName(result.item),
               brand_id: result.item.brand_id,
               description: result.item.description,
+              image: displayImages[0] || '',
               gallery_images: displayImages,
               is_active: result.item.is_active,
               item_type: 'product' as const,

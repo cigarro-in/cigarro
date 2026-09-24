@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Star } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 import { useProductReviews } from '../../hooks/data/useProductReviews';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -35,14 +35,15 @@ export function ProductReviews({
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const handleSubmit = async () => {
     if (!user) {
-      toast.error('Please log in to write a review');
+      setOpError('Please log in to write a review');
       return;
     }
     if (!comment.trim()) {
-      toast.error('Please write a few words');
+      setOpError('Please write a few words');
       return;
     }
     setSaving(true);
@@ -51,9 +52,9 @@ export function ProductReviews({
       setDone(true);
       setTitle('');
       setComment('');
-      toast.success('Thanks! Your review is awaiting moderation.');
+      // No ok-status: the "Submitted — visible after moderation." line below is the confirmation.
     } catch {
-      toast.error('Could not submit review');
+      setOpError('Could not submit review');
     } finally {
       setSaving(false);
     }
@@ -92,6 +93,7 @@ export function ProductReviews({
 
       <div className="max-w-2xl mx-auto mt-10 space-y-3">
         <h3 className="font-medium text-dark">Write a review</h3>
+        <InlineStatus status={opStatus} />
         {done && (
           <p className="text-sm text-green-700">Submitted — visible after moderation.</p>
         )}

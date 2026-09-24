@@ -12,7 +12,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
 
 interface Brand {
@@ -51,6 +51,7 @@ export function BrandFormPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
   const populatedRef = useRef(false);
 
   const [formData, setFormData] = useState<BrandFormData>({
@@ -80,7 +81,7 @@ export function BrandFormPage() {
     populatedRef.current = true;
     const data: any = brandRows.find((b: any) => b.supabaseId === id);
     if (!data) {
-      toast.error('Brand not found');
+      setOpError('Brand not found');
       navigate('/admin/brands');
       return;
     }
@@ -127,7 +128,7 @@ export function BrandFormPage() {
   const handleSubmit = async () => {
     setSaveAttempted(true);
     if (!formData.name.trim()) {
-      toast.error('Brand name is required');
+      setOpError('Brand name is required');
       return;
     }
 
@@ -147,17 +148,17 @@ export function BrandFormPage() {
 
       if (isEditMode) {
         await updateBrand({ supabaseId: id!, patch: args });
-        toast.success('Brand updated successfully');
+        setOpOk('Brand updated successfully');
       } else {
         await createBrand(args);
-        toast.success('Brand created successfully');
+        setOpOk('Brand created successfully');
       }
 
       navigate('/admin/brands');
     } catch (error: any) {
       console.error('Error saving brand:', error);
       const code = error?.data?.code;
-      toast.error(
+      setOpError(
         code === 'SLUG_TAKEN'
           ? 'Slug is taken by another brand'
           : code === 'NOT_CATALOG_ADMIN'
@@ -174,11 +175,11 @@ export function BrandFormPage() {
     setSaving(true);
     try {
       await removeBrand({ supabaseId: id! });
-      toast.success('Brand deleted successfully');
+      setOpOk('Brand deleted successfully');
       navigate('/admin/brands');
     } catch (error: any) {
       console.error('Error deleting brand:', error);
-      toast.error(
+      setOpError(
         error?.data?.code === 'BRAND_IN_USE'
           ? 'This brand has products and cannot be deleted'
           : 'Failed to delete brand'
@@ -239,6 +240,10 @@ export function BrandFormPage() {
           )}
         </Button>
       </PageHeader>
+
+      <div className="max-w-[1600px] mx-auto px-6 mt-6">
+        <InlineStatus status={opStatus} />
+      </div>
 
       <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6 mt-6">
         

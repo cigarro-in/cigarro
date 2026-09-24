@@ -1,7 +1,8 @@
 // Guard for R2 library deletes (admin only). A library image can still be
 // referenced by variants, brands, categories, collections, combos, blogs,
-// hero slides, homepage sections, or site settings — deleting it orphans
-// those surfaces. Call this INSTEAD of window.confirm before deleteR2Image;
+// hero slides, homepage sections, site settings, carts, or order item
+// snapshots — deleting it orphans those surfaces. Call this INSTEAD of
+// window.confirm before deleteR2Image;
 // it returns false to abort. FAIL-CLOSED: a failed usage check blocks the
 // delete (never ask "delete anyway?").
 

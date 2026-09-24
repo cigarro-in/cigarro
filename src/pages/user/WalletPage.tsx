@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { useAuth } from '../../hooks/useAuth';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -44,24 +44,25 @@ export function WalletPage() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [loadAmount, setLoadAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const isLoading = balanceData === undefined || ledger === undefined;
   const balanceRupees = balanceData ? paiseToRupees(balanceData.balancePaise) : 0;
 
   const handleLoadWallet = async () => {
     if (!user) {
-      toast.error('Please sign in to continue');
+      setOpError('Please sign in to continue');
       return;
     }
     if (!org) {
-      toast.error('Store is loading. Please try again.');
+      setOpError('Store is loading. Please try again.');
       return;
     }
 
     const amount = parseFloat(loadAmount);
-    if (!amount || amount <= 0) return toast.error('Please enter a valid amount');
-    if (amount < 10) return toast.error('Minimum load amount is ₹10');
-    if (amount > 50000) return toast.error('Maximum load amount is ₹50,000');
+    if (!amount || amount <= 0) { setOpError('Please enter a valid amount'); return; }
+    if (amount < 10) { setOpError('Minimum load amount is ₹10'); return; }
+    if (amount > 50000) { setOpError('Maximum load amount is ₹50,000'); return; }
 
     setIsProcessing(true);
     try {
@@ -103,7 +104,7 @@ export function WalletPage() {
     } catch (error: any) {
       console.error('Wallet load error:', error);
       const code = error?.data?.code;
-      toast.error(
+      setOpError(
         code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending loads at this amount — retry shortly.'
           : 'Failed to initiate wallet load',
@@ -228,6 +229,7 @@ export function WalletPage() {
             <DialogTitle>Load Wallet</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <InlineStatus status={opStatus} />
             <div>
               <label className="text-sm font-medium mb-2 block">Enter Amount</label>
               <Input

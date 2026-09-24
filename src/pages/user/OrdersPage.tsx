@@ -10,12 +10,14 @@ import { Separator } from '../../components/ui/separator';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { paiseToRupees } from '../../lib/convex/money';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { resolveOrderItemImageUrl } from '../../hooks/data/useMyOrders';
 
 interface OrderItem {
   id: string;
@@ -92,6 +94,7 @@ export function OrdersPage() {
   const { addMultipleToCart } = useCart();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const org = useOrg();
   const convexOrders = useQuery(
@@ -99,6 +102,9 @@ export function OrdersPage() {
     org ? { orgId: org._id, limit: 50 } : 'skip',
   );
   const retryConvexOrder = useMutation(api.orders.retryOrder);
+  // Shared catalog subscription for the legacy order-image fallback
+  // (snapshot → catalog → placeholder, resolved in the data layer).
+  const { products: catalogProducts } = useFullCatalog();
 
   const isInitialLoading = convexOrders === undefined;
   const isFetchingMore = false;
@@ -119,7 +125,7 @@ export function OrdersPage() {
         variant_name: undefined,
         brand: '',
         price: paiseToRupees(it.unitPricePaise),
-        image: '',
+        image: resolveOrderItemImageUrl(it.image, it.productId, it.variantId, catalogProducts),
         quantity: it.qty,
       })),
       subtotal: paiseToRupees(o.cartTotalPaise ?? 0),
@@ -241,17 +247,17 @@ export function OrdersPage() {
       }));
 
       await addMultipleToCart(productsToAdd, order.items.map(item => item.quantity));
-      toast.success(`${order.items.length} item(s) added to cart!`);
+      setOpOk(`${order.items.length} item(s) added to cart!`);
       navigate('/checkout');
     } catch (error) {
       console.error('Buy Again error:', error);
-      toast.error('Failed to add items to cart');
+      setOpError('Failed to add items to cart');
     }
   };
 
   const handleRetryPayment = async (order: Order) => {
     if (!user) {
-      toast.error('Please sign in to retry payment');
+      setOpError('Please sign in to retry payment');
       return;
     }
     try {
@@ -272,11 +278,11 @@ export function OrdersPage() {
       console.error('Retry payment error:', error);
       const code = error?.data?.code;
       if (code === 'NOT_RETRYABLE') {
-        toast.error('This order can no longer be retried.');
+        setOpError('This order can no longer be retried.');
       } else if (code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED') {
-        toast.error('Too many pending orders at this price — try again in a few minutes.');
+        setOpError('Too many pending orders at this price — try again in a few minutes.');
       } else {
-        toast.error('Failed to initiate retry. Please try again.');
+        setOpError('Failed to initiate retry. Please try again.');
       }
     }
   };
@@ -323,6 +329,9 @@ export function OrdersPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8">
+        <div className="mb-4">
+          <InlineStatus status={opStatus} />
+        </div>
         {isInitialLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
@@ -730,7 +739,7 @@ export function OrdersPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               // Add contact support functionality
-                              toast.info('Contact support feature coming soon!');
+                              setOpOk('Contact support feature coming soon!');
                             }}
                             className="flex-1 border border-border bg-background text-foreground px-4 py-2.5 rounded-full font-medium text-sm transition-all duration-300 hover:bg-muted/50"
                           >

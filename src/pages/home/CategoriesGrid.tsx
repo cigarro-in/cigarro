@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Package, Leaf, Flame } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart, Product } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
 
 import { Category as HomeCategory, BlogSectionConfig } from '../../types/home';
@@ -35,13 +35,14 @@ export function CategoriesGrid({
   isLoading = false
 }: CategoriesGridProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch (error) {
-      toast.error('Failed to add item to cart');
+      setOpError('Failed to add item to cart');
     }
   };
 
@@ -65,6 +66,10 @@ export function CategoriesGrid({
             <p className="text-dark/70 mb-4 max-w-2xl mx-auto">{config.description}</p>
           )}
           <div className="w-16 h-0.5 bg-canyon mx-auto"></div>
+        </div>
+
+        <div className="max-w-3xl mx-auto mb-8 px-4">
+          <InlineStatus status={opStatus} />
         </div>
 
         {/* Content Grid */}

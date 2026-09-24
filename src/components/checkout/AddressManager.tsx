@@ -8,7 +8,9 @@ import { Separator } from '../ui/separator';
 import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useAddresses } from '../../lib/convex/useAddresses';
-import { toast } from 'sonner';
+import { useMyProfile } from '../../hooks/data/useMyProfile';
+import { useCurrentLocation } from '../../hooks/useCurrentLocation';
+import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 
 interface Address {
   id?: string;
@@ -56,6 +58,7 @@ export function AddressManager({
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   // Phase 1: address store behind the flat-shape adapter (Convex or Supabase).
   const {
     addresses: storeAddresses,
@@ -65,7 +68,10 @@ export function AddressManager({
     useConvexPath,
   } = useAddresses(user);
 
-  // Address form state
+  // Address form state (name/phone prefill from the normalized profile
+  // contract; typed values are never overwritten by late arrivals).
+  const { profileName, profilePhone10 } = useMyProfile();
+  const { locate } = useCurrentLocation();
   const [addressForm, setAddressForm] = useState({
     full_name: user?.name || '',
     phone: '',
@@ -138,9 +144,9 @@ export function AddressManager({
 
         setAddressForm(prev => ({
           ...prev,
-          city: office.District || prev.city,
-          state: office.State || prev.state,
-          country: office.Country || prev.country
+          city: prev.city || office.District || prev.city,
+          state: prev.state || office.State || prev.state,
+          country: prev.country || office.Country || prev.country
         }));
 
         setAddressErrors(prev => ({
@@ -155,83 +161,38 @@ export function AddressManager({
     }
   };
 
-  // Current location functionality
+  // Current location via the shared path (device position + server-side
+  // reverse geocode, coded inline errors). Manual fields stay editable.
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
-    
+
     try {
-      if (!navigator.geolocation) {
-        toast.error('Location services not supported on this device');
+      const res = await locate();
+      if (!res.ok) {
+        setOpError(res.message);
         return;
       }
+      const addr = res.value;
+      const pincode = addr.pincode || '';
 
-      // Request location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (error) => reject(error),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      });
+      // Update form (blanks only — typed values survive; geocoded
+      // city/state fill empty fields, pincode lookup refines them after)
+      setAddressForm(prev => ({
+        ...prev,
+        address: prev.address || addr.address || prev.address,
+        pincode: prev.pincode || pincode || prev.pincode,
+        city: prev.city || addr.city || prev.city,
+        state: prev.state || addr.state || prev.state
+      }));
 
-      const { latitude, longitude } = position.coords;
-      // No toast: the form fills in place; the spinner + fields are the feedback.
-
-      // Use Nominatim for reverse geocoding
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch address details');
+      // Trigger pincode lookup to fill city/state automatically
+      if (pincode && pincode.length === 6) {
+        await fetchLocationFromPincode(pincode);
       }
-
-      const data = await response.json();
-      
-      if (data && data.address) {
-        const addr = data.address;
-        
-        // Extract components
-        const pincode = addr.postcode || '';
-        
-        // Construct address line
-        const addressParts = [];
-        if (addr.house_number) addressParts.push(addr.house_number);
-        if (addr.building) addressParts.push(addr.building);
-        if (addr.road) addressParts.push(addr.road);
-        if (addr.suburb) addressParts.push(addr.suburb);
-        if (addr.neighbourhood) addressParts.push(addr.neighbourhood);
-        
-        const formattedAddress = addressParts.join(', ');
-
-        // Update form
-        setAddressForm(prev => ({
-          ...prev,
-          address: formattedAddress,
-          pincode: pincode,
-          // Clear city/state to be filled by pincode lookup
-          city: '', 
-          state: ''
-        }));
-
-        // Trigger pincode lookup to fill city/state automatically
-        if (pincode && pincode.length === 6) {
-          await fetchLocationFromPincode(pincode);
-        }
-        // No toast: the form fields filling in IS the confirmation.
-      } else {
-        throw new Error('Incomplete address data received');
-      }
-
+      // No status: the form fields filling in IS the confirmation.
     } catch (error: any) {
       console.error('Location error:', error);
-      let errorMessage = 'Failed to get location';
-      
-      if (error.code === 1) errorMessage = 'Location permission denied';
-      if (error.code === 2) errorMessage = 'Location unavailable';
-      if (error.code === 3) errorMessage = 'Location request timed out';
-      
-      toast.error(errorMessage);
+      setOpError('Failed to get location');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -269,10 +230,10 @@ export function AddressManager({
       if (selectedAddress?.id === addressId) {
         onAddressSelect(null as any);
       }
-      // No toast: the row disappearing + selection clearing is the feedback.
+      // No status: the row disappearing + selection clearing is the feedback.
     } catch (error) {
       console.error('Error deleting address:', error);
-      toast.error('Failed to delete address');
+      setOpError('Failed to delete address');
     }
   };
 
@@ -333,19 +294,20 @@ export function AddressManager({
       onAddressSelect(data);
       setShowAddNewDialog(false);
       resetForm();
-      // No toast: the dialog closes and the address appears selected.
+      // No status: the dialog closes and the address appears selected.
     } catch (error) {
       console.error('Error saving address:', error);
-      toast.error('Failed to save address. Please try again.');
+      setOpError('Failed to save address. Please try again.');
     } finally {
       setIsSavingAddress(false);
     }
   };
 
-  // Reset form
+  // Reset form (blank), then open a new address seeded from the
+  // normalized profile — on open, not on mount, so first creation prefills.
   const resetForm = () => {
     setAddressForm({
-      full_name: user?.name || '',
+      full_name: '',
       phone: '',
       address: '',
       pincode: '',
@@ -357,6 +319,17 @@ export function AddressManager({
     setCustomLabel('');
     setAddressErrors({});
     setEditingAddress(null);
+  };
+
+  const openNewAddress = () => {
+    resetForm();
+    setAddressForm(prev => ({
+      ...prev,
+      full_name: profileName || user?.name || '',
+      phone: profilePhone10 || '',
+    }));
+    onDialogChange(false);
+    setShowAddNewDialog(true);
   };
 
   // Load addresses on mount
@@ -469,6 +442,7 @@ export function AddressManager({
           </DialogHeader>
 
           <div className="space-y-4">
+            <InlineStatus status={opStatus} />
             {/* Saved Addresses */}
             {savedAddresses.length > 0 && (
               <div>
@@ -483,7 +457,7 @@ export function AddressManager({
                         onClick={() => {
                           onAddressSelect(address);
                           onDialogChange(false);
-                          // No toast: the dialog closes onto the chosen address.
+                          // No status: the dialog closes onto the chosen address.
                         }}
                         className="w-full p-3 text-left hover:bg-muted/20 transition-all"
                       >
@@ -546,8 +520,7 @@ export function AddressManager({
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      onDialogChange(false);
-                      setShowAddNewDialog(true);
+                      openNewAddress();
                     }}
                     className="w-full border-dashed border-accent/50 text-accent hover:bg-accent/10"
                   >
@@ -566,11 +539,10 @@ export function AddressManager({
                 <p className="text-xs text-muted-foreground mb-4">Add your first delivery address to continue</p>
                 <Button
                   type="button"
-                  onClick={() => {
-                    onDialogChange(false);
-                    setShowAddNewDialog(true);
-                  }}
-                  className="bg-accent hover:bg-accent/90 text-white"
+                    onClick={() => {
+                      openNewAddress();
+                    }}
+                    className="bg-accent hover:bg-accent/90 text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Your First Address
@@ -592,6 +564,7 @@ export function AddressManager({
           </DialogHeader>
 
           <div className="space-y-4">
+            <InlineStatus status={opStatus} />
             {/* Full Name */}
             <div>
               <Label htmlFor="full_name">Full Name</Label>
@@ -650,6 +623,7 @@ export function AddressManager({
               {addressErrors.address && (
                 <p className="text-xs text-red-500 mt-1">{addressErrors.address}</p>
               )}
+              <p className="text-[10px] text-muted-foreground text-right mt-1">Location lookup by © OpenStreetMap contributors</p>
             </div>
 
             {/* Pincode and City */}

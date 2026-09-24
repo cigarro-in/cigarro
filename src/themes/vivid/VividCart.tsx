@@ -4,7 +4,7 @@ import { Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { QuantityStepper } from '../../components/cart/QuantityStepper';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 
@@ -15,6 +15,7 @@ export default function VividCart() {
   const { user } = useAuth();
   const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   // GA4 view_cart: once per distinct cart content.
   const cartSentRef = useRef<string | null>(null);
@@ -57,6 +58,8 @@ export default function VividCart() {
         Cart ({totalItems})
       </h1>
 
+      <InlineStatus status={opStatus} />
+
       <div className="space-y-3">
         {items.map((item) => {
           const price = item.variant_price || item.combo_price || item.price || 0;
@@ -84,7 +87,7 @@ export default function VividCart() {
                   quantity={item.quantity}
                   onChange={(next) =>
                     updateQuantity(item.id, next, item.variant_id, item.combo_id).catch(() =>
-                      toast.error('Failed to update quantity'),
+                      setOpError('Failed to update quantity'),
                     )
                   }
                   min={0}

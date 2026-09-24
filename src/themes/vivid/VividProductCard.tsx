@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { useCart } from '../../hooks/useCart';
@@ -15,6 +15,7 @@ const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export function VividProductCard({ product, listName = 'products' }: Props) {
   const { addToCart } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const defaultVariant =
     product.product_variants?.find((v) => v.is_default) ||
@@ -33,13 +34,15 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
     e.stopPropagation();
     try {
       await addToCart(product as any, 1, defaultVariant?.id);
-      toast.success(`${product.name} added`);
+      setOpOk(`${product.name} added`);
     } catch {
-      toast.error('Could not add to cart');
+      setOpError('Could not add to cart');
     }
   };
 
   return (
+    <>
+      <InlineStatus status={opStatus} />
     <Link
       to={`/product/${product.slug}`}
       onClick={() => trackSelectItem(product, listName)}
@@ -76,5 +79,6 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
         <Plus className="w-3 h-3" strokeWidth={2.5} />
       </button>
     </Link>
+    </>
   );
 }

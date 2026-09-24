@@ -1,6 +1,9 @@
 // Targeted check: image-ref match/slug/banner/skip/repoint pure logic.
 // Run: npx tsx scripts/check-asset-inventory.ts (no Convex, no R2, no deploy).
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   matchesRef,
   slugFromContexts,
@@ -60,6 +63,28 @@ async function main() {
   assert.equal(replaceEmbeddedRef('<img src="https://cdn.cigarro.in/asset_images/foo/a.jpg">', "asset_images/foo/a.jpg", "https://cdn.cigarro.in/asset_images/foo/a.jpg", "new.webp"), '<img src="new.webp">');
   assert.equal(replaceEmbeddedRef('<img src="https://cdn.cigarro.in/asset_images/foo/a.jpg-extra">', "asset_images/foo/a.jpg", "https://cdn.cigarro.in/asset_images/foo/a.jpg", "new.webp"), null);
   assert.deepEqual(replaceDeepRefs({ hero: ["https://cdn.cigarro.in/asset_images/foo/a.jpg", "other"] }, "asset_images/foo/a.jpg", "https://cdn.cigarro.in/asset_images/foo/a.jpg", "new.webp"), { hero: ["new.webp", "other"] });
+
+  // Order item snapshots (orderItemV.image) are inventoried: any hit counts
+  // (deletes stay fail-closed) and repoint moves them with exact matching.
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const catalog = readFileSync(join(root, "convex/adminCatalog.ts"), "utf8");
+  assert.match(catalog, /ctx\.db\.query\("orders"\)\.collect\(\)/, "inventory scans orders");
+  assert.match(
+    catalog,
+    /kind: "order"[\s\S]*?mutable: false/,
+    "order snapshots count as history (still block deletes via total)",
+  );
+  assert.match(
+    catalog,
+    /items\.map\(\(it: any\) => \(hits\(it\?\.image\) \? \{ \.\.\.it, image: newUrl \} : it\)\)/,
+    "repoint moves order snapshots with exact old-value match",
+  );
+  const guard = readFileSync(join(root, "src/lib/images/guard.ts"), "utf8");
+  assert.match(
+    guard,
+    /usage\.total === 0/,
+    "single delete allowed only at zero references (fail-closed)",
+  );
 
   // Badge copy: unknown / unused / in-use with context.
   assert.equal(usageSummary(undefined), "Checking…");

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { useCatalogProduct } from '../../hooks/data/useCatalog';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
@@ -36,6 +36,7 @@ export default function VividProduct() {
   const { isWishlisted, toggleWishlist } = useWishlist();
   // Wave 3: product + variants from the Convex catalog (same shapes).
   const { product: catalogProduct, loading: catalogLoading } = useCatalogProduct(slug);
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   useEffect(() => {
     if (catalogLoading) return;
@@ -99,9 +100,9 @@ export default function VividProduct() {
       } else {
         await addToCart(product as any, qty);
       }
-      toast.success(`${product.name} added to cart`);
+      setOpOk(`${product.name} added to cart`);
     } catch {
-      toast.error('Could not add to cart');
+      setOpError('Could not add to cart');
     }
   };
 
@@ -142,7 +143,7 @@ export default function VividProduct() {
                       i === activeImage ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
                   }`}
                 >
-                  <img src={getProductImageUrl(img)} alt="" className="w-full h-full object-cover" />
+                  <img src={getProductImageUrl(img)} alt={(selected as any)?.image_alt_text || `${product.name} thumbnail ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -193,6 +194,7 @@ export default function VividProduct() {
             </div>
           )}
 
+          <div className="mb-3"><InlineStatus status={opStatus} /></div>
           <div className="flex items-center gap-3 mb-5">
             <div className="inline-flex items-center bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full overflow-hidden">
               <button

@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { useCart } from '../../hooks/useCart';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../../components/products/ProductCard';
 import { ShowcaseConfig, HomepageProduct, CollectionInfo } from '../../types/home';
@@ -19,6 +19,7 @@ export const ProductShowcase = memo(function ProductShowcase({
   isLoading = false
 }: ProductShowcaseProps) {
   const { addToCart, isLoading: cartLoading } = useCart();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   // Collection (admin) wins: rename the collection once, this section follows.
   const sectionConfig = {
@@ -34,11 +35,11 @@ export const ProductShowcase = memo(function ProductShowcase({
   const handleAddToCart = useCallback(async (product: HomepageProduct) => {
     try {
       await addToCart(product as any, 1);
-      toast.success(`${product.name} added to cart!`);
+      setOpOk(`${product.name} added to cart!`);
     } catch {
-      toast.error('Failed to add item to cart');
+      setOpError('Failed to add item to cart');
     }
-  }, [addToCart]);
+  }, [addToCart, setOpOk, setOpError]);
 
   if (!sectionConfig.is_enabled || products.length === 0) {
     return null;
@@ -55,6 +56,9 @@ export const ProductShowcase = memo(function ProductShowcase({
             </h2>
             <div className="w-12 md:w-16 h-0.5 bg-canyon mx-auto"></div>
           </div>
+        </div>
+        <div className="max-w-3xl mx-auto mb-6 px-4">
+          <InlineStatus status={opStatus} />
         </div>
 
         {/* Mobile: 3 columns (1 image + 2 products) x 3 rows */}

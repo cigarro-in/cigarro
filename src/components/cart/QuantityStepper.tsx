@@ -19,9 +19,9 @@ interface QuantityStepperProps {
 }
 
 const SIZES = {
-  sm: { btn: 'w-6 h-6', icon: 'w-3 h-3', value: 'w-6 text-[11px]' },
-  md: { btn: 'w-9 h-9', icon: 'w-3.5 h-3.5', value: 'w-8 text-sm' },
-  lg: { btn: 'w-8 h-8', icon: 'w-3 h-3', value: 'w-8 text-sm' },
+  sm: { btn: 'w-6 h-6 min-w-[44px] min-h-[44px]', icon: 'w-3 h-3', value: 'w-6 text-[11px]' },
+  md: { btn: 'w-9 h-9 min-w-[44px] min-h-[44px]', icon: 'w-3.5 h-3.5', value: 'w-8 text-sm' },
+  lg: { btn: 'w-8 h-8 min-w-[44px] min-h-[44px]', icon: 'w-3 h-3', value: 'w-8 text-sm' },
 } as const;
 
 // Single shared quantity control for every cart surface (CartPage,

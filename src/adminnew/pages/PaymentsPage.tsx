@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation, useAction } from 'convex/react';
@@ -41,7 +41,7 @@ export function PaymentsPage() {
   }, [location.pathname]);
 
   // After returning from the Google OAuth bounce, strip the query param.
-  // No toast at all: the card flipping to Connected/Polling in place is the
+  // No toast at all: the card flipping to Active in place is the
   // confirmation. (A success toast here would violate the errors-only policy
   // and fire on every return from Google.)
   useEffect(() => {
@@ -57,6 +57,7 @@ export function PaymentsPage() {
   // Last inbox-check outcome, rendered inline next to the button (replaces
   // the old success/info toasts — the page, not a popup, reports results).
   const [checkNote, setCheckNote] = useState<string | null>(null);
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const recentOrders = useQuery(
     api.admin.listRecentOrders,
@@ -86,7 +87,7 @@ export function PaymentsPage() {
     try {
       const r: any = await checkInbox({ maxMessages: 20 });
       if (r?.error) {
-        toast.error(`Inbox check failed: ${r.error}`);
+        setOpError(`Inbox check failed: ${r.error}`);
       } else if (r?.skipped) {
         setCheckNote(`Skipped: ${r.skipped}`);
       } else if ((r?.fetched ?? 0) === 0) {
@@ -97,7 +98,7 @@ export function PaymentsPage() {
         );
       }
     } catch (e: any) {
-      toast.error(e?.data?.code || e?.message || 'Inbox check failed');
+      setOpError(e?.data?.code || e?.message || 'Inbox check failed');
     } finally {
       setChecking(false);
     }
@@ -131,6 +132,7 @@ export function PaymentsPage() {
         </div>
       </PageHeader>
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <div className="flex gap-2 border-b border-gray-200">
           {tabs.map((t) => (
             <button
@@ -343,7 +345,6 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
   const { org, settings, appConfig, gmailStatus, setCheckNoteParent } = props;
   const update = useMutation(api.organizations.updateSettings);
   const setAppConfig = useMutation(api.appConfig.set);
-  const setGmailConfig = useMutation(api.gmail.setGmailConfig);
   const triggerGmailPoll = useAction(api.gmail.triggerPoll);
 
   const [upiVpa, setUpiVpa] = useState('');
@@ -357,6 +358,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
   // Inline save confirmation (replaces the old success toast).
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const { status: settingsStatus, setError: setSettingsError } = useInlineStatus();
 
   useEffect(() => {
     if (!settings) return;
@@ -379,11 +381,11 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
     if (!org) return;
     setSaveAttempted(true);
     if (isBlank(upiVpa)) {
-      toast.error('Primary UPI VPA is required');
+      setSettingsError('Primary UPI VPA is required');
       return;
     }
     if (slotMinBad || quarantineBad || slotsBad) {
-      toast.error('Slot settings are out of range (see red fields)');
+      setSettingsError('Slot settings are out of range (see red fields)');
       return;
     }
     setSaving(true);
@@ -400,7 +402,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
       // No success toast: the inline note + persisted field values confirm it.
       setSavedNote(`Saved ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`);
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Failed to save');
+      setSettingsError(e?.data?.code || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -409,7 +411,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
   const handleCheckInbox = async () => {
     try {
       const r: any = await triggerGmailPoll({ maxMessages: 20 });
-      if (r?.error) toast.error(r.error);
+      if (r?.error) setSettingsError(r.error);
       else setCheckNoteParent?.(
         r?.skipped
           ? `Skipped: ${r.skipped}`
@@ -418,7 +420,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
             (r?.parseFailures ? `, ${r.parseFailures} unreadable` : ''),
       );
     } catch (e: any) {
-      toast.error(e?.data?.message || e?.message || 'Check failed');
+      setSettingsError(e?.data?.message || e?.message || 'Check failed');
     }
   };
 
@@ -426,20 +428,10 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 
   return (
     <div className="max-w-[720px] space-y-4">
+      <InlineStatus status={settingsStatus} />
       <GmailConnectionCard
         status={gmailStatus}
         callbackUrl={GMAIL_CALLBACK_URL}
-        onToggle={async (enabled) => {
-          try {
-            await setGmailConfig({
-              enabled,
-              ...(enabled && org ? { orgId: org._id } : {}),
-            });
-            // No toast: the card badge flips Polling/Connected in place.
-          } catch (e: any) {
-            toast.error(e?.data?.code || 'Failed to save');
-          }
-        }}
         onCheckInbox={handleCheckInbox}
       />
 
@@ -569,8 +561,8 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
           } catch (e: any) {
             const code = e?.data?.code;
             if (code === 'NOT_PLATFORM_OWNER')
-              toast.error('Only owners can edit platform config');
-            else toast.error(code || 'Save failed');
+              setSettingsError('Only owners can edit platform config');
+            else setSettingsError(code || 'Save failed');
           }
         }}
       />
@@ -581,11 +573,11 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 function GmailConnectionCard(props: {
   status: any;
   callbackUrl: string;
-  onToggle: (enabled: boolean) => void;
   onCheckInbox: () => void;
 }) {
   const s = props.status;
   const [connecting, setConnecting] = useState(false);
+  const { status: gmailOpStatus, setError: setGmailError } = useInlineStatus();
   const connectUrl = useAction(api.gmail.getOAuthUrl);
   const disconnect = useMutation(api.gmail.disconnectGmail);
 
@@ -598,7 +590,7 @@ function GmailConnectionCard(props: {
       });
       window.location.href = r.url;
     } catch (e: any) {
-      toast.error(e?.data?.code || e?.message || 'Could not start Google connect');
+      setGmailError(e?.data?.code || e?.message || 'Could not start Google connect');
       setConnecting(false);
     }
   };
@@ -609,7 +601,7 @@ function GmailConnectionCard(props: {
       await disconnect({});
       // No toast: the card badge flips to Not connected in place.
     } catch (e: any) {
-      toast.error(e?.data?.code || 'Disconnect failed');
+      setGmailError(e?.data?.code || 'Disconnect failed');
     }
   };
 
@@ -619,19 +611,18 @@ function GmailConnectionCard(props: {
         <AdminCardTitle>Bank-email connection</AdminCardTitle>
         {s === undefined ? (
           <Badge variant="outline">Loading…</Badge>
-        ) : s.enabled && s.connected ? (
-          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Polling</Badge>
         ) : s.connected ? (
-          <Badge variant="outline">Connected</Badge>
+          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>
         ) : (
           <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Not connected</Badge>
         )}
       </AdminCardHeader>
       <AdminCardContent className="space-y-3">
+        <InlineStatus status={gmailOpStatus} />
         {s?.connected ? (
           <p className="text-sm text-gray-600">
-            Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null} every
-            5 minutes so orders auto-confirm.
+            Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null}.
+            Pending orders auto-confirm — no schedule to manage.
           </p>
         ) : (
           <>
@@ -663,14 +654,12 @@ function GmailConnectionCard(props: {
           </p>
         )}
         <div className="flex items-center gap-2">
-          <Switch checked={!!s?.enabled} onCheckedChange={props.onToggle} disabled={!s?.connected} />
-          <Label>Poll every 5 min</Label>
-          <span className="flex-1" />
           {s?.connected && s?.connectedVia === 'google' && (
             <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={handleDisconnect}>
               Disconnect
             </Button>
           )}
+          <span className="flex-1" />
           <Button size="sm" variant="outline" onClick={props.onCheckInbox} disabled={!s?.connected}>
             <RefreshCw className="w-4 h-4 mr-2" /> Check inbox now
           </Button>

@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { DataTable } from '../components/shared/DataTable';
 import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
@@ -26,6 +26,7 @@ export function CategoriesPage() {
   const navigate = useNavigate();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const rows = useQuery(api.adminCatalog.listCategoriesForAdmin, {});
   const removeCategory = useMutation(api.adminCatalog.deleteCategory);
@@ -57,20 +58,20 @@ export function CategoriesPage() {
       for (const supabaseId of categoryIds) {
         await removeCategory({ supabaseId });
       }
-      toast.success(`${categoryIds.length} categories deleted`);
+      setOpOk(`${categoryIds.length} categories deleted`);
       setSelectedCategories([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete categories');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete categories');
     }
   };
 
   const handleBulkStatusChange = async (categoryIds: string[], isActive: boolean) => {
     try {
       await setActive({ supabaseIds: categoryIds, isActive });
-      toast.success(`${categoryIds.length} categories ${isActive ? 'activated' : 'deactivated'}`);
+      setOpOk(`${categoryIds.length} categories ${isActive ? 'activated' : 'deactivated'}`);
       setSelectedCategories([]);
     } catch (error: any) {
-      toast.error(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
+      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
     }
   };
 
@@ -176,6 +177,7 @@ export function CategoriesPage() {
       </PageHeader>
 
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <InlineStatus status={opStatus} />
         <DataTable
           data={categories}
           columns={columns}

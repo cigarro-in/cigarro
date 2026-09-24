@@ -3,7 +3,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { AlertTriangle, Boxes, History, PackageCheck, Pencil, Search } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { toast } from 'sonner';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { AdminCard, AdminCardContent } from '../components/shared/AdminCard';
 import { Badge } from '../../components/ui/badge';
@@ -53,6 +53,7 @@ export function InventoryPage() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const { status: opStatus, setError: setOpError } = useInlineStatus();
   const adjust = useMutation(api.inventory.adjust);
   const history = useQuery(
     api.inventory.history,
@@ -96,7 +97,7 @@ export function InventoryPage() {
       setEditing(null);
     } catch (error: any) {
       const code = error?.data?.code;
-      toast.error(code === 'STOCK_BELOW_RESERVED'
+      setOpError(code === 'STOCK_BELOW_RESERVED'
         ? `Stock cannot be below ${error?.data?.reserved ?? editing.reserved} reserved units.`
         : error?.message || 'Could not update inventory');
     } finally {
@@ -117,6 +118,7 @@ export function InventoryPage() {
       </PageHeader>
 
       <div className="mx-auto max-w-[1600px] space-y-5 px-6 pt-6">
+        <InlineStatus status={opStatus} />
         {savedMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{savedMessage}</div>}
         <div className="grid gap-4 sm:grid-cols-3">
           <Metric icon={PackageCheck} label="Available to sell" value={totalAvailable} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { Check, Smartphone, RefreshCw, Wallet, X, Clock } from 'lucide-react';
+import { Check, Smartphone, RefreshCw, Wallet, X, Clock, Download } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
@@ -19,11 +19,13 @@ interface TransactionState {
 
 const looksLikeOrderId = (v: string) => /^[A-Za-z0-9]{8,}$/.test(v);
 
-// Scrollable fullscreen shell: min-h-[100dvh] + safe-area padding so QR and
-// controls stay reachable at 360x800 / 375x812 / 390x844. Inner `m-auto`
-// centers short states but lets tall content scroll instead of clipping.
+// Transaction-owned fullscreen shell: min-h-[100dvh] + safe-area padding.
+// Bottom nav is hidden on /transaction in both shells, so bottom padding is
+// just breathing room. overflow-y-auto stays as the short-viewport / zoom /
+// keyboard fallback; overflow-x-clip stops the decorative blur (wider than
+// small phones) from causing horizontal scroll. Never overflow-hidden.
 const PAGE_SHELL =
-  'min-h-[100dvh] overflow-y-auto bg-creme flex flex-col items-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(5rem,env(safe-area-inset-bottom))]';
+  'min-h-[100dvh] overflow-y-auto overflow-x-clip bg-creme flex flex-col items-center px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]';
 
 export function TransactionProcessingPage() {
   const navigate = useNavigate();
@@ -184,11 +186,11 @@ export function TransactionProcessingPage() {
     return (
       <div className={PAGE_SHELL}>
         <div className="m-auto text-center max-w-sm w-full">
-          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <X className="w-10 h-10" strokeWidth={2.5} />
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <X className="w-8 h-8" strokeWidth={2.5} />
           </div>
           <h2 className="text-2xl font-serif text-dark mb-2">Order not found</h2>
-          <p className="text-coyote mb-8 text-sm leading-relaxed px-4">
+          <p className="text-coyote mb-5 text-sm leading-relaxed px-4">
             {malformed
               ? 'This payment link looks invalid. Please start again from your orders.'
               : 'This order isn’t available on this account. It may belong to a different number.'}
@@ -222,6 +224,11 @@ export function TransactionProcessingPage() {
       ? rawNumber
       : null;
   const orderLabel = orderNumber ? `#${orderNumber}` : `#${order.displayOrderId}`;
+  // Download reuses the already-generated QR data URL — same pixels, same
+  // server-generated UPI URL. Never regenerate with different params.
+  const qrFilename = `cigarro-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
+  const qrDownloadSupported =
+    typeof document !== 'undefined' && 'download' in document.createElement('a');
   // Explicit UPI app choices: same params, app-specific scheme so the OS
   // opens the chosen app directly.
   const upiQuery = order.upiUrl?.split('?')[1] ?? '';
@@ -261,22 +268,22 @@ export function TransactionProcessingPage() {
           transition={{ type: 'spring', stiffness: 100, damping: 20 }}
           className="w-full max-w-sm relative z-10 m-auto"
         >
-          <div className="bg-creme-light border border-coyote rounded-t-3xl p-8 text-center relative shadow-2xl">
-            <div className="relative mb-6 mx-auto w-20 h-20 flex items-center justify-center">
+          <div className="bg-creme-light border border-coyote rounded-t-3xl p-5 text-center relative shadow-2xl">
+            <div className="relative mb-4 mx-auto w-14 h-14 flex items-center justify-center">
               <motion.div
                 className="absolute inset-0 bg-green-500/20 rounded-full"
                 animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
-              <div className="w-20 h-20 bg-green-100 text-green-700 rounded-full flex items-center justify-center shadow-inner relative z-10">
-                <Check className="w-10 h-10" strokeWidth={3} />
+              <div className="w-14 h-14 bg-green-100 text-green-700 rounded-full flex items-center justify-center shadow-inner relative z-10">
+                <Check className="w-7 h-7" strokeWidth={3} />
               </div>
             </div>
 
-            <h1 className="text-3xl font-serif text-dark mb-2">Payment Successful</h1>
-            <p className="text-coyote text-sm mb-8">Your order has been confirmed</p>
+            <h1 className="text-2xl font-serif text-dark mb-1">Payment Successful</h1>
+            <p className="text-coyote text-sm mb-4">Your order has been confirmed</p>
 
-            <div className="border-t border-b border-dashed border-coyote/30 py-6 space-y-4">
+            <div className="border-t border-b border-dashed border-coyote/30 py-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-coyote text-sm font-medium">Amount Paid</span>
                 <span className="text-dark font-mono font-bold text-xl">{formatPaiseINR(amountPaise)}</span>
@@ -288,7 +295,7 @@ export function TransactionProcessingPage() {
             </div>
           </div>
 
-          <div className="bg-creme-light border-x border-b border-coyote rounded-b-3xl p-6 relative">
+          <div className="bg-creme-light border-x border-b border-coyote rounded-b-3xl p-4 relative">
             <div className="absolute top-[-10px] left-[-10px] w-5 h-5 bg-creme rounded-full border-r border-b border-coyote z-20" />
             <div className="absolute top-[-10px] right-[-10px] w-5 h-5 bg-creme rounded-full border-l border-b border-coyote z-20" />
             <div className="absolute top-[-1px] left-4 right-4 border-t-2 border-dashed border-coyote/30" />
@@ -323,11 +330,11 @@ export function TransactionProcessingPage() {
           animate={{ scale: 1, opacity: 1 }}
           className="text-center max-w-sm w-full m-auto"
         >
-          <div className={`w-24 h-24 ${isExpired ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'} rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg`}>
-            {isExpired ? <Clock className="w-12 h-12" strokeWidth={2.5} /> : <X className="w-12 h-12" strokeWidth={2.5} />}
+          <div className={`w-16 h-16 ${isExpired ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+            {isExpired ? <Clock className="w-8 h-8" strokeWidth={2.5} /> : <X className="w-8 h-8" strokeWidth={2.5} />}
           </div>
 
-          <h2 className="text-3xl font-serif text-dark mb-2">
+          <h2 className="text-2xl font-serif text-dark mb-2">
             {isExpired ? 'Payment Timed Out' : 'Payment Not Completed'}
           </h2>
           <p className="text-coyote mb-2 text-sm leading-relaxed px-4">
@@ -335,7 +342,7 @@ export function TransactionProcessingPage() {
               ? "We didn't receive your payment in time. If money was deducted, it will arrive shortly and we'll credit your wallet."
               : 'Your order was cancelled. Any wallet debit has been refunded.'}
           </p>
-          <p className="text-xs text-coyote mb-8 font-mono">Order {orderLabel}</p>
+          <p className="text-xs text-coyote mb-5 font-mono">Order {orderLabel}</p>
 
           <div className="space-y-3">
             {canRetry && (
@@ -374,15 +381,15 @@ export function TransactionProcessingPage() {
   return (
     <div className={`${PAGE_SHELL} relative`}>
       <motion.div
-        className="absolute w-[500px] h-[500px] bg-canyon/5 rounded-full blur-3xl pointer-events-none"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-canyon/5 rounded-full blur-3xl pointer-events-none"
         animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      <div className="z-10 w-full max-w-sm text-center space-y-6 m-auto">
+      <div className="z-10 w-full max-w-sm text-center space-y-4 m-auto">
         <div className="relative flex justify-center">
           <motion.div
-            className="w-24 h-24 rounded-full border-4 border-coyote/20 flex items-center justify-center bg-creme-light shadow-xl"
+            className="w-14 h-14 rounded-full border-4 border-coyote/20 flex items-center justify-center bg-creme-light shadow-xl"
             animate={{
               borderColor: ['rgba(195,175,159,0.2)', 'rgba(140,70,48,0.5)', 'rgba(195,175,159,0.2)'],
               boxShadow: [
@@ -393,7 +400,7 @@ export function TransactionProcessingPage() {
             }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            {isWalletOnly ? <Wallet className="w-10 h-10 text-canyon" /> : <Smartphone className="w-10 h-10 text-canyon" />}
+            {isWalletOnly ? <Wallet className="w-6 h-6 text-canyon" /> : <Smartphone className="w-6 h-6 text-canyon" />}
           </motion.div>
         </div>
 
@@ -401,7 +408,7 @@ export function TransactionProcessingPage() {
           <motion.h2
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-serif text-dark"
+            className="text-xl font-serif text-dark"
           >
             Awaiting Payment
           </motion.h2>
@@ -423,14 +430,14 @@ export function TransactionProcessingPage() {
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-white/50 border border-coyote/20 rounded-2xl p-8 backdrop-blur-sm shadow-sm"
+          className="bg-white/50 border border-coyote/20 rounded-2xl p-4 backdrop-blur-sm shadow-sm"
         >
-          <p className="text-xs text-coyote uppercase tracking-widest font-bold mb-2">Pay exactly</p>
-          <p className="text-4xl sm:text-5xl font-mono tracking-tighter text-dark break-all">{formatPaiseINR(amountPaise)}</p>
+          <p className="text-xs text-coyote uppercase tracking-widest font-bold mb-1">Pay exactly</p>
+          <p className="text-3xl font-mono tracking-tighter text-dark break-all">{formatPaiseINR(amountPaise)}</p>
           <p className="text-xs text-coyote mt-2 font-mono">Order {orderLabel}</p>
         </motion.div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {order.upiUrl && (
             <>
               <p className="text-xs text-coyote font-medium">Choose how to pay</p>
@@ -455,9 +462,26 @@ export function TransactionProcessingPage() {
           )}
 
           {qrCode && (
-            <div className="bg-white p-4 rounded-xl shadow-inner inline-block border border-coyote/20">
-              <img src={qrCode} alt={`UPI QR for order ${orderLabel}`} className="w-48 h-48 mix-blend-multiply" />
-              <p className="text-[11px] text-coyote mt-2 font-mono">Scan with any UPI app</p>
+            <div>
+              <div className="bg-white p-3 rounded-xl shadow-inner inline-block border border-coyote/20">
+                <img src={qrCode} alt={`UPI QR for order ${orderLabel}`} className="w-36 h-36 mix-blend-multiply" />
+                <p className="text-[11px] text-coyote mt-1.5 font-mono">Scan with any UPI app</p>
+              </div>
+              <div className="mt-2">
+                {qrDownloadSupported ? (
+                  <a
+                    href={qrCode}
+                    download={qrFilename}
+                    aria-label={`Download UPI QR for order ${orderLabel}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-bold text-canyon hover:underline focus-visible:outline-2 focus-visible:outline-canyon rounded"
+                  >
+                    <Download className="w-4 h-4" aria-hidden="true" />
+                    Download QR
+                  </a>
+                ) : (
+                  <p className="text-xs text-coyote">Downloads aren’t supported here — long-press or screenshot the QR to save it.</p>
+                )}
+              </div>
             </div>
           )}
 
