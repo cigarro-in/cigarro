@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { AlertTriangle, Boxes, History, PackageCheck, Pencil, Search } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
@@ -42,10 +43,11 @@ const movementLabels: Record<string, string> = {
 };
 
 export function InventoryPage() {
+  const [searchParams] = useSearchParams();
   const org = useOrg();
   const rows = useQuery(api.inventory.list, org ? { orgId: org._id, orgSlug: ORG_SLUG } : 'skip') as InventoryRow[] | undefined;
   const [search, setSearch] = useState('');
-  const [lowOnly, setLowOnly] = useState(false);
+  const [lowOnly, setLowOnly] = useState(searchParams.get('lowStock') === '1');
   const [editing, setEditing] = useState<InventoryRow | null>(null);
   const [historyFor, setHistoryFor] = useState<InventoryRow | null>(null);
   const [targetOnHand, setTargetOnHand] = useState(0);

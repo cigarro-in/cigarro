@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Phone } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { formatINR } from '../../utils/currency';
@@ -21,9 +21,12 @@ interface OrderItem {
   variant_name?: string;
 }
 
-const mapStatusToDisplay = (s: string): Order['status'] => {
-  if (s === 'paid' || s === 'late_paid') return 'processing';
-  if (s === 'pending') return 'pending';
+const mapStatusToDisplay = (paymentStatus: string, shippingStatus?: string): Order['status'] => {
+  if (paymentStatus === 'paid' || paymentStatus === 'late_paid') {
+    if (shippingStatus === 'shipped' || shippingStatus === 'delivered') return shippingStatus;
+    return 'processing';
+  }
+  if (paymentStatus === 'pending') return 'pending';
   return 'cancelled';
 };
 
@@ -52,6 +55,7 @@ interface Order {
 
 export function OrdersPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const org = useOrg();
   const convexOrders = useQuery(
     api.admin.listRecentOrders,
@@ -61,7 +65,7 @@ export function OrdersPage() {
   const voidOrder = useMutation(api.admin.voidOrder);
 
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('status') ?? '');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const loading = convexOrders === undefined;
@@ -72,7 +76,7 @@ export function OrdersPage() {
       id: o._id,
       display_order_id: o.displayOrderId,
       user_id: o.userId,
-      status: mapStatusToDisplay(o.status),
+      status: mapStatusToDisplay(o.status, o.shippingStatus),
       payment_verified: o.status === 'paid' || o.status === 'late_paid' ? 'YES' : 'NO',
       payment_method: 'upi',
       subtotal: paiseToRupees(o.cartTotalPaise),

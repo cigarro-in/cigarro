@@ -15,15 +15,12 @@ export function AdminShell({ children }: AdminShellProps) {
   return (
     <SidebarProvider data-admin-shell>
       <AdminSidebar />
-      <SidebarInset className="min-h-screen flex flex-col">
-        {/* Mobile-only top bar with hamburger trigger */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-3 bg-white/95 backdrop-blur border-b border-[var(--color-coyote)]/30">
-          <SidebarTrigger className="-ml-1" />
+      <SidebarInset className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background px-3 md:hidden">
+          <SidebarTrigger />
           <div className="flex items-center gap-2">
-            <div className="flex aspect-square size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <span className="font-bold text-sm">A</span>
-            </div>
-            <span className="font-semibold text-sm">Admin Panel</span>
+            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">C</span>
+            <span className="text-sm font-semibold">Cigarro</span>
           </div>
         </header>
         <main className="flex-1">

@@ -1,25 +1,26 @@
-import { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import {
-  LayoutDashboard,
-  Package,
-  Tags,
+  Boxes,
   Building2,
+  ChevronUp,
+  CreditCard,
+  FileText,
   FolderOpen,
   Home,
-  ShoppingCart,
-  Users,
-  Percent,
-  Settings,
   Image as ImageIcon,
-  FileText,
+  LayoutDashboard,
   LogOut,
-  CreditCard,
-  Star,
-  Boxes,
-  ReceiptIndianRupee,
   Megaphone,
+  Package,
+  Percent,
+  ReceiptIndianRupee,
+  Settings,
+  ShoppingCart,
+  Star,
+  Tags,
+  Users,
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -31,74 +32,92 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
+  useSidebar,
 } from '../../components/ui/sidebar';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrg } from '../../lib/convex/useOrg';
 
-/**
- * Navigation item configuration
- * Abstract structure for dynamic menu generation
- */
 interface NavItem {
-  id: string;
   label: string;
   path: string;
   icon: LucideIcon;
-  section: string;
 }
 
-/**
- * Admin navigation configuration
- * Easily extendable for future website builder features
- */
-const NAVIGATION_CONFIG: NavItem[] = [
-  { id: 'overview', label: 'Overview', path: '/admin', icon: LayoutDashboard, section: 'platform' },
-  { id: 'products', label: 'Products', path: '/admin/products', icon: Package, section: 'platform' },
-  { id: 'categories', label: 'Categories', path: '/admin/categories', icon: Tags, section: 'platform' },
-  { id: 'brands', label: 'Brands', path: '/admin/brands', icon: Building2, section: 'platform' },
-  { id: 'collections', label: 'Collections', path: '/admin/collections', icon: FolderOpen, section: 'platform' },
-  { id: 'orders', label: 'Orders', path: '/admin/orders', icon: ShoppingCart, section: 'platform' },
-  { id: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, section: 'commerce' },
-  { id: 'invoices', label: 'Invoices', path: '/admin/invoices', icon: ReceiptIndianRupee, section: 'commerce' },
-  { id: 'payments', label: 'Payments', path: '/admin/payments', icon: CreditCard, section: 'payments' },
-  { id: 'marketing', label: 'Marketing', path: '/admin/marketing', icon: Megaphone, section: 'marketing' },
-  { id: 'customers', label: 'Customers', path: '/admin/customers', icon: Users, section: 'platform' },
-  { id: 'discounts', label: 'Discounts', path: '/admin/discounts', icon: Percent, section: 'platform' },
-  { id: 'homepage', label: 'Homepage', path: '/admin/homepage', icon: Home, section: 'platform' },
-  { id: 'blogs', label: 'Blogs', path: '/admin/blogs', icon: FileText, section: 'platform' },
-  { id: 'reviews', label: 'Reviews', path: '/admin/reviews', icon: Star, section: 'platform' },
-  { id: 'assets', label: 'Assets', path: '/admin/assets', icon: ImageIcon, section: 'platform' },
-  { id: 'settings', label: 'Settings', path: '/admin/settings', icon: Settings, section: 'platform' },
+interface NavSection {
+  label?: string;
+  items: NavItem[];
+}
+
+export const ADMIN_NAVIGATION: NavSection[] = [
+  {
+    items: [{ label: 'Overview', path: '/admin', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Sales',
+    items: [
+      { label: 'Orders', path: '/admin/orders', icon: ShoppingCart },
+      { label: 'Customers', path: '/admin/customers', icon: Users },
+      { label: 'Payments', path: '/admin/payments', icon: CreditCard },
+      { label: 'Invoices', path: '/admin/invoices', icon: ReceiptIndianRupee },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { label: 'Products', path: '/admin/products', icon: Package },
+      { label: 'Inventory', path: '/admin/inventory', icon: Boxes },
+      { label: 'Collections', path: '/admin/collections', icon: FolderOpen },
+      { label: 'Categories', path: '/admin/categories', icon: Tags },
+      { label: 'Brands', path: '/admin/brands', icon: Building2 },
+    ],
+  },
+  {
+    label: 'Growth',
+    items: [
+      { label: 'Marketing', path: '/admin/marketing', icon: Megaphone },
+      { label: 'Discounts', path: '/admin/discounts', icon: Percent },
+    ],
+  },
+  {
+    label: 'Storefront',
+    items: [
+      { label: 'Homepage', path: '/admin/homepage', icon: Home },
+      { label: 'Reviews', path: '/admin/reviews', icon: Star },
+      { label: 'Blogs', path: '/admin/blogs', icon: FileText },
+      { label: 'Assets', path: '/admin/assets', icon: ImageIcon },
+    ],
+  },
 ];
 
-/**
- * Section labels - can be customized per deployment
- */
-const SECTION_LABELS: Record<string, string> = {
-  platform: 'Platform',
-  payments: 'Payments',
-  commerce: 'Offline sales',
-  marketing: 'Marketing',
-};
-
-/**
- * Branding configuration - easily customizable
- */
-const BRANDING_CONFIG = {
-  name: 'Admin Panel',
-  subtitle: 'Enterprise',
-  logo: 'A', // Single character or could be replaced with image
-};
+function getInitial(value?: string | null) {
+  return value?.trim().charAt(0).toUpperCase() || 'C';
+}
 
 export function AdminSidebar() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut } = useAuth();
+  const org = useOrg();
 
-  const isActive = (path: string) => {
-    if (path === '/admin' && location.pathname === '/admin') return true;
-    if (path !== '/admin' && location.pathname.startsWith(path)) return true;
-    return false;
+  const isActive = (path: string) =>
+    path === '/admin'
+      ? location.pathname === path
+      : location.pathname.startsWith(path);
+
+  const closeMobileSidebar = () => {
+    if (isMobile) setOpenMobile(false);
   };
 
   const handleSignOut = async () => {
@@ -109,45 +128,41 @@ export function AdminSidebar() {
     }
   };
 
-
-
-  // Group items by section
-  const sections = NAVIGATION_CONFIG.reduce((acc, item) => {
-    if (!acc[item.section]) acc[item.section] = [];
-    acc[item.section].push(item);
-    return acc;
-  }, {} as Record<string, NavItem[]>);
-
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <span className="font-bold">{BRANDING_CONFIG.logo}</span>
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">{BRANDING_CONFIG.name}</span>
-            <span className="truncate text-xs text-muted-foreground">{BRANDING_CONFIG.subtitle}</span>
-          </div>
-        </div>
+        <NavLink
+          to="/admin"
+          className="flex h-10 items-center gap-2 rounded-md px-2 outline-none ring-sidebar-ring focus-visible:ring-2"
+          onClick={closeMobileSidebar}
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+            {getInitial(org?.name)}
+          </span>
+          <span className="grid min-w-0 flex-1 text-left leading-tight">
+            <span className="truncate text-sm font-semibold">{org?.name || 'Cigarro'}</span>
+            <span className="truncate text-xs text-muted-foreground">Admin</span>
+          </span>
+        </NavLink>
       </SidebarHeader>
+
       <SidebarContent>
-        {Object.entries(sections).map(([sectionKey, items]) => (
-          <SidebarGroup key={sectionKey}>
-            <SidebarGroupLabel>{SECTION_LABELS[sectionKey] || sectionKey}</SidebarGroupLabel>
+        {ADMIN_NAVIGATION.map((section, sectionIndex) => (
+          <SidebarGroup key={section.label || 'overview'} className={sectionIndex === 0 ? 'pb-0' : undefined}>
+            {section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.id}>
+                {section.items.map((item) => (
+                  <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
+                      asChild
                       isActive={isActive(item.path)}
-                      onClick={() => {
-                        navigate(item.path);
-                      }}
                       tooltip={item.label}
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                      <NavLink to={item.path} end={item.path === '/admin'} onClick={closeMobileSidebar}>
+                        <item.icon aria-hidden />
+                        <span>{item.label}</span>
+                      </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -156,27 +171,57 @@ export function AdminSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
+
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              asChild
+              isActive={isActive('/admin/settings')}
+              tooltip="Settings"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg bg-canyon text-creme">
-                  {user?.name?.charAt(0)?.toUpperCase() || 'A'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user?.name || 'Admin'}</span>
-                <span className="truncate text-xs">{user?.phone || user?.email}</span>
-              </div>
-              <LogOut className="ml-auto size-4" onClick={handleSignOut} />
+              <NavLink to="/admin/settings" onClick={closeMobileSidebar}>
+                <Settings aria-hidden />
+                <span>Settings</span>
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarSeparator />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton size="lg" tooltip="Account">
+                  <Avatar className="size-8 rounded-md">
+                    <AvatarFallback className="rounded-md">
+                      {getInitial(user?.name || user?.email || user?.phone)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="grid min-w-0 flex-1 text-left leading-tight">
+                    <span className="truncate font-medium">{user?.name || 'Admin'}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {user?.phone || user?.email || 'Account'}
+                    </span>
+                  </span>
+                  <ChevronUp className="ml-auto" aria-hidden />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-56">
+                <DropdownMenuLabel>Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={handleSignOut}>
+                    <LogOut aria-hidden />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

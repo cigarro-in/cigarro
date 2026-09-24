@@ -3,7 +3,12 @@ import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
-    files: ["src/adminnew/pages/DashboardPage.tsx"],
+    files: [
+      "src/adminnew/pages/DashboardPage.tsx",
+      "src/adminnew/layout/AdminSidebar.tsx",
+      "src/adminnew/layout/AdminShell.tsx",
+      "src/components/ui/empty.tsx",
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaFeatures: { jsx: true } },

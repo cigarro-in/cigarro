@@ -93,7 +93,7 @@
             "convex:deploy": "convex deploy",
             "type-check": "tsc --noEmit",
             "lint": "npm run lint:ui",
-            "lint:ui": "eslint src/adminnew/pages/DashboardPage.tsx",
+            "lint:ui": "eslint src/adminnew/pages/DashboardPage.tsx src/adminnew/layout/AdminSidebar.tsx src/adminnew/layout/AdminShell.tsx src/components/ui/empty.tsx",
             "test": "echo 'Tests not configured'",
             "build:analyze": "vite build --mode analyze"
       }
