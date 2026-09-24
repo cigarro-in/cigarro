@@ -13,7 +13,7 @@ interface AdminShellProps {
  */
 export function AdminShell({ children }: AdminShellProps) {
   return (
-    <SidebarProvider>
+    <SidebarProvider data-admin-shell>
       <AdminSidebar />
       <SidebarInset className="min-h-screen flex flex-col">
         {/* Mobile-only top bar with hamburger trigger */}

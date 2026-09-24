@@ -222,6 +222,12 @@ body:not(.admin-page) {
   }
 }
 
+/* Admin runs on its own host (often at `/`), so route-based body classes can
+   miss it. Its actual shell is the reliable signal to cancel storefront offset. */
+body:has([data-admin-shell]) {
+  padding-top: 0;
+}
+
 /* Mini Cart Styles */
 .mini-cart {
   --bar-height: 76px;
