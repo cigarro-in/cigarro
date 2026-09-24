@@ -70,10 +70,15 @@
             "zod": "^4.1.12"
       },
       "devDependencies": {
+            "@shadcn/lint": "^0.2.0",
             "@types/node": "^20.10.0",
+            "@typescript-eslint/parser": "^8.70.1",
             "@vitejs/plugin-react-swc": "^3.10.2",
+            "eslint": "^9.39.5",
+            "shadcn": "^4.21.0",
             "terser": "^5.44.0",
             "tsx": "^4.19.2",
+            "typescript": "^5.9.3",
             "vite": "^6.3.6",
             "vite-plugin-pwa": "^1.1.0"
       },
@@ -87,7 +92,8 @@
             "convex:dev": "convex dev",
             "convex:deploy": "convex deploy",
             "type-check": "tsc --noEmit",
-            "lint": "echo 'Linting not configured'",
+            "lint": "npm run lint:ui",
+            "lint:ui": "eslint src/adminnew/pages/DashboardPage.tsx",
             "test": "echo 'Tests not configured'",
             "build:analyze": "vite build --mode analyze"
       }
