@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T00:00:00+05:30",
+  "title": "Design System: Cigarro Admin",
+  "extensions": {
+    "colorMeta": {
+      "admin-background": { "role": "neutral", "displayName": "Admin Canvas", "canonical": "#f6f5f3", "tonalRamp": ["#292a27", "#454641", "#62635e", "#80817b", "#9d9e98", "#bbbbb5", "#d8d8d2", "#f6f5f3"] },
+      "admin-foreground": { "role": "neutral", "displayName": "Charcoal Ink", "canonical": "#252522", "tonalRamp": ["#252522", "#41413d", "#5d5d57", "#797971", "#96968d", "#b2b2a8", "#cecec5", "#ebebe5"] },
+      "admin-surface": { "role": "neutral", "displayName": "Working Surface", "canonical": "#ffffff", "tonalRamp": ["#2b2b2b", "#484848", "#666666", "#838383", "#a1a1a1", "#bebebe", "#dcdcdc", "#ffffff"] },
+      "admin-primary": { "role": "primary", "displayName": "Charcoal Action", "canonical": "#30302d", "tonalRamp": ["#30302d", "#4c4c47", "#686862", "#85857d", "#a2a29a", "#bfbfb6", "#dddddd", "#fafaf4"] },
+      "admin-secondary": { "role": "neutral", "displayName": "Soft Secondary", "canonical": "#efeeeb", "tonalRamp": ["#2b2b29", "#474744", "#64635f", "#81817c", "#9e9d98", "#bbbbb5", "#d8d7d2", "#efeeeb"] },
+      "admin-muted": { "role": "neutral", "displayName": "Muted Ink", "canonical": "#656560", "tonalRamp": ["#2f2f2d", "#4a4a46", "#656560", "#81817b", "#9c9c96", "#b8b8b2", "#d3d3cd", "#eeeee9"] },
+      "admin-accent": { "role": "neutral", "displayName": "Sidebar Accent", "canonical": "#e9e8e4", "tonalRamp": ["#292928", "#464643", "#63625f", "#7f7f7a", "#9c9b96", "#b9b8b3", "#d5d4d0", "#e9e8e4"] },
+      "admin-border": { "role": "neutral", "displayName": "Hairline Border", "canonical": "#deddd8", "tonalRamp": ["#2d2d2b", "#4a4946", "#676663", "#84837f", "#a1a09b", "#bdbcb7", "#d0cfca", "#deddd8"] },
+      "admin-sidebar": { "role": "neutral", "displayName": "Quiet Sidebar", "canonical": "#eeede9", "tonalRamp": ["#2a2a29", "#474744", "#64635f", "#81807b", "#9e9d98", "#bab9b4", "#d7d6d1", "#eeede9"] }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "DM Sans Body", "purpose": "Neutral operational text, table content, and forms." },
+      "title": { "displayName": "DM Sans Title", "purpose": "Page and card headings without display ornament." },
+      "label": { "displayName": "DM Sans Label", "purpose": "Sidebar group labels, metric captions, badges, and supporting metadata." },
+      "control": { "displayName": "DM Sans Control", "purpose": "Button labels and compact navigation/control text at 14px." },
+      "card-title": { "displayName": "DM Sans Card Title", "purpose": "Compact AdminCard headings at 16px." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "none", "purpose": "Admin cards are flat at rest; borders establish containment." },
+      { "name": "transient-popover", "value": "0 10px 15px -3px rgba(37,37,34,0.10), 0 4px 6px -4px rgba(37,37,34,0.10)", "purpose": "Transient dropdown, dialog, and popover elevation only." }
+    ],
+    "motion": [
+      { "name": "state-standard", "value": "all 150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Compact control and navigation state transitions." },
+      { "name": "sidebar-standard", "value": "200ms ease-linear", "purpose": "Sidebar width and position transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    { "name": "Primary Button", "kind": "button", "refersTo": "button-primary", "description": "Primary admin action.", "html": "<button class=\"ds-btn-primary\">SAVE CHANGES</button>", "css": ".ds-btn-primary{background:#30302d;color:#fff;border:0;border-radius:.375rem;height:2.25rem;padding:.5rem 1rem;font:500 .875rem/1.25 DM-Sans,system-ui,sans-serif;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn-primary:hover{background:#464641}.ds-btn-primary:focus-visible{outline:3px solid #656560;outline-offset:1px}.ds-btn-primary:active{background:#252522}" },
+    { "name": "Secondary Button", "kind": "button", "refersTo": "button-secondary", "description": "Secondary action with quiet tonal fill.", "html": "<button class=\"ds-btn-secondary\">CANCEL</button>", "css": ".ds-btn-secondary{background:#efeeeb;color:#30302d;border:0;border-radius:.375rem;height:2.25rem;padding:.5rem 1rem;font:500 .875rem/1.25 DM-Sans,system-ui,sans-serif;transition:all 150ms cubic-bezier(.4,0,.2,1)}.ds-btn-secondary:hover{background:#e9e8e4}.ds-btn-secondary:focus-visible{outline:3px solid #656560;outline-offset:1px}" },
+    { "name": "Input", "kind": "input", "refersTo": "input", "description": "Compact white field for admin forms.", "html": "<input class=\"ds-input\" placeholder=\"Search products\" />", "css": ".ds-input{background:#fff;color:#252522;border:1px solid #deddd8;border-radius:.375rem;height:2.25rem;padding:.25rem .75rem;width:100%;font:400 .875rem/1.5 DM-Sans,system-ui,sans-serif;transition:color 150ms,box-shadow 150ms}.ds-input::placeholder{color:#656560}.ds-input:focus-visible{border-color:#656560;outline:3px solid rgba(101,101,96,.28);outline-offset:0}" },
+    { "name": "Sidebar Navigation", "kind": "nav", "refersTo": "nav-item", "description": "Compact grouped navigation with active state.", "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item is-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z\"/></svg>Overview</a></nav>", "css": ".ds-nav{background:#eeede9;padding:.5rem}.ds-nav-item{display:flex;align-items:center;gap:.5rem;height:2rem;padding:.5rem;border-radius:.375rem;color:#30302d;text-decoration:none;font:400 .875rem/1.5 DM-Sans,system-ui,sans-serif;transition:background 150ms,color 150ms}.ds-nav-item svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2}.ds-nav-item:hover,.ds-nav-item.is-active{background:#deddd8;color:#252522}.ds-nav-item.is-active{font-weight:500}.ds-nav-item:focus-visible{outline:2px solid #656560;outline-offset:1px}" },
+    { "name": "Admin Card", "kind": "card", "refersTo": "card", "description": "Flat working surface with a divided header.", "html": "<section class=\"ds-card\"><header class=\"ds-card-header\">Recent</header><div class=\"ds-card-content\">Operational content</div></section>", "css": ".ds-card{background:#fff;color:#252522;border:1px solid #deddd8;border-radius:.5rem;overflow:hidden}.ds-card-header{padding:.75rem 1rem;border-bottom:1px solid #deddd8;font:600 1rem/1.25 DM-Sans,system-ui,sans-serif}.ds-card-content{padding:1rem;font:400 .875rem/1.5 DM-Sans,system-ui,sans-serif}" },
+    { "name": "Status Badge", "kind": "chip", "refersTo": "button-secondary", "description": "Small semantic status indicator for orders and payments.", "html": "<span class=\"ds-badge\">Paid</span>", "css": ".ds-badge{display:inline-flex;align-items:center;border-radius:.375rem;padding:.125rem .5rem;background:#30302d;color:#fff;font:500 .75rem/1.25 DM-Sans,system-ui,sans-serif;white-space:nowrap}.ds-badge:focus-visible{outline:3px solid #656560;outline-offset:1px}" }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Operations Desk",
+    "overview": "The admin is a Shopify-inspired working surface: calm, dense enough for daily operations, and visually subordinate to the data. It uses a cool off-white canvas, white content surfaces, charcoal text, and a single restrained accent family. The shadcn primitives provide the shared language across dashboard, catalog, orders, payments, and settings.\n\nThe world is deliberately compact and functional. Navigation is persistent on desktop and collapsible to icons; mobile replaces it with a short 48px (h-12) sticky header and sheet navigation. Panels, tables, metrics, and forms rely on spacing and borders for hierarchy rather than decorative effects.",
+    "keyCharacteristics": ["Quiet operational density", "Tonal layering with hairline borders", "Compact shadcn controls and familiar interaction states", "One admin system, independent from storefront identity"],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Use charcoal as the primary action voice; status colors are reserved for semantic states such as destructive, success, warning, and info.", "section": "colors" },
+      { "name": "The Data-First Rule", "body": "Let labels, values, and status carry the hierarchy; do not introduce display-serif or oversized marketing type into admin surfaces.", "section": "typography" },
+      { "name": "The Border-First Rule", "body": "Establish structure with #deddd8 borders and surface contrast before adding a shadow.", "section": "elevation" }
+    ],
+    "dos": ["Do use the admin override tokens under body:has([data-admin-shell]) for new admin surfaces.", "Do compose screens from the existing shadcn primitives and shared AdminCard wrappers.", "Do keep copy short and operational: labels such as “Sales today”, “To fulfil”, and “Add product” are the model.", "Do preserve the border-first, shadowless resting state of admin cards.", "Do retain visible focus states and minimum mobile control heights (2.75rem where the shell enforces them)."],
+    "donts": ["Don't import storefront beige/serif identity into admin screens.", "Don't introduce decorative gradients, glass effects, oversized hero type, or ornamental shadows into the operations shell.", "Don't use a new component family when the shadcn primitive already expresses the behavior.", "Don't canonize legacy hover-lift, glow, or pill-button utilities as admin guidance; they belong to other surfaces or represent drift.", "Don't turn status colors into general decoration; reserve them for semantic feedback."]
+  }
+}

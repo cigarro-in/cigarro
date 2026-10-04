@@ -100,7 +100,6 @@ export function SettingsManager() {
     setShippingMethods(mergeShippingMethods((serverSettings as any).shippingConfig));
     setIsLoading(false);
     setIsDirty(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSettings]);
 
   const handleRegenerateSitemap = async () => {
@@ -325,16 +324,23 @@ export function SettingsManager() {
     setIsDirty(true);
   };
 
+  const jumpTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: no-preference)').matches ? 'smooth' : 'auto',
+      block: 'start',
+    });
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Site Settings"
         description="Manage your website configuration"
@@ -346,17 +352,29 @@ export function SettingsManager() {
         <Button 
           onClick={handleSave} 
           disabled={isSaving || !isDirty}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
       </PageHeader>
 
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-6 space-y-6 max-w-400 mx-auto">
         <InlineStatus status={opStatus} />
+        <nav aria-label="Jump to settings section" className="flex gap-1 overflow-x-auto border-b pb-2">
+          {([
+            ['settings-store', 'Store'],
+            ['settings-payments', 'Payments'],
+            ['settings-delivery', 'Delivery'],
+            ['settings-performance', 'Performance'],
+          ] as const).map(([id, label]) => (
+            <Button key={id} type="button" variant="ghost" size="sm" onClick={() => jumpTo(id)}>
+              {label}
+            </Button>
+          ))}
+        </nav>
         {/* Storefront Theme */}
-        <AdminCard>
+        <AdminCard id="settings-store" className="scroll-mt-24">
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <Palette className="mr-2 h-5 w-5" />
@@ -377,14 +395,14 @@ export function SettingsManager() {
                     type="button"
                     onClick={() => handleSelectTheme(t.id)}
                     disabled={saving}
-                    className={`text-left p-4 rounded-lg border-2 transition-all ${active ? 'border-[var(--color-canyon)] bg-[var(--color-canyon)]/5' : 'border-[var(--color-coyote)]/30 hover:border-[var(--color-coyote)]'}`}
+                    className={`text-left p-4 rounded-lg border-2 transition-all ${active ? 'border-primary bg-primary/5' : 'border-border/30 hover:border-border'}`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-sm">{t.name}</h4>
-                      {active && <Check className="h-4 w-4 text-[var(--color-canyon)]" />}
-                      {saving && <RefreshCw className="h-4 w-4 animate-spin text-[var(--color-canyon)]" />}
+                      {active && <Check className="h-4 w-4 text-primary" />}
+                      {saving && <RefreshCw className="h-4 w-4 animate-spin text-primary" />}
                     </div>
-                    <p className="text-xs text-[var(--color-dark)]/60">{t.description}</p>
+                    <p className="text-xs text-muted-foreground">{t.description}</p>
                   </button>
                 );
               })}
@@ -393,7 +411,7 @@ export function SettingsManager() {
         </AdminCard>
 
         {/* General Settings */}
-        <AdminCard>
+        <AdminCard id="settings-general" className="scroll-mt-24">
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <Globe className="mr-2 h-5 w-5" />
@@ -424,7 +442,7 @@ export function SettingsManager() {
                   }}
                   searchHint={settings.site_name ? `${settings.site_name} favicon` : undefined}
                 />
-                <p className="text-xs text-[var(--color-dark)]/50">
+                <p className="text-xs text-muted-foreground">
                   Recommended: 32x32px or 64x64px .ico or .png
                 </p>
               </div>
@@ -438,7 +456,7 @@ export function SettingsManager() {
                 onChange={(e) => handleChange('meta_title', e.target.value)}
                 placeholder="SEO title for your website"
               />
-              <p className="text-xs text-[var(--color-dark)]/50">
+              <p className="text-xs text-muted-foreground">
                 This appears in browser tabs and search results
               </p>
             </div>
@@ -452,7 +470,7 @@ export function SettingsManager() {
                 placeholder="Brief description of your website for search engines"
                 rows={3}
               />
-              <p className="text-xs text-[var(--color-dark)]/50">
+              <p className="text-xs text-muted-foreground">
                 This appears in search engine results below the title
               </p>
             </div>
@@ -460,7 +478,7 @@ export function SettingsManager() {
         </AdminCard>
 
         {/* Payment Settings */}
-        <AdminCard>
+        <AdminCard id="settings-payments" className="scroll-mt-24">
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <CreditCard className="mr-2 h-5 w-5" />
@@ -480,14 +498,14 @@ export function SettingsManager() {
                 placeholder="yourname@upi"
                 className="max-w-md"
               />
-              <p className="text-xs text-[var(--color-dark)]/50">
+              <p className="text-xs text-muted-foreground">
                 This UPI ID will be used for all payment transactions. Format: username@provider
               </p>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-amber-800">
+            <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-warning">
                 <p className="font-medium">Important Notes:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
                   <li>Changing the UPI ID will affect all new orders immediately</li>
@@ -501,7 +519,7 @@ export function SettingsManager() {
         </AdminCard>
 
         {/* Shipping Methods */}
-        <AdminCard>
+        <AdminCard id="settings-delivery" className="scroll-mt-24">
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <Truck className="mr-2 h-5 w-5" />
@@ -513,11 +531,11 @@ export function SettingsManager() {
           </AdminCardHeader>
           <AdminCardContent className="space-y-4">
             {shippingMethods.map((m) => (
-              <div key={m.id} className="p-4 border border-[var(--color-coyote)]/20 rounded-lg space-y-3">
+              <div key={m.id} className="p-4 border border-border/20 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="capitalize">{m.id}</Label>
-                    <p className="text-xs text-[var(--color-dark)]/50">{m.enabled ? 'Shown at checkout' : 'Hidden from checkout'}</p>
+                    <p className="text-xs text-muted-foreground">{m.enabled ? 'Shown at checkout' : 'Hidden from checkout'}</p>
                   </div>
                   <Switch
                     checked={m.enabled}
@@ -554,14 +572,14 @@ export function SettingsManager() {
                 </div>
               </div>
             ))}
-            <p className="text-xs text-[var(--color-dark)]/50">
+            <p className="text-xs text-muted-foreground">
               At least one method should stay enabled — checkout falls back to the first enabled one. ₹0 shows as “Free”.
             </p>
           </AdminCardContent>
         </AdminCard>
 
         {/* Cloudflare CDN Cache */}
-        <AdminCard>
+        <AdminCard id="settings-performance" className="scroll-mt-24">
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <Cloud className="mr-2 h-5 w-5" />
@@ -572,11 +590,11 @@ export function SettingsManager() {
             </AdminCardDescription>
           </AdminCardHeader>
           <AdminCardContent className="space-y-4">
-            <div className="p-4 bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/30 rounded-lg">
+            <div className="p-4 bg-card border border-border/30 rounded-lg">
               <div className="flex items-start gap-4">
                 <div className="flex-1">
                   <h4 className="font-medium text-sm mb-2">Purge All Cached Pages</h4>
-                    <p className="text-xs text-[var(--color-dark)]/60 mb-3">
+                    <p className="text-xs text-muted-foreground mb-3">
                       Clears the edge cache for key pages, sitemap and API endpoints (HTML prerender ~1h, data feeds).
                       After updating any content or prices, click here to refresh caches immediately across the entire site.
                     </p>
@@ -584,7 +602,7 @@ export function SettingsManager() {
                     <Button
                       onClick={handlePurgeCloudflareCache}
                       disabled={isPurgingCloudflare}
-                      className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
                     >
                       {isPurgingCloudflare ? (
                         <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -611,32 +629,32 @@ export function SettingsManager() {
 
               {/* Performance Results */}
               {performanceResults && (
-                <div className="mt-4 p-4 bg-white rounded-lg border border-[var(--color-coyote)]/20">
+                <div className="mt-4 p-4 bg-white rounded-lg border border-border/20">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-medium text-sm">
                       Performance Results
-                      <span className="ml-2 text-xs text-[var(--color-dark)]/60">
+                      <span className="ml-2 text-xs text-muted-foreground">
                         ({performanceResults.mode === 'development' ? 'Development - Direct DB' : 'Production - Cached'})
                       </span>
                     </h4>
-                    <span className="text-xs text-[var(--color-dark)]/60">{performanceResults.timestamp}</span>
+                    <span className="text-xs text-muted-foreground">{performanceResults.timestamp}</span>
                   </div>
 
                   <div className="space-y-2">
                     {performanceResults.results.map((result, idx) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-3 bg-[var(--color-creme)] rounded border border-[var(--color-coyote)]/20">
+                      <div key={idx} className="flex items-center justify-between py-2 px-3 bg-background rounded border border-border/20">
                         <div className="flex items-center gap-3">
                           <span className="text-lg">{result.status}</span>
                           <span className="font-medium text-sm">{result.name}</span>
                         </div>
                         <div className="flex items-center gap-4 text-xs">
-                          <span className={`font-mono ${result.time < 100 ? 'text-green-600' : result.time < 300 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          <span className={`font-mono ${result.time < 100 ? 'text-success' : result.time < 300 ? 'text-sunflower' : 'text-destructive'}`}>
                             ⏱️ {result.time}ms
                           </span>
-                          <span className="text-[var(--color-dark)]/60">
+                          <span className="text-muted-foreground">
                             💾 {result.cacheStatus}
                           </span>
-                          <span className="text-[var(--color-dark)]/60">
+                          <span className="text-muted-foreground">
                             📦 {result.size}
                           </span>
                         </div>
@@ -644,17 +662,17 @@ export function SettingsManager() {
                     ))}
                   </div>
 
-                  <div className="mt-3 p-3 bg-[var(--color-canyon)]/10 rounded border border-[var(--color-canyon)]/30">
+                  <div className="mt-3 p-3 bg-primary/10 rounded border border-primary/30">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">Average Response Time:</span>
-                      <span className={`text-lg font-mono font-bold ${performanceResults.avgTime < 100 ? 'text-green-600' : performanceResults.avgTime < 300 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      <span className={`text-lg font-mono font-bold ${performanceResults.avgTime < 100 ? 'text-success' : performanceResults.avgTime < 300 ? 'text-sunflower' : 'text-destructive'}`}>
                         {performanceResults.avgTime}ms
                       </span>
                     </div>
                     {performanceResults.mode === 'production' && performanceResults.hitCount !== undefined && (
                       <div className="flex items-center justify-between mt-2">
                         <span className="font-medium text-sm">Cache Hit Rate:</span>
-                        <span className="text-lg font-mono font-bold text-green-600">
+                        <span className="text-lg font-mono font-bold text-success">
                           {performanceResults.hitCount}/{performanceResults.results.length}
                         </span>
                       </div>
@@ -664,9 +682,9 @@ export function SettingsManager() {
               )}
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-amber-800">
+            <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-warning">
                 <p className="font-medium">When to purge cache:</p>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
                   <li>After adding or updating products, categories, or brands</li>
@@ -693,11 +711,11 @@ export function SettingsManager() {
           <AdminCardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Sitemap */}
-              <div className="p-4 border border-[var(--color-coyote)]/20 rounded-lg space-y-3">
+              <div className="p-4 border border-border/20 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-sm">Sitemap</h4>
-                    <p className="text-xs text-[var(--color-dark)]/50">
+                    <p className="text-xs text-muted-foreground">
                       Regenerate sitemap for search engines
                     </p>
                   </div>
@@ -719,18 +737,18 @@ export function SettingsManager() {
                   href="/sitemap.xml"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  className="text-xs text-info hover:underline flex items-center gap-1"
                 >
                   View Sitemap <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
 
               {/* Browser Cache */}
-              <div className="p-4 border border-[var(--color-coyote)]/20 rounded-lg space-y-3">
+              <div className="p-4 border border-border/20 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-sm">Browser Cache</h4>
-                    <p className="text-xs text-[var(--color-dark)]/50">
+                    <p className="text-xs text-muted-foreground">
                       Clear local cached data
                     </p>
                   </div>
@@ -748,7 +766,7 @@ export function SettingsManager() {
                     <span className="ml-2">Clear</span>
                   </Button>
                 </div>
-                <p className="text-xs text-[var(--color-dark)]/40">
+                <p className="text-xs text-muted-foreground">
                   Clears browser cache only, not CDN cache.
                 </p>
               </div>
@@ -758,7 +776,7 @@ export function SettingsManager() {
 
         {/* Last Updated */}
         {settings.updated_at && (
-          <div className="text-center text-sm text-[var(--color-dark)]/50">
+          <div className="text-center text-sm text-muted-foreground">
             Last updated: {new Date(settings.updated_at).toLocaleString()}
           </div>
         )}

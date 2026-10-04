@@ -91,7 +91,6 @@ export function CategoryFormPage() {
     });
     setSelectedProductIds(data.productSupabaseIds || []);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryRows]);
 
   useEffect(() => {
@@ -183,14 +182,14 @@ export function CategoryFormPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-16">
       {/* Header */}
       <PageHeader
         title={formData.name || 'Untitled Category'}
@@ -208,7 +207,7 @@ export function CategoryFormPage() {
             variant="destructive" 
             onClick={handleDelete}
             disabled={saving}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-destructive hover:bg-destructive text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
@@ -217,7 +216,6 @@ export function CategoryFormPage() {
         <Button 
           onClick={handleSubmit} 
           disabled={saving || !isDirty}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
         >
           {saving ? (
             <>
@@ -233,14 +231,14 @@ export function CategoryFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* LEFT COLUMN */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {/* Basic Information */}
           <AdminCard>
             <AdminCardHeader>
@@ -258,12 +256,12 @@ export function CategoryFormPage() {
                 <ReqError show={saveAttempted && isBlank(formData.name)} />
               </div>
 
-              <div className={`flex items-center gap-1 text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)] px-3 py-2 rounded border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
+              <div className={`flex items-center gap-1 text-sm text-muted-foreground bg-background px-3 py-2 rounded border border-border/30${saveAttempted && isBlank(formData.slug) ? ' border-destructive' : ''}`}>
                 <span>store.cigarro.in/categories/</span>
                 <input
                   value={formData.slug}
                   onChange={handleSlugChange}
-                  className="bg-transparent border-none focus:outline-none text-[var(--color-dark)] font-medium flex-1"
+                  className="bg-transparent border-none focus:outline-none text-foreground font-medium flex-1"
                   placeholder="category-slug"
                 />
               </div>
@@ -333,14 +331,14 @@ export function CategoryFormPage() {
         </div>
 
         {/* RIGHT COLUMN */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {/* Status */}
           <AdminCard>
             <AdminCardHeader>
               <AdminCardTitle className="text-xs uppercase tracking-wider">Status</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              <p className="text-sm text-[var(--color-dark)]/60">
+              <p className="text-sm text-muted-foreground">
                 Categories are always visible once created.
               </p>
             </AdminCardContent>
@@ -353,7 +351,7 @@ export function CategoryFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md overflow-hidden bg-[var(--color-creme)] flex-shrink-0">
+                <div className="w-10 h-10 rounded-md overflow-hidden bg-background flex-shrink-0">
                   {formData.image[0] ? (
                     <img
                       src={formData.image[0]}
@@ -362,7 +360,7 @@ export function CategoryFormPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <FolderTree className="h-5 w-5 text-[var(--color-dark)]/40" />
+                      <FolderTree className="h-5 w-5 text-foreground/40" />
                     </div>
                   )}
                 </div>
@@ -370,7 +368,7 @@ export function CategoryFormPage() {
                   <div className="font-medium text-sm truncate">
                     {formData.name || 'Category Name'}
                   </div>
-                  <div className="text-xs text-[var(--color-dark)]/60 truncate">
+                  <div className="text-xs text-muted-foreground truncate">
                     {formData.description || 'Category description'}
                   </div>
                 </div>

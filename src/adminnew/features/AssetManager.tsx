@@ -45,6 +45,9 @@ import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { formatFileSize } from '../components/shared/ImagePicker';
 import { PageHeader } from '../components/shared/PageHeader';
 
+/* Dynamic progress widths are required for upload/reprocess feedback. */
+/* eslint-disable shadcn/no-inline-styles */
+
 interface Asset {
   id: string;
   name: string;
@@ -462,6 +465,13 @@ export function AssetManager() {
     return matchesSearch && matchesType;
   });
 
+  // Folder/filter changes can leave ids selected that are no longer visible.
+  // Keep bulk actions scoped to the current result set.
+  useEffect(() => {
+    const visible = new Set(filteredAssets.map((asset) => asset.id));
+    setSelectedIds((ids) => ids.filter((id) => visible.has(id)));
+  }, [assets, searchTerm, filterType]);
+
   const navigateToFolder = (folder: AssetFolder) => {
     setCurrentFolder(folder.path);
   };
@@ -507,7 +517,7 @@ export function AssetManager() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <PageHeader
         title="Asset Manager"
@@ -525,7 +535,7 @@ export function AssetManager() {
           {isReprocessing ? 'Reprocessing…' : 'Reprocess all to WebP'}
         </Button>
         <label className="cursor-pointer">
-          <Button className="bg-canyon hover:bg-canyon/90 text-creme">
+          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <Upload className="mr-2 h-4 w-4" />
             Upload Files
           </Button>
@@ -539,7 +549,7 @@ export function AssetManager() {
         </label>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-6 max-w-400 mx-auto space-y-6">
         <InlineStatus status={opStatus} />
         {/* Reprocess progress */}
         {(isReprocessing || reprocessProgress || reprocessResults) && (
@@ -547,9 +557,9 @@ export function AssetManager() {
             <AdminCardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-2">
+                  <div className="bg-accent rounded-full h-2">
                     <div
-                      className="bg-canyon h-2 rounded-full transition-all duration-300"
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
                       style={{
                         width: reprocessProgress && reprocessProgress.total > 0
                           ? `${(reprocessProgress.done / reprocessProgress.total) * 100}%`
@@ -558,7 +568,7 @@ export function AssetManager() {
                     />
                   </div>
                 </div>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-muted-foreground">
                   {reprocessProgress && reprocessProgress.total > 0
                     ? `${reprocessProgress.done}/${reprocessProgress.total} — ${reprocessProgress.current}`
                     : reprocessProgress?.current || 'Working…'}
@@ -572,7 +582,7 @@ export function AssetManager() {
             </AdminCardContent>
           </AdminCard>
         )}
-        <label className="flex items-center gap-2 text-sm text-[var(--color-dark)]">
+        <label className="flex items-center gap-2 text-sm text-foreground">
           <input type="checkbox" checked={keepOriginalResolution} onChange={(e) => setKeepOriginalResolution(e.target.checked)} />
           Keep original image dimensions (skip square crop and resize)
         </label>
@@ -582,14 +592,14 @@ export function AssetManager() {
           <AdminCardContent className="p-4">
             <div className="flex items-center space-x-3">
               <div className="flex-1">
-                <div className="bg-gray-200 rounded-full h-2">
+                <div className="bg-accent rounded-full h-2">
                   <div 
-                    className="bg-canyon h-2 rounded-full transition-all duration-300"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
               </div>
-              <span className="text-sm text-gray-600">{Math.round(uploadProgress)}%</span>
+              <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
             </div>
           </AdminCardContent>
         </AdminCard>
@@ -631,7 +641,7 @@ export function AssetManager() {
                   type="button"
                   onClick={() => navigateToSegment(-1)}
                   aria-current={currentFolder === '' ? 'page' : undefined}
-                  className={`rounded px-1 underline-offset-2 hover:underline ${currentFolder === '' ? 'font-medium text-gray-900' : 'text-canyon'}`}
+                  className={`rounded px-1 underline-offset-2 hover:underline ${currentFolder === '' ? 'font-medium text-foreground' : 'text-primary'}`}
                 >
                   Library
                 </button>
@@ -640,16 +650,16 @@ export function AssetManager() {
                 const isLast = i === segments.length - 1;
                 return (
                   <li key={`${seg}-${i}`} className="flex items-center gap-1">
-                    <span className="text-gray-400" aria-hidden="true">/</span>
+                    <span className="text-muted-foreground" aria-hidden="true">/</span>
                     {isLast ? (
-                      <span aria-current="page" className="rounded px-1 font-medium text-gray-900">
+                      <span aria-current="page" className="rounded px-1 font-medium text-foreground">
                         {seg}
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => navigateToSegment(i)}
-                        className="rounded px-1 text-canyon underline-offset-2 hover:underline"
+                        className="rounded px-1 text-primary underline-offset-2 hover:underline"
                       >
                         {seg}
                       </button>
@@ -662,7 +672,7 @@ export function AssetManager() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Search */}
             <div className="relative flex-1 w-full sm:max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Search assets..."
                   value={searchTerm}
@@ -673,7 +683,7 @@ export function AssetManager() {
 
               {/* Filter */}
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-37.5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -712,8 +722,8 @@ export function AssetManager() {
         </AdminCardContent>
       </AdminCard>
 
-      {/* Bulk selection bar — always visible so multiselect is discoverable */}
-      <AdminCard>
+      {/* Bulk actions stay out of the way until a selection exists. */}
+      {selectedIds.length > 0 && <AdminCard>
         <AdminCardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium" role="status">
@@ -777,7 +787,7 @@ export function AssetManager() {
             </Button>
           </div>
         </AdminCardContent>
-      </AdminCard>
+      </AdminCard>}
 
       {/* Subfolders within the active category */}
       {visibleFolders.length > 0 && (
@@ -793,10 +803,10 @@ export function AssetManager() {
                   type="button"
                   onClick={() => navigateToFolder(folder)}
                   aria-label={`Open folder ${folder.name}`}
-                  className="flex flex-col items-center p-4 border rounded-lg hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-canyon transition-colors"
+                  className="flex flex-col items-center p-4 border rounded-lg hover:bg-background focus-visible:outline-2 focus-visible:outline-primary transition-colors"
                 >
-                  <FolderOpen className="h-8 w-8 text-canyon mb-2" aria-hidden="true" />
-                  <span className="text-sm text-gray-700 text-center">{folder.name}</span>
+                  <FolderOpen className="h-8 w-8 text-primary mb-2" aria-hidden="true" />
+                  <span className="text-sm text-foreground text-center">{folder.name}</span>
                 </button>
               ))}
             </div>
@@ -810,7 +820,7 @@ export function AssetManager() {
           <AdminCardTitle className="flex items-center justify-between">
             <span>Assets ({filteredAssets.length})</span>
             {isLoading && (
-              <span role="status" className="text-sm text-gray-500">Loading…</span>
+              <span role="status" className="text-sm text-muted-foreground">Loading…</span>
             )}
           </AdminCardTitle>
         </AdminCardHeader>
@@ -818,13 +828,13 @@ export function AssetManager() {
           {isLoading ? (
             <div role="status" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4" aria-label="Loading assets">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="aspect-square bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="aspect-square bg-muted rounded-lg animate-pulse" />
               ))}
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {filteredAssets.map((asset) => (
-                <div key={asset.id} className="group relative focus-within:ring-2 focus-within:ring-canyon rounded-lg">
+                <div key={asset.id} className="group relative focus-within:ring-2 focus-within:ring-primary rounded-lg">
                   <button
                     type="button"
                     onClick={() => {
@@ -832,7 +842,7 @@ export function AssetManager() {
                       setShowPreview(true);
                     }}
                     aria-label={`Preview ${asset.name}`}
-                    className={`block w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border focus-visible:outline-2 focus-visible:outline-canyon ${selectedIds.includes(asset.id) ? 'ring-2 ring-canyon' : ''}`}
+                    className={`block w-full aspect-square bg-muted rounded-lg overflow-hidden border focus-visible:outline-2 focus-visible:outline-primary ${selectedIds.includes(asset.id) ? 'ring-2 ring-primary' : ''}`}
                   >
                     {asset.content_type.startsWith('image/') ? (
                       <ImageWithFallback
@@ -847,14 +857,14 @@ export function AssetManager() {
                     )}
                   </button>
                   <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">{asset.name}</p>
-                    <p className="text-xs text-gray-500">{formatFileSize(asset.size)}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{asset.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(asset.size)}</p>
                     {(() => {
                       const u = usageByKey.get(asset.path);
                       const inUse = u !== undefined && u.total !== 0;
                       return (
                         <p
-                          className={`text-xs mt-0.5 truncate ${u === undefined || u.total === -1 ? 'text-gray-400' : inUse ? 'text-amber-700 font-medium' : 'text-green-700'}`}
+                          className={`text-xs mt-0.5 truncate ${u === undefined || u.total === -1 ? 'text-muted-foreground' : inUse ? 'text-warning font-medium' : 'text-success'}`}
                           title={u ? usageSummary(u) : undefined}
                         >
                           {usageLoading && u === undefined ? 'Checking usage…' : usageSummary(u)}
@@ -902,7 +912,7 @@ export function AssetManager() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDeleteAsset(asset)}
-                          className="text-red-600"
+                          className="text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
@@ -916,7 +926,7 @@ export function AssetManager() {
           ) : (
             <div className="space-y-2">
               {filteredAssets.map((asset) => (
-                <div key={asset.id} className={`flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg hover:bg-gray-50 ${selectedIds.includes(asset.id) ? 'border-canyon bg-canyon/5' : ''}`}>
+                <div key={asset.id} className={`flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg hover:bg-background ${selectedIds.includes(asset.id) ? 'border-primary bg-primary/5' : ''}`}>
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       checked={selectedIds.includes(asset.id)}
@@ -938,14 +948,14 @@ export function AssetManager() {
                           className="w-10 h-10 object-cover rounded"
                         />
                       ) : (
-                        <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded">
+                        <div className="flex items-center justify-center w-10 h-10 bg-muted rounded">
                           {getFileIcon(asset.content_type)}
                         </div>
                       )}
                     </button>
                     <div>
-                      <p className="font-medium text-gray-900">{asset.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-foreground">{asset.name}</p>
+                      <p className="text-sm text-muted-foreground">
                         {formatFileSize(asset.size)} • {asset.content_type}
                       </p>
                       {(() => {
@@ -953,7 +963,7 @@ export function AssetManager() {
                         const inUse = u !== undefined && u.total !== 0;
                         return (
                           <p
-                            className={`text-xs mt-0.5 ${u === undefined || u.total === -1 ? 'text-gray-400' : inUse ? 'text-amber-700 font-medium' : 'text-green-700'}`}
+                            className={`text-xs mt-0.5 ${u === undefined || u.total === -1 ? 'text-muted-foreground' : inUse ? 'text-warning font-medium' : 'text-success'}`}
                             title={u ? usageSummary(u) : undefined}
                           >
                             {usageLoading && u === undefined ? 'Checking usage…' : usageSummary(u)}
@@ -981,7 +991,7 @@ export function AssetManager() {
                       size="sm" 
                       aria-label={`Delete ${asset.name}`}
                       onClick={() => handleDeleteAsset(asset)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -992,8 +1002,8 @@ export function AssetManager() {
           )}
 
           {filteredAssets.length === 0 && !isLoading && (
-            <div className="text-center py-8 text-gray-500" role="status">
-              <File className="mx-auto h-12 w-12 text-gray-300 mb-4" aria-hidden="true" />
+            <div className="text-center py-8 text-muted-foreground" role="status">
+              <File className="mx-auto h-12 w-12 text-border mb-4" aria-hidden="true" />
               <p>
                 {assets.length === 0
                   ? `No assets in ${CATEGORIES.find((c) => c.id === activeCategory)?.label} yet`
@@ -1017,7 +1027,7 @@ export function AssetManager() {
           </DialogHeader>
           {reprocessResults && (
             <div className="space-y-2 max-h-96 overflow-auto text-sm">
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {reprocessResults.filter((r) => r.status === 'repointed').length} repointed •{' '}
                 {reprocessResults.filter((r) => r.status === 'skipped').length} skipped •{' '}
                 {reprocessResults.filter((r) => r.status === 'failed').length} failed
@@ -1027,14 +1037,14 @@ export function AssetManager() {
                 .map((r) => (
                   <div key={r.asset.id} className="flex items-center justify-between gap-2 border rounded p-2">
                     <span className="truncate">{r.asset.name}</span>
-                    <span className={r.status === 'failed' ? 'text-red-600' : 'text-gray-500'}>
+                    <span className={r.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
                       {r.status === 'failed' ? `Failed: ${r.reason}` : `Skipped: ${r.reason}`}
                     </span>
                   </div>
                 ))}
               {reprocessResults.filter((r) => r.status === 'repointed').length > 0 && (
                 <details>
-                  <summary className="cursor-pointer text-gray-600">
+                  <summary className="cursor-pointer text-muted-foreground">
                     Show repointed ({reprocessResults.filter((r) => r.status === 'repointed').length})
                   </summary>
                   {reprocessResults
@@ -1042,7 +1052,7 @@ export function AssetManager() {
                     .map((r) => (
                       <div key={r.asset.id} className="flex items-center justify-between gap-2 border rounded p-2 mt-1">
                         <span className="truncate">{r.asset.name}</span>
-                        <span className="text-green-700">→ {r.patchedRefs} ref(s)</span>
+                        <span className="text-success">→ {r.patchedRefs} ref(s)</span>
                       </div>
                     ))}
                 </details>
@@ -1071,7 +1081,7 @@ export function AssetManager() {
               ) : (
                 <div className="text-center py-8">
                   {getFileIcon(selectedAsset.content_type)}
-                  <p className="mt-2 text-gray-500">Preview not available for this file type</p>
+                  <p className="mt-2 text-muted-foreground">Preview not available for this file type</p>
                 </div>
               )}
               

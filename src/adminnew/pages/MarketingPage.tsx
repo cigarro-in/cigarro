@@ -10,6 +10,8 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { MessageCircle, Upload, Send, Plus, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -128,9 +130,9 @@ function parseWorkbook(file: File): Promise<{ contacts: ParsedContact[]; skipped
 
 function StatsLine({ campaignId }: { campaignId: string }) {
   const stats = useQuery(api.marketing.campaignStats, { campaignId: campaignId as never });
-  if (!stats) return <span className="text-xs text-gray-400">…</span>;
+  if (!stats) return <span className="text-xs text-muted-foreground">…</span>;
   return (
-    <span className="text-xs text-gray-500">
+    <span className="text-xs text-muted-foreground">
       {stats.sent} sent · {stats.uniqueClicks} clicks · {stats.orders} orders
       {stats.orders > 0 && ` · ₹${(stats.revenuePaise / 100).toLocaleString('en-IN')}`}
     </span>
@@ -322,7 +324,7 @@ export function MarketingPage() {
     : '';
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Marketing"
         description={contactCount !== undefined ? `${contactCount.toLocaleString('en-IN')} contacts` : 'WhatsApp campaigns'}
@@ -334,22 +336,17 @@ export function MarketingPage() {
               : undefined
         }
       >
-        <div className="flex gap-1 rounded-lg border border-[var(--color-coyote)]/30 p-1">
-          {(['contacts', 'templates', 'campaigns', 'send'] as Tab[]).map((t) => (
-            <Button
-              key={t}
-              variant={tab === t ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setTab(t)}
-              className="capitalize"
-            >
-              {t}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+          <TabsList aria-label="Marketing workflows">
+            <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+            <TabsTrigger value="send">Send</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-6 max-w-400 mx-auto space-y-6">
         <InlineStatus status={opStatus} />
 
         {tab === 'contacts' && (
@@ -370,7 +367,7 @@ export function MarketingPage() {
                   <Upload className="h-4 w-4 mr-2" />
                   {importing ? `Importing ${importing}...` : 'Upload customer Excel'}
                 </Button>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   .xlsx with Mobile Number / Customer Name / City columns. Deduped by phone.
                 </p>
               </AdminCardContent>
@@ -444,7 +441,7 @@ export function MarketingPage() {
                   <AdminCardContent className="py-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{t.name}</div>
-                      <div className="text-sm text-gray-500 truncate">{t.message.slice(0, 120)}</div>
+                      <div className="text-sm text-muted-foreground truncate">{t.message.slice(0, 120)}</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
@@ -484,7 +481,7 @@ export function MarketingPage() {
                   </AdminCardContent>
                 </AdminCard>
               ))}
-              {templates?.length === 0 && <p className="text-sm text-gray-500">No templates yet — save your first copy block.</p>}
+              {templates?.length === 0 && <p className="text-sm text-muted-foreground">No templates yet — save your first copy block.</p>}
             </div>
           </div>
         )}
@@ -501,29 +498,29 @@ export function MarketingPage() {
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
                 />
-                <select
-                  className="w-full rounded-md border border-[var(--color-coyote)]/40 bg-white px-3 py-2 text-sm"
-                  value={campaignTemplateId}
-                  onChange={(e) => {
-                    setCampaignTemplateId(e.target.value);
-                    const t = templates?.find((x) => x._id === e.target.value);
+                <Select value={campaignTemplateId || 'blank'} onValueChange={(value) => {
+                    const next = value === 'blank' ? '' : value;
+                    setCampaignTemplateId(next);
+                    const t = templates?.find((x) => x._id === next);
                     if (t) setCampaignMessage(t.message);
-                  }}
-                >
-                  <option value="">Start from blank…</option>
+                  }}>
+                  <SelectTrigger><SelectValue placeholder="Start from blank" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="blank">Start from blank</SelectItem>
                   {(templates ?? []).map((t) => (
-                    <option key={t._id} value={t._id}>
+                    <SelectItem key={t._id} value={t._id}>
                       {t.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                  </SelectContent>
+                </Select>
                 <Textarea
                   rows={8}
                   placeholder={'Hi {{firstname}}! ... Use {{code}} ... {{link}}'}
                   value={campaignMessage}
                   onChange={(e) => setCampaignMessage(e.target.value)}
                 />
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   Preview: {renderMessage(campaignMessage || 'Hi {{firstname}}!', { name: 'Augustin', city: 'Bangalore' }, { code: 'DIWALI10', link: `${trackBase()}/m?…` }).slice(0, 200)}
                 </div>
                 <div>
@@ -533,7 +530,7 @@ export function MarketingPage() {
                     onChange={(e) => setCampaignCoupon(e.target.value.toUpperCase())}
                   />
                   {campaignCoupon.trim() && (
-                    <p className={`text-xs mt-1 ${couponMatch ? 'text-green-700' : 'text-amber-700'}`}>
+                    <p className={`text-xs mt-1 ${couponMatch ? 'text-success' : 'text-warning'}`}>
                       {couponMatch
                         ? `Matched: ${couponMatch.name} — orders with this coupon count toward the campaign.`
                         : 'No matching discount yet — create it under Discounts first, or orders won\'t attribute.'}
@@ -554,7 +551,7 @@ export function MarketingPage() {
                         {c.name}
                         {c.couponCode && <Badge variant="outline" className="ml-2">{c.couponCode}</Badge>}
                       </div>
-                      <div className="text-sm text-gray-500 truncate">{c.message.slice(0, 100)}</div>
+                      <div className="text-sm text-muted-foreground truncate">{c.message.slice(0, 100)}</div>
                       <StatsLine campaignId={c._id} />
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -573,7 +570,7 @@ export function MarketingPage() {
                   </AdminCardContent>
                 </AdminCard>
               ))}
-              {campaigns?.length === 0 && <p className="text-sm text-gray-500">No campaigns yet.</p>}
+              {campaigns?.length === 0 && <p className="text-sm text-muted-foreground">No campaigns yet.</p>}
             </div>
           </div>
         )}
@@ -583,41 +580,39 @@ export function MarketingPage() {
             <AdminCard>
               <AdminCardContent className="py-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <select
-                    className="rounded-md border border-[var(--color-coyote)]/40 bg-white px-3 py-2 text-sm"
-                    value={activeCampaignId ?? ''}
-                    onChange={(e) => {
-                      const id = e.target.value || null;
+                  <Select value={activeCampaignId ?? 'none'} onValueChange={(value) => {
+                      const id = value === 'none' ? null : value;
                       setActiveCampaignId(id);
                       const c = campaigns?.find((x) => x._id === id);
                       if (c) setCampaignMessage(c.message);
-                    }}
-                  >
-                    <option value="">Select campaign...</option>
+                    }}>
+                    <SelectTrigger className="w-55"><SelectValue placeholder="Select campaign" /></SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="none">Select campaign</SelectItem>
                     {(campaigns ?? []).map((c) => (
-                      <option key={c._id} value={c._id}>
+                      <SelectItem key={c._id} value={c._id}>
                         {c.name} ({c.sentCount} sent)
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <select
-                    className="rounded-md border border-[var(--color-coyote)]/40 bg-white px-3 py-2 text-sm"
-                    value=""
-                    onChange={(e) => {
-                      const t = templates?.find((x) => x._id === e.target.value);
+                    </SelectContent>
+                  </Select>
+                  <Select value="swap" onValueChange={(value) => {
+                      const t = templates?.find((x) => x._id === value);
                       if (t) {
                         setCampaignMessage(t.message);
                         setOpOk(`Swapped to template "${t.name}" — save to keep it on this campaign`);
                       }
-                    }}
-                  >
-                    <option value="">Swap template…</option>
+                    }}>
+                    <SelectTrigger className="w-45"><SelectValue placeholder="Swap template" /></SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="swap">Swap template</SelectItem>
                     {(templates ?? []).map((t) => (
-                      <option key={t._id} value={t._id}>
+                      <SelectItem key={t._id} value={t._id}>
                         {t.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
+                    </SelectContent>
+                  </Select>
                   {activeCampaign && (
                     <>
                       <Button size="sm" variant="outline" onClick={handleSaveCampaign}>
@@ -645,8 +640,8 @@ export function MarketingPage() {
                       onChange={(e) => setCampaignMessage(e.target.value)}
                     />
                     {previewText && (
-                      <div className="rounded-md bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/30 p-3 text-sm whitespace-pre-wrap">
-                        <span className="text-xs text-gray-400 block mb-1">
+                      <div className="rounded-md bg-card border border-border/30 p-3 text-sm whitespace-pre-wrap">
+                        <span className="text-xs text-muted-foreground block mb-1">
                           Preview as {previewContact?.name} ({previewText.length} chars)
                         </span>
                         {previewText}
@@ -671,7 +666,7 @@ export function MarketingPage() {
                     activeCampaignId && sentSet.has(item.id) ? (
                       <Badge variant="outline">Sent</Badge>
                     ) : (
-                      <span className="text-sm text-gray-400">Not sent</span>
+                      <span className="text-sm text-muted-foreground">Not sent</span>
                     ),
                 },
                 {

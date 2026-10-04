@@ -107,16 +107,16 @@ export function ProductsPage() {
         const defaultVariant = product.product_variants?.find(v => v.is_default);
         const images = defaultVariant?.images || product.product_variants?.[0]?.images || [];
         return (
-          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+          <div className="size-10 overflow-hidden rounded-md bg-muted">
             {images && images.length > 0 ? (
               <ImageWithFallback
                 src={images[0]}
                 alt="Product"
-                className="w-full h-full object-cover"
+                className="size-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Package className="h-6 w-6 text-gray-400" />
+                <Package className="size-4 text-muted-foreground" />
               </div>
             )}
           </div>
@@ -128,8 +128,8 @@ export function ProductsPage() {
       label: 'Product Name',
       render: (name: string, product: Product) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{product.brand?.name || ''}</div>
+          <div className="font-medium">{name}</div>
+          {product.brand?.name && <div className="text-xs text-muted-foreground">{product.brand.name}</div>}
         </div>
       )
     },
@@ -137,7 +137,7 @@ export function ProductsPage() {
       key: 'variants_count',
       label: 'Variants',
       render: (_: any, product: Product) => (
-        <Badge variant="outline" className="bg-gray-50">
+        <Badge variant="secondary">
           {product.product_variants?.length || 0}
         </Badge>
       )
@@ -152,7 +152,7 @@ export function ProductsPage() {
         }
         return product.product_variants && product.product_variants.length > 0 ? 
           <div className="font-medium">{formatINR(product.product_variants[0].price)}</div> :
-          <div className="text-gray-400">-</div>;
+          <div className="text-muted-foreground">—</div>;
       }
     },
     {
@@ -162,8 +162,8 @@ export function ProductsPage() {
         const defaultVariant = product.product_variants?.find(v => v.is_default);
         const stock = defaultVariant?.stock ?? product.product_variants?.[0]?.stock ?? 0;
         return (
-          <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'}>
-            {stock} units
+        <Badge variant={stock > 10 ? 'secondary' : stock > 0 ? 'outline' : 'destructive'}>
+            {stock}
           </Badge>
         );
       }
@@ -177,11 +177,6 @@ export function ProductsPage() {
         </Badge>
       )
     },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (date: string) => new Date(date).toLocaleDateString()
-    }
   ];
 
   const bulkActions = [
@@ -204,7 +199,7 @@ export function ProductsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader 
         title="Products" 
         description="Manage your product catalog"
@@ -219,14 +214,14 @@ export function ProductsPage() {
           <FileSpreadsheet className="mr-2 h-4 w-4" />
           Import / Export
         </Button>
-        <Button onClick={handleAddProduct} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
+        <Button onClick={handleAddProduct}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
       </PageHeader>
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-screen overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Products · Import / Export</DialogTitle>
           </DialogHeader>
@@ -234,10 +229,11 @@ export function ProductsPage() {
         </DialogContent>
       </Dialog>
       
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
         <DataTable
           data={products}
+          searchText={(product) => [product.name, product.slug, product.brand?.name, ...(product.product_variants ?? []).map((variant) => variant.variant_name)].join(' ')}
           columns={columns}
           loading={loading}
           selectedItems={selectedProducts}

@@ -12,6 +12,9 @@ import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '..
 import { SingleImagePicker } from '../components/shared/ImagePicker';
 import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { PageHeader } from '../components/shared/PageHeader';
+
+/* Preview image/opacity values are data-driven at runtime. */
+/* eslint-disable shadcn/no-inline-styles */
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
@@ -109,7 +112,6 @@ export function HeroSlideFormPage() {
       const max = Math.max(-1, ...slides.map((s: any) => s.sortOrder ?? 0));
       setForm((prev) => ({ ...prev, sort_order: max + 1 }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides]);
 
   const handleSave = async () => {
@@ -180,14 +182,14 @@ export function HeroSlideFormPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-20">
       <PageHeader
         title={isEditMode ? 'Edit Slide' : 'New Slide'}
         description={isEditMode ? 'Update hero slide details' : 'Create a new hero slide'}
@@ -198,7 +200,7 @@ export function HeroSlideFormPage() {
             variant="destructive"
             onClick={handleDelete}
             disabled={saving}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-destructive hover:bg-destructive text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
@@ -207,18 +209,18 @@ export function HeroSlideFormPage() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Save className="mr-2 h-4 w-4" />
           {saving ? 'Saving...' : 'Save Slide'}
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Basic Info */}
@@ -324,7 +326,7 @@ export function HeroSlideFormPage() {
               <AdminCardTitle>Product Spotlight (optional)</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent className="space-y-4">
-              <p className="text-xs text-[var(--color-dark)]/60">
+              <p className="text-xs text-muted-foreground">
                 Shows the floating product card on the slide. Leave empty to hide it.
               </p>
               <div className="grid grid-cols-2 gap-4">
@@ -413,7 +415,7 @@ export function HeroSlideFormPage() {
                   max={100}
                   step={5}
                 />
-                <p className="text-xs text-[var(--color-dark)]/60">
+                <p className="text-xs text-muted-foreground">
                   Controls the darkness of the overlay on the image
                 </p>
               </div>
@@ -432,7 +434,7 @@ export function HeroSlideFormPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Active</Label>
-                  <p className="text-xs text-[var(--color-dark)]/60">Show on homepage</p>
+                  <p className="text-xs text-muted-foreground">Show on homepage</p>
                 </div>
                 <Switch
                   checked={form.is_active}
@@ -448,13 +450,13 @@ export function HeroSlideFormPage() {
                   placeholder="0"
                   min={0}
                 />
-                <p className="text-xs text-[var(--color-dark)]/60">Lower numbers appear first</p>
+                <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
               </div>
             </AdminCardContent>
           </AdminCard>
 
           {/* Desktop Image */}
-          <AdminCard className={saveAttempted && !form.image_url ? 'border-red-500' : undefined}>
+          <AdminCard className={saveAttempted && !form.image_url ? 'border-destructive' : undefined}>
             <AdminCardHeader>
               <AdminCardTitle>Desktop Image <Req /></AdminCardTitle>
             </AdminCardHeader>
@@ -468,7 +470,7 @@ export function HeroSlideFormPage() {
               <ReqError show={saveAttempted && !form.image_url}>
                 A desktop image is required
               </ReqError>
-              <p className="text-xs text-[var(--color-dark)]/60 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Recommended: 1920x800px
               </p>
             </AdminCardContent>
@@ -486,7 +488,7 @@ export function HeroSlideFormPage() {
                 searchHint={form.title ? `${form.title} hero banner mobile` : undefined}
                 keepOriginalResolution
               />
-              <p className="text-xs text-[var(--color-dark)]/60 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Optional. Recommended: 768x600px
               </p>
             </AdminCardContent>
@@ -499,7 +501,7 @@ export function HeroSlideFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div 
-                className="relative aspect-[16/9] rounded-lg overflow-hidden bg-gray-100"
+                className="relative aspect-video rounded-lg overflow-hidden bg-muted"
                 style={{
                   backgroundImage: form.image_url ? `url(${form.image_url})` : undefined,
                   backgroundSize: 'cover',

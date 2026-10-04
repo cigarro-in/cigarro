@@ -216,16 +216,16 @@ export function DiscountFormPage() {
 
   if (isEditMode && row === undefined) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (isEditMode && row === null) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <p className="text-gray-500">Discount not found. It may have been deleted.</p>
+      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
+        <p className="text-muted-foreground">Discount not found. It may have been deleted.</p>
         <Button variant="outline" onClick={() => navigate('/admin/discounts')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Discounts
@@ -235,7 +235,7 @@ export function DiscountFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <PageHeader
         title={formData.name || 'Untitled Discount'}
@@ -253,7 +253,7 @@ export function DiscountFormPage() {
             variant="destructive" 
             onClick={handleDelete}
             disabled={saving}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-destructive hover:bg-destructive text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
@@ -262,7 +262,7 @@ export function DiscountFormPage() {
         <Button 
           onClick={handleSubmit} 
           disabled={saving || !isDirty}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           {saving ? (
             <>
@@ -278,11 +278,11 @@ export function DiscountFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">
@@ -295,14 +295,14 @@ export function DiscountFormPage() {
               
               {/* Name */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">
+                <Label className="text-foreground font-medium">
                   Name <Req />
                 </Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => handleChange({ name: e.target.value })}
                   placeholder="e.g. Summer Sale"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  className="bg-background border-border focus:ring-primary text-lg py-6"
                   aria-invalid={saveAttempted && isBlank(formData.name)}
                 />
                 <ReqError show={saveAttempted && isBlank(formData.name)} />
@@ -310,19 +310,19 @@ export function DiscountFormPage() {
 
               {/* Code */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Discount Code</Label>
+                <Label className="text-foreground font-medium">Discount Code</Label>
                 <div className="flex space-x-2">
                   <Input
                     value={formData.code}
                     onChange={(e) => handleChange({ code: e.target.value.toUpperCase() })}
                     placeholder="SUMMER2024"
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] font-mono"
+                    className="bg-background border-border focus:ring-primary font-mono"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={generateCode}
-                    className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)]"
+                    className="border-border hover:bg-background"
                   >
                     <RefreshCw className="w-4 h-4" />
                   </Button>
@@ -331,27 +331,27 @@ export function DiscountFormPage() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Description</Label>
+                <Label className="text-foreground font-medium">Description</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => handleChange({ description: e.target.value })}
                   placeholder="Describe the discount..."
                   rows={3}
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                  className="bg-background border-border focus:ring-primary"
                 />
               </div>
 
               {/* Type and Value */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">Discount Type</Label>
+                  <Label className="text-foreground font-medium">Discount Type</Label>
                   <Select
                     value={formData.type}
                     onValueChange={(value: 'percentage' | 'fixed_amount' | 'cart_value') => 
                       handleChange({ type: value, value: 0 })
                     }
                   >
-                    <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                    <SelectTrigger className="bg-background border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -362,7 +362,7 @@ export function DiscountFormPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">
+                  <Label className="text-foreground font-medium">
                     {formData.type === 'percentage' ? 'Percentage (%)' :
                      formData.type === 'fixed_amount' ? 'Amount (₹)' :
                      'Cart Value (₹)'}
@@ -373,7 +373,7 @@ export function DiscountFormPage() {
                     value={formData.value}
                     onChange={(e) => handleChange({ value: parseFloat(e.target.value) || 0 })}
                     placeholder={formData.type === 'percentage' ? '10' : '100'}
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    className="bg-background border-border focus:ring-primary"
                     aria-invalid={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}
                   />
                   <ReqError show={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}>
@@ -384,14 +384,14 @@ export function DiscountFormPage() {
 
               {/* Applicability */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Applies To</Label>
+                <Label className="text-foreground font-medium">Applies To</Label>
                 <Select
                   value={formData.applicable_to}
                   onValueChange={(value: 'all' | 'products' | 'combos' | 'variants') => 
                     handleChange({ applicable_to: value })
                   }
                 >
-                  <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                  <SelectTrigger className="bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -406,24 +406,24 @@ export function DiscountFormPage() {
               {/* Conditions */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">Minimum Cart Value</Label>
+                  <Label className="text-foreground font-medium">Minimum Cart Value</Label>
                   <Input
                     type="number"
                     value={formData.min_cart_value}
                     onChange={(e) => handleChange({ min_cart_value: parseFloat(e.target.value) || 0 })}
                     placeholder="0"
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    className="bg-background border-border focus:ring-primary"
                   />
                 </div>
                 {formData.type === 'percentage' && (
                   <div className="space-y-2">
-                    <Label className="text-[var(--color-dark)] font-medium">Maximum Discount Amount</Label>
+                    <Label className="text-foreground font-medium">Maximum Discount Amount</Label>
                     <Input
                       type="number"
                       value={formData.max_discount_amount}
                       onChange={(e) => handleChange({ max_discount_amount: parseFloat(e.target.value) || 0 })}
                       placeholder="0"
-                      className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                      className="bg-background border-border focus:ring-primary"
                     />
                   </div>
                 )}
@@ -432,34 +432,34 @@ export function DiscountFormPage() {
               {/* Date Range */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">Start Date</Label>
+                  <Label className="text-foreground font-medium">Start Date</Label>
                   <Input
                     type="date"
                     value={formData.start_date}
                     onChange={(e) => handleChange({ start_date: e.target.value })}
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    className="bg-background border-border focus:ring-primary"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">End Date</Label>
+                  <Label className="text-foreground font-medium">End Date</Label>
                   <Input
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => handleChange({ end_date: e.target.value })}
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    className="bg-background border-border focus:ring-primary"
                   />
                 </div>
               </div>
 
               {/* Usage Limit */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Usage Limit</Label>
+                <Label className="text-foreground font-medium">Usage Limit</Label>
                 <Input
                   type="number"
                   value={formData.usage_limit}
                   onChange={(e) => handleChange({ usage_limit: parseInt(e.target.value) || 0 })}
                   placeholder="0 (unlimited)"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                  className="bg-background border-border focus:ring-primary"
                 />
               </div>
             </AdminCardContent>
@@ -477,7 +477,7 @@ export function DiscountFormPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Active</Label>
-                  <p className="text-sm text-gray-500">Discount is available to customers</p>
+                  <p className="text-sm text-muted-foreground">Discount is available to customers</p>
                 </div>
                 <Switch
                   checked={formData.is_active}
@@ -494,20 +494,20 @@ export function DiscountFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div className="space-y-3">
-                <div className="p-4 border border-[var(--color-coyote)]/30 rounded-lg">
-                  <div className="font-medium text-gray-900 mb-2">
+                <div className="p-4 border border-border/30 rounded-lg">
+                  <div className="font-medium text-foreground mb-2">
                     {formData.name || 'Discount Name'}
                   </div>
                   {formData.code && (
-                    <div className="text-sm font-mono text-gray-600 mb-2">
+                    <div className="text-sm font-mono text-muted-foreground mb-2">
                       Code: {formData.code}
                     </div>
                   )}
-                  <div className="text-lg font-bold text-[var(--color-canyon)]">
+                  <div className="text-lg font-bold text-primary">
                     {formatDiscountValue()}
                   </div>
                   {formData.description && (
-                    <div className="text-sm text-gray-600 mt-2">
+                    <div className="text-sm text-muted-foreground mt-2">
                       {formData.description}
                     </div>
                   )}

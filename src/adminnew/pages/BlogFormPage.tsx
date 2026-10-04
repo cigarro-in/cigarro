@@ -136,7 +136,6 @@ export function BlogFormPage() {
       meta_description: data.metaDescription || '',
     });
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postRows]);
 
   const generateSlug = (title: string) => {
@@ -222,14 +221,14 @@ export function BlogFormPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--color-creme)] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-canyon)]" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-20">
       <PageHeader
         title={isEditing ? `Edit: ${post?.title || 'Post'}` : 'New Blog Post'}
         description={isEditing ? 'Update blog post details' : 'Create a new blog post'}
@@ -244,18 +243,18 @@ export function BlogFormPage() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Save className="mr-2 h-4 w-4" />
           {saving ? 'Saving...' : 'Save Post'}
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left Column - Main Content */}
         <div className="space-y-4">
           {/* Post Content */}
@@ -284,7 +283,7 @@ export function BlogFormPage() {
                   onChange={(e) => setForm(prev => ({ ...prev, slug: e.target.value }))}
                   placeholder="post-url-slug"
                 />
-                <p className="text-xs text-[var(--color-dark)]/50">
+                <p className="text-xs text-muted-foreground">
                   URL: /blog/{form.slug || 'your-post-slug'}
                 </p>
               </div>
@@ -310,7 +309,7 @@ export function BlogFormPage() {
                   rows={15}
                   className="font-mono text-sm"
                 />
-                <p className="text-xs text-[var(--color-dark)]/50">
+                <p className="text-xs text-muted-foreground">
                   ~{calculateReadingTime(form.content)} min read
                 </p>
               </div>
@@ -398,7 +397,7 @@ export function BlogFormPage() {
                     </SelectItem>
                     <SelectItem value="archived">
                       <div className="flex items-center gap-2">
-                        <EyeOff className="h-4 w-4 text-gray-400" />
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
                         Archived
                       </div>
                     </SelectItem>
@@ -424,6 +423,7 @@ export function BlogFormPage() {
                         <div className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
+                            // eslint-disable-next-line shadcn/no-inline-styles -- category color is data-driven
                             style={{ backgroundColor: cat.color }}
                           />
                           {cat.name}
@@ -437,10 +437,10 @@ export function BlogFormPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <Label className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-500" />
+                    <Star className="h-4 w-4 text-sunflower" />
                     Featured
                   </Label>
-                  <p className="text-xs text-[var(--color-dark)]/50">Show in featured section</p>
+                  <p className="text-xs text-muted-foreground">Show in featured section</p>
                 </div>
                 <Switch
                   checked={form.is_featured}
@@ -451,10 +451,10 @@ export function BlogFormPage() {
               <div className="flex items-center justify-between py-2">
                 <div>
                   <Label className="flex items-center gap-2">
-                    <Pin className="h-4 w-4 text-blue-500" />
+                    <Pin className="h-4 w-4 text-info" />
                     Pinned
                   </Label>
-                  <p className="text-xs text-[var(--color-dark)]/50">Pin to top of list</p>
+                  <p className="text-xs text-muted-foreground">Pin to top of list</p>
                 </div>
                 <Switch
                   checked={form.is_pinned}
@@ -470,7 +470,7 @@ export function BlogFormPage() {
               <AdminCardHeader>
                 <AdminCardTitle>Post Info</AdminCardTitle>
               </AdminCardHeader>
-              <AdminCardContent className="space-y-2 text-sm text-[var(--color-dark)]/60">
+              <AdminCardContent className="space-y-2 text-sm text-muted-foreground">
                 <p>Created: {format(new Date(post.created_at), 'MMM dd, yyyy')}</p>
                 <p>Updated: {format(new Date(post.updated_at), 'MMM dd, yyyy')}</p>
                 {post.published_at && (
@@ -482,7 +482,7 @@ export function BlogFormPage() {
                     href={`/blog/${post.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-1 mt-2"
+                    className="text-info hover:underline flex items-center gap-1 mt-2"
                   >
                     View Post <ExternalLink className="h-3 w-3" />
                   </a>

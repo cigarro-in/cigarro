@@ -450,7 +450,7 @@ export function ImagePicker({
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-dark)]/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search images..."
             value={searchTerm}
@@ -489,14 +489,14 @@ export function ImagePicker({
       </div>
 
       {/* Image Grid/List */}
-      <div className="h-[400px] overflow-y-auto border border-[var(--color-coyote)]/30 rounded-lg p-3 bg-[var(--color-creme-light)]/50">
+      <div className="h-100 overflow-y-auto border border-border/30 rounded-lg p-3 bg-card/50">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-canyon)]" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : filteredImages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[var(--color-dark)]/60">
-            <ImageIcon className="h-12 w-12 mb-3 text-[var(--color-coyote)]" />
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <ImageIcon className="h-12 w-12 mb-3 text-border" />
             <p className="font-medium">No images found</p>
             <p className="text-sm">Upload some images to get started</p>
           </div>
@@ -507,12 +507,23 @@ export function ImagePicker({
               return (
                 <div
                   key={image.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Select ${image.name}`}
+                  aria-pressed={isSelected}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggleImageSelection(image.url);
+                    }
+                  }}
                   onClick={() => toggleImageSelection(image.url)}
                   className={cn(
                     "group relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
                     isSelected
-                      ? "border-[var(--color-canyon)] ring-2 ring-[var(--color-canyon)]/30"
-                      : "border-transparent hover:border-[var(--color-coyote)]"
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-transparent hover:border-border"
                   )}
                 >
                   <img
@@ -524,7 +535,7 @@ export function ImagePicker({
 
                   {/* Selection indicator */}
                   {isSelected && (
-                    <div className="absolute top-1 left-1 bg-[var(--color-canyon)] text-white rounded-full p-1">
+                    <div className="absolute top-1 left-1 bg-primary text-primary-foreground rounded-full p-1">
                       <Check className="h-3 w-3" />
                     </div>
                   )}
@@ -532,14 +543,16 @@ export function ImagePicker({
                   {/* Delete button - shows on hover */}
                   <button
                     onClick={(e) => deleteImage(e, image)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                    type="button"
+                    aria-label={`Delete ${image.name}`}
                     title="Delete image"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
 
                   {/* Name tooltip on hover */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-[var(--color-dark)]/70 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute bottom-0 left-0 right-0 bg-foreground/70 text-primary-foreground text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
                     {image.name}
                   </div>
                 </div>
@@ -553,12 +566,23 @@ export function ImagePicker({
               return (
                 <div
                   key={image.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Select ${image.name}`}
+                  aria-pressed={isSelected}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggleImageSelection(image.url);
+                    }
+                  }}
                   onClick={() => toggleImageSelection(image.url)}
                   className={cn(
                     "flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-all",
                     isSelected
-                      ? "border-[var(--color-canyon)] bg-[var(--color-canyon)]/5"
-                      : "border-[var(--color-coyote)]/30 hover:border-[var(--color-coyote)] hover:bg-[var(--color-creme-light)]"
+                      ? "border-primary bg-primary/5"
+                      : "border-border/30 hover:border-border hover:bg-card"
                   )}
                 >
                   <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0">
@@ -568,21 +592,23 @@ export function ImagePicker({
                       className="w-full h-full object-cover"
                     />
                     {isSelected && (
-                      <div className="absolute inset-0 bg-[var(--color-canyon)]/20 flex items-center justify-center">
-                        <Check className="h-4 w-4 text-[var(--color-canyon)]" />
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                        <Check className="h-4 w-4 text-primary" />
                       </div>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate text-[var(--color-dark)]">{image.name}</p>
-                    <p className="text-xs text-[var(--color-dark)]/50">{formatFileSize(image.size)}</p>
+                    <p className="font-medium text-sm truncate text-foreground">{image.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(image.size)}</p>
                   </div>
 
                   {/* Delete button */}
                   <button
+                    type="button"
+                    aria-label={`Delete ${image.name}`}
                     onClick={(e) => deleteImage(e, image)}
-                    className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                    className="p-1.5 text-destructive hover:bg-destructive/10 rounded transition-colors"
                     title="Delete image"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -609,34 +635,29 @@ export function ImagePicker({
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          "h-[400px] border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors",
+          "h-100 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors",
           dragOver
-            ? "border-[var(--color-canyon)] bg-[var(--color-canyon)]/5"
-            : "border-[var(--color-coyote)] hover:border-[var(--color-canyon)] hover:bg-[var(--color-creme-light)]"
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary hover:bg-card"
         )}
       >
         {uploading ? (
           <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-[var(--color-canyon)] mx-auto mb-4" />
-            <p className="font-medium text-[var(--color-dark)]">Uploading...</p>
-            <div className="w-48 h-2 bg-[var(--color-coyote)]/30 rounded-full mt-3 overflow-hidden">
-              <div
-                className="h-full bg-[var(--color-canyon)] transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-            <p className="text-sm text-[var(--color-dark)]/60 mt-2">{Math.round(uploadProgress)}%</p>
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="font-medium text-foreground">Uploading...</p>
+            <progress aria-label="Upload progress" className="mt-3 h-2 w-48" value={uploadProgress} max={100} />
+            <p className="text-sm text-muted-foreground mt-2">{Math.round(uploadProgress)}%</p>
           </div>
         ) : (
           <>
-            <Upload className="h-12 w-12 text-[var(--color-coyote)] mb-4" />
-            <p className="font-medium text-[var(--color-dark)]">
+            <Upload className="h-12 w-12 text-border mb-4" />
+            <p className="font-medium text-foreground">
               Drag & drop images here
             </p>
-            <p className="text-sm text-[var(--color-dark)]/60 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               or click to browse
             </p>
-            <p className="text-xs text-[var(--color-dark)]/40 mt-4">
+            <p className="text-xs text-muted-foreground mt-4">
               JPEG, PNG, WebP, GIF up to {formatFileSize(maxFileSize)}
             </p>
             {multiple && (
@@ -694,7 +715,7 @@ export function ImagePicker({
       {/* Search input */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-dark)]/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search for images (e.g., Marlboro Red cigarette pack)"
             value={webSearchQuery}
@@ -709,16 +730,16 @@ export function ImagePicker({
       </div>
 
       {/* Results */}
-      <div className="h-[400px] overflow-y-auto">
+      <div className="h-100 overflow-y-auto">
         {webSearchLoading ? (
           <div className="h-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-canyon)]" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : webSearchResults.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
-            <Search className="h-12 w-12 text-[var(--color-coyote)] mb-4" />
-            <p className="text-[var(--color-dark)]/60">Search the web for product images</p>
-            <p className="text-sm text-[var(--color-dark)]/40 mt-1">Results from DuckDuckGo Image Search</p>
+            <Search className="h-12 w-12 text-border mb-4" />
+            <p className="text-muted-foreground">Search the web for product images</p>
+            <p className="text-sm text-muted-foreground mt-1">Results from DuckDuckGo Image Search</p>
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-3">
@@ -731,10 +752,10 @@ export function ImagePicker({
                   key={`${img.url}-${idx}`}
                   onClick={() => toggleImageSelection(img.url)}
                   className={cn(
-                    "relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02] bg-[var(--color-creme-light)]",
+                    "relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:ring-2 hover:ring-ring bg-card",
                     isSelected
-                      ? "border-[var(--color-canyon)] ring-2 ring-[var(--color-canyon)]/30 shadow-lg"
-                      : "border-transparent hover:border-[var(--color-coyote)]"
+                      ? "border-primary ring-2 ring-primary/30 shadow-lg"
+                      : "border-transparent hover:border-border"
                   )}
                 >
                   <img
@@ -757,8 +778,8 @@ export function ImagePicker({
                     }}
                   />
                   {isSelected && (
-                    <div className="absolute inset-0 bg-[var(--color-canyon)]/20 flex items-center justify-center">
-                      <div className="w-8 h-8 rounded-full bg-[var(--color-canyon)] flex items-center justify-center text-white font-bold text-sm">
+                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
                         {selectionIndex + 1}
                       </div>
                     </div>
@@ -779,7 +800,7 @@ export function ImagePicker({
   const renderContent = () => (
     <div className="space-y-3">
     <InlineStatus status={opStatus} />
-    <label className="flex items-center gap-2 text-sm text-[var(--color-dark)]">
+    <label className="flex items-center gap-2 text-sm text-foreground">
       <input type="checkbox" checked={keepOriginalResolution} onChange={(e) => setKeepOriginalResolution(e.target.checked)} />
       Keep original dimensions (skip square crop and resize)
     </label>
@@ -862,7 +883,7 @@ export function ImagePicker({
         {/* Selection summary */}
         {selectedUrls.length > 0 && (
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-[var(--color-dark)]/70">
+            <p className="text-sm text-muted-foreground">
               {selectedUrls.length} image(s) selected
             </p>
             <div className="flex gap-2">
@@ -876,7 +897,7 @@ export function ImagePicker({
               <Button
                 size="sm"
                 onClick={handleConfirmSelection}
-                className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-white"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 Confirm Selection
               </Button>
@@ -896,7 +917,7 @@ export function ImagePicker({
 
       {/* Modal */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="max-w-4xl admin-dialog-height overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ImageIcon className="h-5 w-5" />
@@ -906,23 +927,23 @@ export function ImagePicker({
 
           {renderContent()}
 
-          <DialogFooter className="flex items-center justify-between border-t border-[var(--color-coyote)]/30 pt-4">
+          <DialogFooter className="flex items-center justify-between border-t border-border/30 pt-4">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-[var(--color-dark)]/70">
+              <span className="text-sm text-muted-foreground">
                 {selectedUrls.length > 0 ? (
                   <span>{selectedUrls.length} selected</span>
                 ) : (
                   <span>No image selected</span>
                 )}
                 {multiple && maxImages && (
-                  <span className="text-[var(--color-dark)]/40 ml-2">(max {maxImages})</span>
+                  <span className="text-muted-foreground ml-2">(max {maxImages})</span>
                 )}
               </span>
               {selectedUrls.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setSelectedUrls([])}
                 >
                   Clear
@@ -935,7 +956,7 @@ export function ImagePicker({
               </Button>
               <Button
                 onClick={handleConfirmSelection}
-                className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-white"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {selectedUrls.length > 0 ? (multiple ? 'Select Images' : 'Select Image') : 'Clear Selection'}
               </Button>
@@ -982,12 +1003,22 @@ export function SingleImagePicker({
     <>
       {/* Compact tile - click to open picker */}
       <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled}
+        aria-label={value ? 'Change image' : 'Add image'}
+        onKeyDown={(event) => {
+          if (!disabled && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
         onClick={() => !disabled && setOpen(true)}
         className={cn(
           "relative w-16 h-16 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 group",
           value
-            ? "border-[var(--color-coyote)]/30 hover:border-[var(--color-canyon)]"
-            : "border-dashed border-[var(--color-coyote)] hover:border-[var(--color-canyon)] hover:bg-[var(--color-creme-light)]",
+            ? "border-border/30 hover:border-primary"
+            : "border-dashed border-border hover:border-primary hover:bg-card",
           disabled && "opacity-50 cursor-not-allowed",
           className
         )}
@@ -1000,14 +1031,14 @@ export function SingleImagePicker({
               className="w-full h-full object-cover"
             />
             {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <ImageIcon className="h-4 w-4 text-white" />
+            <div className="absolute inset-0 bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <ImageIcon className="h-4 w-4 text-primary-foreground" />
             </div>
           </>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-[var(--color-creme-light)]">
-            <Upload className="h-4 w-4 text-[var(--color-coyote)]" />
-            <span className="text-[10px] text-[var(--color-dark)]/60 mt-0.5">Add</span>
+          <div className="w-full h-full flex flex-col items-center justify-center bg-card">
+            <Upload className="h-4 w-4 text-border" />
+            <span className="text-xs text-muted-foreground mt-0.5">Add</span>
           </div>
         )}
       </div>
@@ -1079,7 +1110,7 @@ export function MultipleImagePicker({
         {value.map((url, index) => (
           <div
             key={url}
-            className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-[var(--color-coyote)]/30 bg-[var(--color-creme-light)] group cursor-move"
+            className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-border/30 bg-card group cursor-move"
             draggable
             onDragStart={(e) => e.dataTransfer.setData('text/plain', index.toString())}
             onDragOver={(e) => e.preventDefault()}
@@ -1095,7 +1126,7 @@ export function MultipleImagePicker({
               className="w-full h-full object-cover"
             />
             {/* Hover overlay with remove */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <div className="absolute inset-0 bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Button
                 type="button"
                 variant="destructive"
@@ -1108,7 +1139,7 @@ export function MultipleImagePicker({
               </Button>
             </div>
             {index === 0 && (
-              <Badge className="absolute bottom-0.5 left-0.5 text-[10px] px-1 py-0">
+              <Badge className="absolute bottom-0.5 left-0.5 text-xs px-1 py-0">
                 Main
               </Badge>
             )}
@@ -1121,13 +1152,13 @@ export function MultipleImagePicker({
             onClick={() => !disabled && setOpen(true)}
             className={cn(
               "relative w-16 h-16 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0",
-              "border-dashed border-[var(--color-coyote)] hover:border-[var(--color-canyon)] hover:bg-[var(--color-creme-light)]",
+              "border-dashed border-border hover:border-primary hover:bg-card",
               disabled && "opacity-50 cursor-not-allowed"
             )}
           >
-            <div className="w-full h-full flex flex-col items-center justify-center bg-[var(--color-creme-light)]">
-              <Upload className="h-4 w-4 text-[var(--color-coyote)]" />
-              <span className="text-[10px] text-[var(--color-dark)]/60 mt-0.5">Add</span>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-card">
+              <Upload className="h-4 w-4 text-border" />
+              <span className="text-xs text-muted-foreground mt-0.5">Add</span>
             </div>
           </div>
         )}

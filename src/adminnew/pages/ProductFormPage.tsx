@@ -160,7 +160,6 @@ export function ProductFormPage({ }: ProductFormPageProps) {
       review_count: data.reviewCount ?? 0
     };
     setFormData(mappedData);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editData]);
 
   const handleNameChange = (name: string) => {
@@ -409,14 +408,14 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-16">
       {/* Header */}
       <PageHeader
         title={formData.name || 'Untitled Product'}
@@ -434,7 +433,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
             variant="destructive"
             onClick={handleDelete}
             disabled={saving}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-destructive hover:bg-destructive text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
@@ -443,7 +442,6 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         <Button
           onClick={handleSubmit}
           disabled={saving || !isDirty}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
         >
           {saving ? (
             <>
@@ -459,14 +457,14 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* LEFT COLUMN */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-4">
           {/* Basic Information */}
           <AdminCard>
             <AdminCardHeader>
@@ -476,14 +474,14 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
               {/* Title */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">
+                <Label className="text-foreground font-medium">
                   Title <Req />
                 </Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="e.g. Marlboro Red (Imported)"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  className="bg-background border-border focus:ring-ring text-lg py-6"
                   aria-invalid={saveAttempted && isBlank(formData.name)}
                 />
                 <ReqError show={saveAttempted && isBlank(formData.name)} />
@@ -491,43 +489,43 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
               {/* Short Description */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Short Description</Label>
+                <Label className="text-foreground font-medium">Short Description</Label>
                 <Input
                   value={formData.short_description || ''}
                   onChange={(e) => handleChange({ short_description: e.target.value })}
                   placeholder="Brief summary for collection pages..."
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                  className="bg-background border-border focus:ring-ring"
                 />
               </div>
 
               {/* Slug */}
-              <div className={`grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 items-center text-sm text-muted-foreground bg-background/50 p-3 rounded-md border border-border/30${saveAttempted && isBlank(formData.slug) ? ' border-destructive' : ''}`}>
                 <span className="font-medium">store.cigarro.in/products/</span>
                 <input
                   value={formData.slug}
                   onChange={handleSlugChange}
-                  className="bg-transparent border-none focus:outline-none text-[var(--color-dark)] font-medium w-full"
+                  className="bg-transparent border-none focus:outline-none text-foreground font-medium w-full"
                   placeholder="product-slug"
                 />
               </div>
 
               {/* Rich Description */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Description</Label>
-                <div className="border-2 border-[var(--color-coyote)] rounded-md bg-[var(--color-creme)]">
+                <Label className="text-foreground font-medium">Description</Label>
+                <div className="border-2 border-border rounded-md bg-background">
                   {/* Toolbar Mockup */}
-                  <div className="flex items-center gap-2 p-2 border-b border-[var(--color-coyote)]/50 bg-[var(--color-creme-light)] text-[var(--color-dark)]/70">
-                    <button className="p-1 hover:bg-[var(--color-coyote)]/20 rounded"><strong>B</strong></button>
-                    <button className="p-1 hover:bg-[var(--color-coyote)]/20 rounded"><em>I</em></button>
-                    <button className="p-1 hover:bg-[var(--color-coyote)]/20 rounded"><u>U</u></button>
-                    <div className="w-px h-4 bg-[var(--color-coyote)]/50 mx-1" />
-                    <button className="p-1 hover:bg-[var(--color-coyote)]/20 rounded">List</button>
+                  <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted text-muted-foreground">
+                    <button className="p-1 hover:bg-muted rounded"><strong>B</strong></button>
+                    <button className="p-1 hover:bg-muted rounded"><em>I</em></button>
+                    <button className="p-1 hover:bg-muted rounded"><u>U</u></button>
+                    <div className="w-px h-4 bg-muted mx-1" />
+                    <button className="p-1 hover:bg-muted rounded">List</button>
                   </div>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => handleChange({ description: e.target.value })}
                     placeholder="Describe the product..."
-                    className="border-none shadow-none focus-visible:ring-0 min-h-[200px] bg-transparent"
+                    className="border-none shadow-none focus-visible:ring-0 min-h-50 bg-transparent"
                   />
                 </div>
               </div>
@@ -544,11 +542,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
               <div className="grid grid-cols-2 gap-6">
                 {/* Brand */}
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">
-                    Brand <span className="text-red-500">*</span>
+                  <Label className="text-foreground font-medium">
+                    Brand <span className="text-destructive">*</span>
                   </Label>
                   <Select value={formData.brand_id} onValueChange={(value) => handleChange({ brand_id: value })}>
-                    <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                    <SelectTrigger className="bg-background border-border">
                       <SelectValue placeholder="Select brand" />
                     </SelectTrigger>
                     <SelectContent>
@@ -561,19 +559,19 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
                 {/* Origin */}
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-dark)] font-medium">Origin</Label>
+                  <Label className="text-foreground font-medium">Origin</Label>
                   <Input
                     value={formData.origin}
                     onChange={(e) => handleChange({ origin: e.target.value })}
                     placeholder="Country of origin"
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                    className="bg-background border-border focus:ring-ring"
                   />
                 </div>
               </div>
 
               {/* Categories */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Categories</Label>
+                <Label className="text-foreground font-medium">Categories</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {categories.length > 0 ? (
                     categories.map(category => (
@@ -587,14 +585,14 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                       </Badge>
                     ))
                   ) : (
-                    <p className="text-sm text-[var(--color-dark)]/50">No categories available</p>
+                    <p className="text-sm text-foreground/50">No categories available</p>
                   )}
                 </div>
               </div>
 
               {/* Collections */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Collections</Label>
+                <Label className="text-foreground font-medium">Collections</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {collections.length > 0 ? (
                     collections.map(collection => (
@@ -608,7 +606,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                       </Badge>
                     ))
                   ) : (
-                    <p className="text-sm text-[var(--color-dark)]/50">No collections available</p>
+                    <p className="text-sm text-foreground/50">No collections available</p>
                   )}
                 </div>
               </div>
@@ -625,7 +623,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   variant="outline"
                   size="sm"
                   onClick={addSpecification}
-                  className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                  className="h-8 border-border hover:bg-background text-foreground"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Specification
@@ -639,27 +637,27 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                     placeholder="Key"
                     value={spec.key}
                     onChange={(e) => updateSpecification(index, 'key', e.target.value)}
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                    className="bg-background border-border"
                   />
                   <Input
                     placeholder="Value"
                     value={spec.value}
                     onChange={(e) => updateSpecification(index, 'value', e.target.value)}
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                    className="bg-background border-border"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => removeSpecification(index)}
-                    className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                    className="border-border hover:bg-background text-foreground"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               ))}
               {formData.specifications.length === 0 && (
-                <p className="text-gray-500 text-sm">No specifications added</p>
+                <p className="text-muted-foreground text-sm">No specifications added</p>
               )}
             </AdminCardContent>
           </AdminCard>
@@ -674,7 +672,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => addVariant('carton')}
-                  className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                  className="h-8 border-border hover:bg-background text-foreground"
                 >
                   <Box className="w-4 h-4 mr-2" />
                   Add Carton
@@ -684,7 +682,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => addVariant('custom')}
-                  className="h-8 border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                  className="h-8 border-border hover:bg-background text-foreground"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Custom
@@ -701,7 +699,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                 .map((variant, originalIndex) => ({ variant, originalIndex }))
                 .sort((a, b) => (b.variant.is_default ? 1 : 0) - (a.variant.is_default ? 1 : 0))
                 .map(({ variant, originalIndex: index }) => (
-                  <AdminCard key={index} className="border-2 border-[var(--color-coyote)]/30">
+                  <AdminCard key={index} className="border-2 border-border/30">
                     <AdminCardContent>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
@@ -717,7 +715,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             variant="outline"
                             size="sm"
                             onClick={() => removeVariant(index)}
-                            className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                            className="border-border hover:bg-background text-foreground"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -731,13 +729,13 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             value={variant.variant_name}
                             onChange={(e) => updateVariant(index, { variant_name: e.target.value })}
                             placeholder="e.g., Packet, Carton"
-                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            className="bg-background border-border"
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Variant Type</Label>
                           <Select value={variant.variant_type} onValueChange={(value) => updateVariant(index, { variant_type: value })}>
-                            <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                            <SelectTrigger className="bg-background border-border">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -757,13 +755,13 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             type="number"
                             value={variant.units_contained}
                             onChange={(e) => updateVariant(index, { units_contained: parseInt(e.target.value) || 0 })}
-                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            className="bg-background border-border"
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Unit</Label>
                           <Select value={variant.unit} onValueChange={(value) => updateVariant(index, { unit: value })}>
-                            <SelectTrigger className="bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                            <SelectTrigger className="bg-background border-border">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -780,14 +778,14 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                         <div className="space-y-2">
                           <Label>Selling Price {variant.is_default ? <Req /> : null}</Label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                             <Input
                               type="number"
                               step="0.01"
                               value={variant.price}
                               onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) || 0 })}
                               placeholder="0.00"
-                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                              className="pl-8 bg-background border-border"
                               aria-invalid={saveAttempted && !!variant.is_default && !(variant.price > 0)}
                             />
                           </div>
@@ -798,28 +796,28 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                         <div className="space-y-2">
                           <Label>Compare at Price</Label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                             <Input
                               type="number"
                               step="0.01"
                               value={variant.compare_at_price || ''}
                               onChange={(e) => updateVariant(index, { compare_at_price: parseFloat(e.target.value) || 0 })}
                               placeholder="0.00"
-                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                              className="pl-8 bg-background border-border"
                             />
                           </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Cost Price</Label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                             <Input
                               type="number"
                               step="0.01"
                               value={variant.cost_price || ''}
                               onChange={(e) => updateVariant(index, { cost_price: parseFloat(e.target.value) || 0 })}
                               placeholder="0.00"
-                              className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                              className="pl-8 bg-background border-border"
                             />
                           </div>
                         </div>
@@ -833,10 +831,10 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             value={variant.stock}
                             onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value) || 0 })}
                             disabled={Boolean(variant.id)}
-                            className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                            className="bg-background border-border"
                           />
                           {variant.id && (
-                            <button type="button" onClick={() => navigate('/admin/inventory')} className="text-xs font-medium text-[var(--color-canyon)] hover:underline">
+                            <button type="button" onClick={() => navigate('/admin/inventory')} className="text-xs font-medium text-primary hover:underline">
                               Adjust live stock in Inventory
                             </button>
                           )}
@@ -861,7 +859,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                               setImageSearchVariantIndex(index);
                               setImageSearchOpen(true);
                             }}
-                            className="h-7 text-xs border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
+                            className="h-7 text-xs border-border hover:bg-background text-foreground"
                           >
                             <Search className="w-3 h-3 mr-1" />
                             Search Images
@@ -877,7 +875,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                           value={variant.image_alt_text || ''}
                           onChange={(e) => updateVariant(index, { image_alt_text: e.target.value })}
                           placeholder={`${formData.name} ${variant.variant_name}`.trim() || 'Image alt text (auto-filled on save)'}
-                          className="bg-[var(--color-creme)] border-[var(--color-coyote)] text-sm"
+                          className="bg-background border-border text-sm"
                         />
                       </div>
                     </AdminCardContent>
@@ -899,7 +897,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   value={formData.meta_title}
                   onChange={(e) => handleChange({ meta_title: e.target.value })}
                   placeholder="SEO title (defaults to product name)"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  className="bg-background border-border"
                 />
               </div>
 
@@ -911,7 +909,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   onChange={(e) => handleChange({ meta_description: e.target.value })}
                   placeholder="SEO description"
                   rows={3}
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  className="bg-background border-border"
                 />
               </div>
 
@@ -922,7 +920,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   value={formData.canonical_url}
                   onChange={(e) => handleChange({ canonical_url: e.target.value })}
                   placeholder="https://example.com/product"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  className="bg-background border-border"
                 />
               </div>
 
@@ -938,7 +936,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                     value={formData.rating_value ?? ''}
                     onChange={(e) => handleChange({ rating_value: e.target.value === '' ? null : Number(e.target.value) })}
                     placeholder="e.g. 4.5"
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                    className="bg-background border-border"
                   />
                 </div>
                 <div className="space-y-2">
@@ -951,7 +949,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                     value={formData.review_count ?? 0}
                     onChange={(e) => handleChange({ review_count: e.target.value === '' ? 0 : Number(e.target.value) })}
                     placeholder="0"
-                    className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                    className="bg-background border-border"
                   />
                 </div>
               </div>
@@ -963,7 +961,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
         </div>
 
         {/* RIGHT COLUMN */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-4">
           {/* Status */}
           <AdminCard>
             <AdminCardHeader>
@@ -974,25 +972,25 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                 value={formData.is_active ? 'active' : 'draft'}
                 onValueChange={(value: string) => handleChange({ is_active: value === 'active' })}
               >
-                <SelectTrigger className="w-full bg-[var(--color-creme)] border-[var(--color-coyote)]">
+                <SelectTrigger className="w-full bg-background border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div className="w-2 h-2 rounded-full bg-success" />
                       Active
                     </div>
                   </SelectItem>
                   <SelectItem value="draft">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400" />
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground" />
                       Draft
                     </div>
                   </SelectItem>
                   <SelectItem value="archived">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-400" />
+                      <div className="w-2 h-2 rounded-full bg-destructive/70" />
                       Archived
                     </div>
                   </SelectItem>
@@ -1009,7 +1007,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
             <AdminCardContent>
 
               {!defaultVariant ? (
-                <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                <Alert className="bg-warning/10 border-warning/30 text-primary">
                   <Info className="h-4 w-4" />
                   <AlertDescription>
                     Add a default variant to set pricing information. All pricing is now managed through variants.
@@ -1019,11 +1017,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                 <>
                   {/* Default Variant Price */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-[var(--color-dark)]/60">
-                      Default Variant Price <span className="text-red-500">*</span>
+                    <Label className="text-xs text-muted-foreground">
+                      Default Variant Price <span className="text-destructive">*</span>
                     </Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                       <Input
                         type="number"
                         value={defaultVariant.price}
@@ -1035,16 +1033,16 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             handleChange({ variants: newVariants });
                           }
                         }}
-                        className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                        className="pl-8 bg-background border-border"
                       />
                     </div>
                   </div>
 
                   {/* Compare At */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-[var(--color-dark)]/60">Compare at price</Label>
+                    <Label className="text-xs text-muted-foreground">Compare at price</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                       <Input
                         type="number"
                         value={defaultVariant.compare_at_price || ''}
@@ -1056,7 +1054,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             handleChange({ variants: newVariants });
                           }
                         }}
-                        className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                        className="pl-8 bg-background border-border"
                       />
                     </div>
                   </div>
@@ -1064,15 +1062,15 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   {/* Cost Price & Margin */}
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <Label className="text-xs text-[var(--color-dark)]/60">Cost per item</Label>
+                      <Label className="text-xs text-muted-foreground">Cost per item</Label>
                       {margin !== 0 && (
-                        <span className={`text-xs font-medium ${margin > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`text-xs font-medium ${margin > 0 ? 'text-success' : 'text-destructive'}`}>
                           {margin}% Margin
                         </span>
                       )}
                     </div>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-dark)]/50">₹</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">₹</span>
                       <Input
                         type="number"
                         value={defaultVariant.cost_price || ''}
@@ -1084,7 +1082,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             handleChange({ variants: newVariants });
                           }
                         }}
-                        className="pl-8 bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                        className="pl-8 bg-background border-border"
                       />
                     </div>
                   </div>
@@ -1108,7 +1106,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   <div className="text-right">
                     <div className="font-medium">{formatINR(variant.price)}</div>
                     {variant.compare_at_price && variant.compare_at_price > variant.price && (
-                      <div className="text-sm text-gray-500 line-through">
+                      <div className="text-sm text-muted-foreground line-through">
                         {formatINR(variant.compare_at_price)}
                       </div>
                     )}

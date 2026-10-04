@@ -6,7 +6,7 @@
 
 export function Req() {
   return (
-    <span className="text-red-500" aria-hidden="true">
+    <span className="text-destructive" aria-hidden="true">
       {' *'}
     </span>
   );
@@ -15,7 +15,7 @@ export function Req() {
 export function ReqError({ show, children }: { show: boolean; children?: React.ReactNode }) {
   if (!show) return null;
   return (
-    <p className="text-red-500 text-xs mt-1" role="alert">
+    <p className="text-destructive text-xs mt-1" role="alert">
       {children ?? 'This field is required'}
     </p>
   );

@@ -128,7 +128,7 @@ export function BlogsPage() {
       label: 'Post',
       render: (_: any, post: BlogPost) => (
         <div className="flex items-center gap-3">
-          <div className="w-12 h-9 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
+          <div className="w-12 h-9 rounded-md overflow-hidden bg-muted flex-shrink-0">
             {post.featured_image ? (
               <ImageWithFallback
                 src={post.featured_image}
@@ -137,17 +137,17 @@ export function BlogsPage() {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-gray-400" />
+                <BookOpen className="w-4 h-4 text-muted-foreground" />
               </div>
             )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm truncate">{post.title}</span>
-              {post.is_featured && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 flex-shrink-0" />}
-              {post.is_pinned && <Pin className="h-3 w-3 text-blue-500 flex-shrink-0" />}
+              {post.is_featured && <Star className="h-3 w-3 text-sunflower fill-sunflower flex-shrink-0" />}
+              {post.is_pinned && <Pin className="h-3 w-3 text-info flex-shrink-0" />}
             </div>
-            <p className="text-xs text-gray-500 truncate max-w-[300px]">
+            <p className="text-xs text-muted-foreground truncate max-w-75">
               {post.excerpt || 'No excerpt'}
             </p>
           </div>
@@ -161,13 +161,14 @@ export function BlogsPage() {
         post.category ? (
           <Badge 
             variant="outline" 
+            // eslint-disable-next-line shadcn/no-inline-styles -- category color is data-driven
             style={{ borderColor: post.category.color, color: post.category.color }}
             className="text-xs"
           >
             {post.category.name}
           </Badge>
         ) : (
-          <span className="text-xs text-gray-400">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         )
       ),
     },
@@ -184,14 +185,14 @@ export function BlogsPage() {
       key: 'view_count',
       label: 'Views',
       render: (_: any, post: BlogPost) => (
-        <span className="text-sm text-gray-600">{post.view_count || 0}</span>
+        <span className="text-sm text-muted-foreground">{post.view_count || 0}</span>
       ),
     },
     {
       key: 'created_at',
       label: 'Date',
       render: (_: any, post: BlogPost) => (
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-muted-foreground">
           {post.published_at 
             ? format(new Date(post.published_at), 'MMM dd, yyyy')
             : format(new Date(post.created_at), 'MMM dd, yyyy')}
@@ -201,26 +202,26 @@ export function BlogsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Blog Posts"
         description={`${posts.length} posts total`}
       >
         <Button 
           onClick={handleAddPost}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Plus className="mr-2 h-4 w-4" />
           New Post
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-400 mx-auto space-y-4 sm:space-y-6">
         <InlineStatus status={opStatus} />
         {/* Filters */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search posts..."
               value={searchTerm}
@@ -243,7 +244,7 @@ export function BlogsPage() {
 
         {/* Bulk Actions */}
         {selectedPosts.length > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/20 rounded-lg">
+          <div className="flex items-center gap-2 p-3 bg-card border border-border/20 rounded-lg">
             <span className="text-sm font-medium">
               {selectedPosts.length} selected
             </span>

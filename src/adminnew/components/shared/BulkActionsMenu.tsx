@@ -3,6 +3,7 @@ import { Button } from '../../../components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../../components/ui/dropdown-menu';
@@ -29,16 +30,18 @@ export function BulkActionsMenu({ selectedIds, actions }: BulkActionsMenuProps) 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {actions.map((action, idx) => (
+        <DropdownMenuGroup>
+        {actions.map((action) => (
           <DropdownMenuItem
-            key={idx}
+            key={action.label}
             onClick={() => action.onClick(selectedIds)}
-            className={action.variant === 'destructive' ? 'text-red-600' : ''}
+            variant={action.variant ?? 'default'}
           >
             {action.icon && <action.icon className="mr-2 h-4 w-4" />}
             {action.label}
           </DropdownMenuItem>
         ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

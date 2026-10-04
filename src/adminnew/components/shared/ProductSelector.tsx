@@ -102,17 +102,17 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
   const isAtLimit = maxProducts ? selectedProductIds.length >= maxProducts : false;
 
   return (
-    <div className="border border-[var(--color-coyote)]/30 rounded-lg overflow-hidden bg-[var(--color-creme-light)]">
+    <div className="border border-border/30 rounded-lg overflow-hidden bg-card">
       {/* Header */}
-      <div className="bg-[var(--color-creme)] px-4 py-2 border-b border-[var(--color-coyote)]/20 flex items-center justify-between">
+      <div className="bg-background px-4 py-2 border-b border-border/20 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Package className="w-4 h-4 text-[var(--color-canyon)]" />
-          <span className="font-medium text-sm text-[var(--color-dark)]">Product Selection</span>
+          <Package className="w-4 h-4 text-primary" />
+          <span className="font-medium text-sm text-foreground">Product Selection</span>
           <Badge 
             variant="secondary"
             className={isAtLimit 
-              ? "bg-amber-100 text-amber-800 text-xs" 
-              : "bg-[var(--color-creme)] text-[var(--color-dark)]/60 text-xs"
+              ? "bg-warning/10 text-warning text-xs"
+              : "bg-background text-muted-foreground text-xs"
             }
           >
             {selectedProductIds.length}{maxProducts ? ` / ${maxProducts}` : ''} selected
@@ -123,19 +123,19 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
             variant="ghost" 
             size="sm" 
             onClick={handleClearAll}
-            className="text-[var(--color-dark)]/50 hover:text-red-600 hover:bg-red-50 text-xs h-7"
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-xs h-7"
           >
             Clear all
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-coyote)]/20">
+      <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border/20">
         {/* Left Panel: Available Products */}
         <div className="flex flex-col">
-          <div className="p-2 border-b border-[var(--color-coyote)]/10 bg-[var(--color-creme-light)]">
+          <div className="p-2 border-b border-border/10 bg-card">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-dark)]/40" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search available products..."
                 value={searchTerm}
@@ -145,21 +145,21 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
             </div>
           </div>
 
-          <div className="h-[240px] overflow-y-auto bg-[var(--color-creme-light)]">
+          <div className="h-60 overflow-y-auto bg-card">
             {loading ? (
-              <div className="flex flex-col items-center justify-center h-full text-[var(--color-dark)]/40">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin mb-2" />
                 <span className="text-xs">Loading products...</span>
               </div>
             ) : availableProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-[var(--color-dark)]/40 px-4">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">
                 <Package className="w-8 h-8 mb-2 opacity-40" />
                 <span className="text-xs text-center">
                   {searchTerm ? 'No products match your search' : 'All products have been selected'}
                 </span>
               </div>
             ) : (
-              <div className="divide-y divide-[var(--color-coyote)]/10">
+              <div className="divide-y divide-border/10">
                 {availableProducts.map(product => (
                   <button
                     key={product.id}
@@ -168,10 +168,10 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
                     className={`w-full flex items-center gap-2 p-2 text-left transition-colors ${
                       isAtLimit 
                         ? 'opacity-50 cursor-not-allowed' 
-                        : 'hover:bg-[var(--color-creme)] cursor-pointer'
+                        : 'hover:bg-background cursor-pointer'
                     }`}
                   >
-                    <div className="w-8 h-8 rounded overflow-hidden bg-[var(--color-creme)] flex-shrink-0 border border-[var(--color-coyote)]/20">
+                    <div className="w-8 h-8 rounded overflow-hidden bg-background flex-shrink-0 border border-border/20">
                       {getProductImage(product) ? (
                         <ImageWithFallback
                           src={getProductImage(product)}
@@ -180,24 +180,24 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-3 h-3 text-[var(--color-dark)]/30" />
+                          <Package className="w-3 h-3 text-muted-foreground" />
                         </div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-xs text-[var(--color-dark)] truncate">{product.name}</p>
-                      <p className="text-xs text-[var(--color-dark)]/50 truncate">{product.brand?.name}</p>
+                      <p className="font-medium text-xs text-foreground truncate">{product.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{product.brand?.name}</p>
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {getProductPrice(product) && (
-                        <span className="text-xs font-medium text-[var(--color-canyon)]">
+                        <span className="text-xs font-medium text-primary">
                           {formatINR(getProductPrice(product))}
                         </span>
                       )}
-                      <div className="w-5 h-5 rounded-full bg-[var(--color-canyon)]/10 flex items-center justify-center">
-                        <Plus className="w-3 h-3 text-[var(--color-canyon)]" />
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Plus className="w-3 h-3 text-primary" />
                       </div>
                     </div>
                   </button>
@@ -208,32 +208,32 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
         </div>
 
         {/* Right Panel: Selected Products */}
-        <div className="flex flex-col bg-[var(--color-canyon)]/5">
-          <div className="p-2 border-b border-[var(--color-coyote)]/10 bg-[var(--color-canyon)]/10">
+        <div className="flex flex-col bg-primary/5">
+          <div className="p-2 border-b border-border/10 bg-primary/10">
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-[var(--color-canyon)]" />
-              <span className="text-xs font-medium text-[var(--color-dark)]">Selected Products</span>
+              <Check className="w-4 h-4 text-primary" />
+              <span className="text-xs font-medium text-foreground">Selected Products</span>
             </div>
           </div>
 
-          <div className="h-[240px] overflow-y-auto">
+          <div className="h-60 overflow-y-auto">
             {selectedProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-[var(--color-dark)]/40 px-4">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">
                 <ArrowRight className="w-6 h-6 mb-2 opacity-30" />
                 <span className="text-xs text-center">Click products on the left to add them here</span>
               </div>
             ) : (
-              <div className="divide-y divide-[var(--color-coyote)]/10">
+              <div className="divide-y divide-border/10">
                 {selectedProducts.map((product, index) => (
                   <div
                     key={product.id}
-                    className="flex items-center gap-2 p-2 bg-[var(--color-creme-light)] hover:bg-[var(--color-creme)] transition-colors group"
+                    className="flex items-center gap-2 p-2 bg-card hover:bg-background transition-colors group"
                   >
-                    <span className="w-5 h-5 rounded-full bg-[var(--color-canyon)] text-white text-xs flex items-center justify-center font-medium flex-shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium flex-shrink-0">
                       {index + 1}
                     </span>
 
-                    <div className="w-8 h-8 rounded overflow-hidden bg-[var(--color-creme)] flex-shrink-0 border-2 border-[var(--color-canyon)]/20">
+                    <div className="w-8 h-8 rounded overflow-hidden bg-background flex-shrink-0 border-2 border-primary/20">
                       {getProductImage(product) ? (
                         <ImageWithFallback
                           src={getProductImage(product)}
@@ -242,19 +242,19 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-3 h-3 text-[var(--color-dark)]/30" />
+                          <Package className="w-3 h-3 text-muted-foreground" />
                         </div>
                       )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-xs text-[var(--color-dark)] truncate">{product.name}</p>
+                      <p className="font-medium text-xs text-foreground truncate">{product.name}</p>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-[var(--color-dark)]/50 truncate">{product.brand?.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">{product.brand?.name}</span>
                         {getProductPrice(product) && (
                           <>
-                            <span className="text-[var(--color-dark)]/30">•</span>
-                            <span className="text-xs font-medium text-[var(--color-canyon)]">
+                            <span className="text-muted-foreground">•</span>
+                            <span className="text-xs font-medium text-primary">
                               {formatINR(getProductPrice(product))}
                             </span>
                           </>
@@ -263,10 +263,12 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
                     </div>
 
                     <button
+                      type="button"
+                      aria-label={`Remove ${product.name}`}
                       onClick={() => handleRemoveProduct(product.id)}
-                      className="w-5 h-5 rounded-full bg-[var(--color-creme)] hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                      className="size-9 rounded-md bg-background hover:bg-destructive/10 flex items-center justify-center"
                     >
-                      <X className="w-3 h-3 text-[var(--color-dark)]/40 group-hover:text-red-600" />
+                      <X className="w-3 h-3 text-muted-foreground group-hover:text-destructive" />
                     </button>
                   </div>
                 ))}
@@ -278,8 +280,8 @@ export function ProductSelector({ selectedProductIds, onSelectionChange, maxProd
 
       {/* Footer with limit warning */}
       {isAtLimit && (
-        <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-center">
-          <span className="text-xs text-amber-700 font-medium">
+        <div className="px-4 py-2 bg-warning/10 border-t border-warning text-center">
+          <span className="text-xs text-warning font-medium">
             Maximum of {maxProducts} products reached
           </span>
         </div>

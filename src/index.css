@@ -49,6 +49,18 @@
 
   /* Extend Tailwind Colors */
   --color-background: var(--color-creme);
+  --color-card: var(--color-creme-light);
+  --color-card-foreground: var(--color-dark);
+  --color-popover: var(--color-creme-light);
+  --color-popover-foreground: var(--color-dark);
+  --color-destructive: #b42318;
+  --color-destructive-foreground: #ffffff;
+  --color-success: #166534;
+  --color-success-muted: #e8f5ec;
+  --color-warning: #854d0e;
+  --color-warning-muted: #fff4d6;
+  --color-info: #1e40af;
+  --color-info-muted: #eaf0ff;
   --color-foreground: var(--color-dark);
   --color-primary: var(--color-dark);
   --color-primary-foreground: var(--color-creme-light);
@@ -60,6 +72,7 @@
   --color-muted-foreground: var(--color-dark);
   --color-border: var(--color-coyote);
   --color-input: var(--color-creme-light);
+  --color-input-background: var(--color-creme-light);
   --color-ring: var(--color-canyon);
 
   /* Sidebar (used by admin Sidebar component from shadcn) */
@@ -71,6 +84,10 @@
   --color-sidebar-accent-foreground: var(--color-dark);
   --color-sidebar-border: var(--color-coyote);
   --color-sidebar-ring: var(--color-canyon);
+}
+
+@utility admin-dialog-height {
+  max-height: calc(100dvh - 2rem);
 }
 
 /* Utility Classes */
@@ -226,6 +243,58 @@ body:not(.admin-page) {
    miss it. Its actual shell is the reliable signal to cancel storefront offset. */
 body:has([data-admin-shell]) {
   padding-top: 0;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --color-background: #f6f5f3;
+  --color-foreground: #252522;
+  --color-card: #ffffff;
+  --color-card-foreground: #252522;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #252522;
+  --color-primary: #30302d;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #efeeeb;
+  --color-secondary-foreground: #30302d;
+  --color-muted: #efeeeb;
+  --color-muted-foreground: #656560;
+  --color-accent: #e9e8e4;
+  --color-accent-foreground: #252522;
+  --color-border: #deddd8;
+  --color-input: #deddd8;
+  --color-input-background: #ffffff;
+  --color-ring: #656560;
+  --color-sidebar: #eeede9;
+  --color-sidebar-foreground: #30302d;
+  --color-sidebar-primary: #30302d;
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: #deddd8;
+  --color-sidebar-accent-foreground: #252522;
+  --color-sidebar-border: #deddd8;
+  --color-sidebar-ring: #656560;
+}
+
+[data-admin-shell] [data-slot="card"] {
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+
+@layer base {
+  :where(body:has([data-admin-shell])) *,
+  :where(body:has([data-admin-shell])) *::before,
+  :where(body:has([data-admin-shell])) *::after {
+    border-color: var(--color-border);
+  }
+}
+
+@media (max-width: 767px) {
+  body:has([data-admin-shell]) [data-slot="button"],
+  body:has([data-admin-shell]) [data-slot="select-trigger"] {
+    min-height: 2.75rem;
+  }
 }
 
 /* Mini Cart Styles */

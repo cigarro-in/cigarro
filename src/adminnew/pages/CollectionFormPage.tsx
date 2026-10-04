@@ -77,7 +77,6 @@ export function CollectionFormPage() {
       const max = Math.max(0, ...collectionRows.map((c: any) => c.sortOrder ?? 0));
       setFormData((prev) => ({ ...prev, display_order: max + 1 }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, collectionRows]);
 
   // Populate once from the Convex admin list (carries linked product ids).
@@ -102,7 +101,6 @@ export function CollectionFormPage() {
     });
     setSelectedProductIds(data.productSupabaseIds || []);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionRows]);
 
   useEffect(() => {
@@ -190,14 +188,14 @@ export function CollectionFormPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-16">
       {/* Header */}
       <PageHeader
         title={formData.title || 'Untitled Collection'}
@@ -215,7 +213,7 @@ export function CollectionFormPage() {
             variant="destructive" 
             onClick={handleDelete}
             disabled={saving}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-destructive hover:bg-destructive text-white"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
@@ -224,7 +222,6 @@ export function CollectionFormPage() {
         <Button 
           onClick={handleSubmit} 
           disabled={saving || !isDirty}
-          className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
         >
           {saving ? (
             <>
@@ -240,14 +237,14 @@ export function CollectionFormPage() {
         </Button>
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="max-w-400 mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* LEFT COLUMN */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-4">
           {/* Basic Information */}
           <AdminCard>
             <AdminCardHeader>
@@ -257,45 +254,45 @@ export function CollectionFormPage() {
               
               {/* Title */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">
+                <Label className="text-foreground font-medium">
                   Title <Req />
                 </Label>
                 <Input
                   value={formData.title}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="e.g. Premium Selection"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)] text-lg py-6"
+                  className="bg-background border-border focus:ring-ring text-lg py-6"
                   aria-invalid={saveAttempted && isBlank(formData.title)}
                 />
                 <ReqError show={saveAttempted && isBlank(formData.title)} />
               </div>
 
               {/* Slug */}
-              <div className={`grid grid-cols-[auto_1fr] gap-2 items-center text-sm text-[var(--color-dark)]/60 bg-[var(--color-creme)]/50 p-3 rounded-md border border-[var(--color-coyote)]/30${saveAttempted && isBlank(formData.slug) ? ' border-red-500' : ''}`}>
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 items-center text-sm text-muted-foreground bg-background/50 p-3 rounded-md border border-border/30${saveAttempted && isBlank(formData.slug) ? ' border-destructive' : ''}`}>
                 <span className="font-medium">store.cigarro.in/collections/</span>
                 <input
                   value={formData.slug}
                   onChange={handleSlugChange}
-                  className="bg-transparent border-none focus:outline-none text-[var(--color-dark)] font-medium w-full"
+                  className="bg-transparent border-none focus:outline-none text-foreground font-medium w-full"
                   placeholder="collection-slug"
                 />
               </div>
 
               {/* Description */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Description</Label>
+                <Label className="text-foreground font-medium">Description</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => handleChange({ description: e.target.value })}
                   placeholder="Describe the collection..."
                   rows={4}
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                  className="bg-background border-border focus:ring-ring"
                 />
               </div>
 
               {/* Image */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Collection Image</Label>
+                <Label className="text-foreground font-medium">Collection Image</Label>
                 <SingleImagePicker
                   value={formData.image_url[0] || null}
                   onChange={(url) => handleChange({ image_url: url ? [url] : [] })}
@@ -305,13 +302,13 @@ export function CollectionFormPage() {
 
               {/* Display Order */}
               <div className="space-y-2">
-                <Label className="text-[var(--color-dark)] font-medium">Display Order</Label>
+                <Label className="text-foreground font-medium">Display Order</Label>
                 <Input
                   type="number"
                   value={formData.display_order}
                   onChange={(e) => handleChange({ display_order: parseInt(e.target.value) || 1 })}
                   placeholder="1"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)] focus:ring-[var(--color-canyon)]"
+                  className="bg-background border-border focus:ring-ring"
                 />
               </div>
             </AdminCardContent>
@@ -343,7 +340,7 @@ export function CollectionFormPage() {
                   value={formData.meta_title}
                   onChange={(e) => handleChange({ meta_title: e.target.value })}
                   placeholder="SEO title (defaults to collection title)"
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  className="bg-background border-border"
                 />
               </div>
 
@@ -355,7 +352,7 @@ export function CollectionFormPage() {
                   onChange={(e) => handleChange({ meta_description: e.target.value })}
                   placeholder="SEO description"
                   rows={3}
-                  className="bg-[var(--color-creme)] border-[var(--color-coyote)]"
+                  className="bg-background border-border"
                 />
               </div>
             </AdminCardContent>
@@ -363,7 +360,7 @@ export function CollectionFormPage() {
         </div>
 
         {/* RIGHT COLUMN */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-4">
           {/* Status */}
           <AdminCard>
             <AdminCardHeader>
@@ -373,7 +370,7 @@ export function CollectionFormPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Active</Label>
-                  <p className="text-sm text-gray-500">Collection is visible to customers</p>
+                  <p className="text-sm text-muted-foreground">Collection is visible to customers</p>
                 </div>
                 <Switch
                   checked={formData.is_active}
@@ -391,7 +388,7 @@ export function CollectionFormPage() {
             <AdminCardContent>
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
                     {formData.image_url[0] ? (
                       <img
                         src={formData.image_url[0]}
@@ -400,15 +397,15 @@ export function CollectionFormPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <LayoutGrid className="h-6 w-6 text-gray-400" />
+                        <LayoutGrid className="h-6 w-6 text-muted-foreground" />
                       </div>
                     )}
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-foreground">
                       {formData.title || 'Collection Title'}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-muted-foreground">
                       {formData.description || 'Collection description'}
                     </div>
                   </div>

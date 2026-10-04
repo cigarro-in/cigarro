@@ -62,9 +62,9 @@ export function CustomersPage() {
       label: 'Customer',
       render: (name: string, customer: Customer) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
+          <div className="font-medium text-foreground">{name}</div>
           {customer.phone && (
-            <div className="text-sm text-gray-500 flex items-center">
+            <div className="text-sm text-muted-foreground flex items-center">
               <Phone className="w-3 h-3 mr-1" />
               {customer.phone}
             </div>
@@ -78,20 +78,20 @@ export function CustomersPage() {
       render: (count: number) => (
         <div className="text-center">
           <div className="font-medium">{count}</div>
-          <div className="text-xs text-gray-500">orders</div>
+          <div className="text-xs text-muted-foreground">orders</div>
         </div>
       )
     },
     {
       key: 'totalSpent',
-      label: 'Total Spent',
+      label: 'Spent (shown)',
       render: (amount: number) => (
         <div className="font-medium">{formatINR(amount)}</div>
       )
     },
     {
       key: 'averageOrderValue',
-      label: 'Avg. Order',
+      label: 'Avg. Order (shown)',
       render: (amount: number) => (
         <div className="text-sm">{formatINR(amount)}</div>
       )
@@ -115,7 +115,7 @@ export function CustomersPage() {
               Admin
             </Badge>
           ) : (
-            <span className="text-sm text-gray-500">Customer</span>
+            <span className="text-sm text-muted-foreground">Customer</span>
           )}
         </div>
       )
@@ -130,10 +130,10 @@ export function CustomersPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Customers"
-        description="Manage customer accounts"
+        description="Customer accounts · spend and orders shown from the current admin dataset"
         search={{
           value: searchTerm,
           onChange: setSearchTerm,
@@ -141,7 +141,7 @@ export function CustomersPage() {
         }}
       />
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-6 max-w-400 mx-auto space-y-6">
         <DataTable
           data={customers}
           columns={columns}

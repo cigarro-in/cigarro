@@ -29,23 +29,6 @@ import { paiseToRupees } from '../../lib/convex/money';
 type PaymentStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'late_paid' | 'refunded' | 'voided';
 type ShippingStatus = 'awaiting' | 'processing' | 'shipped' | 'delivered' | 'returned';
 
-const paymentBadge = (s: PaymentStatus) => {
-  if (s === 'paid' || s === 'late_paid') return 'bg-green-100 text-green-800';
-  if (s === 'pending') return 'bg-yellow-100 text-yellow-800';
-  if (s === 'refunded') return 'bg-gray-100 text-gray-800';
-  return 'bg-red-100 text-red-800';
-};
-
-const shippingBadge = (s?: ShippingStatus) => {
-  switch (s) {
-    case 'processing': return 'bg-blue-100 text-blue-800';
-    case 'shipped': return 'bg-purple-100 text-purple-800';
-    case 'delivered': return 'bg-green-100 text-green-800';
-    case 'returned': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
 const shippingIcon = (s?: ShippingStatus) => {
   switch (s) {
     case 'processing': return <Package className="w-4 h-4" />;
@@ -86,17 +69,17 @@ export function OrderFormPage() {
 
   if (order === undefined) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (order === null) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900">Order not found</h3>
+          <h3 className="text-lg font-medium text-foreground">Order not found</h3>
           <Button onClick={() => navigate('/admin/orders')} className="mt-4">
             Back to Orders
           </Button>
@@ -191,39 +174,39 @@ export function OrderFormPage() {
   const createdAt = new Date(order._creationTime);
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-20">
       <PageHeader
         title={`Order #${order.displayOrderId}`}
         description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()}`}
         backUrl="/admin/orders"
       >
-        <Badge className={paymentBadge(order.status as PaymentStatus)}>
+        <Badge variant="secondary">
           {order.status}
         </Badge>
         {shipStatus && (
-          <Badge className={shippingBadge(shipStatus)}>
+          <Badge variant="secondary">
             {shippingIcon(shipStatus)}
             <span className="ml-1">{shipStatus}</span>
           </Badge>
         )}
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6">
+      <div className="max-w-400 mx-auto px-6">
         <InlineStatus status={opStatus} />
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_360px] gap-6">
+      <div className="mx-auto grid max-w-400 gap-4 px-4 sm:px-6 lg:grid-cols-3">
         {/* LEFT */}
-        <div className="space-y-6">
+        <div className="flex min-w-0 flex-col gap-4">
           <AdminCard>
             <AdminCardHeader><AdminCardTitle>Customer</AdminCardTitle></AdminCardHeader>
             <AdminCardContent>
               <div className="font-medium">{order.address?.name || 'N/A'}</div>
-              <div className="text-sm text-gray-500 flex items-center">
+              <div className="text-sm text-muted-foreground flex items-center">
                 <Phone className="w-4 h-4 mr-2" />
                 {order.address?.phone || 'N/A'}
               </div>
-              <div className="text-xs text-gray-400 mt-1">User ID: {order.userId}</div>
+              <div className="text-xs text-muted-foreground mt-1">User ID: {order.userId}</div>
             </AdminCardContent>
           </AdminCard>
 
@@ -232,14 +215,14 @@ export function OrderFormPage() {
               <AdminCardHeader><AdminCardTitle>Shipping Address</AdminCardTitle></AdminCardHeader>
               <AdminCardContent>
                 <div className="flex items-start">
-                  <MapPin className="w-4 h-4 mr-2 mt-1 text-gray-400 shrink-0" />
+                  <MapPin className="w-4 h-4 mr-2 mt-1 text-muted-foreground shrink-0" />
                   <div>
                     <div className="font-medium">{order.address.name}</div>
-                    <div className="text-sm text-gray-600">{order.address.line1}</div>
+                    <div className="text-sm text-muted-foreground">{order.address.line1}</div>
                     {order.address.line2 && (
-                      <div className="text-sm text-gray-600">{order.address.line2}</div>
+                      <div className="text-sm text-muted-foreground">{order.address.line2}</div>
                     )}
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {order.address.city}, {order.address.state} {order.address.pincode}
                     </div>
                   </div>
@@ -254,7 +237,7 @@ export function OrderFormPage() {
               <div className="space-y-4">
                 {order.items.map((item, idx) => (
                   <div key={idx} className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                       {(item as any).image ? (
                         <img
                           src={getProductImageUrl((item as any).image)}
@@ -263,21 +246,21 @@ export function OrderFormPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Package className="h-5 w-5 text-gray-400" />
+                        <Package className="h-5 w-5 text-muted-foreground" />
                       )}
                     </div>
                     <div className="flex-1">
                       <div className="font-medium">{item.name}</div>
                       {item.variantId && (
-                        <div className="text-xs text-gray-500">Variant: {item.variantId}</div>
+                        <div className="text-xs text-muted-foreground">Variant: {item.variantId}</div>
                       )}
-                      <div className="text-sm text-gray-500">Qty: {item.qty}</div>
+                      <div className="text-sm text-muted-foreground">Qty: {item.qty}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium">
                         {formatINR(paiseToRupees(item.unitPricePaise * item.qty))}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         {formatINR(paiseToRupees(item.unitPricePaise))} each
                       </div>
                     </div>
@@ -292,8 +275,8 @@ export function OrderFormPage() {
               <AdminCardHeader><AdminCardTitle>Tracking</AdminCardTitle></AdminCardHeader>
               <AdminCardContent>
                 {(order as any).shippingMethod && (
-                  <div className="flex justify-between text-sm pb-3 mb-1 border-b border-gray-100">
-                    <span className="text-gray-600">Delivery option</span>
+                  <div className="flex justify-between text-sm pb-3 mb-1 border-b border-border">
+                    <span className="text-muted-foreground">Delivery option</span>
                     <span className="font-medium capitalize">
                       {(order as any).shippingMethod}
                       {(order as any).shippingPricePaise != null && (order as any).shippingPricePaise > 0
@@ -329,13 +312,13 @@ export function OrderFormPage() {
         </div>
 
         {/* RIGHT */}
-        <div className="space-y-6">
+        <div className="flex min-w-0 flex-col gap-4">
           <AdminCard>
             <AdminCardHeader><AdminCardTitle>Payment Actions</AdminCardTitle></AdminCardHeader>
             <AdminCardContent className="space-y-2">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Payment status</span>
-                <Badge className={paymentBadge(order.status as PaymentStatus)}>
+                <span className="text-muted-foreground">Payment status</span>
+                <Badge variant="secondary">
                   {order.status}
                 </Badge>
               </div>
@@ -344,7 +327,7 @@ export function OrderFormPage() {
                   <Button onClick={handleMarkPaid} disabled={saving} className="w-full">
                     <CheckCircle2 className="w-4 h-4 mr-2" /> Mark Paid
                   </Button>
-                  <Button onClick={handleVoid} disabled={saving} variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50">
+                  <Button onClick={handleVoid} disabled={saving} variant="outline" className="w-full border-border text-destructive hover:bg-muted">
                     <Ban className="w-4 h-4 mr-2" /> Void Order
                   </Button>
                 </>
@@ -360,7 +343,7 @@ export function OrderFormPage() {
                 </>
               )}
               {isTerminal && (
-                <p className="text-sm text-gray-500">Order is in a terminal state; no payment actions available.</p>
+                <p className="text-sm text-muted-foreground">Order is in a terminal state; no payment actions available.</p>
               )}
             </AdminCardContent>
           </AdminCard>
@@ -370,8 +353,8 @@ export function OrderFormPage() {
               <AdminCardHeader><AdminCardTitle>Shipping Status</AdminCardTitle></AdminCardHeader>
               <AdminCardContent className="space-y-2">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Current</span>
-                  <Badge className={shippingBadge(shipStatus)}>
+                  <span className="text-muted-foreground">Current</span>
+                  <Badge variant="secondary">
                     {shippingIcon(shipStatus)}<span className="ml-1">{shipStatus || 'awaiting'}</span>
                   </Badge>
                 </div>
@@ -391,10 +374,10 @@ export function OrderFormPage() {
                   </Button>
                 )}
                 {shipStatus === 'delivered' && (
-                  <p className="text-sm text-green-700">Delivered {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString() : ''}</p>
+                  <p className="text-sm text-success">Delivered {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString() : ''}</p>
                 )}
                 {shipStatus !== 'returned' && shipStatus !== 'delivered' && (
-                  <Button onClick={() => handleShipStatus('returned')} disabled={saving} variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50">
+                  <Button onClick={() => handleShipStatus('returned')} disabled={saving} variant="outline" className="w-full border-border text-destructive hover:bg-muted">
                     Mark Returned
                   </Button>
                 )}
@@ -406,13 +389,13 @@ export function OrderFormPage() {
             <AdminCardHeader><AdminCardTitle>Summary</AdminCardTitle></AdminCardHeader>
             <AdminCardContent>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal</span>
+                <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatINR(subtotal)}</span>
               </div>
               {walletUsed > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Wallet used</span>
-                  <span className="text-green-600">-{formatINR(walletUsed)}</span>
+                  <span className="text-muted-foreground">Wallet used</span>
+                  <span className="text-success">-{formatINR(walletUsed)}</span>
                 </div>
               )}
               <Separator />
@@ -427,22 +410,22 @@ export function OrderFormPage() {
             <AdminCardHeader><AdminCardTitle>Payment Info</AdminCardTitle></AdminCardHeader>
             <AdminCardContent className="space-y-1">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Method</span>
+                <span className="text-muted-foreground">Method</span>
                 <span className="flex items-center gap-1"><CreditCard className="w-3 h-3" /> UPI</span>
               </div>
               {order.verificationMethod && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Verified via</span>
+                  <span className="text-muted-foreground">Verified via</span>
                   <span>{order.verificationMethod}</span>
                 </div>
               )}
               {order.paidAt && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Paid at</span>
+                  <span className="text-muted-foreground">Paid at</span>
                   <span>{new Date(order.paidAt).toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between text-xs text-gray-500 mt-2">
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
                 <span>Amount w/ slot offset</span>
                 <span className="font-mono">{formatINR(paiseToRupees(order.finalAmountPaise))}</span>
               </div>

@@ -109,8 +109,8 @@ export function ReviewsPage() {
       label: 'Product',
       render: (_: any, r: ReviewRow) => (
         <div>
-          <div className="font-medium text-gray-900">{r.productName}</div>
-          <div className="text-xs text-gray-500">
+          <div className="font-medium text-foreground">{r.productName}</div>
+          <div className="text-xs text-muted-foreground">
             {r.userName} · {new Date(r.createdAt).toLocaleDateString()}
           </div>
         </div>
@@ -121,7 +121,7 @@ export function ReviewsPage() {
       label: 'Rating',
       render: (rating: number) => (
         <span className="inline-flex items-center gap-1">
-          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+          <Star className="w-4 h-4 fill-sunflower text-sunflower" />
           {rating}
         </span>
       )
@@ -132,7 +132,7 @@ export function ReviewsPage() {
       render: (_: any, r: ReviewRow) => (
         <div className="max-w-md">
           {r.title && <div className="font-medium text-sm">{r.title}</div>}
-          <div className="text-sm text-gray-600 line-clamp-3">{r.comment || '—'}</div>
+          <div className="text-sm text-muted-foreground line-clamp-3">{r.comment || '—'}</div>
         </div>
       )
     },
@@ -140,7 +140,7 @@ export function ReviewsPage() {
       key: 'isApproved',
       label: 'Status',
       render: (approved: boolean) => (
-        <Badge className={approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+        <Badge className={approved ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
           {approved ? 'Approved' : 'Pending'}
         </Badge>
       )
@@ -148,7 +148,7 @@ export function ReviewsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Reviews"
         description="Moderate customer reviews"
@@ -170,14 +170,14 @@ export function ReviewsPage() {
         </div>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-6 max-w-400 mx-auto space-y-6">
         <InlineStatus status={opStatus} />
         <div>
           <Button size="sm" onClick={() => { setSaveAttempted(false); setShowForm((s) => !s); }}>
             <Plus className="w-4 h-4 mr-1" /> Add review
           </Button>
           {showForm && (
-            <div className="mt-3 max-w-xl space-y-3 rounded-lg border border-[var(--color-coyote)]/30 bg-[var(--color-creme-light)] p-4">
+            <div className="mt-3 max-w-xl space-y-3 rounded-lg border border-border/30 bg-card p-4">
               <div>
                 <p className="text-xs font-medium mb-1">Product <Req /></p>
                 <Select value={form.productId} onValueChange={(v) => set({ productId: v })}>
@@ -197,13 +197,13 @@ export function ReviewsPage() {
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button key={n} type="button" onClick={() => set({ rating: n })} aria-label={`${n} stars`}>
-                    <Star className={`w-6 h-6 ${n <= form.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+                    <Star className={`w-6 h-6 ${n <= form.rating ? 'fill-sunflower text-sunflower' : 'text-border'}`} />
                   </button>
                 ))}
               </div>
-              <Input placeholder="Name (blank = Cigarro Team)" value={form.userName} onChange={(e) => set({ userName: e.target.value })} />
-              <Input placeholder="Title (optional)" value={form.title} onChange={(e) => set({ title: e.target.value })} />
-              <Textarea placeholder="Review (optional)" value={form.comment} onChange={(e) => set({ comment: e.target.value })} />
+              <label className="grid gap-1 text-xs font-medium">Reviewer name <Input aria-label="Reviewer name" placeholder="Cigarro Team" value={form.userName} onChange={(e) => set({ userName: e.target.value })} /></label>
+              <label className="grid gap-1 text-xs font-medium">Title <Input aria-label="Review title" placeholder="Optional" value={form.title} onChange={(e) => set({ title: e.target.value })} /></label>
+              <label className="grid gap-1 text-xs font-medium">Review <Textarea aria-label="Review comment" placeholder="Optional" value={form.comment} onChange={(e) => set({ comment: e.target.value })} /></label>
               <div className="flex gap-2">
                 <Button size="sm" onClick={submit}>Save review</Button>
                 <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>

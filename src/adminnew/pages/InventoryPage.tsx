@@ -15,6 +15,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 
 type InventoryRow = {
   variantSupabaseId: string;
@@ -110,7 +111,7 @@ export function InventoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-16">
+    <div className="min-h-screen bg-background pb-16">
       <PageHeader
         title="Inventory"
         description="Live stock across online and offline sales"
@@ -121,10 +122,10 @@ export function InventoryPage() {
         </Button>
       </PageHeader>
 
-      <div className="mx-auto max-w-[1600px] space-y-5 px-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
-        {savedMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{savedMessage}</div>}
-        <div className="grid gap-4 sm:grid-cols-3">
+        {savedMessage && <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">{savedMessage}</div>}
+        <div className="grid gap-3 sm:grid-cols-3">
           <Metric icon={PackageCheck} label="Available to sell" value={totalAvailable} />
           <Metric icon={Boxes} label="Reserved online" value={totalReserved} />
           <Metric icon={AlertTriangle} label="Low stock variants" value={lowCount} danger={lowCount > 0} />
@@ -132,29 +133,27 @@ export function InventoryPage() {
 
         <AdminCard>
           <AdminCardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-[var(--color-coyote)]/20 bg-[var(--color-coyote)]/5 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <tr><th className="px-4 py-3">Product</th><th className="px-4 py-3 text-right">On hand</th><th className="px-4 py-3 text-right">Reserved</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-coyote)]/15">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-transparent"><TableHead>Product</TableHead><TableHead className="text-right">On hand</TableHead><TableHead className="text-right">Reserved</TableHead><TableHead className="text-right">Available</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
                   {rows === undefined ? (
-                    <tr><td colSpan={6} className="px-4 py-16 text-center text-gray-500">Loading inventory…</td></tr>
+                    <TableRow><TableCell colSpan={6} className="py-16 text-center text-muted-foreground">Loading inventory…</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-16 text-center text-gray-500"><Search className="mx-auto mb-2 h-6 w-6" />No matching inventory</td></tr>
+                    <TableRow><TableCell colSpan={6} className="py-16 text-center text-muted-foreground"><Search className="mx-auto mb-2 size-5" />No matching inventory</TableCell></TableRow>
                   ) : filtered.map((row) => (
-                    <tr key={row.variantSupabaseId} className="hover:bg-white/50">
-                      <td className="px-4 py-3"><div className="font-medium text-[var(--color-dark)]">{row.productName}</div><div className="text-xs text-gray-500">{row.variantName}</div></td>
-                      <td className="px-4 py-3 text-right font-mono">{row.trackInventory ? row.onHand : '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono text-amber-700">{row.trackInventory ? row.reserved : '—'}</td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold">{row.trackInventory ? row.available : '∞'}</td>
-                      <td className="px-4 py-3">{!row.trackInventory ? <Badge variant="secondary">Not tracked</Badge> : row.available < 0 ? <Badge variant="destructive">Oversold · {Math.abs(row.available)} short</Badge> : row.available === 0 ? <Badge variant="destructive">Out of stock</Badge> : row.lowStock ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Low · reorder at {row.reorderPoint}</Badge> : <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Healthy</Badge>}</td>
-                      <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setHistoryFor(row)}><History className="mr-1 h-4 w-4" />History</Button>{row.trackInventory && <Button size="sm" variant="outline" onClick={() => openEdit(row)}><Pencil className="mr-1 h-4 w-4" />Adjust</Button>}</div></td>
-                    </tr>
+                    <TableRow key={row.variantSupabaseId}>
+                      <TableCell><div className="font-medium">{row.productName}</div><div className="text-xs text-muted-foreground">{row.variantName}</div></TableCell>
+                      <TableCell className="text-right font-mono">{row.trackInventory ? row.onHand : '—'}</TableCell>
+                      <TableCell className="text-right font-mono">{row.trackInventory ? row.reserved : '—'}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold">{row.trackInventory ? row.available : '∞'}</TableCell>
+                      <TableCell>{!row.trackInventory ? <Badge variant="secondary">Not tracked</Badge> : row.available < 0 ? <Badge variant="destructive">Oversold · {Math.abs(row.available)} short</Badge> : row.available === 0 ? <Badge variant="destructive">Out of stock</Badge> : row.lowStock ? <Badge variant="outline">Low · {row.reorderPoint}</Badge> : <Badge variant="secondary">Healthy</Badge>}</TableCell>
+                      <TableCell><div className="flex justify-end gap-1"><Button size="sm" variant="ghost" onClick={() => setHistoryFor(row)}><History data-icon="inline-start" />History</Button>{row.trackInventory && <Button size="sm" variant="outline" onClick={() => openEdit(row)}><Pencil data-icon="inline-start" />Adjust</Button>}</div></TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+              </TableBody>
+            </Table>
           </AdminCardContent>
         </AdminCard>
       </div>
@@ -162,7 +161,7 @@ export function InventoryPage() {
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Adjust inventory</DialogTitle></DialogHeader>
-          <p className="text-sm text-gray-600">{editing?.productName} · {editing?.variantName}</p>
+          <p className="text-sm text-muted-foreground">{editing?.productName} · {editing?.variantName}</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>On-hand quantity</Label><Input type="number" min={editing?.reserved ?? 0} step="1" value={targetOnHand} onChange={(e) => setTargetOnHand(Number(e.target.value))} /></div>
             <div className="space-y-2"><Label>Low-stock alert at</Label><Input type="number" min="0" step="1" value={reorderPoint} onChange={(e) => setReorderPoint(Number(e.target.value))} /></div>
@@ -176,12 +175,12 @@ export function InventoryPage() {
       <Dialog open={!!historyFor} onOpenChange={(open) => !open && setHistoryFor(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Movement history</DialogTitle></DialogHeader>
-          <p className="text-sm text-gray-600">{historyFor?.productName} · {historyFor?.variantName}</p>
-          <div className="max-h-[55vh] divide-y overflow-y-auto">
-            {history === undefined ? <p className="py-8 text-center text-sm text-gray-500">Loading…</p> : history.length === 0 ? <p className="py-8 text-center text-sm text-gray-500">No movements yet</p> : history.map((item: any) => (
+          <p className="text-sm text-muted-foreground">{historyFor?.productName} · {historyFor?.variantName}</p>
+          <div className="max-h-96 divide-y overflow-y-auto">
+            {history === undefined ? <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p> : history.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No movements yet</p> : history.map((item: any) => (
               <div key={item._id} className="flex items-center justify-between py-3 text-sm">
-                <div><div className="font-medium">{movementLabels[item.type] ?? item.type}</div><div className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString('en-IN')}{item.note ? ` · ${item.note}` : ''}</div></div>
-                <div className="text-right"><div className={item.quantityDelta > 0 ? 'font-semibold text-emerald-700' : item.quantityDelta < 0 ? 'font-semibold text-red-700' : 'font-semibold text-amber-700'}>{item.quantityDelta > 0 ? '+' : ''}{item.quantityDelta || (item.reservedDelta > 0 ? `Reserved ${item.reservedDelta}` : `Released ${Math.abs(item.reservedDelta)}`)}</div><div className="text-xs text-gray-500">On hand: {item.onHandAfter} · Reserved: {item.reservedAfter}</div></div>
+                <div><div className="font-medium">{movementLabels[item.type] ?? item.type}</div><div className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString('en-IN')}{item.note ? ` · ${item.note}` : ''}</div></div>
+                <div className="text-right"><div className={item.quantityDelta > 0 ? 'font-semibold text-success' : item.quantityDelta < 0 ? 'font-semibold text-destructive' : 'font-semibold text-primary'}>{item.quantityDelta > 0 ? '+' : ''}{item.quantityDelta || (item.reservedDelta > 0 ? `Reserved ${item.reservedDelta}` : `Released ${Math.abs(item.reservedDelta)}`)}</div><div className="text-xs text-muted-foreground">On hand: {item.onHandAfter} · Reserved: {item.reservedAfter}</div></div>
               </div>
             ))}
           </div>
@@ -192,5 +191,5 @@ export function InventoryPage() {
 }
 
 function Metric({ icon: Icon, label, value, danger }: { icon: typeof Boxes; label: string; value: number; danger?: boolean }) {
-  return <AdminCard><AdminCardContent className="flex items-center gap-4 py-5"><div className={`rounded-xl p-3 ${danger ? 'bg-red-100 text-red-700' : 'bg-[var(--color-canyon)]/10 text-[var(--color-canyon)]'}`}><Icon className="h-5 w-5" /></div><div><div className="text-2xl font-bold">{value.toLocaleString('en-IN')}</div><div className="text-sm text-gray-500">{label}</div></div></AdminCardContent></AdminCard>;
+  return <AdminCard><AdminCardContent className="flex items-center gap-3 py-4"><div className={`rounded-md p-2 ${danger ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}><Icon className="size-4" /></div><div><div className="text-xl font-semibold">{value.toLocaleString('en-IN')}</div><div className="text-xs text-muted-foreground">{label}</div></div></AdminCardContent></AdminCard>;
 }

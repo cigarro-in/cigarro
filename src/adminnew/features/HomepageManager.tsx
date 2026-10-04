@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/button';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
@@ -137,7 +138,7 @@ function SectionRow({
   const linked = LINKABLE_SECTIONS.has(name) && !!component.section_id;
   const showTitle = SECTION_TITLE_ROWS.includes(name) && name !== 'hero_section' && !linked;
   if (row === undefined && showTitle) {
-    return <div className="h-16 animate-pulse bg-[var(--color-creme)] border border-[var(--color-coyote)]/30 rounded-lg" />;
+    return <div className="h-16 animate-pulse bg-background border border-border/30 rounded-lg" />;
   }
   const current = draft ?? (row?.title || '');
   const dirty = draft !== null && draft.trim() !== (row?.title || '');
@@ -155,15 +156,15 @@ function SectionRow({
     }
   };
   return (
-    <div className="p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] space-y-3">
+    <div className="p-3 border border-border/30 rounded-lg bg-background space-y-3">
       <InlineStatus status={rowStatus} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {sectionIcon(name)}
           <div>
-            <h3 className="font-medium text-[var(--color-dark)]">{sectionLabel(name)}</h3>
+            <h3 className="font-medium text-foreground">{sectionLabel(name)}</h3>
             {linked && component.section && (
-              <p className="text-sm text-[var(--color-dark)]/60">
+              <p className="text-sm text-muted-foreground">
                 Collection: {component.section.title}
               </p>
             )}
@@ -182,7 +183,7 @@ function SectionRow({
 
       {showTitle && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">
             Heading:
           </label>
           <input
@@ -190,7 +191,7 @@ function SectionRow({
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void saveTitle(); }}
             placeholder={SECTION_FALLBACK_TITLES[name] || name}
-            className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
+            className="flex-1 text-sm border border-border/30 rounded-md px-2 py-1.5 bg-white"
           />
           <Button variant="outline" size="sm" disabled={!dirty || saving} onClick={() => void saveTitle()}>
             {saving ? 'Saving…' : 'Save'}
@@ -200,21 +201,20 @@ function SectionRow({
 
       {LINKABLE_SECTIONS.has(name) && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--color-dark)]/60 whitespace-nowrap">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">
             Collection:
           </label>
-          <select
-            value={component.section_id || ''}
-            onChange={(e) => onLink(name, e.target.value)}
-            className="flex-1 text-sm border border-[var(--color-coyote)]/30 rounded-md px-2 py-1.5 bg-white"
-          >
-            <option value="">— Latest products (default) —</option>
+          <Select value={component.section_id || 'latest'} onValueChange={(value) => onLink(name, value === 'latest' ? '' : value)}>
+            <SelectTrigger className="flex-1"><SelectValue placeholder="Latest products (default)" /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="latest">Latest products (default)</SelectItem>
             {collectionRows.map((c: any) => (
-              <option key={c.supabaseId} value={c.supabaseId}>
+              <SelectItem key={c.supabaseId} value={c.supabaseId}>
                 {c.title}{c.isActive === false ? ' (inactive)' : ''}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={onManage}>
             <Eye className="h-3 w-3 mr-1" />
             Manage
@@ -384,14 +384,14 @@ export function HomepageManager() {
   const activeSlides = heroSlides.filter(s => s.is_active).length;
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader
         title="Homepage Manager"
         description="Manage hero slides and homepage sections"
       >
       </PageHeader>
 
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-6 space-y-6 max-w-400 mx-auto">
         <InlineStatus status={opStatus} />
         {/* Hero Slides Section */}
         <AdminCard>
@@ -403,7 +403,7 @@ export function HomepageManager() {
             <Button 
               onClick={() => navigate('/admin/hero-slides/new')}
               size="sm"
-              className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Slide
@@ -412,11 +412,11 @@ export function HomepageManager() {
           <AdminCardContent>
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-canyon)]" />
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
               </div>
             ) : heroSlides.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Image className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <div className="text-center py-8 text-muted-foreground">
+                <Image className="mx-auto h-12 w-12 text-border mb-4" />
                 <p>No hero slides yet</p>
                 <Button 
                   onClick={() => navigate('/admin/hero-slides/new')}
@@ -431,7 +431,7 @@ export function HomepageManager() {
                 {heroSlides.map((slide, index) => (
                   <div 
                     key={slide.id}
-                    className="flex items-center gap-4 p-3 border border-[var(--color-coyote)]/30 rounded-lg bg-[var(--color-creme)] hover:bg-[var(--color-creme-light)] transition-colors"
+                    className="flex items-center gap-4 p-3 border border-border/30 rounded-lg bg-background hover:bg-card transition-colors"
                   >
                     {/* Order Controls */}
                     <div className="flex flex-col gap-1">
@@ -456,7 +456,7 @@ export function HomepageManager() {
                     </div>
 
                     {/* Image Preview */}
-                    <div className="w-24 h-14 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="w-24 h-14 rounded overflow-hidden bg-muted flex-shrink-0">
                       {slide.image_url ? (
                         <img
                           src={slide.image_url}
@@ -465,7 +465,7 @@ export function HomepageManager() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Image className="h-6 w-6 text-gray-400" />
+                          <Image className="h-6 w-6 text-muted-foreground" />
                         </div>
                       )}
                     </div>
@@ -473,7 +473,7 @@ export function HomepageManager() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-[var(--color-dark)] truncate">
+                        <h3 className="font-medium text-foreground truncate">
                           {slide.title}
                         </h3>
                         <Badge variant={slide.is_active ? 'default' : 'secondary'} className="text-xs">
@@ -481,7 +481,7 @@ export function HomepageManager() {
                         </Badge>
                       </div>
                       {slide.subtitle && (
-                        <p className="text-sm text-[var(--color-dark)]/60 truncate">
+                        <p className="text-sm text-muted-foreground truncate">
                           {slide.subtitle}
                         </p>
                       )}
@@ -504,7 +504,7 @@ export function HomepageManager() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteSlide(slide.id, slide.title)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -525,7 +525,7 @@ export function HomepageManager() {
             </AdminCardTitle>
           </AdminCardHeader>
           <AdminCardContent>
-            <p className="text-sm text-[var(--color-dark)]/60 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Toggle sections on/off and edit their headings. Link a product
               section to a Collection to drive its title + products from it —
               linked sections use the collection&apos;s name, so the title field
@@ -533,7 +533,7 @@ export function HomepageManager() {
             </p>
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-canyon)]" />
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
               </div>
             ) : (
               <div className="space-y-3">

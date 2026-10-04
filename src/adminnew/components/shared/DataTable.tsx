@@ -1,5 +1,7 @@
-import { Loader2 } from 'lucide-react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { Checkbox } from '../../../components/ui/checkbox';
+import { Empty, EmptyHeader, EmptyTitle } from '../../../components/ui/empty';
+import { Skeleton } from '../../../components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -8,12 +10,14 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
+import { cn } from '../../../components/ui/utils';
 import { AdminCard, AdminCardContent } from './AdminCard';
 
 interface Column<T> {
   key: string;
   label: string;
-  render?: (value: any, item: T) => React.ReactNode;
+  render?: (value: any, item: T) => ReactNode;
+  align?: 'left' | 'right';
 }
 
 export interface BulkAction {
@@ -31,6 +35,8 @@ interface DataTableProps<T extends { id: string }> {
   onSelectionChange?: (ids: string[]) => void;
   onRowClick?: (item: T) => void;
   searchTerm?: string;
+  searchText?: (item: T) => string;
+  emptyLabel?: string;
 }
 
 export function DataTable<T extends { id: string }>({
@@ -41,91 +47,116 @@ export function DataTable<T extends { id: string }>({
   onSelectionChange,
   onRowClick,
   searchTerm,
+  searchText,
+  emptyLabel = 'No results',
 }: DataTableProps<T>) {
-  const filteredData = data.filter(item => {
-    if (!searchTerm) return true;
-    return columns.some(col => {
-      const value = (item as any)[col.key];
-      if (typeof value === 'string') {
-        return value.toLowerCase().includes(searchTerm.toLowerCase());
-      }
-      return false;
-    });
-  });
+  const normalizedSearch = searchTerm?.trim().toLowerCase();
+  const filteredData = normalizedSearch
+    ? data.filter((item) => {
+        const haystack = searchText
+          ? searchText(item)
+          : Object.values(item)
+              .filter((value) => typeof value === 'string' || typeof value === 'number')
+              .join(' ');
+        return haystack.toLowerCase().includes(normalizedSearch);
+      })
+    : data;
+
+  const visibleIds = filteredData.map((item) => item.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedItems.includes(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedItems.includes(id));
 
   const handleSelectAll = () => {
     if (!onSelectionChange) return;
-    if (selectedItems.length === filteredData.length) {
-      onSelectionChange([]);
-    } else {
-      onSelectionChange(filteredData.map(item => item.id));
+    if (allVisibleSelected) {
+      onSelectionChange(selectedItems.filter((id) => !visibleIds.includes(id)));
+      return;
     }
+    onSelectionChange(Array.from(new Set([...selectedItems, ...visibleIds])));
   };
 
   const handleSelectItem = (id: string) => {
     if (!onSelectionChange) return;
-    if (selectedItems.includes(id)) {
-      onSelectionChange(selectedItems.filter(i => i !== id));
-    } else {
-      onSelectionChange([...selectedItems, id]);
-    }
+    onSelectionChange(
+      selectedItems.includes(id)
+        ? selectedItems.filter((selectedId) => selectedId !== id)
+        : [...selectedItems, id],
+    );
   };
+
+  const activateRow = (event: KeyboardEvent<HTMLTableRowElement>, item: T) => {
+    if (event.target !== event.currentTarget) return;
+    if (!onRowClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    onRowClick(item);
+  };
+
+  const columnCount = columns.length + (onSelectionChange ? 1 : 0);
 
   return (
     <AdminCard>
       <AdminCardContent className="p-0">
         <Table>
-          <TableHeader className="bg-[var(--color-creme-light)] border-b border-[var(--color-coyote)]/20">
+          <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent">
               {onSelectionChange && (
-                <TableHead className="w-[50px]">
+                <TableHead className="w-12">
                   <Checkbox
-                    checked={selectedItems.length === filteredData.length && filteredData.length > 0}
+                    aria-label="Select visible rows"
+                    checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false}
                     onCheckedChange={handleSelectAll}
                   />
                 </TableHead>
               )}
-              {columns.map(col => (
-                <TableHead key={col.key} className="font-bold text-[var(--color-dark)]">{col.label}</TableHead>
+              {columns.map((column) => (
+                <TableHead key={column.key} className={cn(column.align === 'right' && 'text-right')}>
+                  {column.label}
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + (onSelectionChange ? 1 : 0)} className="h-24 text-center">
-                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading...
-                  </div>
-                </TableCell>
-              </TableRow>
+              [0, 1, 2, 3, 4].map((row) => (
+                <TableRow key={row}>
+                  <TableCell colSpan={columnCount}>
+                    <Skeleton className="h-8 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : filteredData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (onSelectionChange ? 1 : 0)} className="h-24 text-center text-muted-foreground">
-                  No items found.
+                <TableCell colSpan={columnCount}>
+                  <Empty className="min-h-40">
+                    <EmptyHeader>
+                      <EmptyTitle>{emptyLabel}</EmptyTitle>
+                    </EmptyHeader>
+                  </Empty>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredData.map(item => (
+              filteredData.map((item) => (
                 <TableRow
                   key={item.id}
-                  className={`${onRowClick ? 'cursor-pointer' : ''} hover:bg-muted/50`}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  className={cn(onRowClick && 'cursor-pointer')}
                   onClick={() => onRowClick?.(item)}
+                  onKeyDown={(event) => activateRow(event, item)}
                 >
                   {onSelectionChange && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell onClick={(event) => event.stopPropagation()}>
                       <Checkbox
+                        aria-label={`Select row ${item.id}`}
                         checked={selectedItems.includes(item.id)}
                         onCheckedChange={() => handleSelectItem(item.id)}
                       />
                     </TableCell>
                   )}
-                  {columns.map(col => (
-                    <TableCell key={col.key}>
-                      {col.render
-                        ? col.render((item as any)[col.key], item)
-                        : (item as any)[col.key]}
+                  {columns.map((column) => (
+                    <TableCell key={column.key} className={cn(column.align === 'right' && 'text-right')}>
+                      {column.render
+                        ? column.render((item as any)[column.key], item)
+                        : (item as any)[column.key]}
                     </TableCell>
                   ))}
                 </TableRow>

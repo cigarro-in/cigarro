@@ -49,7 +49,6 @@ export function PaymentsPage() {
     if (params.get('gmail') === 'connected') {
       navigate(location.pathname, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkInbox = useAction(api.gmail.triggerPoll);
@@ -111,11 +110,11 @@ export function PaymentsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader title="Payments" description="UPI payment operations">
         <div className="flex items-center gap-2">
           {checkNote && (
-            <span className="text-xs text-gray-600 max-w-[320px] truncate" title={checkNote}>
+            <span className="text-xs text-muted-foreground max-w-80 truncate" title={checkNote}>
               {checkNote}
             </span>
           )}
@@ -131,17 +130,17 @@ export function PaymentsPage() {
           </Button>
         </div>
       </PageHeader>
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
-        <div className="flex gap-2 border-b border-gray-200">
+        <div className="flex gap-1 overflow-x-auto border-b border-border">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                 tab === t.id
-                  ? 'border-[var(--color-dark)] text-[var(--color-dark)]'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {t.label}
@@ -189,15 +188,15 @@ function OverviewTab(props: {
       <AdminCard>
         <AdminCardHeader className="flex flex-row items-center justify-between">
           <AdminCardTitle className="text-base">Recent bank emails</AdminCardTitle>
-          <button onClick={props.onViewUnmatched} className="text-sm text-blue-600 hover:underline">
+          <button onClick={props.onViewUnmatched} className="text-sm text-info hover:underline">
             View unmatched
           </button>
         </AdminCardHeader>
         <AdminCardContent>
           {recentEmails === undefined ? (
-            <p className="text-sm text-gray-500">Loading…</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : recentEmails.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               No emails ingested yet. Click <b>Check inbox now</b> after a bank transaction.
             </p>
           ) : (
@@ -214,25 +213,25 @@ function OverviewTab(props: {
         <AdminCardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Pending Orders</h3>
-            <button onClick={props.onViewOrders} className="text-sm text-blue-600 hover:underline">
+            <button onClick={props.onViewOrders} className="text-sm text-info hover:underline">
               View all
             </button>
           </div>
           {recentOrders === undefined ? (
-            <p className="text-sm text-gray-500">Loading...</p>
+            <p className="text-sm text-muted-foreground">Loading...</p>
           ) : pending.length === 0 ? (
-            <p className="text-sm text-gray-500">No pending orders</p>
+            <p className="text-sm text-muted-foreground">No pending orders</p>
           ) : (
             <div className="space-y-2">
               {pending.map((o: any) => (
                 <div
                   key={o._id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 cursor-pointer"
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted cursor-pointer"
                   onClick={() => props.onOpenOrder(o._id)}
                 >
                   <div>
                     <p className="font-mono text-sm">#{o.displayOrderId}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {o.address?.name || 'Wallet load'} • {new Date(o._creationTime).toLocaleString()}
                     </p>
                   </div>
@@ -258,7 +257,7 @@ function UnmatchedTab(props: { emails: any[] | undefined }) {
     <div className="space-y-3">
       {emails === undefined && <p>Loading...</p>}
       {emails && emails.length === 0 && (
-        <AdminCard><AdminCardContent className="p-6 text-center text-gray-600">No unmatched emails</AdminCardContent></AdminCard>
+        <AdminCard><AdminCardContent className="p-6 text-center text-muted-foreground">No unmatched emails</AdminCardContent></AdminCard>
       )}
       {emails && emails.length > 0 && (
         <AdminCard>
@@ -276,13 +275,13 @@ function UnmatchedTab(props: { emails: any[] | undefined }) {
 function BankEmailRow({ email }: { email: any }) {
   const [open, setOpen] = useState(false);
   const statusColor =
-    email.status === 'matched' ? 'bg-green-100 text-green-800' :
-    email.status === 'duplicate' ? 'bg-yellow-100 text-yellow-800' :
-    email.status === 'no_match' ? 'bg-orange-100 text-orange-800' :
-    email.status === 'no_candidate' ? 'bg-amber-100 text-amber-800' :
-    email.status === 'parse_failed' ? 'bg-red-100 text-red-800' :
-    email.status === 'ignored' ? 'bg-gray-100 text-gray-500' :
-    'bg-gray-100 text-gray-800';
+    email.status === 'matched' ? 'bg-success-muted text-success' :
+    email.status === 'duplicate' ? 'bg-warning-muted text-warning' :
+    email.status === 'no_match' ? 'bg-warning-muted text-warning' :
+    email.status === 'no_candidate' ? 'bg-warning-muted text-warning' :
+    email.status === 'parse_failed' ? 'bg-destructive text-destructive-foreground' :
+    email.status === 'ignored' ? 'bg-muted text-muted-foreground' :
+    'bg-muted text-foreground';
   const statusHint =
     email.status === 'no_candidate' ? ' — no pending order within ₹2' :
     email.status === 'parse_failed' ? ' — amount unreadable, check template' :
@@ -302,32 +301,32 @@ function BankEmailRow({ email }: { email: any }) {
             </Badge>
           )}
         </div>
-        <div className="text-xs text-gray-600 truncate">
+        <div className="text-xs text-muted-foreground truncate">
           {email.senderEmail}
           {email.payerVpa && <span> · payer: <b>{email.payerVpa}</b></span>}
           {email.payerName && <span> ({email.payerName})</span>}
         </div>
         {email.upiRef && (
-          <div className="text-xs text-gray-500 font-mono truncate">
+          <div className="text-xs text-muted-foreground font-mono truncate">
             ref: {email.upiRef}
           </div>
         )}
         {email.subject && (
-          <div className="text-xs text-gray-500 italic truncate">{email.subject}</div>
+          <div className="text-xs text-muted-foreground italic truncate">{email.subject}</div>
         )}
         <button
           onClick={() => setOpen((v) => !v)}
-          className="mt-1 text-xs text-blue-600 hover:underline"
+          className="mt-1 text-xs text-info hover:underline"
         >
           {open ? 'Hide full email' : 'View full email'}
         </button>
         {open && email.rawBody && (
-          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words max-h-96 overflow-auto rounded border bg-gray-50 p-3 font-mono">
+          <pre className="mt-2 text-xs text-foreground whitespace-pre-wrap break-words max-h-96 overflow-auto rounded border bg-muted p-3 font-mono">
             {email.rawBody}
           </pre>
         )}
       </div>
-      <div className="text-xs text-gray-500 shrink-0">
+      <div className="text-xs text-muted-foreground shrink-0">
         {new Date(email.receivedAt ?? email._creationTime).toLocaleString('en-IN', {
           day: 'numeric',
           month: 'short',
@@ -427,7 +426,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
   if (settings === undefined) return <p>Loading...</p>;
 
   return (
-    <div className="max-w-[720px] space-y-4">
+    <div className="max-w-180 space-y-4">
       <InlineStatus status={settingsStatus} />
       <GmailConnectionCard
         status={gmailStatus}
@@ -447,7 +446,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
               aria-invalid={saveAttempted && isBlank(upiVpa)}
             />
             <ReqError show={saveAttempted && isBlank(upiVpa)} />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               This is the VPA embedded in the UPI deep-link customers see.
             </p>
           </div>
@@ -458,7 +457,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
           <div className="flex items-center justify-between">
             <div>
               <Label>Lucky Discount</Label>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 1–99p fingerprint for exact-amount matching. Only needed at high traffic — off = exact rupee totals.
               </p>
             </div>
@@ -468,7 +467,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
             <Button onClick={handleSaveGeneral} disabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </Button>
-            {savedNote && <span className="text-xs text-green-700">{savedNote}</span>}
+            {savedNote && <span className="text-xs text-success">{savedNote}</span>}
           </div>
         </AdminCardContent>
       </AdminCard>
@@ -498,7 +497,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
               <ReqError show={saveAttempted && slotMinBad}>
                 Must be between 1 and 60 minutes
               </ReqError>
-              <p className="text-xs text-gray-500 mt-1">How long a UPI slot is held (1–60 min).</p>
+              <p className="text-xs text-muted-foreground mt-1">How long a UPI slot is held (1–60 min).</p>
             </div>
             <div>
               <Label>Quarantine (minutes) <Req /></Label>
@@ -513,7 +512,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
               <ReqError show={saveAttempted && quarantineBad}>
                 Must be between 0 and 1440 minutes
               </ReqError>
-              <p className="text-xs text-gray-500 mt-1">Late-arrival grace window after expiry.</p>
+              <p className="text-xs text-muted-foreground mt-1">Late-arrival grace window after expiry.</p>
             </div>
             <div>
               <Label>Slots Per Base Amount <Req /></Label>
@@ -528,7 +527,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
               <ReqError show={saveAttempted && slotsBad}>
                 Must be a whole number between 10 and 1000
               </ReqError>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Unique paise offsets. Higher = more concurrent orders at same base.
               </p>
             </div>
@@ -612,7 +611,7 @@ function GmailConnectionCard(props: {
         {s === undefined ? (
           <Badge variant="outline">Loading…</Badge>
         ) : s.connected ? (
-          <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>
+          <Badge className="bg-success-muted text-success"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>
         ) : (
           <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Not connected</Badge>
         )}
@@ -620,23 +619,23 @@ function GmailConnectionCard(props: {
       <AdminCardContent className="space-y-3">
         <InlineStatus status={gmailOpStatus} />
         {s?.connected ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null}.
             Pending orders auto-confirm — no schedule to manage.
           </p>
         ) : (
           <>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Connect the inbox that receives bank alerts. Approve read-only
               access once — done.
             </p>
             {s && !s.configured && (
-              <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+              <p className="text-xs text-warning bg-warning-muted border border-warning-muted rounded p-2">
                 Server keys missing (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET).
                 Add them in the Convex dashboard → Settings → Environment Variables first.
               </p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               First time only: add this redirect URI in your Google Cloud OAuth client:{' '}
               <code className="font-mono break-all">{props.callbackUrl}</code>
             </p>
@@ -646,16 +645,16 @@ function GmailConnectionCard(props: {
           </>
         )}
         {s && s.lastError && (
-          <p className="text-xs text-red-700">Last error: {s.lastError}</p>
+          <p className="text-xs text-destructive">Last error: {s.lastError}</p>
         )}
         {s && s.lastPollAt && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Last poll: {new Date(s.lastPollAt).toLocaleString()}
           </p>
         )}
         <div className="flex items-center gap-2">
           {s?.connected && s?.connectedVia === 'google' && (
-            <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={handleDisconnect}>
+            <Button size="sm" variant="outline" className="border-border text-destructive hover:bg-muted" onClick={handleDisconnect}>
               Disconnect
             </Button>
           )}
@@ -710,34 +709,34 @@ function PlatformConfigCard(props: {
       </AdminCardHeader>
       {open && (
         <AdminCardContent className="space-y-4">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             These settings apply to every tenant. Only users with an <b>owner</b> role
             on any org can save.
           </p>
           <div>
             <Label>Additional bank-alert senders</Label>
             <textarea
-              className="w-full rounded-md border border-gray-300 p-2 text-sm font-mono"
+              className="w-full rounded-md border border-border p-2 text-sm font-mono"
               rows={4}
               value={sendersCsv}
               onChange={(e) => setSendersCsv(e.target.value)}
               placeholder={'@icicibank.com\nalerts@sbi.co.in'}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               One per line. Gmail <code>from:</code> patterns. These are <b>added</b>
               to the built-in defaults (HDFC) — they don't replace them. Max 20 entries.
             </p>
-            <div className="mt-3 rounded-lg bg-gray-50 border p-3 text-xs">
+            <div className="mt-3 rounded-lg bg-muted border p-3 text-xs">
               <p className="font-semibold mb-1">Currently searched ({props.mergedSenders.length})</p>
               <ul className="space-y-0.5">
                 {props.mergedSenders.map((s) => (
-                  <li key={s} className="font-mono text-gray-700">
+                  <li key={s} className="font-mono text-foreground">
                     {s}
                     {props.defaultSenders.includes(s) && (
-                      <span className="text-gray-400 ml-2">(default)</span>
+                      <span className="text-muted-foreground ml-2">(default)</span>
                     )}
                     {props.customSenders.includes(s) && !props.defaultSenders.includes(s) && (
-                      <span className="text-blue-600 ml-2">(custom)</span>
+                      <span className="text-info ml-2">(custom)</span>
                     )}
                   </li>
                 ))}
@@ -748,7 +747,7 @@ function PlatformConfigCard(props: {
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save platform config'}
             </Button>
-            {savedNote && <span className="text-xs text-green-700">{savedNote}</span>}
+            {savedNote && <span className="text-xs text-success">{savedNote}</span>}
           </div>
         </AdminCardContent>
       )}

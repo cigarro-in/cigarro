@@ -20,52 +20,41 @@ export function PageHeader({ title, description, children, backUrl, search }: Pa
   const navigate = useNavigate();
 
   return (
-    <div className="sticky top-0 z-20 bg-[var(--color-creme)] border-b border-[var(--color-coyote)]">
-      <div className="w-full px-6 pt-0 pb-4 flex items-center justify-between gap-4">
-        {/* Left Section: Navigation & Title */}
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex items-center gap-4 min-w-0">
-            {backUrl && (
-              <Button variant="ghost" size="icon" onClick={() => navigate(backUrl)} className="-ml-2 shrink-0">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold text-[var(--color-dark)] leading-none truncate">
-                {title}
-              </h1>
-              {description && (
-                <p className="text-sm text-gray-600 mt-1 hidden sm:block truncate">
-                  {description}
-                </p>
-              )}
-            </div>
+    <header className="sticky top-12 z-20 border-b bg-background md:top-0">
+      <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center gap-2 px-4 py-2 sm:px-6">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+          {backUrl && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              aria-label="Go back"
+              onClick={() => navigate(backUrl)}
+            >
+              <ArrowLeft aria-hidden />
+            </Button>
+          )}
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold">{title}</h1>
+            {description && <p className="hidden truncate text-xs text-muted-foreground sm:block">{description}</p>}
           </div>
         </div>
-        
-        {/* Spacer */}
-        <div className="flex-1" />
-        
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {children}
-        </div>
 
-        {/* Search Section (Right Most) */}
+        {children && <div className="flex max-w-full flex-wrap items-center gap-2">{children}</div>}
+
         {search && (
-          <div className="w-[300px] hidden md:block">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={search.placeholder || "Search..."}
-                className="pl-9 bg-[var(--color-creme-light)] border-[var(--color-coyote)]/50 focus:border-[var(--color-canyon)] transition-colors"
-                value={search.value}
-                onChange={(e) => search.onChange(e.target.value)}
-              />
-            </div>
+          <div className="relative order-last w-full md:order-none md:w-72">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              aria-label={search.placeholder || 'Search'}
+              placeholder={search.placeholder || 'Search'}
+              className="pl-9"
+              value={search.value}
+              onChange={(event) => search.onChange(event.target.value)}
+            />
           </div>
         )}
       </div>
-    </div>
+    </header>
   );
 }

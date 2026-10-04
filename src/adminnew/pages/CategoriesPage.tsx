@@ -81,16 +81,16 @@ export function CategoriesPage() {
       key: 'image',
       label: 'Image',
       render: (_: any, category: Category) => (
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+        <div className="size-10 overflow-hidden rounded-md bg-muted">
           {category.image ? (
             <ImageWithFallback
               src={category.image}
               alt="Category"
-              className="w-full h-full object-cover"
+              className="size-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <FolderTree className="h-6 w-6 text-gray-400" />
+            <div className="flex size-full items-center justify-center">
+              <FolderTree className="size-4 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -101,17 +101,8 @@ export function CategoriesPage() {
       label: 'Category Name',
       render: (name: string, category: Category) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{category.slug}</div>
-        </div>
-      )
-    },
-    {
-      key: 'description',
-      label: 'Description',
-      render: (description: string | null) => (
-        <div className="max-w-xs truncate text-sm text-gray-600">
-          {description || 'No description'}
+          <div className="font-medium">{name}</div>
+          <div className="text-xs text-muted-foreground">{category.slug}</div>
         </div>
       )
     },
@@ -119,8 +110,8 @@ export function CategoriesPage() {
       key: 'product_count',
       label: 'Products',
       render: (count: number) => (
-        <Badge variant="outline" className="bg-gray-50">
-          {count} products
+        <Badge variant="secondary">
+          {count}
         </Badge>
       )
     },
@@ -133,11 +124,6 @@ export function CategoriesPage() {
         </Badge>
       )
     },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (date: string) => new Date(date).toLocaleDateString()
-    }
   ];
 
   const bulkActions = [
@@ -160,7 +146,7 @@ export function CategoriesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader 
         title="Categories" 
         description="Manage your product categories"
@@ -171,13 +157,13 @@ export function CategoriesPage() {
         }}
       >
         <BulkActionsMenu selectedIds={selectedCategories} actions={bulkActions} />
-        <Button onClick={handleAddCategory} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
+        <Button onClick={handleAddCategory}>
           <Plus className="mr-2 h-4 w-4" />
           Add Category
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
         <DataTable
           data={categories}

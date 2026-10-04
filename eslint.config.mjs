@@ -2,11 +2,12 @@ import { plugin as shadcn } from "@shadcn/lint";
 import tsParser from "@typescript-eslint/parser";
 
 export default [
+  // Printable invoices intentionally use physical paper dimensions and an
+  // operator-selected brand color, independent of the interactive admin UI.
+  { ignores: ["src/adminnew/components/invoices/InvoiceDocument.tsx"] },
   {
     files: [
-      "src/adminnew/pages/DashboardPage.tsx",
-      "src/adminnew/layout/AdminSidebar.tsx",
-      "src/adminnew/layout/AdminShell.tsx",
+      "src/adminnew/**/*.tsx",
       "src/components/ui/empty.tsx",
     ],
     languageOptions: {

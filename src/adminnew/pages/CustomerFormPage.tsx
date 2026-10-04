@@ -86,18 +86,18 @@ export function CustomerFormPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center min-h-100">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900">Customer not found</h3>
-          <p className="text-gray-500">The customer you're looking for doesn't exist.</p>
+          <h3 className="text-lg font-medium text-foreground">Customer not found</h3>
+          <p className="text-muted-foreground">The customer you're looking for doesn't exist.</p>
           <Button onClick={() => navigate('/admin/customers')} className="mt-4">
             Back to Customers
           </Button>
@@ -107,7 +107,7 @@ export function CustomerFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)] pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <PageHeader
         title={customer.name}
@@ -119,7 +119,7 @@ export function CustomerFormPage() {
         )}
       </PageHeader>
 
-      <div className="max-w-[1600px] mx-auto px-6 grid grid-cols-[1fr_350px] gap-6">
+      <div className="mx-auto grid max-w-400 gap-4 px-4 sm:px-6 lg:grid-cols-3">
         
         {/* LEFT COLUMN */}
         <div className="space-y-6">
@@ -129,23 +129,23 @@ export function CustomerFormPage() {
               <AdminCardTitle>Customer Overview</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-500">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <User className="w-4 h-4 mr-2" />
                     Name
                   </div>
                   <div className="font-medium">{customer.name}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-500">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <Mail className="w-4 h-4 mr-2" />
                     Contact
                   </div>
                   <div className="font-medium">{customer.phone || customer.email || '—'}</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-500">
+                  <div className="flex items-center text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4 mr-2" />
                     Member Since
                   </div>
@@ -163,28 +163,28 @@ export function CustomerFormPage() {
             <AdminCardContent>
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 border border-[var(--color-coyote)]/30 rounded-lg">
+                  <button key={order.id} type="button" onClick={() => navigate(`/admin/orders/${order.id}`)} className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-foreground">
                         #{order.display_order_id}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-muted-foreground">
                         {new Date(order.created_at).toLocaleDateString()} • {order.items_count} items
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-foreground">
                         {formatINR(order.total)}
                       </div>
                       <Badge variant={getOrderStatusBadgeVariant(order.status)} className="text-xs">
                         {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </Badge>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {orders.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    <ShoppingBag className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                  <div className="text-center text-muted-foreground py-8">
+                    <ShoppingBag className="w-12 h-12 mx-auto text-border mb-4" />
                     <p>No orders yet</p>
                   </div>
                 )}
@@ -198,21 +198,21 @@ export function CustomerFormPage() {
           {/* Statistics */}
           <AdminCard>
             <AdminCardHeader>
-              <AdminCardTitle>Statistics</AdminCardTitle>
+              <AdminCardTitle>Statistics · shown data</AdminCardTitle>
             </AdminCardHeader>
             <AdminCardContent>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Orders</span>
+                <span className="text-sm text-muted-foreground">Total Orders</span>
                 <span className="font-bold text-lg">{customer.orderCount}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Spent</span>
+                <span className="text-sm text-muted-foreground">Total Spent</span>
                 <span className="font-bold text-lg">{formatINR(customer.totalSpent)}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Average Order</span>
+                <span className="text-sm text-muted-foreground">Average Order</span>
                 <span className="font-bold text-lg">{formatINR(customer.averageOrderValue)}</span>
               </div>
             </AdminCardContent>
@@ -225,7 +225,7 @@ export function CustomerFormPage() {
             </AdminCardHeader>
             <AdminCardContent>
               <div className="space-y-2">
-                <div className="flex items-center text-sm text-gray-500">
+                <div className="flex items-center text-sm text-muted-foreground">
                   <Calendar className="w-4 h-4 mr-2" />
                   First Order
                 </div>
@@ -235,7 +235,7 @@ export function CustomerFormPage() {
               </div>
               <Separator />
               <div className="space-y-2">
-                <div className="flex items-center text-sm text-gray-500">
+                <div className="flex items-center text-sm text-muted-foreground">
                   <Clock className="w-4 h-4 mr-2" />
                   Last Order
                 </div>

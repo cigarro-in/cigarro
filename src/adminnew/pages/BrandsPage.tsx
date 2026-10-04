@@ -88,16 +88,16 @@ export function BrandsPage() {
       key: 'logo_url',
       label: 'Logo',
       render: (_: any, brand: Brand) => (
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+        <div className="size-10 overflow-hidden rounded-md bg-muted">
           {brand.logo_url ? (
             <ImageWithFallback
               src={brand.logo_url}
               alt="Brand"
-              className="w-full h-full object-cover"
+              className="size-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-gray-400" />
+            <div className="flex size-full items-center justify-center">
+              <Building2 className="size-4 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -108,17 +108,8 @@ export function BrandsPage() {
       label: 'Brand Name',
       render: (name: string, brand: Brand) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{brand.slug}</div>
-        </div>
-      )
-    },
-    {
-      key: 'description',
-      label: 'Description',
-      render: (description: string | null) => (
-        <div className="max-w-xs truncate text-sm text-gray-600">
-          {description || 'No description'}
+          <div className="font-medium">{name}</div>
+          <div className="text-xs text-muted-foreground">{brand.slug}</div>
         </div>
       )
     },
@@ -126,8 +117,8 @@ export function BrandsPage() {
       key: 'product_count',
       label: 'Products',
       render: (count: number) => (
-        <Badge variant="outline" className="bg-gray-50">
-          {count} products
+        <Badge variant="secondary">
+          {count}
         </Badge>
       )
     },
@@ -140,11 +131,6 @@ export function BrandsPage() {
         </Badge>
       )
     },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (date: string) => new Date(date).toLocaleDateString()
-    }
   ];
 
   const bulkActions = [
@@ -167,7 +153,7 @@ export function BrandsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader 
         title="Brands" 
         description="Manage your product brands"
@@ -178,13 +164,13 @@ export function BrandsPage() {
         }}
       >
         <BulkActionsMenu selectedIds={selectedBrands} actions={bulkActions} />
-        <Button onClick={handleAddBrand} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
+        <Button onClick={handleAddBrand}>
           <Plus className="mr-2 h-4 w-4" />
           Add Brand
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
         <DataTable
           data={brands}

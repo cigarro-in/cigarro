@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Trash2, FolderOpen, LayoutGrid, ArrowUpRight, Plus } from 'lucide-react';
+import { Eye, EyeOff, Trash2, LayoutGrid, Plus } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { useQuery, useMutation } from 'convex/react';
@@ -81,16 +81,16 @@ export function CollectionsPage() {
       key: 'image_url',
       label: 'Image',
       render: (_: any, collection: Collection) => (
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+        <div className="size-10 overflow-hidden rounded-md bg-muted">
           {collection.image_url ? (
             <ImageWithFallback
               src={collection.image_url}
               alt="Collection"
-              className="w-full h-full object-cover"
+              className="size-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <LayoutGrid className="h-6 w-6 text-gray-400" />
+            <div className="flex size-full items-center justify-center">
+              <LayoutGrid className="size-4 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -101,17 +101,8 @@ export function CollectionsPage() {
       label: 'Collection Name',
       render: (title: string, collection: Collection) => (
         <div>
-          <div className="font-medium text-gray-900">{title}</div>
-          <div className="text-sm text-gray-500">{collection.slug}</div>
-        </div>
-      )
-    },
-    {
-      key: 'description',
-      label: 'Description',
-      render: (description: string | undefined) => (
-        <div className="max-w-xs truncate text-sm text-gray-600">
-          {description || 'No description'}
+          <div className="font-medium">{title}</div>
+          <div className="text-xs text-muted-foreground">{collection.slug}</div>
         </div>
       )
     },
@@ -119,8 +110,8 @@ export function CollectionsPage() {
       key: 'products_count',
       label: 'Products',
       render: (count: number) => (
-        <Badge variant="outline" className="bg-gray-50">
-          {count} products
+        <Badge variant="secondary">
+          {count}
         </Badge>
       )
     },
@@ -128,7 +119,7 @@ export function CollectionsPage() {
       key: 'display_order',
       label: 'Order',
       render: (order: number) => (
-        <Badge variant="outline" className="bg-gray-50">
+        <Badge variant="outline">
           #{order}
         </Badge>
       )
@@ -142,26 +133,6 @@ export function CollectionsPage() {
         </Badge>
       )
     },
-    {
-      key: 'actions',
-      label: 'Homepage',
-      render: (_: any, collection: Collection) => (
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/admin/homepage');
-            }}
-            title="Link this collection to a homepage section"
-            className="border-[var(--color-coyote)] hover:bg-[var(--color-creme)] text-[var(--color-dark)]"
-          >
-            <ArrowUpRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   const bulkActions = [
@@ -184,7 +155,7 @@ export function CollectionsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader 
         title="Collections" 
         description="Manage your product collections"
@@ -195,13 +166,14 @@ export function CollectionsPage() {
         }}
       >
         <BulkActionsMenu selectedIds={selectedCollections} actions={bulkActions} />
-        <Button onClick={handleAddCollection} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
+        <Button variant="outline" onClick={() => navigate('/admin/homepage')}>Homepage</Button>
+        <Button onClick={handleAddCollection}>
           <Plus className="mr-2 h-4 w-4" />
           Add Collection
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
         <DataTable
           data={collections}

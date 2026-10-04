@@ -122,18 +122,6 @@ export function DiscountsPage() {
     }
   };
 
-  const getStatusColor = (isActive: boolean, startDate?: string | null, endDate?: string | null) => {
-    if (!isActive) return 'bg-gray-100 text-gray-800';
-    
-    const now = new Date();
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-    
-    if (start && start > now) return 'bg-yellow-100 text-yellow-800';
-    if (end && end < now) return 'bg-red-100 text-red-800';
-    return 'bg-green-100 text-green-800';
-  };
-
   const getStatusText = (isActive: boolean, startDate?: string | null, endDate?: string | null) => {
     if (!isActive) return 'Inactive';
     
@@ -152,10 +140,10 @@ export function DiscountsPage() {
       label: 'Discount Name',
       render: (name: string, discount: Discount) => (
         <div>
-          <div className="font-medium text-gray-900">{name}</div>
-          <div className="text-sm text-gray-500">{discount.description}</div>
+          <div className="font-medium text-foreground">{name}</div>
+          <div className="text-sm text-muted-foreground">{discount.description}</div>
           {discount.code && (
-            <div className="text-xs text-gray-400 font-mono">{discount.code}</div>
+            <div className="text-xs text-muted-foreground font-mono">{discount.code}</div>
           )}
         </div>
       )
@@ -168,7 +156,7 @@ export function DiscountsPage() {
           <Badge variant="outline" className="capitalize">
             {type.replace('_', ' ')}
           </Badge>
-          <div className="text-sm font-medium text-gray-900 mt-1">
+          <div className="text-sm font-medium text-foreground mt-1">
             {formatDiscountValue(discount)}
           </div>
         </div>
@@ -190,7 +178,7 @@ export function DiscountsPage() {
         <div className="text-sm">
           <div className="font-medium">{count}</div>
           {discount.usage_limit && (
-            <div className="text-gray-500">of {discount.usage_limit}</div>
+            <div className="text-muted-foreground">of {discount.usage_limit}</div>
           )}
         </div>
       )
@@ -199,7 +187,7 @@ export function DiscountsPage() {
       key: 'dates',
       label: 'Duration',
       render: (_: any, discount: Discount) => (
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-muted-foreground">
           {discount.start_date && (
             <div>From: {new Date(discount.start_date).toLocaleDateString()}</div>
           )}
@@ -207,7 +195,7 @@ export function DiscountsPage() {
             <div>To: {new Date(discount.end_date).toLocaleDateString()}</div>
           )}
           {!discount.start_date && !discount.end_date && (
-            <div className="text-gray-400">No limits</div>
+            <div className="text-muted-foreground">No limits</div>
           )}
         </div>
       )
@@ -215,11 +203,10 @@ export function DiscountsPage() {
     {
       key: 'is_active',
       label: 'Status',
-      render: (_: any, discount: Discount) => (
-        <Badge className={getStatusColor(discount.is_active, discount.start_date, discount.end_date)}>
-          {getStatusText(discount.is_active, discount.start_date, discount.end_date)}
-        </Badge>
-      )
+      render: (_: any, discount: Discount) => {
+        const status = getStatusText(discount.is_active, discount.start_date, discount.end_date);
+        return <Badge variant={status === 'Expired' ? 'destructive' : status === 'Active' ? 'default' : 'secondary'}>{status}</Badge>;
+      }
     },
     {
       key: 'created_at',
@@ -248,7 +235,7 @@ export function DiscountsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-creme)]">
+    <div className="min-h-screen bg-background">
       <PageHeader 
         title="Discounts" 
         description="Manage discount codes and promotions"
@@ -259,13 +246,13 @@ export function DiscountsPage() {
         }}
       >
         <BulkActionsMenu selectedIds={selectedDiscounts} actions={bulkActions} />
-        <Button onClick={handleAddDiscount} className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]">
+        <Button onClick={handleAddDiscount} className="bg-primary hover:bg-primary/90 text-primary-foreground">
           <Plus className="mr-2 h-4 w-4" />
           Add Discount
         </Button>
       </PageHeader>
 
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-400 mx-auto space-y-4 sm:space-y-6">
         <InlineStatus status={opStatus} />
         <DataTable
           data={discounts}

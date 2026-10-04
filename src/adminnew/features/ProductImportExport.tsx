@@ -509,7 +509,7 @@ export function ProductImportExport({ products }: Props) {
           </AdminCardTitle>
         </AdminCardHeader>
         <AdminCardContent className="flex items-center justify-between gap-4 flex-wrap">
-          <p className="text-sm text-[var(--color-dark)]/70 max-w-xl">
+          <p className="text-sm text-muted-foreground max-w-xl">
             Download your full catalog (products, variants, categories, collections, specs) as XLSX.
             Images are not exported — manage those through the Assets library.
           </p>
@@ -539,7 +539,7 @@ export function ProductImportExport({ products }: Props) {
           </AdminCardTitle>
         </AdminCardHeader>
         <AdminCardContent className="space-y-4">
-          <div className="flex items-start gap-2 text-xs text-[var(--color-dark)]/70 bg-[var(--color-creme-light)] border border-[var(--color-coyote)]/20 rounded-lg p-3">
+          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-card border border-border/20 rounded-lg p-3">
             <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <p>
               The import <strong>dedupes by Slug</strong>: rows that match an existing product
@@ -560,11 +560,11 @@ export function ProductImportExport({ products }: Props) {
               Choose file…
             </Button>
             {file && (
-              <span className="text-sm text-[var(--color-dark)]/70 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground flex items-center gap-2">
                 {file.name}
                 <button
                   onClick={() => onPick(null)}
-                  className="text-[var(--color-dark)]/50 hover:text-red-500"
+                  className="text-muted-foreground hover:text-destructive"
                   aria-label="Remove file"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -579,7 +579,7 @@ export function ProductImportExport({ products }: Props) {
               <Button
                 onClick={onImport}
                 disabled={working}
-                className="bg-[var(--color-canyon)] hover:bg-[var(--color-canyon)]/90 text-[var(--color-creme)]"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {working ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Import {rows.length} row{rows.length === 1 ? '' : 's'}
@@ -589,23 +589,24 @@ export function ProductImportExport({ products }: Props) {
 
           {working && (
             <div>
-              <div className="h-1.5 rounded-full bg-[var(--color-coyote)]/30 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
                 <div
-                  className="h-full bg-[var(--color-canyon)] transition-all"
+                  className="h-full bg-primary transition-all"
+                  // eslint-disable-next-line shadcn/no-inline-styles -- runtime progress width
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-xs text-[var(--color-dark)]/60 mt-2">{progress}%</p>
+              <p className="text-xs text-muted-foreground mt-2">{progress}%</p>
             </div>
           )}
 
           {rows && rows.length > 0 && !summary && (
-            <div className="overflow-x-auto border border-[var(--color-coyote)]/30 rounded-lg">
+            <div className="overflow-x-auto border border-border/30 rounded-lg">
               <table className="w-full text-xs">
-                <thead className="bg-[var(--color-creme)]">
+                <thead className="bg-background">
                   <tr>
                     {['Row', 'Name', 'Variant', 'Price', 'Brand', 'Categories'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left font-semibold text-[var(--color-dark)]">
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-foreground">
                         {h}
                       </th>
                     ))}
@@ -613,8 +614,8 @@ export function ProductImportExport({ products }: Props) {
                 </thead>
                 <tbody>
                   {rows.slice(0, 40).map((r, idx) => (
-                    <tr key={idx} className="border-t border-[var(--color-coyote)]/20">
-                      <td className="px-3 py-2 text-[var(--color-dark)]/60">{String(r._row ?? '')}</td>
+                    <tr key={idx} className="border-t border-border/20">
+                      <td className="px-3 py-2 text-muted-foreground">{String(r._row ?? '')}</td>
                       <td className="px-3 py-2 font-medium">{String(r.Name ?? '')}</td>
                       <td className="px-3 py-2">{String(r['Variant Name'] ?? '')}</td>
                       <td className="px-3 py-2">{String(r.Price ?? '')}</td>
@@ -625,7 +626,7 @@ export function ProductImportExport({ products }: Props) {
                 </tbody>
               </table>
               {rows.length > 40 && (
-                <p className="text-xs text-[var(--color-dark)]/60 p-3 border-t border-[var(--color-coyote)]/20">
+                <p className="text-xs text-muted-foreground p-3 border-t border-border/20">
                   …and {rows.length - 40} more. All rows will be imported.
                 </p>
               )}
@@ -634,15 +635,15 @@ export function ProductImportExport({ products }: Props) {
 
           {summary && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-[var(--color-dark)]">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <div className="flex items-center gap-2 text-foreground">
+                <CheckCircle2 className="w-4 h-4 text-success" />
                 <span className="font-semibold">
                   {summary.productsCreated} new · {summary.productsUpdated} updated · {summary.variantsCreated + summary.variantsUpdated} variants
                   {summary.skipped > 0 && ` · ${summary.skipped} skipped`}
                 </span>
               </div>
               {summary.warnings.length > 0 && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning space-y-1">
                   <p className="font-semibold">Warnings</p>
                   {summary.warnings.slice(0, 20).map((w, i) => (
                     <p key={i}>{w}</p>
@@ -651,7 +652,7 @@ export function ProductImportExport({ products }: Props) {
                 </div>
               )}
               {summary.errors.length > 0 && (
-                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-900 space-y-1">
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
                   <p className="font-semibold flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     Errors
