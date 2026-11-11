@@ -36,6 +36,55 @@ export async function requireOrgAdmin(
   return requireMember(ctx, orgId, ["admin", "owner"]);
 }
 
-// TODO(multi-tenant): introduce requireSuperAdmin gated by
-// SUPER_ADMIN_USER_IDS env var when more than one tenant exists. For now
-// appConfig.set accepts any org owner.
+// Interim platform-admin gate: userIds listed (comma-separated) in the
+// PLATFORM_ADMIN_USER_IDS Convex env var. Missing/empty env denies everyone.
+function platformAdminIds(): string[] {
+  return (process.env.PLATFORM_ADMIN_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Non-throwing variant for reads that must return null to non-admins.
+export async function getPlatformAdminIdentity(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+  return platformAdminIds().includes(identity.subject) ? identity : null;
+}
+
+// Replaced by Citadel `requireSaWrite` once super-admin SSO lands.
+export async function requirePlatformAdmin(ctx: QueryCtx | MutationCtx) {
+  const identity = await requireIdentity(ctx);
+  if (!platformAdminIds().includes(identity.subject))
+    throw new ConvexError({ code: "NOT_PLATFORM_ADMIN" });
+  return identity;
+}
+
+// OAuth/redirect targets: only cigarro.in (+ subdomains) over https, and
+// localhost / 127.0.0.1 over http with an explicit port. Anything else is
+// rejected (callers fall back to adminPaymentsFallback()).
+export function isSafeReturnTo(raw: unknown): raw is string {
+  if (typeof raw !== "string" || raw.length > 2048) return false;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.username || u.password) return false;
+  const host = u.hostname.toLowerCase();
+  if (u.protocol === "https:")
+    return host === "cigarro.in" || host.endsWith(".cigarro.in");
+  if (u.protocol === "http:")
+    return (host === "localhost" || host === "127.0.0.1") && u.port !== "";
+  return false;
+}
+
+export function adminPaymentsFallback(): string {
+  const site = (process.env.SITE_URL ?? "https://cigarro.in").replace(/\/$/, "");
+  return `${site}/admin/payments`;
+}
+
+export function safeReturnTo(raw: unknown): string {
+  return isSafeReturnTo(raw) ? raw : adminPaymentsFallback();
+}

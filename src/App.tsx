@@ -19,9 +19,10 @@ import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
 import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
+import { ORG_SLUG } from './lib/convex/org';
 import { ThemeProvider, useTheme } from './themes';
 
 // Phase 3: no toasts anywhere. All success/failure feedback renders inline
@@ -39,6 +40,11 @@ function LoadingSpinner() {
 function AdminHostView() {
   const { user, isLoading, signOut } = useAuth();
   const [loginOpen, setLoginOpen] = useState(true);
+  // Admin for THIS storefront org only (user.isAdmin spans every org).
+  const scopedProfile = useQuery(
+    api.userState.getMyProfile,
+    user ? { orgSlug: ORG_SLUG } : 'skip',
+  );
 
   if (isLoading) return null;
 
@@ -60,7 +66,9 @@ function AdminHostView() {
     );
   }
 
-  if (!user.isAdmin) {
+  if (scopedProfile === undefined) return null;
+
+  if (!scopedProfile.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-creme px-4">
         <div className="text-center space-y-3 max-w-sm">

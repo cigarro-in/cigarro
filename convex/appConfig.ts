@@ -1,11 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireIdentity } from "./lib/auth";
+import { getPlatformAdminIdentity, requirePlatformAdmin } from "./lib/auth";
 
 const KEY = "singleton";
 
 /**
- * Public read — returns platform-wide config like the bank-alert sender list.
+ * Platform-admin read — returns platform-wide config like the bank-alert
+ * sender list. Non-platform-admins get null.
  */
  // Sender patterns used for the Gmail `from:` search. Domain-level is safer
 // than exact address — HDFC can rotate sender addresses without breaking us.
@@ -36,6 +37,7 @@ export function mergeSenders(custom: string[] | undefined): string[] {
 export const get = query({
   args: {},
   handler: async (ctx) => {
+    if (!(await getPlatformAdminIdentity(ctx))) return null;
     const row = await ctx.db
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", KEY))
@@ -55,6 +57,7 @@ export const get = query({
 export const getBankSenders = query({
   args: {},
   handler: async (ctx) => {
+    if (!(await getPlatformAdminIdentity(ctx))) return null;
     const row = await ctx.db
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", KEY))
@@ -64,21 +67,15 @@ export const getBankSenders = query({
 });
 
 /**
- * Mutation — callable only by a user who is an `owner` of at least one org.
- * Keeps this gated while still letting you edit from the admin UI.
+ * Mutation — callable only by a PLATFORM_ADMIN_USER_IDS member.
  */
 export const set = mutation({
   args: {
     bankSenders: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx);
-    const ownerMembership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .filter((q) => q.eq(q.field("role"), "owner"))
-      .first();
-    if (!ownerMembership) throw new ConvexError({ code: "NOT_PLATFORM_OWNER" });
+    // Interim: replaced by Citadel `requireSaWrite` once super-admin SSO lands.
+    const identity = await requirePlatformAdmin(ctx);
 
     const patch: Record<string, unknown> = {
       updatedAt: Date.now(),

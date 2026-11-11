@@ -8,7 +8,13 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import { requireIdentity } from "./lib/auth";
+import type { Id } from "./_generated/dataModel";
+import {
+  isSafeReturnTo,
+  requireIdentity,
+  requireOrgAdmin,
+  safeReturnTo,
+} from "./lib/auth";
 import { mergeSenders } from "./appConfig";
 import {
   buildOrderPollOffsets,
@@ -47,7 +53,7 @@ async function refreshAccessToken(
   clientId: string,
   clientSecret: string,
   refreshToken: string,
-): Promise<string | null> {
+): Promise<{ accessToken: string } | { error: string }> {
   try {
     const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -59,10 +65,15 @@ async function refreshAccessToken(
         grant_type: "refresh_token",
       }).toString(),
     });
-    const body = await res.json().catch(() => null);
-    return body?.access_token ?? null;
+    const body: any = await res.json().catch(() => null);
+    if (body?.access_token) return { accessToken: String(body.access_token) };
+    // Revoked or expired grant: the stored refresh token is dead until the
+    // admin reconnects. Recorded distinctly so Payment Settings says so.
+    if (body?.error === "invalid_grant")
+      return { error: "invalid_grant: reconnect Gmail" };
+    return { error: "token refresh failed" };
   } catch {
-    return null;
+    return { error: "token refresh failed" };
   }
 }
 
@@ -234,13 +245,14 @@ export const pollInbox = internalAction({
       if (!anyPending) return { skipped: "no_pending_orders" };
     }
 
-    const accessToken = await refreshAccessToken(clientId, clientSecret, refreshToken);
-    if (!accessToken) {
+    const token = await refreshAccessToken(clientId, clientSecret, refreshToken);
+    if (!("accessToken" in token)) {
       await ctx.runMutation(internal.gmail.notePollResult, {
-        error: "token refresh failed",
+        error: token.error,
       });
-      return { error: "token refresh failed" };
+      return { error: token.error };
     }
+    const accessToken = token.accessToken;
 
     const q = cfg?.query?.trim()
       ? cfg.query.trim()
@@ -301,25 +313,26 @@ export const pollInbox = internalAction({
 
 // Manual trigger from Payment Settings ("Check inbox now"). Same path as the
 // order-triggered checks, but always runs (no pending-work skip).
+// Target org for every Gmail admin action: the org the inbox is bound to, or
+// (when none is bound yet) the orgId the caller passes.
 export const triggerPoll = action({
-  args: { maxMessages: v.optional(v.number()) },
+  args: {
+    maxMessages: v.optional(v.number()),
+    orgId: v.optional(v.id("organizations")),
+  },
   handler: async (ctx, args): Promise<any> => {
-    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, {});
+    const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, {});
+    const targetOrgId = cfg?.orgId ?? args.orgId;
+    if (!targetOrgId) throw new ConvexError({ code: "ORG_REQUIRED" });
+    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, { orgId: targetOrgId });
     return await ctx.runAction(internal.gmail.pollInbox, {
+      orgId: targetOrgId,
       maxMessages: args.maxMessages ?? 20,
       reason: "manual",
     });
   },
 });
 
-// Only allow relative admin paths or https URLs — never javascript:/data:.
-function isSafeReturnTo(url: string | undefined): url is string {
-  if (!url) return false;
-  if (url.startsWith("/admin/")) return true;
-  if (/^https:\/\/[A-Za-z0-9.-]+(\/.*)?$/.test(url)) return true;
-  if (/^http:\/\/localhost(:\d+)?(\/.*)?$/.test(url)) return true;
-  return false;
-}
 //
 // Admin clicks "Connect with Google" → this returns the Google consent URL
 // (offline access, so Google issues a refresh token). Google redirects back
@@ -329,28 +342,28 @@ function isSafeReturnTo(url: string | undefined): url is string {
 const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
+// Owner/admin of the given org only. Returns the caller's userId.
 export const assertPaymentsAdmin = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await requireIdentity(ctx);
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .filter((q) =>
-        q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
-      )
-      .first();
-    if (!membership) throw new ConvexError({ code: "NOT_PAYMENTS_ADMIN" });
-    return identity.subject;
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const { userId } = await requireOrgAdmin(ctx, orgId);
+    return userId;
   },
 });
 
 export const getOAuthUrl = action({
-  args: { redirectUri: v.string(), returnTo: v.optional(v.string()) },
-  handler: async (ctx, { redirectUri, returnTo }): Promise<{ url: string }> => {
+  args: {
+    redirectUri: v.string(),
+    returnTo: v.optional(v.string()),
+    orgId: v.optional(v.id("organizations")),
+  },
+  handler: async (ctx, { redirectUri, returnTo, orgId }): Promise<{ url: string }> => {
+    const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, {});
+    const targetOrgId = cfg?.orgId ?? orgId;
+    if (!targetOrgId) throw new ConvexError({ code: "ORG_REQUIRED" });
     const adminUserId: string = await ctx.runQuery(
       internal.gmail.assertPaymentsAdmin,
-      {},
+      { orgId: targetOrgId },
     );
     const clientId = process.env.GMAIL_CLIENT_ID;
     if (!clientId) throw new ConvexError({ code: "GMAIL_NOT_CONFIGURED" });
@@ -361,7 +374,7 @@ export const getOAuthUrl = action({
     await ctx.runMutation(internal.gmail.saveOAuthState, {
       state,
       redirectUri,
-      returnTo: isSafeReturnTo(returnTo) ? returnTo : undefined,
+      returnTo: safeReturnTo(returnTo),
       adminUserId,
     });
 
@@ -448,16 +461,18 @@ export const finishOAuthConnect = internalMutation({
 });
 
 export const disconnectGmail = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await requirePaymentsAdmin(ctx);
+  args: { orgId: v.optional(v.id("organizations")) },
+  handler: async (ctx, { orgId }) => {
     const cfg = await getConfig(ctx);
+    const targetOrgId = cfg?.gmailOrgId ?? orgId;
+    if (!targetOrgId) throw new ConvexError({ code: "ORG_REQUIRED" });
+    const { userId } = await requirePaymentsAdmin(ctx, targetOrgId);
     if (cfg) {
       await ctx.db.patch(cfg._id, {
         gmailRefreshToken: undefined,
         gmailAccountEmail: undefined,
         updatedAt: Date.now(),
-        updatedBy: identity.subject,
+        updatedBy: userId,
       });
     }
     return { ok: true as const };
@@ -597,10 +612,19 @@ export const getPollConfigInternal = internalQuery({
 });
 
 // Admin-visible poll state (surfaced in Payment Settings).
+// Returns null (not an error) when the caller is not owner/admin of the org
+// the inbox is bound to, or when no org can be resolved.
 export const getGmailStatus = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgId: v.optional(v.id("organizations")) },
+  handler: async (ctx, { orgId }) => {
     const cfg = await getConfig(ctx);
+    const targetOrgId = cfg?.gmailOrgId ?? orgId;
+    if (!targetOrgId) return null;
+    try {
+      await requireOrgAdmin(ctx, targetOrgId);
+    } catch {
+      return null;
+    }
     const senders = mergeSenders(cfg?.bankSenders);
     const hasDbToken = !!cfg?.gmailRefreshToken;
     const hasEnvToken = !!process.env.GMAIL_REFRESH_TOKEN;
@@ -621,17 +645,9 @@ export const getGmailStatus = query({
   },
 });
 
-async function requirePaymentsAdmin(ctx: any) {
-  const identity = await requireIdentity(ctx);
-  const membership = await ctx.db
-    .query("memberships")
-    .withIndex("by_user", (q: any) => q.eq("userId", identity.subject))
-    .filter((q: any) =>
-      q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
-    )
-    .first();
-  if (!membership) throw new ConvexError({ code: "NOT_PAYMENTS_ADMIN" });
-  return identity;
+// Owner/admin of THAT org (never "admin of any org").
+async function requirePaymentsAdmin(ctx: any, orgId: Id<"organizations">) {
+  return await requireOrgAdmin(ctx, orgId);
 }
 
 export const setGmailConfig = mutation({
@@ -640,10 +656,16 @@ export const setGmailConfig = mutation({
     orgId: v.optional(v.id("organizations")),
   },
   handler: async (ctx, args) => {
-    const identity = await requirePaymentsAdmin(ctx);
-    const now = Date.now();
     const cfg = await getConfig(ctx);
-    const patch: any = { updatedAt: now, updatedBy: identity.subject };
+    // Admin of the org being set, and of the org already bound (if different).
+    const targets = new Set<Id<"organizations">>();
+    if (args.orgId !== undefined) targets.add(args.orgId);
+    if (cfg?.gmailOrgId) targets.add(cfg.gmailOrgId);
+    if (targets.size === 0) throw new ConvexError({ code: "ORG_REQUIRED" });
+    let actorId = "";
+    for (const t of targets) actorId = (await requirePaymentsAdmin(ctx, t)).userId;
+    const now = Date.now();
+    const patch: any = { updatedAt: now, updatedBy: actorId };
     if (args.query !== undefined) patch.gmailQuery = args.query.trim() || undefined;
     if (args.orgId !== undefined) patch.gmailOrgId = args.orgId;
     if (!cfg) {

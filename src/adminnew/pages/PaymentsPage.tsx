@@ -75,7 +75,11 @@ export function PaymentsPage() {
     org ? { orgId: org._id } : 'skip',
   );
   const appConfig = useQuery(api.appConfig.get, {});
-  const gmailStatus = useQuery(api.gmail.getGmailStatus, {});
+  // null = caller is not an admin of this org (UI shows "Unavailable").
+  const gmailStatus = useQuery(
+    api.gmail.getGmailStatus,
+    org ? { orgId: org._id } : 'skip',
+  );
 
   const pendingCount = recentOrders?.filter((o: any) => o.status === 'pending').length ?? 0;
   const unmatchedCount = unmatched?.length ?? 0;
@@ -84,7 +88,7 @@ export function PaymentsPage() {
     setChecking(true);
     setCheckNote(null);
     try {
-      const r: any = await checkInbox({ maxMessages: 20 });
+      const r: any = await checkInbox(org ? { maxMessages: 20, orgId: org._id } : { maxMessages: 20 });
       if (r?.error) {
         setOpError(`Inbox check failed: ${r.error}`);
       } else if (r?.skipped) {
@@ -409,7 +413,9 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 
   const handleCheckInbox = async () => {
     try {
-      const r: any = await triggerGmailPoll({ maxMessages: 20 });
+      const r: any = await triggerGmailPoll(
+        org ? { maxMessages: 20, orgId: org._id } : { maxMessages: 20 },
+      );
       if (r?.error) setSettingsError(r.error);
       else setCheckNoteParent?.(
         r?.skipped
@@ -430,6 +436,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
       <InlineStatus status={settingsStatus} />
       <GmailConnectionCard
         status={gmailStatus}
+        orgId={org?._id}
         callbackUrl={GMAIL_CALLBACK_URL}
         onCheckInbox={handleCheckInbox}
       />
@@ -544,6 +551,11 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
         )}
       </AdminCard>
 
+      {appConfig === null && (
+        <p className="text-xs text-muted-foreground">
+          Platform bank-sender config is restricted to platform admins.
+        </p>
+      )}
       <PlatformConfigCard
         customSenders={(appConfig as any)?.customBankSenders ?? []}
         defaultSenders={(appConfig as any)?.defaultBankSenders ?? []}
@@ -559,8 +571,8 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
             // No success toast: PlatformConfigCard shows its own inline note.
           } catch (e: any) {
             const code = e?.data?.code;
-            if (code === 'NOT_PLATFORM_OWNER')
-              setSettingsError('Only owners can edit platform config');
+            if (code === 'NOT_PLATFORM_ADMIN')
+              setSettingsError('Only platform admins can edit platform config');
             else setSettingsError(code || 'Save failed');
           }
         }}
@@ -571,6 +583,7 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 
 function GmailConnectionCard(props: {
   status: any;
+  orgId: any;
   callbackUrl: string;
   onCheckInbox: () => void;
 }) {
@@ -586,6 +599,7 @@ function GmailConnectionCard(props: {
       const r = await connectUrl({
         redirectUri: props.callbackUrl,
         returnTo: `${window.location.origin}/admin/payments/settings?gmail=connected`,
+        ...(props.orgId ? { orgId: props.orgId } : {}),
       });
       window.location.href = r.url;
     } catch (e: any) {
@@ -597,7 +611,7 @@ function GmailConnectionCard(props: {
   const handleDisconnect = async () => {
     if (!confirm('Disconnect Gmail? Order auto-confirm will stop.')) return;
     try {
-      await disconnect({});
+      await disconnect(props.orgId ? { orgId: props.orgId } : {});
       // No toast: the card badge flips to Not connected in place.
     } catch (e: any) {
       setGmailError(e?.data?.code || 'Disconnect failed');
@@ -610,6 +624,8 @@ function GmailConnectionCard(props: {
         <AdminCardTitle>Bank-email connection</AdminCardTitle>
         {s === undefined ? (
           <Badge variant="outline">Loading…</Badge>
+        ) : s === null ? (
+          <Badge variant="outline">Unavailable</Badge>
         ) : s.connected ? (
           <Badge className="bg-success-muted text-success"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>
         ) : (
@@ -622,6 +638,10 @@ function GmailConnectionCard(props: {
           <p className="text-sm text-muted-foreground">
             Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null}.
             Pending orders auto-confirm — no schedule to manage.
+          </p>
+        ) : s === null ? (
+          <p className="text-sm text-muted-foreground">
+            Inbox status is only visible to organization owners and admins.
           </p>
         ) : (
           <>

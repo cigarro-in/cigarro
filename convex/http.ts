@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { adminPaymentsFallback, isSafeReturnTo } from "./lib/auth";
 
 const http = httpRouter();
 
@@ -105,8 +106,11 @@ http.route({
     // redirect to the pre-registered convex.site callback, so this hop is
     // what returns the admin to /admin/payments/settings.
     const back = (pending as any)?.returnTo;
-    if (typeof back === "string" && isSafeRedirect(back)) {
-      return Response.redirect(back, 302);
+    if (typeof back === "string" && back.length > 0) {
+      return Response.redirect(
+        isSafeReturnTo(back) ? back : adminPaymentsFallback(),
+        302,
+      );
     }
     return oauthPage(true, accountEmail ?? null);
   }),
@@ -258,13 +262,6 @@ function jsonResponse(payload: unknown, status = 200) {
       "access-control-allow-origin": "*",
     },
   });
-}
-
-function isSafeRedirect(url: string): boolean {
-  if (url.startsWith("/admin/")) return true;
-  if (/^https:\/\/[A-Za-z0-9.-]+(\/.*)?$/.test(url)) return true;
-  if (/^http:\/\/localhost(:\d+)?(\/.*)?$/.test(url)) return true;
-  return false;
 }
 
 function oauthPage(ok: boolean, detail: string | null): Response {

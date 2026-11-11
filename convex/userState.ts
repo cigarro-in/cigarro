@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { requireIdentity, requireMember } from "./lib/auth";
+import { resolveOrg } from "./lib/org";
 import { normalizePhoneE164 } from "./lib/phone";
 import {
   internalMutation,
@@ -17,26 +18,44 @@ import { Doc, Id } from "./_generated/dataModel";
 // Auth Phase 2 profile read: identity-scoped (no membership needed —
 // customers may have none yet). isAdmin resolves via memberships, replacing
 // the Supabase profiles read in useAuth.
+// Pass orgSlug to scope isAdmin to that org (owner/admin of THAT org). Without
+// it, isAdmin is true for admin of ANY org (legacy; do not use for gating).
 export const getMyProfile = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgSlug: v.optional(v.string()) },
+  handler: async (ctx, { orgSlug }) => {
     const identity = await requireIdentity(ctx);
     const user = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .filter((q: any) =>
-        q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
-      )
-      .first();
+    let isAdmin: boolean;
+    if (orgSlug !== undefined) {
+      const org = await resolveOrg(ctx, orgSlug).catch(() => null);
+      const orgMembership = org
+        ? await ctx.db
+            .query("memberships")
+            .withIndex("by_org_user", (q) =>
+              q.eq("orgId", org._id).eq("userId", identity.subject),
+            )
+            .unique()
+        : null;
+      isAdmin =
+        orgMembership?.role === "owner" || orgMembership?.role === "admin";
+    } else {
+      const membership = await ctx.db
+        .query("memberships")
+        .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+        .filter((q: any) =>
+          q.or(q.eq(q.field("role"), "owner"), q.eq(q.field("role"), "admin")),
+        )
+        .first();
+      isAdmin = !!membership;
+    }
     return {
       userId: identity.subject,
       phone: user?.phone ?? null,
       name: user?.name ?? null,
-      isAdmin: !!membership,
+      isAdmin,
     };
   },
 });
