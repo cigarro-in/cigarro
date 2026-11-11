@@ -48,19 +48,17 @@ Themes own:
 ## Admin UI structure
 
 - `src/adminnew/AdminRouter.tsx` — route table. `ADMIN_ROUTES` array drives pages.
-- `src/adminnew/layout/AdminSidebar.tsx` — `NAVIGATION_CONFIG` drives sidebar. Sections: `platform`, `payments`.
+- `src/adminnew/layout/AdminSidebar.tsx` — `ADMIN_NAVIGATION` drives sidebar. Sections: `platform`, `payments`.
 - Payment screens live under `/admin/payments/*`: hub, late payments, unmatched emails, settings.
 - Order detail page `/admin/orders/:id` → `OrderFormPage.tsx` handles both payment actions (mark paid / void / refund) and shipping lifecycle.
 
 ## Conventions
 
-- New admin pages: create in `src/adminnew/pages/`, export from `pages/index.ts`, add to `ADMIN_ROUTES` in `AdminRouter.tsx`, add to `NAVIGATION_CONFIG` in `AdminSidebar.tsx`.
+- New admin pages: create in `src/adminnew/pages/`, export from `pages/index.ts`, add to `ADMIN_ROUTES` in `AdminRouter.tsx`, add to `ADMIN_NAVIGATION` in `AdminSidebar.tsx`.
 - Never introduce `<theme>Xxx.tsx` files that fetch data. Extract a hook first.
 - Never use toasts (`sonner` is banned under `src/` — see `scripts/check-no-toasts.mjs`); surface user-facing errors inline via `InlineStatus` and include Convex error codes via `error?.data?.code`.
 - Before committing schema changes, run `npx convex deploy`. Schema changes are NOT live until deployed.
 
 ## Known deferred items
 
-- Admin dashboard / customers pages still read Supabase `orders` for stat tiles (shows 0 / stale, not breaking).
 - Cloudflare Email Routing → Convex HTTP action for bank-email ingestion is not wired. Manual `markPaid` is the interim path.
-- Supabase RPCs related to the old payment flow (`verify_order_payment`, `create_order`, `admin_verify_payment`, `get_wallet_balance`) are orphaned — safe to drop from Supabase.

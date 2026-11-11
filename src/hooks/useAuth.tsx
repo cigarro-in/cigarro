@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkSession = async () => {
     try {
-      // Own JWT only (auth cutover complete — no Supabase).
+      // Own JWT only.
       const session = getSession();
       if (session) {
         const u = await establishCustomerSession(session.token, {

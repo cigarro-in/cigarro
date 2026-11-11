@@ -11,8 +11,8 @@ import { collectInOrg } from "./lib/org";
 const PAID = ["paid", "late_paid"];
 
 // Edge (invalidate-cache) admin gate: the caller forwards the admin's
-// Supabase session JWT as Bearer; the customJwt bridge yields the same
-// subject the SPA uses, so memberships resolve identically.
+// session JWT as Bearer; the customJwt bridge yields the same subject the
+// SPA uses, so memberships resolve identically.
 export const checkMyAdmin = query({
   args: { orgSlug: v.optional(v.string()) },
   handler: async (ctx, { orgSlug }) => {

@@ -53,8 +53,7 @@ export function CheckoutPage() {
   const convexClient = useConvex();
   // Reuse the key if a response is lost after Convex committed the order.
   const paymentIdempotencyKeyRef = useRef<string | null>(null);
-  // Single address book (Convex). The legacy dual-table
-  // saved_addresses/addresses Supabase writes are gone.
+  // Single address book (Convex).
   const {
     saveAddress: saveStoreAddress,
     deleteAddress: deleteStoreAddress,

@@ -13,8 +13,7 @@ import { api } from '../../convex/_generated/api';
 import { ORG_SLUG } from '../lib/convex/org';
 
 // Wave 3: homepage composes entirely from Convex hooks (catalog + content).
-// No API hop, no Supabase fallback. Shapes match the legacy HomepageData
-// contract; money stays rupees.
+// No API hop. Shapes match the HomepageData contract; money stays rupees.
 //
 // Featured + showcase sections resolve from admin-linked Collections
 // (homepageComponentConfig.sectionId = collection supabaseId): the section

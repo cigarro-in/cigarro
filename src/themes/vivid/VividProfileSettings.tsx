@@ -29,8 +29,7 @@ export function VividProfileSettings() {
     if (!user) return;
     setSaving(true);
     try {
-      // Theme files must not touch Supabase: display name lives in Convex
-      // (Phase 1 spine) via useMyProfile. Email is read-only here (contact
+      // Display name lives in Convex (Phase 1 spine) via useMyProfile. Email is read-only here (contact
       // support to change), mirroring the classic settings page.
       await updateDisplayName(name || undefined);
       setOpOk('Profile updated');

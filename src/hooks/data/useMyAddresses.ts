@@ -7,9 +7,8 @@ import {
 export type { FlatAddress };
 
 // Theme-safe address store (Convex migration Phase 1). Themes must not
-// import Convex/Supabase clients directly — they go through this hook.
-// Flat row shape matches the legacy Supabase `saved_addresses` rows, so
-// theme UI code is unchanged regardless of backend.
+// import Convex clients directly — they go through this hook.
+// Flat row shape keeps theme UI code unchanged regardless of backend.
 export function useMyAddresses() {
   const { user } = useAuth();
   const store = useAddresses(user);

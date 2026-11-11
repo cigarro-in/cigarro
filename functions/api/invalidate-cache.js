@@ -8,7 +8,7 @@ import { requiredConvexUrl } from '../lib/env.js';
 //  2. Warm fallback: otherwise re-fetches key endpoints with cache-busting
 //     headers so the next visitor triggers a fresh edge fetch.
 //
-// Auth: requires a Supabase session JWT for an admin/owner user
+// Auth: requires a session JWT for an admin/owner user
 // (Authorization: Bearer <access_token>), verified against Convex
 // memberships via adminStats:checkMyAdmin. The customJwt bridge yields the
 // same subject the SPA uses. Set PURGE_REQUIRE_ADMIN=false to disable

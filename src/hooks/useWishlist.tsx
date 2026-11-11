@@ -5,7 +5,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
 // Phase 1 complete: wishlist lives in Convex for signed-in users,
-// localStorage for guests. No Supabase paths remain.
+// localStorage for guests.
 interface WishlistContextType {
   wishlistItems: string[];
   isWishlisted: (productId: string) => boolean;

@@ -67,8 +67,7 @@ export function ProductsPage() {
   const { addToCart, isLoading: cartLoading } = useCart();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  // Wave 3: products + filter facets from the Convex catalog (same shapes
-  // the API/Supabase paths produced). Filtering stays client-side.
+  // Products + filter facets from the Convex catalog. Filtering stays client-side.
   const {
     products: catalogProducts,
     brands: catalogBrands,
@@ -191,8 +190,8 @@ export function ProductsPage() {
     setFilterSections(sections);
   }, [categories, brands, origins, strengths, packSizes]);
 
-  // Filter the Convex catalog locally (same semantics the Supabase
-  // query had: active only, search, category/brand facets, price ranges
+  // Filter the Convex catalog locally: active only, search, category/brand
+  // facets, price ranges
   // against the default-variant price in rupees, newest first).
   const priceInRange = (price: number, range: string): boolean => {
     switch (range) {

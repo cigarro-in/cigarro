@@ -1,8 +1,8 @@
 /**
  * Audit logging utility for security and compliance.
  *
- * Supabase removed: the audit_logs table never existed in production, so
- * events are logged via the app logger only (never crash the app).
+ * No audit_logs table exists, so events go to the app logger only (never
+ * crash the app).
  */
 
 import { logger } from './logger';

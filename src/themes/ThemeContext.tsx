@@ -24,7 +24,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { settings } = useSiteSettings();
 
   useEffect(() => {
-    // Wave 2: remote theme comes from Convex site settings (was Supabase).
+    // Remote theme comes from Convex site settings.
     const remote = settings?.active_theme;
     if (remote && remote !== themeId && getTheme(remote)) {
       setThemeIdState(remote);

@@ -13,7 +13,7 @@ import { mapCartItem, trackAddToCart, trackRemoveFromCart } from '../lib/analyti
 // item state, merge logic, totals and the public API are unchanged.
 // Guests use localStorage. Checkout re-prices from the catalog, so persisted
 // unit prices are display snapshots only. Catalog rehydration reads from
-// Convex (Wave 3); shapes match the legacy Supabase rows.
+// Convex; row shapes match what the storefront components expect.
 
 // Updated to match new schema - images on variants, brand via relation
 export interface Product {
@@ -289,7 +289,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [serverCartSig]);
 
   // Rehydrate lean server lines into rich CartItems via the catalog
-  // (Supabase until Phase 3). Drops lines whose product/variant vanished.
+  // Drops lines whose product/variant vanished.
   const rehydrateLines = async (
     lines: Array<{
       productId: string;
@@ -526,7 +526,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
     } else {
       // Create new cart item with variant/combo info
-      // Extract brand name - handle array format from Supabase relations
+      // Extract brand name - handle array format from relation joins
       const extractBrand = (brand: any): string => {
         if (!brand) return 'Premium';
         if (typeof brand === 'string') return brand;

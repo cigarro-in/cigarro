@@ -509,12 +509,12 @@ export default defineSchema({
     .index("by_org_number", ["orgId", "invoiceNumber"])
     .index("by_org_idempotency", ["orgId", "idempotencyKey"]),
 
-  // ---- Phase 1: user state (migrated off Supabase) ----
-  // userId = Supabase auth.users.id during Phase 1 (bridge unchanged).
+  // ---- Phase 1: user state ----
+  // userId is the stable user identity.
   // Phase 2 keeps these exact strings as the stable identity when the
   // issuer changes (Convex users table maps phone -> legacy userId).
   users: defineTable({
-    // Stable identity, shared across auth providers. Today: Supabase sub.
+    // Stable identity, shared across auth providers.
     userId: v.string(),
     phone: v.optional(v.string()), // E.164, e.g. +919876543210
     name: v.optional(v.string()),
@@ -561,7 +561,7 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_org_user", ["orgId", "userId"]),
 
-  // ---- Wave 2: content tables (Supabase -> Convex) ----
+  // ---- Content tables ----
   // ORG-SCOPED content: every row carries the owning orgId (optional until
   // the org backfill runs; new writes always set it). Public reads filter by
   // the slug-resolved org; admin writes require that org's admin.
@@ -587,7 +587,7 @@ export default defineSchema({
     content: v.string(),
     featuredImage: v.optional(v.string()),
     status: v.string(), // published | draft
-    // Plain string — no profiles join (Supabase author rows not migrated).
+    // Plain string — no profiles join.
     authorName: v.string(),
     categorySlug: v.optional(v.string()),
     readingTime: v.optional(v.number()),
@@ -687,9 +687,9 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_key", ["orgId", "key"]),
 
-  // ---- Wave 3: catalog (migrating off Supabase) ----
-  // Authorship moves to Convex; Supabase stays a read replica during soak.
-  // Money in catalog tables is RUPEES (numbers, as in Supabase); integer
+  // ---- Wave 3: catalog ----
+  // Authorship lives in Convex.
+  // Money in catalog tables is RUPEES (numbers); integer
   // PAISE applies only at the order/wallet boundary (rupeesToPaise).
   // supabaseId preserves the original UUID for idempotent backfill + join
   // rebuild; slugs keep uniqueness PER ORG via by_org_slug (enforced in
@@ -703,7 +703,7 @@ export default defineSchema({
     logoUrl: v.optional(v.string()),
     websiteUrl: v.optional(v.string()),
     countryOfOrigin: v.optional(v.string()),
-    heritage: v.optional(v.any()), // JSON object in Supabase (founder, year, …)
+    heritage: v.optional(v.any()), // JSON object (founder, year, …)
     isActive: v.boolean(),
     sortOrder: v.optional(v.number()),
     metaTitle: v.optional(v.string()),
@@ -875,11 +875,11 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_combo", ["orgId", "comboSupabaseId"]),
 
-  // ---------- Wave 7: commercial discounts (Supabase -> Convex) ----------
+  // ---------- Wave 7: commercial discounts ----------
   // ORG-SCOPED (codes unique per org). Money in RUPEES (cart totals are
   // rupees); paise only at the order boundary. Dates as ms timestamps.
-  // Field names stay snake_case to match the Supabase shape the admin
-  // UI and checkout already speak.
+  // Field names stay snake_case to match the shape the admin UI and
+  // checkout already speak.
   discounts: defineTable({
     orgId: v.optional(v.id("organizations")),
     name: v.string(),
@@ -905,9 +905,9 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_code", ["orgId", "code"]),
 
-  // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
-  // ORG-SCOPED: one row per user per org. userId = stable identity (Supabase
-  // sub, same as users table). Codes are shareable by design; validation stays
+  // ---------- Wave 7: referrals, minimal ----------
+  // ORG-SCOPED: one row per user per org. userId = stable identity (same as
+  // users table). Codes are shareable by design; validation stays
   // public (scoped by orgSlug), personal reads enforce subject match. Money in
   // RUPEES; dates as ms timestamps. Field names stay snake_case to match the
   // shape the app already speaks.
@@ -1005,8 +1005,7 @@ export default defineSchema({
     .index("by_org", ["orgId"]),
 
   // ---------- Wave 10: product reviews, Convex-native ----------
-  // Never existed in Supabase in usable form (product_reviews dropped by
-  // migration 076), so no backfill: rows start here. ORG-SCOPED, like catalog.
+  // No backfill: rows start here. ORG-SCOPED, like catalog.
   // userId = stable identity. Only approved rows are public.
   productReviews: defineTable({
     orgId: v.optional(v.id("organizations")),

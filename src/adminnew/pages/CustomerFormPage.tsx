@@ -39,7 +39,7 @@ export function CustomerFormPage() {
   const navigate = useNavigate();
   const org = useOrg();
 
-  // Route id is the stable userId (Supabase auth UUID, unchanged by migration).
+  // Route id is the stable userId.
   const data = useQuery(
     api.adminStats.getCustomerForAdmin,
     org && id ? { orgId: org._id, userId: id } : 'skip'

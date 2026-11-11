@@ -4,10 +4,10 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { ORG_SLUG } from '../../lib/convex/org';
 
-// Theme-safe catalog reads (Wave 3: Convex). Shapes mirror the legacy
-// Supabase rows — snake_case, Supabase UUID ids, ISO timestamps, explicit
-// nulls — so pages keep their logic untouched. Money stays RUPEES.
-// Themes must use these hooks, never Convex/Supabase clients.
+// Theme-safe catalog reads (Convex). Shapes are snake_case rows with ISO
+// timestamps and explicit nulls, so pages keep their logic untouched. Money
+// stays RUPEES.
+// Themes must use these hooks, never Convex clients.
 
 const iso = (ms: any) =>
   ms == null ? null : new Date(ms).toISOString().replace('Z', '+00:00');
@@ -196,8 +196,7 @@ export function useCatalogProduct(slug: string | undefined) {
   }, [detail]);
 }
 
-// Combos are an empty table in prod: keep the legacy call-site contract
-// (list) without a Supabase dependency.
+// Combos are an empty table in prod: keep the call-site contract (list).
 export function useCatalogCombos() {
   const rows = useQuery(api.catalog.listCombos, { activeOnly: true, orgSlug: ORG_SLUG });
   return useMemo(() => ({ combos: rows ?? [] }), [rows]);

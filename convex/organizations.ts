@@ -167,7 +167,7 @@ export const getSettings = query({
 // Example:
 //   npx convex run organizations:seedOrg '{"slug":"cigarro","name":"Cigarro",
 //     "upiVpa":"cigarro@ybl","bankEmailAlias":"cigarro",
-//     "ownerUserId":"<supabase-user-id>"}'
+//     "ownerUserId":"<user-id>"}'
 //
 // Marked as internal mutation so it's not exposed over the public API.
 

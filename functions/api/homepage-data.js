@@ -3,9 +3,9 @@ import { requiredConvexUrl } from '../lib/env.js';
 // Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/homepage-data
-// Wave 3: catalog reads from Convex (fullCatalog bundle); heroes, section
-// configs, and blogs from the Convex content queries. Output shape is the
-// exact legacy Supabase JSON so the storefront is untouched. Known,
+// Catalog reads from Convex (fullCatalog bundle); heroes, section configs,
+// and blogs from the Convex content queries. Output shape matches what the
+// storefront consumes. Known,
 // consumer-free deltas: hero created_at/updated_at/id (null/Convex id),
 // blog author email (name only).
 
@@ -20,7 +20,7 @@ async function cxQuery(baseUrl, path, args) {
   return body.value;
 }
 
-// Supabase timestamptz serializes "+00:00"; Date.toISOString gives "Z".
+// Timestamps serialize as "+00:00"; Date.toISOString gives "Z".
 const iso = (ms) => (ms == null ? null : new Date(ms).toISOString().replace('Z', '+00:00'));
 
 export async function onRequest(context) {

@@ -4,7 +4,7 @@
  * Phase 1 (Convex migration): the useCart/useWishlist hooks now merge guest
  * localStorage data into Convex-backed server state themselves on user
  * change. This util therefore only nudges the hooks to reload — it must NOT
- * write to the legacy Supabase tables or clear localStorage early, or guest
+ * clear localStorage early, or guest
  * items would bypass the Convex merge and be lost.
  */
 export const transferGuestDataToUser = async (userId: string): Promise<void> => {

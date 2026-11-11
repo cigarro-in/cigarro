@@ -3,8 +3,8 @@ import { requiredConvexUrl } from '../lib/env.js';
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/brands
-// Wave 3: reads from Convex (fullCatalog bundle). Output shape is the exact
-// legacy Supabase row JSON so consumers are untouched.
+// Reads from Convex (fullCatalog bundle). Output shape is the exact row
+// JSON consumers expect.
 
 async function cxQuery(baseUrl, path, args) {
   const res = await fetch(`${baseUrl}/api/query`, {
@@ -17,7 +17,7 @@ async function cxQuery(baseUrl, path, args) {
   return body.value;
 }
 
-// Supabase timestamptz serializes "+00:00"; Date.toISOString gives "Z".
+// Timestamps serialize as "+00:00"; Date.toISOString gives "Z".
 const iso = (ms) => (ms == null ? null : new Date(ms).toISOString().replace('Z', '+00:00'));
 
 export async function onRequest(context) {

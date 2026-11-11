@@ -3,8 +3,8 @@ import { requiredConvexUrl } from '../lib/env.js';
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
 // URL: https://cigarro.in/api/categories
-// Wave 3: reads from Convex (fullCatalog bundle). Output shape is the exact
-// legacy Supabase JSON so consumers are untouched.
+// Reads from Convex (fullCatalog bundle). Output shape is the exact JSON
+// consumers expect.
 
 async function cxQuery(baseUrl, path, args) {
   const res = await fetch(`${baseUrl}/api/query`, {

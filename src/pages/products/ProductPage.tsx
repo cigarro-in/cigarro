@@ -106,8 +106,7 @@ function ProductPage() {
 
   // Store all products for related product lookups
   const [allProducts, setAllProducts] = useState<any[]>([]);
-  // Wave 3: product + catalog from Convex (same shapes the API/Supabase
-  // paths produced). Combos resolve via hook (empty table in prod).
+  // Product + catalog from Convex. Combos resolve via hook (empty table in prod).
   const { product: catalogProduct, loading: catalogProductLoading } =
     useCatalogProduct(slug);
   const { products: catalogAllProducts } = useFullCatalog();

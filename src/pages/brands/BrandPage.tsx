@@ -39,8 +39,7 @@ export function BrandPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-  // Wave 3: brand + products resolve from the Convex catalog (same shapes
-  // the Supabase fallback produced). No API-hop, no Supabase.
+  // Brand + products resolve from the Convex catalog. No API hop.
   const { products: catalogProducts, brands: catalogBrands, loading: catalogLoading } =
     useFullCatalog();
 

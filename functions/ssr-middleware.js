@@ -87,8 +87,8 @@ function breadcrumbNavHtml(items) {
   return `<nav aria-label="Breadcrumb"><ol>${links}</ol></nav>`;
 }
 
-// Wave 3: catalog reads come from Convex. Templates below are untouched —
-// Convex rows are adapted to the exact Supabase shapes the templates expect,
+// Catalog reads come from Convex. Templates below are untouched —
+// Convex rows are adapted to the exact row shapes the templates expect,
 // so bot HTML stays byte-identical (gate: canonical/H1/schema asserted).
 // `cx` = { url, orgSlug }. Every catalog/content query validator requires
 // `orgSlug` (org-scoped reads), so it is injected here for every call.
@@ -1415,8 +1415,7 @@ export async function onRequest(context) {
   }
 
   try {
-    // Wave 8: all catalog reads (bot HTML + search + ?format= feeds) come
-    // from Convex. Supabase is fully decoupled from this middleware.
+    // All catalog reads (bot HTML + search + ?format= feeds) come from Convex.
     const cx = { url: requiredConvexUrl(env), orgSlug: getOrgSlug(env) };
 
     // Use static favicon path (no database fetch needed)
