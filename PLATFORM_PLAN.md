@@ -11,7 +11,8 @@ Status: draft, 2026-11-11. Owner: orchestrator session. Executors: Haiku agents,
 - SEO is non-negotiable: migrating merchants must keep or gain rankings.
 - Rendering: full SSR for every visitor (React Router v7 framework mode on Cloudflare), done in slices. P0 hotfix still ships first on the current edge renderer.
 - Bank emails: both paths. Gmail sign-in per store is primary; forwarding to `<store>@pay.cigarro.in` (existing email-worker) is the fallback. Google OAuth app must be set to "In production" (unverified is fine under 100 users), because "Testing" status expires refresh tokens after 7 days. Verification + CASA audit only when scaling past 100 users.
-- Platform admin: pending the user's analysis doc; plan assumes it gets built in P7.
+- Platform admin = **Citadel** (`P:\Citadel`, central SSO hub). Cigarro becomes a Citadel receiver: launch JWT (60s, Ed25519, single-use `jti`) → `/sa/callback` → `POST /api/sa/exchange` → `saSessions` (10 min idle / 1 h cap). Scaffold from `P:\Citadel\templates\citadel-integration` (`npm run scaffold:project -- --slug cigarro`). Store admins keep phone-verify login + `requireOrgAdmin`. Never mix the two sessions.
+- **Do not onboard store #2** until P1 security fixes, the Citadel receiver (P2.5) and the P3 org-scoped JWT land. Today the same customer JWT works on every org and any org owner can edit platform config.
 
 ## What the survey found (2026-11-11)
 - **LIVE SEO OUTAGE**: edge SSR (`functions/ssr-middleware.js`) and `functions/sitemap.xml.js` call Convex catalog/content queries without the required `orgSlug`. Verified on production: Googlebot gets **404** on every product/category/brand/blog URL; sitemap has 13 static URLs, zero catalog URLs. Unknown paths return 200 + homepage canonical to everyone (soft 404).
@@ -31,8 +32,10 @@ Status: draft, 2026-11-11. Owner: orchestrator session. Executors: Haiku agents,
 2. Unknown paths: real 404 status for all UAs (edge checks route table + slug existence).
 3. `_headers`: remove blanket `X-Robots-Tag: index, follow`.
 4. Verify on preview deploy with Googlebot UA; then resubmit sitemap in Search Console.
+5. P0b (data + small code): fix 3 canonical-drift 404s (`elements-filter-tips`, `dunhill-international`, `esse-black-golden-leaf`: `canonicalUrl` ≠ slug). Enrich hub bot HTML (`/`, `/products`, `/brands`, `/categories`, `/blogs` are ~260 chars with zero internal links) with real link lists for crawl/link equity. Then GSC + Bing revalidation.
 
 ### P1: Cleanup + guardrails (~2 agents, parallel)
+- A0 (user action, before A): if the Supabase project still exists, run `supabase db push` for `supabase/migrations/084_drop_orphaned_payment_rpcs.sql`, or just delete the project. Keep `supabaseId` fields (live compat data, never rename). Add `scripts/check-no-supabase.mjs` guard (fails on `@supabase` import or `VITE_SUPABASE_`). Fix CLAUDE.md drift: sidebar export is `ADMIN_NAVIGATION`, not `NAVIGATION_CONFIG`.
 - A: delete `supabase/` (check `.temp/pooler-url` contents, then `git rm`), stale comments, unused deps, dead shadcn/components listed in survey, broken `generate-sitemap`, root junk (after user OK on docs).
 - B: add `convex/tsconfig.json` + `npm run type-check` covering convex; CI-style script `npm run verify` = type-check + lint + check-no-toasts + build.
 - Fix security holes listed above (scope every admin check to the target org).
@@ -43,11 +46,19 @@ Status: draft, 2026-11-11. Owner: orchestrator session. Executors: Haiku agents,
 3. Frontend: `useOrg()` reads `__ORG__`; delete `ORG_SLUG` constant; replace 227 refs mechanically (admin pages take org from route param `/<store>`).
 4. Per-store settings: branding, contact, legal pages, age-gate (on/off, min age per state), referral reward, UPI VPA, invoice details, analytics/GSC verification tokens, SEO defaults. Move every hardcoded "Cigarro"/cigarro.in in survey list into settings.
 
+Note: domains live in a separate `orgDomains` table, not a `domains[]` array on `organizations`, because each hostname needs its own verification status, Cloudflare hostname ID and primary/alias flag. Keep the `smokeshop` null-orgId fallback until the backfill is verified in production, then delete it.
+
+### P2.5: Citadel super-admin receiver
+- Scaffold receiver (`--slug cigarro`), add `saSessions` + `saExchangedJtis` tables, envs `CITADEL_JWKS_URL/ISSUER/AUDIENCE=cigarro`.
+- Implement `requireSuperAdmin` / `requireSaSession` / `requireSaWrite` (TOTP-backed write scope) in `convex/lib/auth.ts`. `appConfig.set` and all org create/suspend/domain/member mutations require SA write.
+- Platform pages under `/sa/*` behind `SuperGate`: stores list, create/suspend, domains (P6), members, platform config. Move "Platform Config (owners only)" card off the Payments page.
+
 ### P3: Per-store customers
 - `users` gets `orgId`, index `by_org_phone`. Same phone = different user per store.
 - JWT adds `org` claim; Convex auth helper rejects tokens whose `org` ≠ target org. Issuer stays platform (`https://auth.cigarro.in` or keep current), JWKS shared.
 - Backfill existing users → smokeshop. Remove `CUSTOMER_ORG_SLUG` gate.
-- Sessions are per-origin already (localStorage), good for custom domains.
+- Sessions are per-origin already (localStorage), good for custom domains. Subdomains on a shared parent are separate origins too; still key the session `cigarro.session.v1:<orgSlug>` as belt-and-braces.
+- Audit every customer-facing Convex function for `requireMember(orgId)` coverage (one Haiku agent, table output).
 
 ### P4: Admin PWA (`admin.cigarro.in/<store>`)
 - Admin routes move under `/:store/*`; membership check per store. Store switcher for multi-store users.
@@ -69,8 +80,8 @@ Rendering (decision Q2). Then, per store:
 - Cloudflare for SaaS custom hostnames on the Pages project; platform admin adds domain → API creates hostname → shows DNS (CNAME) + TXT verification → status polling → `orgDomains.status = active`.
 - Cutover runbook: redirects imported + checker green → DNS switch → submit sitemap → monitor GSC coverage 14 days.
 
-### P7: Platform admin
-- Per decision Q1. Minimum: super-admin role (env allowlist of user IDs), list/create/suspend stores, domains, members, impersonate-as-admin (audited).
+### P7: Platform admin extras
+- On top of P2.5: plans/billing, impersonate-as-store-admin (audited), cross-store health (Gmail connection status, failed matches, GSC coverage).
 
 ## Execution rules for Haiku agents
 - One slice per agent, brief names exact files, done criteria, and what NOT to touch.
