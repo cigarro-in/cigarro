@@ -166,6 +166,19 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
 
+  // Hostname → org routing. hostname is lowercase, no port, no trailing dot.
+  orgDomains: defineTable({
+    orgId: v.id("organizations"),
+    hostname: v.string(),
+    kind: v.union(v.literal("primary"), v.literal("alias")),
+    status: v.union(v.literal("pending"), v.literal("active"), v.literal("disabled")),
+    cfHostnameId: v.optional(v.string()),
+    createdAt: v.number(),
+    verifiedAt: v.optional(v.number()),
+  })
+    .index("by_hostname", ["hostname"])
+    .index("by_org", ["orgId"]),
+
   memberships: defineTable({
     orgId: v.id("organizations"),
     userId: v.string(),
