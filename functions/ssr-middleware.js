@@ -1,4 +1,4 @@
-import { requiredConvexUrl } from './lib/env.js';
+import { requiredConvexUrl, getOrgSlug } from './lib/env.js';
 // SSR Middleware for Cloudflare Pages
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
@@ -90,21 +90,23 @@ function breadcrumbNavHtml(items) {
 // Wave 3: catalog reads come from Convex. Templates below are untouched —
 // Convex rows are adapted to the exact Supabase shapes the templates expect,
 // so bot HTML stays byte-identical (gate: canonical/H1/schema asserted).
-async function cxQuery(baseUrl, path, args) {
-  const res = await fetch(`${baseUrl}/api/query`, {
+// `cx` = { url, orgSlug }. Every catalog/content query validator requires
+// `orgSlug` (org-scoped reads), so it is injected here for every call.
+async function cxQuery(cx, path, args) {
+  const res = await fetch(`${cx.url}/api/query`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, args, format: 'json' }),
+    body: JSON.stringify({ path, args: { orgSlug: cx.orgSlug, ...args }, format: 'json' }),
   });
   const body = await res.json();
-  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed: ${body.errorMessage || body.status}`);
   return body.value;
 }
 
 // Generate HTML for product pages
-async function generateProductHTML(slug, faviconUrl, convexUrl) {
+async function generateProductHTML(slug, faviconUrl, cx) {
   try {
-    const detail = await cxQuery(convexUrl, 'catalog:getProductBySlug', { slug });
+    const detail = await cxQuery(cx, 'catalog:getProductBySlug', { slug });
     if (!detail || !detail.product || detail.product.isActive === false) {
       return null;
     }
@@ -210,7 +212,7 @@ async function generateProductHTML(slug, faviconUrl, convexUrl) {
     let relatedLinks = '';
     try {
       const brandName = product.brand?.name;
-      const links = await cxQuery(convexUrl, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 50 });
+      const links = await cxQuery(cx, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 50 });
       const list = (links || []).map(r => ({
         slug: r.slug,
         name: r.name,
@@ -445,8 +447,8 @@ function normalizeConvexVariant(x) {
 
 // Full product fetch for agent formats (includes stock/unit columns the
 // SEO HTML intentionally omits). Convex-backed; output shape unchanged.
-async function fetchProductData(slug, convexUrl) {
-  const detail = await cxQuery(convexUrl, 'catalog:getProductBySlug', { slug }).catch(() => null);
+async function fetchProductData(slug, cx) {
+  const detail = await cxQuery(cx, 'catalog:getProductBySlug', { slug }).catch(() => null);
   if (!detail || !detail.product || detail.product.isActive === false) return null;
   const p = detail.product;
   const brand = detail.brand || null;
@@ -461,7 +463,7 @@ async function fetchProductData(slug, convexUrl) {
   const images = (detail.variants || []).flatMap(x => x.images || []);
   let related = [];
   try {
-    const links = await cxQuery(convexUrl, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 8 });
+    const links = await cxQuery(cx, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 8 });
     related = (links || []).map(l => ({ name: l.name, url: `https://cigarro.in/product/${l.slug}` }));
   } catch { /* related links are best-effort */ }
   return {
@@ -519,11 +521,11 @@ function serializeProductMarkdown(norm) {
 // Search over the Convex fullCatalog bundle (in-memory substring match =
 // the old RPC's ILIKE semantics; empty query lists the active catalog).
 // Output shape matches the old RPC path exactly; search never hard-fails.
-async function fetchSearchResults(query, convexUrl) {
+async function fetchSearchResults(query, cx) {
   const q = (query || '').trim().toLowerCase().slice(0, 100);
   let full = null;
   try {
-    full = await cxQuery(convexUrl, 'catalog:fullCatalog', {});
+    full = await cxQuery(cx, 'catalog:fullCatalog', {});
   } catch (e) {
     console.error('convex fullCatalog failed:', e.message);
     return [];
@@ -605,9 +607,9 @@ function agentFormatResponse(body, format) {
 }
 
 // Generate HTML for category pages
-async function generateCategoryHTML(slug, faviconUrl, convexUrl) {
+async function generateCategoryHTML(slug, faviconUrl, cx) {
   try {
-    const detail = await cxQuery(convexUrl, 'catalog:getCategoryDetail', { slug });
+    const detail = await cxQuery(cx, 'catalog:getCategoryDetail', { slug });
     if (!detail || !detail.category) {
       return null;
     }
@@ -698,9 +700,9 @@ async function generateCategoryHTML(slug, faviconUrl, convexUrl) {
 }
 
 // Generate HTML for brand pages — queried from DB, never guessed from slug
-async function generateBrandHTML(slug, faviconUrl, convexUrl) {
+async function generateBrandHTML(slug, faviconUrl, cx) {
   try {
-    const detail = await cxQuery(convexUrl, 'catalog:getBrandDetail', { slug });
+    const detail = await cxQuery(cx, 'catalog:getBrandDetail', { slug });
     if (!detail || !detail.brand) {
       return null;
     }
@@ -874,7 +876,7 @@ function generateHomepageHTML(faviconUrl) {
 
 // Generate HTML for static pages. For /blogs the bot body also lists the
 // latest posts (crawlable internal links); failures degrade to title + desc.
-async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
+async function generateStaticPageHTML(pathname, faviconUrl, cx) {
   const pages = {
     '/about': {
       title: 'About Cigarro | Online Cigarette Store in India',
@@ -929,9 +931,9 @@ async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
 
   let postsNav = '';
   let postsSchema = '';
-  if (pathname === '/blogs' && convexUrl) {
+  if (pathname === '/blogs' && cx) {
     try {
-      const rows = await cxQuery(convexUrl, 'content:listBlogPosts', { limit: 50 });
+      const rows = await cxQuery(cx, 'content:listBlogPosts', { limit: 50 });
       const items = (rows || []).map((p) => ({
         title: p.title,
         url: `https://cigarro.in/blog/${p.slug}`,
@@ -1022,9 +1024,9 @@ async function generateStaticPageHTML(pathname, faviconUrl, convexUrl) {
 }
 
 // Generate HTML for blog posts
-async function generateBlogHTML(slug, faviconUrl, convexUrl) {
+async function generateBlogHTML(slug, faviconUrl, cx) {
   try {
-    const row = await cxQuery(convexUrl, 'content:getBlogPostBySlug', { slug });
+    const row = await cxQuery(cx, 'content:getBlogPostBySlug', { slug });
     if (!row) {
       return null;
     }
@@ -1267,6 +1269,34 @@ function isExcludedPath(pathname) {
     pathname.startsWith('/payment');
 }
 
+// Known SPA route patterns, mirrored from src/config/routes.ts (ROUTES) and
+// src/routes/AppRoutes.tsx. Keep in sync when routes are added. Used only to
+// decide whether a BOT request gets a soft 404 (unknown path) vs. the SPA.
+const KNOWN_ROUTE_PATTERNS = [
+  '/', '/cart', '/checkout', '/desktop-checkout', '/mobile-checkout',
+  '/transaction', '/transaction/:orderId', '/orders', '/payment',
+  '/profile', '/profile/settings', '/addresses', '/reviews', '/wallet',
+  '/wishlist', '/referrals', '/referral/:code',
+  '/products', '/product/:slug', '/categories', '/category/:slug',
+  '/category/:category/:brand', '/brands', '/brand/:slug',
+  '/blogs', '/blog/:slug', '/about', '/contact', '/agents',
+  '/legal', '/privacy', '/terms', '/shipping', '/returns',
+  '/admin/*',
+].map(pattern => {
+  const body = pattern.endsWith('/*')
+    ? pattern.slice(0, -2).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:/.*)?'
+    : pattern.split('/').map(seg => (seg.startsWith(':') ? '[^/]+' : seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('/').replace(/\/$/, '');
+  return new RegExp(`^${body}/?$`);
+});
+
+// True when the path matches no SPA route. Paths with a file extension
+// (sw.js, robots.txt, assets) are static files, never soft-404'd here.
+export function isUnknownRoutePath(pathname) {
+  const last = pathname.split('/').pop() || '';
+  if (last.includes('.')) return false;
+  return !KNOWN_ROUTE_PATTERNS.some(re => re.test(pathname));
+}
+
 // Returns the entity slug when pathname is a single-segment catalog detail URL
 // (/product/:slug, /brand/:slug, /category/:slug, /blog/:slug), else null.
 // Multi-segment paths (e.g. /category/:category/:brand, a valid SPA route) are
@@ -1387,7 +1417,7 @@ export async function onRequest(context) {
   try {
     // Wave 8: all catalog reads (bot HTML + search + ?format= feeds) come
     // from Convex. Supabase is fully decoupled from this middleware.
-    const convexUrl = requiredConvexUrl(env);
+    const cx = { url: requiredConvexUrl(env), orgSlug: getOrgSlug(env) };
 
     // Use static favicon path (no database fetch needed)
     const faviconUrl = 'https://cigarro.in/icons/android-chrome-512x512.png';
@@ -1403,7 +1433,7 @@ export async function onRequest(context) {
         }
         if (url.pathname === '/products') {
           const q = url.searchParams.get('search') || '';
-          const results = await fetchSearchResults(q, convexUrl);
+          const results = await fetchSearchResults(q, cx);
           return agentFormatResponse(
             formatParam === 'json' ? serializeSearchJson(q, results) : serializeSearchMarkdown(q, results),
             formatParam
@@ -1411,7 +1441,7 @@ export async function onRequest(context) {
         }
         if (url.pathname.startsWith('/product/')) {
           const slug = url.pathname.replace('/product/', '').split('?')[0];
-          const norm = await fetchProductData(slug, convexUrl);
+          const norm = await fetchProductData(slug, cx);
           if (!norm) {
             return new Response(
               formatParam === 'json' ? JSON.stringify({ error: 'Product not found', slug }) : '# Not found\n\nNo active product for this URL.',
@@ -1455,35 +1485,36 @@ export async function onRequest(context) {
       url.pathname === '/terms' || url.pathname === '/privacy' ||
       url.pathname === '/shipping' || url.pathname === '/returns' ||
       url.pathname === '/legal') {
-      html = await generateStaticPageHTML(url.pathname, faviconUrl, convexUrl);
+      html = await generateStaticPageHTML(url.pathname, faviconUrl, cx);
     } else if (url.pathname.startsWith('/product/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateProductHTML(slug, faviconUrl, convexUrl);
+        html = await generateProductHTML(slug, faviconUrl, cx);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/category/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateCategoryHTML(slug, faviconUrl, convexUrl);
+        html = await generateCategoryHTML(slug, faviconUrl, cx);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/brand/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBrandHTML(slug, faviconUrl, convexUrl);
+        html = await generateBrandHTML(slug, faviconUrl, cx);
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/blog/')) {
       const slug = catalogSlug(url.pathname);
       if (slug !== null) {
-        html = await generateBlogHTML(slug, faviconUrl, convexUrl);
+        html = await generateBlogHTML(slug, faviconUrl, cx);
         if (!html) catalogMiss = true;
       }
     }
 
-    // Dead catalog URL: branded 404, never the SPA shell (soft 404).
-    if (!html && catalogMiss) {
+    // Dead catalog URL or path that matches no SPA route: branded 404, never
+    // the SPA shell (soft 404).
+    if (!html && (catalogMiss || isUnknownRoutePath(url.pathname))) {
       return new Response(generateNotFoundHTML(url.pathname, faviconUrl), {
         status: 404,
         headers: {

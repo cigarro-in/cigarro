@@ -8,3 +8,9 @@ export function requiredConvexUrl(env) {
   if (!url) throw new Error('VITE_CONVEX_URL not configured');
   return url;
 }
+
+// Storefront org slug for every Convex catalog/content query. Convex
+// validators require `orgSlug` (no default on the server side).
+export function getOrgSlug(env) {
+  return env.VITE_ORG_SLUG || 'smokeshop';
+}

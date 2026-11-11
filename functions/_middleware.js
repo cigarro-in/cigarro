@@ -1,5 +1,5 @@
 // Cloudflare Pages middleware for SPA routing and SSR
-import { onRequest as ssrMiddleware } from './ssr-middleware.js';
+import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
 
 export async function onRequest(context) {
@@ -113,7 +113,13 @@ async function routeRequest(context) {
   )) {
     return ssrMiddleware(context);
   }
-  
+
+  // Bots hitting a path that matches no SPA route get the branded soft 404
+  // from ssr-middleware (never the 200 SPA shell). Humans are untouched.
+  if (isBot && isUnknownRoutePath(url.pathname)) {
+    return ssrMiddleware(context);
+  }
+
   // Let Cloudflare Pages handle everything else (normal SPA routing)
   return next();
 }

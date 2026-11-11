@@ -1,4 +1,4 @@
-import { requiredConvexUrl } from './lib/env.js';
+import { requiredConvexUrl, getOrgSlug } from './lib/env.js';
 // Dynamic sitemap.xml endpoint for Cloudflare Pages
 // Automatically serves fresh sitemap from database
 // URL: https://cigarro.in/sitemap.xml
@@ -11,7 +11,7 @@ async function cxQuery(baseUrl, path, args) {
     body: JSON.stringify({ path, args, format: 'json' }),
   });
   const body = await res.json();
-  if (body.status !== 'success') throw new Error(`Convex ${path} failed`);
+  if (body.status !== 'success') throw new Error(`Convex ${path} failed: ${body.errorMessage || body.status}`);
   return body.value;
 }
 
@@ -35,8 +35,8 @@ export async function onRequest(context) {
     const convexUrl = requiredConvexUrl(env);
 
     // Generate sitemap XML
-    const xml = await generateSitemap(convexUrl);
-    
+    const xml = await generateSitemap(convexUrl, getOrgSlug(env));
+
     return new Response(xml, {
       headers: {
         'Content-Type': 'application/xml',
@@ -44,30 +44,21 @@ export async function onRequest(context) {
         ...corsHeaders,
       }
     });
-    
+
   } catch (error) {
-    console.error('Sitemap error:', error);
-    console.error('Stack trace:', error.stack);
-    
-    // Return fallback static sitemap on error
-    const fallback = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://cigarro.in/</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://cigarro.in/products</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-</urlset>`;
-    
-    return new Response(fallback, {
-      headers: { 'Content-Type': 'application/xml', ...corsHeaders }
+    console.error('Sitemap error:', error?.message || error);
+    console.error('Stack trace:', error?.stack);
+
+    // Never serve a short sitemap on failure: Google reads missing URLs as
+    // removed pages. 503 + Retry-After tells crawlers to come back later.
+    return new Response('Sitemap temporarily unavailable', {
+      status: 503,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Retry-After': '3600',
+        'Cache-Control': 'no-store',
+        ...corsHeaders,
+      }
     });
   }
 }
@@ -83,7 +74,7 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-async function generateSitemap(convexUrl) {
+async function generateSitemap(convexUrl, orgSlug) {
   const BASE_URL = 'https://cigarro.in';
   const today = new Date().toISOString().split('T')[0];
   // Static pages change rarely — fixed date so Google trusts lastmod.
@@ -112,16 +103,26 @@ async function generateSitemap(convexUrl) {
 
   // Fetch data (with error handling) — Convex is the catalog source.
   const [catalogResult, blogResult] = await Promise.allSettled([
-    cxQuery(convexUrl, 'catalog:sitemapCatalog', {}),
+    cxQuery(convexUrl, 'catalog:sitemapCatalog', { orgSlug }),
 
-    cxQuery(convexUrl, 'content:listBlogPosts', { limit: 100 }),
+    cxQuery(convexUrl, 'content:listBlogPosts', { orgSlug, limit: 100 }),
   ]);
 
-  const catalog = catalogResult.status === 'fulfilled' ? catalogResult.value : null;
+  // A failed fetch must NOT produce a partial sitemap (see onRequest 503).
+  if (catalogResult.status !== 'fulfilled') {
+    console.error('Sitemap catalog fetch failed:', catalogResult.reason?.message || catalogResult.reason);
+    throw catalogResult.reason;
+  }
+  if (blogResult.status !== 'fulfilled') {
+    console.error('Sitemap blog fetch failed:', blogResult.reason?.message || blogResult.reason);
+    throw blogResult.reason;
+  }
+
+  const catalog = catalogResult.value;
   const products = catalog?.products || [];
   const categories = catalog?.categories || [];
   const brands = catalog?.brands || [];
-  const blogPosts = (blogResult.status === 'fulfilled' ? blogResult.value : []).map(p => ({
+  const blogPosts = (blogResult.value || []).map(p => ({
     slug: p.slug,
     // content queries return ms timestamps; sitemap wants YYYY-MM-DD.
     updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : null,
