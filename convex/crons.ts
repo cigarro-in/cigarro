@@ -1,8 +1,10 @@
 import { cronJobs } from "convex/server";
+import { internal } from './_generated/api';
 
 const crons = cronJobs();
+crons.interval('prune crash logs', { hours: 6 }, internal.crashLogs.prune, {});
 
-// No permanent cron. Gmail inbox checks are event-driven per order (creation
+// Gmail inbox checks are event-driven per order (creation
 // backoff, customer wake/refresh, post-expiry reconciliation) plus manual
 // admin checks — each skips with zero Gmail calls when nothing is pending.
 

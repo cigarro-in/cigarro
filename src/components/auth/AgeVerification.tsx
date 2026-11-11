@@ -1,3 +1,4 @@
+import { readStoredPreference, writeStoredPreference } from '../../lib/browserStorage';
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { motion } from 'framer-motion';
@@ -12,7 +13,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
 
   useEffect(() => {
     // Check if user has already verified permanently (first ever visit check)
-    const hasVerified = localStorage.getItem('ageVerified');
+    const hasVerified = readStoredPreference('ageVerified');
     if (hasVerified === 'true') {
       onVerify();
     }
@@ -20,11 +21,11 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
 
   const handleVerify = () => {
     // Store age verification in local storage (persistent)
-    localStorage.setItem('ageVerified', 'true');
+    writeStoredPreference('ageVerified', 'true');
     
     // Also set cookie consent as implied by using the site if needed
-    if (!localStorage.getItem('cookie_consent')) {
-        localStorage.setItem('cookie_consent', JSON.stringify({
+    if (!readStoredPreference('cookie_consent')) {
+        writeStoredPreference('cookie_consent', JSON.stringify({
             necessary: true,
             analytics: true,
             marketing: true,

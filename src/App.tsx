@@ -1,3 +1,4 @@
+import { readStoredPreference } from './lib/browserStorage';
 import { useState, useEffect, useLayoutEffect, Suspense } from 'react';
 import { BrowserRouter as Router, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
@@ -139,7 +140,7 @@ function AppContent() {  const { user } = useAuth();
   
   // Check localStorage immediately to prevent flash of age verification
   const [isAgeVerified, setIsAgeVerified] = useState(() => {
-    return localStorage.getItem('ageVerified') === 'true';
+    return readStoredPreference('ageVerified') === 'true';
   });
 
   const [siteSettings, setSiteSettings] = useState({
@@ -203,7 +204,7 @@ function AppContent() {  const { user } = useAuth();
   // Already-verified visitors never see the gate again: offer them the
   // one-time banner instead so analytics is never silently enabled.
   const [legacyConsentNeeded] = useState(
-    () => localStorage.getItem('ageVerified') === 'true' && getConsent() === null
+    () => readStoredPreference('ageVerified') === 'true' && getConsent() === null
   );
 
   // Apply before paint: storefront top padding must not shift the admin host.

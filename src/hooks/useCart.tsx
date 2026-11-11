@@ -1,3 +1,4 @@
+import { readStoredPreference } from '../lib/browserStorage';
 import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
@@ -397,7 +398,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // cart. Once org arrives the Convex path merges it server-side.
     if (!user || !org) {
       // Load from localStorage for guests
-      const savedCart = localStorage.getItem('cart');
+      const savedCart = readStoredPreference('cart');
       if (savedCart) {
         try {
           const parsedCart = JSON.parse(savedCart);
@@ -425,7 +426,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // persisting so we never overwrite server lines with guest-only
       // state. The serverCartSig effect re-runs loadCart once lines arrive.
       if (convexLineCount === undefined) {
-        const savedCart = localStorage.getItem('cart');
+        const savedCart = readStoredPreference('cart');
         if (savedCart) {
           try {
             const parsedCart = JSON.parse(savedCart);
@@ -444,7 +445,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const guestCart = localStorage.getItem('cart');
+        const guestCart = readStoredPreference('cart');
         const parsedGuestCart = guestCart ? JSON.parse(guestCart) : [];
         const guestItems: CartItem[] = Array.isArray(parsedGuestCart)
           ? parsedGuestCart.map((item) => ({

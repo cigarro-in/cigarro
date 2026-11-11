@@ -1,7 +1,50 @@
 // Cloudflare Pages middleware for SPA routing and SSR
 import { onRequest as ssrMiddleware } from './ssr-middleware.js';
+import { persistCrash } from './lib/crash-logs.js';
 
 export async function onRequest(context) {
+  if (new URL(context.request.url).pathname === '/api/crash-logs') return context.next();
+  try {
+    const response = await routeRequest(context);
+    if (response.status >= 500) {
+      context.waitUntil((async () => {
+        let detail = '';
+        // Only inspect bounded JSON error fields, never successful response data.
+        if (response.headers.get('content-type')?.includes('application/json')) {
+          const reader = response.clone().body?.getReader();
+          if (reader) {
+            const chunks = [];
+            let size = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              size += value.length;
+              if (size > 4000) { void reader.cancel(); break; }
+              chunks.push(value);
+            }
+            if (size <= 4000) {
+              try {
+                const text = chunks.map(chunk => new TextDecoder().decode(chunk)).join('');
+                const body = JSON.parse(text);
+                detail = [body.error, body.details].filter(value => typeof value === 'string').join(': ');
+              } catch { /* Non-JSON errors still get the status and request ID. */ }
+            }
+          }
+        }
+        await persistCrash(context, { message: `HTTP ${response.status}${detail ? ': ' + detail : ''}`, status: response.status });
+      })().catch(() => persistCrash(context, { message: `HTTP ${response.status}`, status: response.status })));
+    }
+    return response;
+  } catch (error) {
+    context.waitUntil(persistCrash(context, {
+      message: error instanceof Error ? error.message : 'Unhandled Cloudflare error',
+      stack: error instanceof Error ? error.stack : '', status: 500,
+    }));
+    throw error;
+  }
+}
+
+async function routeRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
 

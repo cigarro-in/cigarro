@@ -61,6 +61,8 @@ Themes own:
 
 ## Known deferred items
 
+- Crash diagnostics: `crashLogs` in Convex, admin-only `crashLogs.list`, 14-day retention. App reports go through `POST /api/crash-logs`; Pages forwards using the existing `EDGE_SHARED_SECRET` to Convex `POST /crashLogs`. App/Pages capture requires a frontend deployment; Gmail background errors log directly. Verify with `node scripts/check-crash-logging.mjs` and `node scripts/check-device-compatibility.mjs`.
+
 - Dashboard + customers read Convex (`adminStats.getDashboardStats`) — no Supabase stat tiles remain.
 - Bank-email ingestion is code-complete both ends (`email-worker` → `POST /receiveBankEmail` → `ingestBankEmail`, org resolved via `bankInboxes` full address or legacy `bankEmailAlias` slug). Remaining is operator wiring: `wrangler deploy` + secrets in `email-worker/`, Email Routing rule per `bank-<slug>` alias, Gmail forward filter. Manual `markPaid` is the interim path.
 - Old payment-flow RPCs (`verify_order_payment`, `create_order`, `admin_verify_payment`, `get_wallet_balance`) have zero callers in `src/` and `functions/`; drop file is `supabase/migrations/084_drop_orphaned_payment_rpcs.sql` (apply with `supabase db push`).

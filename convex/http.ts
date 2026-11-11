@@ -4,6 +4,30 @@ import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
+http.route({
+  path: '/crashLogs', method: 'POST',
+  handler: httpAction(async (ctx, req) => {
+    const secret = process.env.EDGE_SHARED_SECRET;
+    if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    const text = await req.text();
+    if (text.length > 24000) return new Response('Too large', { status: 413 });
+    try {
+      const body = JSON.parse(text);
+      const result = await ctx.runMutation(internal.crashLogs.record, {
+        orgSlug: body.orgSlug, reporter: body.reporter, report: body.report,
+      });
+      return new Response(JSON.stringify(result), {
+        status: result.accepted ? 200 : 429,
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      });
+    } catch {
+      return new Response('Invalid crash report', { status: 400 });
+    }
+  }),
+});
+
 // ---------- Google OAuth callback (one-click Gmail connect) ----------
 //
 // Google redirects here after the admin approves gmail.readonly access.

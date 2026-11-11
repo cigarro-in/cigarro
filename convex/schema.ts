@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { crashSource } from './lib/crashLog';
 
 export const orderStatus = v.union(
   v.literal("pending"),
@@ -130,6 +131,16 @@ export const orderItemV = v.object({
 });
 
 export default defineSchema({
+  crashLogs: defineTable({
+    orgId: v.id('organizations'), reporter: v.string(), createdAt: v.number(),
+    source: crashSource, message: v.string(), stack: v.string(),
+    componentStack: v.string(), path: v.string(), userAgent: v.string(),
+    build: v.string(), operation: v.string(), requestId: v.string(),
+    status: v.optional(v.number()),
+  }).index('by_org_created', ['orgId', 'createdAt'])
+    .index('by_org_source_created', ['orgId', 'source', 'createdAt'])
+    .index('by_reporter_created', ['reporter', 'createdAt'])
+    .index('by_created', ['createdAt']),
   organizations: defineTable({
     slug: v.string(),
     name: v.string(),

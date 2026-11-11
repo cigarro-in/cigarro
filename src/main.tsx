@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { installCrashReporting } from './lib/crashReporting';
+
+installCrashReporting();
 
 // Suppress react-beautiful-dnd defaultProps deprecation warning
 // This is a known issue with the library and React 18+
@@ -32,6 +35,12 @@ function reloadOnceForFreshChunks(): void {
   }
   window.location.reload();
 }
+// React.lazy handles rejected imports before they reach unhandledrejection.
+// Vite emits this event first, so existing users can still recover after deploys.
+window.addEventListener('vite:preloadError', (event) => {
+  const error = (event as Event & { payload?: { message?: string } }).payload;
+  if (isChunkLoadFailure(error?.message)) reloadOnceForFreshChunks();
+});
 window.addEventListener('error', (event) => {
   if (isChunkLoadFailure((event as ErrorEvent)?.message)) reloadOnceForFreshChunks();
 });

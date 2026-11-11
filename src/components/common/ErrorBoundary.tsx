@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { logger } from '../../utils/logger';
 import { auditLogger } from '../../utils/audit-logger';
+import { reportCrash } from '../../lib/crashReporting';
 
 interface Props {
   children: ReactNode;
@@ -31,6 +32,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    reportCrash(error, {
+      componentStack: errorInfo.componentStack,
+      operation: `ErrorBoundary:${this.props.variant || 'page'}`,
+    });
     // Log error details
     logger.error('Error Boundary caught an error:', {
       error: error.message,

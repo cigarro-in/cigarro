@@ -1,3 +1,4 @@
+import { writeStoredPreference } from '../../lib/browserStorage';
 import { useState } from 'react';
 import { ShieldCheck, Cigarette } from 'lucide-react';
 
@@ -10,7 +11,7 @@ export function VividAgeVerification({ onVerify }: Props) {
 
   const handleYes = () => {
     setConfirming(true);
-    localStorage.setItem('ageVerified', 'true');
+    writeStoredPreference('ageVerified', 'true');
     setTimeout(onVerify, 200);
   };
 

@@ -277,9 +277,17 @@ export const pollInbox = internalAction({
         } catch (e: any) {
           // Per-message failures must not stop the batch.
           console.error("[gmail] message failed:", m?.id, e?.message);
+          await ctx.runMutation(internal.crashLogs.record, {
+            orgId: targetOrgId, reporter: 'convex:gmail',
+            report: { source: 'convex', message: String(e?.message || e), stack: e?.stack, operation: 'gmail.pollInbox.message' },
+          }).catch(() => {});
         }
       }
     } catch (e: any) {
+      await ctx.runMutation(internal.crashLogs.record, {
+        orgId: targetOrgId, reporter: 'convex:gmail',
+        report: { source: 'convex', message: String(e?.message || e), stack: e?.stack, operation: 'gmail.pollInbox' },
+      }).catch(() => {});
       await ctx.runMutation(internal.gmail.notePollResult, {
         error: String(e?.message || e).slice(0, 300),
       });

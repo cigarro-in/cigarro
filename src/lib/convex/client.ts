@@ -1,4 +1,5 @@
 import { ConvexReactClient } from 'convex/react';
+import { reportCrash } from '../crashReporting';
 
 export const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
@@ -8,4 +9,16 @@ if (!convexUrl) {
   );
 }
 
-export const convex = new ConvexReactClient(convexUrl);
+export const convex = new ConvexReactClient(convexUrl, {
+  logger: {
+    logVerbose: () => {},
+    log: (...args: unknown[]) => console.log(...args),
+    warn: (...args: unknown[]) => console.warn(...args),
+    error: (...args: unknown[]) => {
+      console.error(...args);
+      // The SDK includes the function name and server stack in this string.
+      const message = args.filter(arg => typeof arg === 'string').join(' ');
+      reportCrash(message || 'Convex client error', { source: 'convex', operation: 'convex-client' });
+    },
+  },
+});

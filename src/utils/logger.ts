@@ -1,7 +1,9 @@
 /**
  * Production-safe logging utility
- * Removes console logs in production builds
+ * Keeps errors available for diagnosis; suppresses other production logs.
  */
+
+import { reportCrash } from '../lib/crashReporting';
 
 type LogLevel = 'log' | 'warn' | 'error' | 'info' | 'debug';
 
@@ -20,12 +22,14 @@ const createLogger = (level: LogLevel): (...args: any[]) => void => {
     return console[level].bind(console);
   }
   
-  // In production, only log errors to a proper logging service
+  // Keep crash diagnostics available in the affected browser.
   if (level === 'error') {
-    // TODO: Replace with proper logging service (e.g., Sentry, LogRocket)
-    return (...args: any[]) => {
-      // Silent in production for now
-      // In the future, send to logging service
+    return (...args: unknown[]) => {
+      console.error(...args);
+      const error = args.find(arg => arg instanceof Error);
+      // React boundaries submit their full stack separately; never serialize
+      // arbitrary objects here (they may contain private customer data).
+      if (error) reportCrash(error, { operation: String(args[0]).slice(0, 200) });
     };
   }
   
