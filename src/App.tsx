@@ -14,7 +14,7 @@ import { PhoneAuthDialog } from './components/auth/PhoneAuthDialog';
 import { ConvexAuthProvider } from './lib/convex/ConvexAuthProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
-import { useSiteSettings } from './hooks/data/useContent';
+import { useStoreSettings } from './hooks/data/useStoreSettings';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
@@ -151,28 +151,17 @@ function AppContent() {  const { user } = useAuth();
     return readStoredPreference('ageVerified') === 'true';
   });
 
-  const [siteSettings, setSiteSettings] = useState({
-    meta_title: 'Cigarro',
-    meta_description: 'The finest selection of premium cigarettes and cigars.',
-    site_name: 'Cigarro',
-  });
-  // Wave 2: meta/site settings come from Convex (was Supabase).
-  const { settings: convexSettings } = useSiteSettings();
+  // Per-store settings from Convex, defaults filled in (was Supabase).
+  const { settings: store } = useStoreSettings();
+  const gateActive = store.ageGate.enabled;
+  // A store with the age gate switched off never shows it.
+  const gatePassed = !gateActive || isAgeVerified;
 
   // Analytics: load gtag once (consent-denied by default; no collection
   // until the visitor accepts the banner).
   useEffect(() => {
     initAnalytics();
   }, []);
-
-  useEffect(() => {
-    if (!convexSettings) return;
-    setSiteSettings({
-      meta_title: convexSettings.meta_title || 'Cigarro',
-      meta_description: convexSettings.meta_description || 'The finest selection of premium cigarettes and cigars.',
-      site_name: convexSettings.site_name || 'Cigarro',
-    });
-  }, [convexSettings]);
 
   const isAdminHost =
     typeof window !== 'undefined' && window.location.hostname.split('.')[0] === 'admin';
@@ -183,9 +172,9 @@ function AppContent() {  const { user } = useAuth();
   // IP-based internal-traffic filter in GA4 Admin > Data Settings (recommended),
   // not by dropping hits here.
   useEffect(() => {
-    if (!isAgeVerified) return;
+    if (!gatePassed) return;
     trackPageView(location.pathname + location.search);
-  }, [location.pathname, location.search, isAgeVerified]);
+  }, [location.pathname, location.search, gatePassed]);
 
   // Storefront host: /admin* never existed — homepage, no subdomain redirect.
   // (Admin lives only on admin.cigarro.in; same phone number = storefront here.)
@@ -211,9 +200,13 @@ function AppContent() {  const { user } = useAuth();
 
   // Already-verified visitors never see the gate again: offer them the
   // one-time banner instead so analytics is never silently enabled.
-  const [legacyConsentNeeded] = useState(
+  const [legacyConsentNeeded, setLegacyConsentNeeded] = useState(
     () => readStoredPreference('ageVerified') === 'true' && getConsent() === null
   );
+  // Gate switched off for this store: there is no entry moment, so offer the banner.
+  useEffect(() => {
+    if (!gateActive && getConsent() === null) setLegacyConsentNeeded(true);
+  }, [gateActive]);
 
   // Apply before paint: storefront top padding must not shift the admin host.
   useLayoutEffect(() => {
@@ -224,16 +217,16 @@ function AppContent() {  const { user } = useAuth();
     }
   }, [isAdminHost, isAdminPath]);
 
-  if (!isAgeVerified) {
+  if (!gatePassed) {
     const ThemedAgeGate = theme.slots.AgeVerification;
     if (ThemedAgeGate) {
       return (
         <Suspense fallback={null}>
-          <ThemedAgeGate onVerify={handleAgeVerified} />
+          <ThemedAgeGate onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />
         </Suspense>
       );
     }
-    return <AgeVerification onVerify={handleAgeVerified} />;
+    return <AgeVerification onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />;
   }
 
   return (
@@ -245,12 +238,18 @@ function AppContent() {  const { user } = useAuth();
           consent-denied forever and their visits never reached GA. */}
       {legacyConsentNeeded && <ConsentBanner />}
       <Helmet>
-        <title>{siteSettings.meta_title || 'Cigarro'}</title>
-        <meta name="description" content={siteSettings.meta_description || 'Premium tobacco products'} />
+        <title>{store.metaTitle}</title>
+        <meta name="description" content={store.metaDescription} />
         
-        {/* Static Favicon - Uses icons from /icons/ folder */}
-        <link rel="icon" type="image/x-icon" href="/icons/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        {/* Favicon: the store's own when set, else the static icons from /icons/ */}
+        {store.brand.faviconUrl ? (
+          <link rel="icon" href={store.brand.faviconUrl} />
+        ) : (
+          <>
+            <link rel="icon" type="image/x-icon" href="/icons/favicon.ico" />
+            <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+          </>
+        )}
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Helmet>
 {isUserPage ? (

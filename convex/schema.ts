@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { crashSource } from './lib/crashLog';
+import { storeAgeGateV, storeBrandV, storeBusinessV, storeSeoV, storeSocialsV } from './lib/siteSettings';
 
 export const orderStatus = v.union(
   v.literal("pending"),
@@ -693,6 +694,13 @@ export default defineSchema({
     // { standard?: {enabled, priceRupees, label, eta}, express?: {...}, priority?: {...} }
     // Absent keys fall back to DEFAULT_SHIPPING_METHODS in src/lib/shipping.ts.
     shippingConfig: v.optional(v.any()),
+    // Per-store settings (all optional; defaults live in src/config/site.ts).
+    brand: v.optional(storeBrandV),
+    business: v.optional(storeBusinessV),
+    ageGate: v.optional(storeAgeGateV),
+    referralRewardPaise: v.optional(v.number()), // integer paise
+    seo: v.optional(storeSeoV),
+    socials: v.optional(storeSocialsV),
     updatedAt: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
   })

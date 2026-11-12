@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useStoreSettings } from './data/useStoreSettings';
 import type { ReferralStats, ReferredUser } from '../types/referral';
 import {
   getUserReferralStats,
@@ -15,6 +16,7 @@ import {
 
 export function useReferral() {
   const { user } = useAuth();
+  const { settings: store } = useStoreSettings();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ export function useReferral() {
   // Share referral link
   const shareLink = async (): Promise<boolean> => {
     if (!stats?.referral_code) return false;
-    return await shareReferralLink(stats.referral_code);
+    return await shareReferralLink(stats.referral_code, store.referralRewardRupees);
   };
 
   // Refresh data

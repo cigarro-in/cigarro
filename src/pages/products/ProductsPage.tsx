@@ -13,6 +13,7 @@ import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { formatINR } from '../../utils/currency';
 import { Product } from '../../hooks/useCart';
+import { siteConfig } from '../../config/site';
 
 interface FilterSection {
   id: string;
@@ -435,7 +436,7 @@ export function ProductsPage() {
       <SEOHead
         title="All Products - Premium Cigarettes & Tobacco"
         description="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery."
-        url={`https://cigarro.in${location.pathname}`}
+        url={`${siteConfig.url}${location.pathname}`}
         type="website"
         keywords={['premium cigarettes', 'buy cigarettes online', 'tobacco products', 'cigars online', 'cigarette shop', 'premium tobacco India']}
       />

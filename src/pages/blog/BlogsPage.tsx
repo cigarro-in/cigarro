@@ -7,6 +7,7 @@ import { getBlogImageUrl } from '../../lib/images/urls';
 import type { BlogPost as BlogPostType } from '../../types/blog';
 import DOMPurify from 'dompurify';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
+import { siteConfig } from '../../config/site';
 
 export function BlogsPage() {
   const location = useLocation();
@@ -19,7 +20,7 @@ export function BlogsPage() {
       <SEOHead
         title="Blog - Stories of Craftsmanship & Heritage"
         description="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes."
-        url={`https://cigarro.in${location.pathname}`}
+        url={`${siteConfig.url}${location.pathname}`}
         type="website"
         keywords={['tobacco blog', 'cigarette stories', 'tobacco heritage', 'smoking culture', 'premium tobacco articles']}
       />
@@ -195,7 +196,7 @@ export function BlogPost() {
       <SEOHead
         title={post.meta_title || post.title}
         description={post.meta_description || post.excerpt}
-        url={`https://cigarro.in/blog/${post.slug}`}
+        url={`${siteConfig.url}/blog/${post.slug}`}
         type="article"
         author={post.author?.name || undefined}
         publishedTime={post.published_at || undefined}

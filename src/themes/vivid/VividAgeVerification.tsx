@@ -1,12 +1,20 @@
 import { writeStoredPreference } from '../../lib/browserStorage';
 import { useState } from 'react';
 import { ShieldCheck, Cigarette } from 'lucide-react';
+import { DEFAULT_AGE_GATE, type StoreSettings } from '../../lib/storeSettings';
+import { siteConfig } from '../../config/site';
 
 interface Props {
   onVerify: () => void;
+  ageGate?: StoreSettings['ageGate'];
+  siteName?: string;
 }
 
-export function VividAgeVerification({ onVerify }: Props) {
+export function VividAgeVerification({
+  onVerify,
+  ageGate = DEFAULT_AGE_GATE,
+  siteName = siteConfig.name,
+}: Props) {
   const [confirming, setConfirming] = useState(false);
 
   const handleYes = () => {
@@ -32,13 +40,13 @@ export function VividAgeVerification({ onVerify }: Props) {
           </div>
 
           <h1 className="text-xl font-bold tracking-tight text-[#0f0f12] mb-1">
-            Cigarro
+            {siteName}
           </h1>
           <p className="text-xs uppercase tracking-[0.12em] text-[#6b7280] mb-6">
             Premium tobacco marketplace
           </p>
 
-          <h2 className="text-lg font-bold text-[#0f0f12] mb-2">Are you 18 or older?</h2>
+          <h2 className="text-lg font-bold text-[#0f0f12] mb-2">Are you {ageGate.minAge} or older?</h2>
           <p className="text-sm text-[#585966] leading-relaxed mb-6">
             This site sells tobacco products. Entry is restricted to adults of legal age
             per Indian law. By continuing you confirm you meet this requirement.
@@ -49,14 +57,14 @@ export function VividAgeVerification({ onVerify }: Props) {
               onClick={handleNo}
               className="h-11 rounded-[10px] border border-[#e7e8ec] text-[#0f0f12] font-semibold text-sm hover:bg-[#f1f2f4] transition"
             >
-              I'm under 18
+              I'm under {ageGate.minAge}
             </button>
             <button
               onClick={handleYes}
               disabled={confirming}
               className="h-11 rounded-[10px] bg-[#2563eb] text-white font-semibold text-sm hover:bg-[#1d4ed8] active:scale-[0.98] transition-all"
             >
-              Yes, I am 18+
+              Yes, I am {ageGate.minAge}+
             </button>
           </div>
 
@@ -65,7 +73,7 @@ export function VividAgeVerification({ onVerify }: Props) {
             Your answer is stored locally only
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-[#8a8b95]">
-            Continuing confirms you are 18+ and accept our use of cookies.{' '}
+            Continuing confirms you are {ageGate.minAge}+ and accept our use of cookies.{' '}
             <a href="/privacy" className="underline underline-offset-2">Privacy</a>
           </p>
         </div>

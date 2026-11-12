@@ -8,10 +8,13 @@ import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import { Sparkles, ArrowRight, Gift, Leaf, Heart } from 'lucide-react';
 import { validateReferralCode } from '../../utils/referral/referralService';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { motion } from 'framer-motion';
 
 export default function ReferralLandingPage() {
   const { code } = useParams<{ code: string }>();
+  const { settings: store } = useStoreSettings();
+  const rewardRupees = store.referralRewardRupees;
   const { user } = useAuth();
   const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
@@ -127,7 +130,7 @@ export default function ReferralLandingPage() {
             className="max-w-2xl mx-auto"
           >
             <p className="text-xl text-dark/80 mb-12 leading-relaxed font-serif italic">
-              "Discover a curated collection of premium tobacco. Accept this invitation to begin your journey with a <span className="font-semibold text-canyon not-italic">₹100 gift</span> for your first order."
+              "Discover a curated collection of premium tobacco. Accept this invitation to begin your journey with a <span className="font-semibold text-canyon not-italic">₹{rewardRupees} gift</span> for your first order."
             </p>
 
             {/* CTA Button */}
@@ -156,7 +159,7 @@ export default function ReferralLandingPage() {
             {
               icon: Gift,
               title: "The Gift",
-              desc: "Receive ₹100 in your wallet upon your first delivery.",
+              desc: `Receive ₹${rewardRupees} in your wallet upon your first delivery.`,
               delay: 0.4
             },
             {
@@ -208,7 +211,7 @@ export default function ReferralLandingPage() {
               { step: "01", title: "Join", desc: "Create account" },
               { step: "02", title: "Choose", desc: "Select products" },
               { step: "03", title: "Order", desc: "Secure delivery" },
-              { step: "04", title: "Receive", desc: "Get ₹100 credit" }
+              { step: "04", title: "Receive", desc: `Get ₹${rewardRupees} credit` }
             ].map((item, i) => (
               <div key={i} className="text-center relative z-10">
                 <div className="w-12 h-12 mx-auto bg-creme border border-coyote/20 rounded-full flex items-center justify-center mb-4 font-serif text-canyon text-lg shadow-[0_0_0_8px_var(--color-creme)]">

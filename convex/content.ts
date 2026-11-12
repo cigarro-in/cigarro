@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { collectInOrg, inOrg, resolveOrg } from "./lib/org";
+import { readOrgSiteSettings } from "./lib/siteSettings";
 
 // ---------- Wave 2: content reads (Supabase -> Convex) ----------
 // Content is ORG-SCOPED and public: every query takes the storefront orgSlug,
@@ -269,26 +270,13 @@ export const listHomepageComponents = query({
   },
 });
 
+// Storefront-facing read: every field returned here is public by design
+// (meta tags, contact details, age rule). No orgId/key/updatedBy leaks.
 export const getSiteSettings = query({
   args: { orgSlug: v.string() },
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
-    const row = await ctx.db
-      .query("siteSettings")
-      .withIndex("by_org_key", (q) =>
-        q.eq("orgId", org._id).eq("key", "main"),
-      )
-      .unique();
-    const legacy =
-      !row && org.slug === "smokeshop"
-        ? (
-            await ctx.db
-              .query("siteSettings")
-              .withIndex("by_key", (q) => q.eq("key", "main"))
-              .collect()
-          ).find((r: any) => r.orgId == null) ?? null
-        : null;
-    const found = row ?? legacy;
+    const found = await readOrgSiteSettings(ctx, org);
     if (!found) return null;
     return {
       siteName: found.siteName,
@@ -298,6 +286,12 @@ export const getSiteSettings = query({
       activeTheme: found.activeTheme,
       upiId: found.upiId,
       shippingConfig: found.shippingConfig ?? null,
+      brand: found.brand ?? null,
+      business: found.business ?? null,
+      ageGate: found.ageGate ?? null,
+      referralRewardPaise: found.referralRewardPaise ?? null,
+      seo: found.seo ?? null,
+      socials: found.socials ?? null,
       updatedAt: found.updatedAt,
     };
   },

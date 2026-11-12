@@ -1,8 +1,10 @@
 /**
- * Site Configuration
- * 
- * Central configuration for site-wide settings.
- * Update these values to customize the site for different deployments.
+ * Site defaults.
+ *
+ * These are the fallbacks used when a store has not set a value in its
+ * siteSettings row. Consumed only through src/hooks/data/useStoreSettings.ts
+ * (the store's own settings always win). Keep the values equal to what the
+ * smokeshop storefront has always shown.
  */
 
 export const siteConfig = {
@@ -35,6 +37,14 @@ export const siteConfig = {
   
   // Legal
   ageRestriction: 18,
+  // Defaults for the per-store age gate (overridden by siteSettings.ageGate).
+  ageGate: {
+    enabled: true,
+    minAge: 18,
+    stateMinAge: [{ state: 'Karnataka', minAge: 21 }],
+  },
+  // Defaults for the per-store referral reward (siteSettings.referralRewardPaise).
+  referralRewardPaise: 10000,
   
   // SEO Defaults
   seo: {

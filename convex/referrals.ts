@@ -3,11 +3,20 @@ import { ConvexError, v } from "convex/values";
 import { requireIdentity } from "./lib/auth";
 import { inOrg, resolveOrg } from "./lib/org";
 import { creditWallet } from "./wallet";
+import { rupeesToPaise, paiseToRupees } from "./lib/money";
+import { DEFAULT_REFERRAL_REWARD_PAISE, readOrgSiteSettings } from "./lib/siteSettings";
 
 // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
 // ORG-SCOPED: one row per user per org. Ports the record/validate semantics
 // from 040 and pays the configured reward from the trusted delivered-order
 // transition. Reads stay snake_case + ISO dates, matching the old row shape.
+
+// Reward snapshot taken when a referral row is created: the org's
+// referralRewardPaise setting (default Rs 100), stored as rupees on the row.
+async function orgRewardRupees(ctx: any, org: any): Promise<number> {
+  const s = await readOrgSiteSettings(ctx, org);
+  return paiseToRupees(s?.referralRewardPaise ?? DEFAULT_REFERRAL_REWARD_PAISE);
+}
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -119,7 +128,7 @@ export const ensureMyReferral = mutation({
       totalReferrals: 0,
       successfulReferrals: 0,
       totalRewardsEarned: 0,
-      referralRewardAmount: 100,
+      referralRewardAmount: await orgRewardRupees(ctx, org),
       firstOrderCompleted: false,
       ownRewardPaid: false,
       isActive: true,
@@ -184,7 +193,7 @@ async function attach(
       totalReferrals: 0,
       successfulReferrals: 0,
       totalRewardsEarned: 0,
-      referralRewardAmount: 100,
+      referralRewardAmount: await orgRewardRupees(ctx, org),
       firstOrderCompleted: false,
       ownRewardPaid: false,
       referredByUserId: referrer.userId,
@@ -275,7 +284,7 @@ export async function rewardDeliveredReferral(
   if (!referrerMembership) return false;
 
   const now = Date.now();
-  const rewardPaise = Math.max(0, Math.floor(mineRow.referralRewardAmount * 100));
+  const rewardPaise = Math.max(0, rupeesToPaise(mineRow.referralRewardAmount));
   await ctx.db.patch(mineRow._id, {
     orgId: order.orgId,
     firstOrderCompleted: true,

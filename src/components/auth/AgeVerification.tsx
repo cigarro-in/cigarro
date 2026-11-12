@@ -3,12 +3,21 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { motion } from 'framer-motion';
 import { Shield, MapPin, FileText, AlertCircle, Crown } from 'lucide-react';
+import { DEFAULT_AGE_GATE, ageRuleLabel, type StoreSettings } from '../../lib/storeSettings';
+import { siteConfig } from '../../config/site';
 
 interface AgeVerificationProps {
   onVerify: () => void;
+  ageGate?: StoreSettings['ageGate'];
+  siteName?: string;
 }
 
-export function AgeVerification({ onVerify }: AgeVerificationProps) {
+export function AgeVerification({
+  onVerify,
+  ageGate = DEFAULT_AGE_GATE,
+  siteName = siteConfig.name,
+}: AgeVerificationProps) {
+  const rule = ageRuleLabel(ageGate);
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
@@ -61,7 +70,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
                   Smoking is injurious to health.
               </h2>
               <p className="text-canyon font-sans text-sm uppercase tracking-wider font-bold">
-                  Cigarro does not promote tobacco use.
+                  {siteName} does not promote tobacco use.
               </p>
           </div>
 
@@ -75,10 +84,10 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
                   {/* Item 1 - Age */}
                   <div className="flex gap-5 items-start group">
                       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-creme border border-coyote flex items-center justify-center font-serif font-bold text-canyon text-sm group-hover:bg-canyon group-hover:text-creme-light transition-colors duration-300">
-                          18+
+                          {ageGate.minAge}+
                       </div>
                       <p className="text-dark/80 font-sans text-sm md:text-base leading-relaxed pt-1">
-                          I am over the age of 18 years (21 for Karnataka) and am not purchasing tobacco products for anyone underage, understanding that doing so is a criminal offense.
+                          I am over the age of {rule} years and am not purchasing tobacco products for anyone underage, understanding that doing so is a criminal offense.
                       </p>
                   </div>
 
@@ -98,7 +107,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
                           <Shield size={18} strokeWidth={1.5} />
                       </div>
                       <p className="text-dark/80 font-sans text-sm md:text-base leading-relaxed pt-1">
-                          I acknowledge that the delivery executive may request valid age proof to confirm I am over 18 (21 for Karnataka), and I will comply.
+                          I acknowledge that the delivery executive may request valid age proof to confirm I am over {rule}, and I will comply.
                       </p>
                   </div>
 
@@ -108,7 +117,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
                           <AlertCircle size={18} strokeWidth={1.5} />
                       </div>
                       <p className="text-dark/80 font-sans text-sm md:text-base leading-relaxed pt-1">
-                          Cigarro reserves the right to report my account in case of any transgressions.
+                          {siteName} reserves the right to report my account in case of any transgressions.
                       </p>
                   </div>
 
@@ -127,7 +136,7 @@ export function AgeVerification({ onVerify }: AgeVerificationProps) {
           {/* Footer Button */}
           <div className="p-6 md:p-10 border-t border-coyote/20 bg-creme/30">
               <p className="text-center text-dark/60 font-sans text-xs md:text-sm leading-relaxed mb-4">
-                  Proceeding confirms you are 18+ and accept our use of cookies. <a href="/privacy" className="underline underline-offset-2">Privacy</a>
+                  Proceeding confirms you are {ageGate.minAge}+ and accept our use of cookies. <a href="/privacy" className="underline underline-offset-2">Privacy</a>
               </p>
               <Button 
                   onClick={handleVerify}

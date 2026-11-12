@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Bot, Search, MapPin, AlertTriangle, BookOpen, Ban } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { siteConfig } from '../../config/site';
 
 /**
  * AgentsPage — dead-simple static doc for AI shopping agents.
@@ -8,11 +10,13 @@ import { SEOHead } from '../../components/seo/SEOHead';
  * Bots also get a prerendered copy from functions/ssr-middleware.js.
  */
 export function AgentsPage() {
+  const { settings: store } = useStoreSettings();
+  const stateRules = store.ageGate.stateMinAge.map((s) => `${s.minAge}+ in ${s.state}`).join(', ');
   return (
     <>
       <SEOHead
-        title="Shopping Agents — Start Here | Cigarro"
-        description="Machine-readable guide for AI shopping agents: catalog entry points, search template, variant semantics, and compliance rules for cigarro.in. 21+ only."
+        title={`Shopping Agents — Start Here | ${store.name}`}
+        description={`Machine-readable guide for AI shopping agents: catalog entry points, search template, variant semantics, and compliance rules for ${siteConfig.domain}. ${store.ageGate.minAge}+ only.`}
         url="https://cigarro.in/agents"
       />
       <main className="main-container py-10 md:py-16 max-w-3xl">
@@ -23,7 +27,7 @@ export function AgentsPage() {
           Agents start here
         </h1>
         <p className="text-dark/70 text-base md:text-lg leading-relaxed mb-8">
-          Cigarro is India&apos;s premium tobacco marketplace. This page is the
+          {store.name} is India&apos;s premium tobacco marketplace. This page is the
           machine-readable entry point: where the catalog lives, how search
           works, and the rules for acting on a shopper&apos;s behalf.
         </p>
@@ -34,8 +38,8 @@ export function AgentsPage() {
             <AlertTriangle className="w-5 h-5 text-canyon" /> Compliance (non-negotiable)
           </h2>
           <ul className="list-disc pl-5 space-y-2 text-dark/80 text-sm md:text-base leading-relaxed">
-            <li>Buyers must be 18+ (21+ in Karnataka). Never facilitate underage purchase — it is a criminal offense.</li>
-            <li>Smoking is injurious to health. Cigarro does not promote tobacco use.</li>
+            <li>Buyers must be {store.ageGate.minAge}+{stateRules ? ` (${stateRules})` : ''}. Never facilitate underage purchase — it is a criminal offense.</li>
+            <li>Smoking is injurious to health. {store.name} does not promote tobacco use.</li>
             <li>Surface the product&apos;s health warning to the shopper before checkout.</li>
           </ul>
         </section>

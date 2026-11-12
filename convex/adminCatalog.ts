@@ -7,6 +7,7 @@ import {
   requireOrgAdminBySlug,
 } from "./lib/org";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
+import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 
 // ---------- Wave 5: catalog + content authorship (Supabase -> Convex) ----------
 // Catalog/content tables are ORG-SCOPED. Every read/write takes orgSlug,
@@ -1612,24 +1613,29 @@ export const saveSiteSettings = mutation({
     activeTheme: v.optional(v.string()),
     upiId: v.optional(v.string()),
     shippingConfig: v.optional(v.any()),
+    brand: v.optional(storeBrandV),
+    business: v.optional(storeBusinessV),
+    ageGate: v.optional(storeAgeGateV),
+    referralRewardPaise: v.optional(v.number()),
+    seo: v.optional(storeSeoV),
+    socials: v.optional(storeSocialsV),
   },
   handler: async (ctx, args) => {
     const { org, orgId, identity } = await requireOrgAdminBySlug(ctx, args.orgSlug);
     const { orgSlug: _drop, ...rest } = args;
-    const row = await ctx.db
-      .query("siteSettings")
-      .withIndex("by_org_key", (q) => q.eq("orgId", orgId).eq("key", "main"))
-      .unique();
-    const legacy =
-      !row && org.slug === "smokeshop"
-        ? (
-            await ctx.db
-              .query("siteSettings")
-              .withIndex("by_key", (q) => q.eq("key", "main"))
-              .collect()
-          ).find((r: any) => r.orgId == null) ?? null
-        : null;
-    const found = row ?? legacy;
+    if (rest.brand?.brandColor && !/^#[0-9a-fA-F]{6}$/.test(rest.brand.brandColor))
+      throw new ConvexError({ code: "INVALID_BRAND_COLOR" });
+    if (rest.ageGate) {
+      const ages = [rest.ageGate.minAge, ...rest.ageGate.stateMinAge.map((s) => s.minAge)];
+      if (ages.some((a) => !Number.isInteger(a) || a < 0 || a > 100))
+        throw new ConvexError({ code: "INVALID_AGE" });
+    }
+    if (
+      rest.referralRewardPaise !== undefined &&
+      (!Number.isInteger(rest.referralRewardPaise) || rest.referralRewardPaise < 0)
+    )
+      throw new ConvexError({ code: "INVALID_REFERRAL_REWARD" });
+    const found = await readOrgSiteSettings(ctx, org);
     if (found && !inOrg(found as any, org)) throw new ConvexError({ code: "NOT_FOUND" });
     const patch = {
       ...rest,

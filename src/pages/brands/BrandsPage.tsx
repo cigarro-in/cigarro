@@ -5,6 +5,7 @@ import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ArrowRight, Star, Package } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { siteConfig } from '../../config/site';
 
 interface Brand {
   id: string;
@@ -79,7 +80,7 @@ export function BrandsPage() {
       <SEOHead
         title="Our Premium Brands"
         description="Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world's finest brands."
-        url={`https://cigarro.in${location.pathname}`}
+        url={`${siteConfig.url}${location.pathname}`}
         type="website"
         keywords={['premium brands', 'cigarette brands', 'tobacco brands', 'luxury cigarettes']}
       />

@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { useReferral } from '../../hooks/useReferral';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { 
@@ -23,6 +24,7 @@ import { cn } from '../../components/ui/utils';
 
 export default function ReferralPage() {
   const { stats, referredUsers, wasReferred, loading, copyLink, shareLink } = useReferral();
+  const { settings: store } = useStoreSettings();
   const [copying, setCopying] = useState(false);
   const [sharing, setSharing] = useState(false);
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
@@ -84,7 +86,7 @@ export default function ReferralPage() {
               <span className="italic text-canyon">Ritual</span>
             </h1>
             <p className="font-sans text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed font-light">
-              Invite friends to discover Cigarro. When they find their peace, you both receive <span className="font-medium text-dark">₹100</span> as a token of our gratitude.
+              Invite friends to discover {store.name}. When they find their peace, you both receive <span className="font-medium text-dark">₹{store.referralRewardRupees}</span> as a token of our gratitude.
             </p>
           </motion.div>
         </div>

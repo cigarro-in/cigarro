@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
 // The 512px icon is a valid image for Organization/publisher logos (never a share image).
@@ -42,8 +43,8 @@ interface SEOHeadProps {
 }
 
 export function SEOHead({
-  title = 'Cigarro | Cigarettes and Tobacco Products Online',
-  description = 'Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro.',
+  title: titleProp,
+  description: descriptionProp,
   keywords = ['cigarettes online', 'cigarette brands India', 'tobacco products India'],
   image,
   url = 'https://cigarro.in',
@@ -68,7 +69,15 @@ export function SEOHead({
   twitterImage,
   robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
 }: SEOHeadProps) {
-  const fullTitle = title.includes('Cigarro') ? title : `${title} | Cigarro`;
+  const { settings: store } = useStoreSettings();
+  const siteName = store.name;
+  const title = titleProp ?? `${siteName} | Cigarettes and Tobacco Products Online`;
+  const description =
+    descriptionProp ??
+    (store.seo.defaultDescription || `Browse ${siteName} products online.`);
+  const fullTitle = title.includes(siteName)
+    ? title
+    : store.seo.titleTemplate.replace('%s', title);
   
   // Build canonical URL - strip query params and normalize trailing slashes for SEO
   const buildCanonicalUrl = () => {
@@ -134,7 +143,7 @@ export function SEOHead({
           url: offerUrl || canonicalUrl,
           seller: {
             '@type': 'Organization',
-            name: 'Cigarro'
+            name: siteName
           },
           // Standard shipping: 5-7 business days, free, India-wide
           shippingDetails: {
@@ -211,7 +220,7 @@ export function SEOHead({
         author: author ? { '@type': 'Person', name: author } : undefined,
         publisher: {
           '@type': 'Organization',
-          name: 'Cigarro',
+          name: siteName,
           logo: {
             '@type': 'ImageObject',
             url: SITE_LOGO_URL
@@ -227,7 +236,7 @@ export function SEOHead({
       '@type': 'WebSite',
       publisher: {
         '@type': 'Organization',
-        name: 'Cigarro',
+        name: siteName,
         url: 'https://cigarro.in',
         logo: {
           '@type': 'ImageObject',
@@ -269,7 +278,13 @@ export function SEOHead({
           <meta property="og:image:height" content="630" />
         </>
       )}
-      <meta property="og:site_name" content="Cigarro" />
+      <meta property="og:site_name" content={siteName} />
+      {store.seo.googleSiteVerification && (
+        <meta name="google-site-verification" content={store.seo.googleSiteVerification} />
+      )}
+      {store.seo.bingSiteVerification && (
+        <meta name="msvalidate.01" content={store.seo.bingSiteVerification} />
+      )}
       <meta property="og:locale" content="en_IN" />
       {type === 'product' && (
         <>
@@ -298,7 +313,7 @@ export function SEOHead({
       <meta name="bingbot" content={robots} />
       <meta name="language" content="English" />
       <meta name="revisit-after" content="7 days" />
-      <meta name="author" content={author || 'Cigarro'} />
+      <meta name="author" content={author || siteName} />
 
       {/* Geo Tags */}
       <meta name="geo.region" content="IN" />
@@ -319,10 +334,10 @@ export function SEOHead({
         {JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'Organization',
-          name: 'Cigarro',
+          name: siteName,
           url: 'https://cigarro.in',
           logo: SITE_LOGO_URL,
-          description: 'Online cigarette and tobacco product catalogue for adult customers in India',
+          description: store.seo.defaultDescription,
           address: {
             '@type': 'PostalAddress',
             addressCountry: 'IN'
@@ -330,10 +345,11 @@ export function SEOHead({
           contactPoint: {
             '@type': 'ContactPoint',
             contactType: 'Customer Service',
-            availableLanguage: ['English', 'Hindi']
-          }
-          // Add sameAs array when you have real social media profiles:
-          // sameAs: ['https://instagram.com/your-handle']
+            availableLanguage: ['English', 'Hindi'],
+            ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
+            ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {})
+          },
+          sameAs: Object.values(store.socials).filter((u) => u.startsWith('http'))
         })}
       </script>
     </Helmet>

@@ -11,6 +11,9 @@ import { ORG_SLUG } from '../../lib/convex/org';
 import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check, Truck } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { DEFAULT_SHIPPING_METHODS, mergeShippingMethods, toShippingConfig, type ShippingMethod } from '../../lib/shipping';
+import { resolveStoreSettings, type RawStoreSettings, type StoreSettings, type StoreStateMinAge } from '../../lib/storeSettings';
+import { rupeesToPaise } from '../../lib/convex/money';
+import { siteConfig } from '../../config/site';
 import { useTheme } from '../../themes';
 import { PageHeader } from '../components/shared/PageHeader';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
@@ -79,6 +82,8 @@ export function SettingsManager() {
   const saveSettings = useMutation(api.adminCatalog.saveSiteSettings);
   const populatedRef = useRef(false);
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>(DEFAULT_SHIPPING_METHODS);
+  // Normalized per-store settings (defaults filled in, so the form shows what is live).
+  const [store, setStore] = useState<StoreSettings>(() => resolveStoreSettings(null));
 
   // Populate once from Convex (singleton key "main" — no numeric id anymore).
   useEffect(() => {
@@ -98,6 +103,7 @@ export function SettingsManager() {
       updated_by: null,
     });
     setShippingMethods(mergeShippingMethods((serverSettings as any).shippingConfig));
+    setStore(resolveStoreSettings(serverSettings as RawStoreSettings));
     setIsLoading(false);
     setIsDirty(false);
   }, [serverSettings]);
@@ -139,7 +145,7 @@ export function SettingsManager() {
   };
 
   const handlePurgeCloudflareCache = async () => {
-    const isProduction = window.location.hostname === 'cigarro.in';
+    const isProduction = window.location.hostname === siteConfig.domain;
 
     if (!isProduction) {
       setOpOk('Cloudflare cache purge only works in production. In development, there is no CDN cache - all data loads fresh from Convex.');
@@ -150,7 +156,7 @@ export function SettingsManager() {
 
     try {
       const own = getAccessToken();
-      const response = await fetch('https://cigarro.in/api/invalidate-cache', {
+      const response = await fetch(`https://${siteConfig.domain}/api/invalidate-cache`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,10 +190,10 @@ export function SettingsManager() {
       // no direct-DB branch, so no Supabase dependency here).
 
       const endpoints = [
-        { name: 'Homepage Data', url: 'https://cigarro.in/api/homepage-data' },
-        { name: 'Categories', url: 'https://cigarro.in/api/categories' },
-        { name: 'Products', url: 'https://cigarro.in/api/products' },
-        { name: 'Brands', url: 'https://cigarro.in/api/brands' },
+        { name: 'Homepage Data', url: `https://${siteConfig.domain}/api/homepage-data` },
+        { name: 'Categories', url: `https://${siteConfig.domain}/api/categories` },
+        { name: 'Products', url: `https://${siteConfig.domain}/api/products` },
+        { name: 'Brands', url: `https://${siteConfig.domain}/api/brands` },
       ];
 
         const results: PerformanceResult[] = [];
@@ -254,17 +260,68 @@ export function SettingsManager() {
       }
     }
 
+    const brandColor = store.brand.brandColor.trim();
+    if (brandColor && !/^#[0-9a-fA-F]{6}$/.test(brandColor)) {
+      setOpError('Brand colour must be a hex value like #8B4513');
+      return;
+    }
+    const ages = [store.ageGate.minAge, ...store.ageGate.stateMinAge.map((r) => r.minAge)];
+    if (ages.some((a) => !Number.isInteger(a) || a < 0 || a > 100)) {
+      setOpError('Minimum ages must be whole numbers between 0 and 100');
+      return;
+    }
+
     setIsSaving(true);
     try {
       // updatedBy stamps server-side from the Convex identity.
       await saveSettings({
         orgSlug: ORG_SLUG,
         siteName: settings.site_name?.trim() || undefined,
-        faviconUrl: settings.favicon_url?.trim() || undefined,
         metaTitle: settings.meta_title?.trim() || undefined,
         metaDescription: settings.meta_description?.trim() || undefined,
         upiId: settings.upi_id?.trim() || undefined,
         shippingConfig: toShippingConfig(shippingMethods),
+        brand: {
+          logoUrl: store.brand.logoUrl.trim() || undefined,
+          faviconUrl: store.brand.faviconUrl.trim() || undefined,
+          brandColor: brandColor || undefined,
+        },
+        business: {
+          legalName: store.business.legalName.trim() || undefined,
+          gstin: store.business.gstin.trim() || undefined,
+          supportEmail: store.business.supportEmail.trim() || undefined,
+          supportPhone: store.business.supportPhone.trim() || undefined,
+          address: {
+            line1: store.business.address.line1.trim() || undefined,
+            line2: store.business.address.line2.trim() || undefined,
+            city: store.business.address.city.trim() || undefined,
+            state: store.business.address.state.trim() || undefined,
+            pincode: store.business.address.pincode.trim() || undefined,
+          },
+          openingHours: store.business.openingHours.trim() || undefined,
+        },
+        ageGate: {
+          enabled: store.ageGate.enabled,
+          minAge: store.ageGate.minAge,
+          stateMinAge: store.ageGate.stateMinAge
+            .map((r) => ({ state: r.state.trim(), minAge: r.minAge }))
+            .filter((r) => r.state !== ''),
+        },
+        referralRewardPaise: rupeesToPaise(store.referralRewardRupees),
+        seo: {
+          titleTemplate: store.seo.titleTemplate.trim() || undefined,
+          defaultDescription: store.seo.defaultDescription.trim() || undefined,
+          googleSiteVerification: store.seo.googleSiteVerification.trim() || undefined,
+          bingSiteVerification: store.seo.bingSiteVerification.trim() || undefined,
+          gaMeasurementId: store.seo.gaMeasurementId.trim() || undefined,
+        },
+        socials: {
+          instagram: store.socials.instagram.trim() || undefined,
+          facebook: store.socials.facebook.trim() || undefined,
+          x: store.socials.x.trim() || undefined,
+          youtube: store.socials.youtube.trim() || undefined,
+          whatsapp: store.socials.whatsapp.trim() || undefined,
+        },
       });
 
       setOpOk('Settings updated successfully');
@@ -301,6 +358,7 @@ export function SettingsManager() {
   const handleReset = () => {
     if (!serverSettings) return;
     setShippingMethods(mergeShippingMethods((serverSettings as any).shippingConfig));
+    setStore(resolveStoreSettings(serverSettings as RawStoreSettings));
     populatedRef.current = false;
     setSettings({
       id: 1,
@@ -323,6 +381,25 @@ export function SettingsManager() {
     setSettings(prev => ({ ...prev, [field]: value }));
     setIsDirty(true);
   };
+
+  // Patch one object section of the normalized store settings.
+  const patchSection = <K extends 'brand' | 'business' | 'ageGate' | 'seo' | 'socials'>(
+    key: K,
+    patch: Partial<StoreSettings[K]>,
+  ) => {
+    setStore((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }) as StoreSettings);
+    setIsDirty(true);
+  };
+
+  const patchAddress = (patch: Partial<StoreSettings['business']['address']>) => {
+    setStore((prev) => ({
+      ...prev,
+      business: { ...prev.business, address: { ...prev.business.address, ...patch } },
+    }));
+    setIsDirty(true);
+  };
+
+  const setStateRules = (rules: StoreStateMinAge[]) => patchSection('ageGate', { stateMinAge: rules });
 
   const jumpTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({
@@ -364,6 +441,10 @@ export function SettingsManager() {
         <nav aria-label="Jump to settings section" className="flex gap-1 overflow-x-auto border-b pb-2">
           {([
             ['settings-store', 'Store'],
+            ['settings-brand', 'Brand'],
+            ['settings-business', 'Business'],
+            ['settings-age', 'Age gate'],
+            ['settings-seo', 'SEO'],
             ['settings-payments', 'Payments'],
             ['settings-delivery', 'Delivery'],
             ['settings-performance', 'Performance'],
@@ -432,20 +513,6 @@ export function SettingsManager() {
                   placeholder="Your website name"
                 />
               </div>
-              <div className="space-y-1">
-                <Label>Favicon</Label>
-                <SingleImagePicker
-                  value={settings.favicon_url || null}
-                  onChange={(url) => {
-                    setSettings(prev => ({ ...prev, favicon_url: url || '' }));
-                    setIsDirty(true);
-                  }}
-                  searchHint={settings.site_name ? `${settings.site_name} favicon` : undefined}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Recommended: 32x32px or 64x64px .ico or .png
-                </p>
-              </div>
             </div>
             
             <div className="space-y-1">
@@ -473,6 +540,317 @@ export function SettingsManager() {
               <p className="text-xs text-muted-foreground">
                 This appears in search engine results below the title
               </p>
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* Brand */}
+        <AdminCard id="settings-brand" className="scroll-mt-24">
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Palette className="mr-2 h-5 w-5" />
+              Brand
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Logo, favicon and the accent colour used across the storefront
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Logo</Label>
+                <SingleImagePicker
+                  value={store.brand.logoUrl || null}
+                  onChange={(url) => patchSection('brand', { logoUrl: url || '' })}
+                  searchHint={store.name ? `${store.name} logo` : undefined}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Favicon</Label>
+                <SingleImagePicker
+                  value={store.brand.faviconUrl || null}
+                  onChange={(url) => patchSection('brand', { faviconUrl: url || '' })}
+                  searchHint={store.name ? `${store.name} favicon` : undefined}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Recommended: 32x32px or 64x64px .ico or .png
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="brand_color">Brand colour</Label>
+              <div className="flex items-center gap-2 max-w-md">
+                <input
+                  type="color"
+                  aria-label="Brand colour picker"
+                  value={/^#[0-9a-fA-F]{6}$/.test(store.brand.brandColor) ? store.brand.brandColor : siteConfig.theme.primaryColor}
+                  onChange={(e) => patchSection('brand', { brandColor: e.target.value })}
+                  className="h-9 w-12 cursor-pointer rounded border border-border/30 bg-transparent p-0.5"
+                />
+                <Input
+                  id="brand_color"
+                  value={store.brand.brandColor}
+                  onChange={(e) => patchSection('brand', { brandColor: e.target.value })}
+                  placeholder={siteConfig.theme.primaryColor}
+                />
+              </div>
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* Business details */}
+        <AdminCard id="settings-business" className="scroll-mt-24">
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <FileText className="mr-2 h-5 w-5" />
+              Business Details
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Legal name, tax number, contact and address shown on invoices and the contact page
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="legal_name">Legal name</Label>
+                <Input
+                  id="legal_name"
+                  value={store.business.legalName}
+                  onChange={(e) => patchSection('business', { legalName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="gstin">GSTIN</Label>
+                <Input
+                  id="gstin"
+                  value={store.business.gstin}
+                  onChange={(e) => patchSection('business', { gstin: e.target.value })}
+                  placeholder="22AAAAA0000A1Z5"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="support_email">Support email</Label>
+                <Input
+                  id="support_email"
+                  type="email"
+                  value={store.business.supportEmail}
+                  onChange={(e) => patchSection('business', { supportEmail: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="support_phone">Support phone</Label>
+                <Input
+                  id="support_phone"
+                  value={store.business.supportPhone}
+                  onChange={(e) => patchSection('business', { supportPhone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {([
+                ['line1', 'Address line 1'],
+                ['line2', 'Address line 2'],
+                ['city', 'City'],
+                ['state', 'State'],
+                ['pincode', 'PIN code'],
+              ] as const).map(([field, label]) => (
+                <div key={field} className="space-y-1">
+                  <Label htmlFor={`address_${field}`}>{label}</Label>
+                  <Input
+                    id={`address_${field}`}
+                    value={store.business.address[field]}
+                    onChange={(e) => patchAddress({ [field]: e.target.value })}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="opening_hours">Opening hours</Label>
+              <Input
+                id="opening_hours"
+                value={store.business.openingHours}
+                onChange={(e) => patchSection('business', { openingHours: e.target.value })}
+                placeholder="Mon-Sat 10:00-19:00"
+              />
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* Age gate and referral */}
+        <AdminCard id="settings-age" className="scroll-mt-24">
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <AlertCircle className="mr-2 h-5 w-5" />
+              Age Gate & Referrals
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Entry age rules shown to visitors, and the reward paid for a referred first order
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border border-border/20 rounded-lg">
+              <div>
+                <Label>Show age gate</Label>
+                <p className="text-xs text-muted-foreground">
+                  {store.ageGate.enabled ? 'Visitors must confirm their age before browsing' : 'No age check on entry'}
+                </p>
+              </div>
+              <Switch
+                checked={store.ageGate.enabled}
+                onCheckedChange={(checked) => patchSection('ageGate', { enabled: checked })}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="min_age">Minimum age</Label>
+                <Input
+                  id="min_age"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={store.ageGate.minAge}
+                  onChange={(e) => patchSection('ageGate', { minAge: Number(e.target.value) || 0 })}
+                  className="max-w-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="referral_reward">Referral reward (₹)</Label>
+                <Input
+                  id="referral_reward"
+                  type="number"
+                  min={0}
+                  value={store.referralRewardRupees}
+                  onChange={(e) => {
+                    setStore((prev) => ({ ...prev, referralRewardRupees: Math.max(0, Number(e.target.value) || 0) }));
+                    setIsDirty(true);
+                  }}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">Paid to both people when a referred first order is delivered</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>State-specific minimum ages</Label>
+              {store.ageGate.stateMinAge.map((rule, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    aria-label="State"
+                    className="min-w-0 flex-1"
+                    value={rule.state}
+                    placeholder="Karnataka"
+                    onChange={(e) =>
+                      setStateRules(store.ageGate.stateMinAge.map((r, i) => (i === idx ? { ...r, state: e.target.value } : r)))
+                    }
+                  />
+                  <Input
+                    aria-label="Minimum age for state"
+                    className="w-32"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={rule.minAge}
+                    onChange={(e) =>
+                      setStateRules(store.ageGate.stateMinAge.map((r, i) => (i === idx ? { ...r, minAge: Number(e.target.value) || 0 } : r)))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStateRules(store.ageGate.stateMinAge.filter((_, i) => i !== idx))}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setStateRules([...store.ageGate.stateMinAge, { state: '', minAge: store.ageGate.minAge }])}
+              >
+                Add state rule
+              </Button>
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* SEO and social */}
+        <AdminCard id="settings-seo" className="scroll-mt-24">
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Globe className="mr-2 h-5 w-5" />
+              SEO & Social
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Title pattern, search verification codes and social profile links
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="seo_title_template">Title template</Label>
+                <Input
+                  id="seo_title_template"
+                  value={store.seo.titleTemplate}
+                  onChange={(e) => patchSection('seo', { titleTemplate: e.target.value })}
+                  placeholder="%s | Your Store"
+                />
+                <p className="text-xs text-muted-foreground">%s is replaced by the page title</p>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="seo_default_description">Default description</Label>
+                <Input
+                  id="seo_default_description"
+                  value={store.seo.defaultDescription}
+                  onChange={(e) => patchSection('seo', { defaultDescription: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="google_verification">Google site verification</Label>
+                <Input
+                  id="google_verification"
+                  value={store.seo.googleSiteVerification}
+                  onChange={(e) => patchSection('seo', { googleSiteVerification: e.target.value })}
+                  placeholder="Content value only"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="bing_verification">Bing site verification</Label>
+                <Input
+                  id="bing_verification"
+                  value={store.seo.bingSiteVerification}
+                  onChange={(e) => patchSection('seo', { bingSiteVerification: e.target.value })}
+                  placeholder="Content value only"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ga_id">Google Analytics ID</Label>
+                <Input
+                  id="ga_id"
+                  value={store.seo.gaMeasurementId}
+                  onChange={(e) => patchSection('seo', { gaMeasurementId: e.target.value })}
+                  placeholder="G-XXXXXXXXXX"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {([
+                ['instagram', 'Instagram URL'],
+                ['facebook', 'Facebook URL'],
+                ['x', 'X (Twitter) URL'],
+                ['youtube', 'YouTube URL'],
+                ['whatsapp', 'WhatsApp link'],
+              ] as const).map(([field, label]) => (
+                <div key={field} className="space-y-1">
+                  <Label htmlFor={`social_${field}`}>{label}</Label>
+                  <Input
+                    id={`social_${field}`}
+                    value={store.socials[field]}
+                    onChange={(e) => patchSection('socials', { [field]: e.target.value })}
+                  />
+                </div>
+              ))}
             </div>
           </AdminCardContent>
         </AdminCard>

@@ -8,6 +8,8 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
 import { trackViewItemList } from '../../lib/analytics/ga';
 import { Button } from '../../components/ui/button';
+import { siteConfig } from '../../config/site';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 interface Brand {
   id: string;
@@ -33,6 +35,7 @@ interface Brand {
 
 export function BrandPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { settings: store } = useStoreSettings();
   const location = useLocation();
   const [brand, setBrand] = useState<Brand | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -139,9 +142,9 @@ export function BrandPage() {
   return (
     <>
       <SEOHead
-        title={brand.meta_title || `${brand.name} - Premium Cigarettes | Cigarro`}
+        title={brand.meta_title || `${brand.name} - Premium Cigarettes | ${store.name}`}
         description={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`}
-        url={`https://cigarro.in${location.pathname}`}
+        url={`${siteConfig.url}${location.pathname}`}
         type="website"
         brand={brand.name}
         keywords={[brand.name, 'premium cigarettes', 'tobacco products', `${brand.name} cigarettes`, 'authentic tobacco']}
