@@ -5,6 +5,7 @@ import { audit } from "./lib/audit";
 import { normalizePhoneE164 } from "./lib/phone";
 import { role } from "./schema";
 import { insertOrganization } from "./organizations";
+import { ensureStoreSubdomain } from "./domains";
 
 // Super-admin (Citadel SSO) store management. Every function takes `saToken`:
 // reads use requireSaSession, writes use requireSaWrite (write window + audit
@@ -105,6 +106,8 @@ export const createStore = mutation({
       upiVpa: (args.upiVpa ?? "").trim(),
       bankEmailAlias: slug,
     });
+    // <slug>.<platform root>: registered on Cloudflare, primary while the store has none.
+    await ensureStoreSubdomain(ctx, { orgId, slug, adminId: sa.adminId });
     await audit(ctx, {
       adminUserId: sa.adminId,
       actorType: "super_admin",

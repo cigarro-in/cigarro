@@ -172,13 +172,39 @@ export default defineSchema({
     orgId: v.id("organizations"),
     hostname: v.string(),
     kind: v.union(v.literal("primary"), v.literal("alias")),
-    status: v.union(v.literal("pending"), v.literal("active"), v.literal("disabled")),
+    // Derived from Cloudflare only (convex/lib/domainStatus.ts), never set by
+    // hand. "disabled" is a legacy value from manual status control; it is
+    // overwritten on the next Cloudflare check.
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("disabled"),
+      v.literal("error"),
+    ),
+    // True for the platform-generated <slug>.<PLATFORM_ROOT_DOMAIN> row.
+    managed: v.optional(v.boolean()),
     cfHostnameId: v.optional(v.string()),
     // Cloudflare Pages domain status (initializing/pending/active/...) and
     // the DNS records the merchant must add. Written by convex/domains.ts.
     cfStatus: v.optional(v.string()),
     cfError: v.optional(v.string()),
     cfCheckedAt: v.optional(v.number()),
+    lastActiveAt: v.optional(v.number()),
+    // Last 5 status changes, newest last.
+    statusHistory: v.optional(
+      v.array(
+        v.object({
+          status: v.union(
+            v.literal("pending"),
+            v.literal("active"),
+            v.literal("disabled"),
+            v.literal("error"),
+          ),
+          at: v.number(),
+          cfStatus: v.optional(v.string()),
+        }),
+      ),
+    ),
     dnsInstructions: v.optional(
       v.object({
         cnameTarget: v.string(),

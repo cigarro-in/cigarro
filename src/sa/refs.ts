@@ -16,7 +16,7 @@ export interface StoreRow {
   domainCount: number;
   memberCount: number;
   primaryHost: string | null;
-  primaryStatus: 'pending' | 'active' | 'disabled' | null;
+  primaryStatus: DomainStatus | null;
 }
 
 export interface MemberRow {
@@ -79,19 +79,44 @@ export interface DnsInstructions {
   txtRecords: { name: string; value: string }[];
 }
 
+// Derived from Cloudflare only. "disabled" is a legacy value.
+export type DomainStatus = 'pending' | 'active' | 'disabled' | 'error';
+
+export interface DomainStatusChange {
+  status: DomainStatus;
+  at: number;
+  cfStatus?: string;
+}
+
 export interface DomainRow {
   _id: Id<'orgDomains'>;
   orgId: Id<'organizations'>;
   hostname: string;
   kind: 'primary' | 'alias';
-  status: 'pending' | 'active' | 'disabled';
+  status: DomainStatus;
   verifiedAt?: number;
-  // False for platform hosts (cigarro.in, *.cigarro.in): never sent to Cloudflare.
-  managed: boolean;
+  // Platform-generated <slug>.<platform root> row.
+  managed?: boolean;
+  // True when Cloudflare Pages registration applies (false for cigarro.in, www).
+  cfManaged: boolean;
   cfStatus?: string;
   cfError?: string;
   cfCheckedAt?: number;
+  lastActiveAt?: number;
+  statusHistory?: DomainStatusChange[];
   dnsInstructions?: DnsInstructions;
+}
+
+export interface AllDomainRow extends DomainRow {
+  storeName: string;
+  storeSlug: string;
+  storeActive: boolean;
+}
+
+export interface ProvisionSubdomainResult {
+  created: boolean;
+  hostname: string | null;
+  reason: string | null;
 }
 
 export const listDomainsRef = makeFunctionReference<
@@ -104,11 +129,16 @@ export const addDomainRef = makeFunctionReference<
   { saToken: string; orgId: Id<'organizations'>; hostname: string },
   Id<'orgDomains'>
 >('domains:addDomain');
-export const setDomainStatusRef = makeFunctionReference<
+export const listAllDomainsRef = makeFunctionReference<
+  'query',
+  { saToken: string },
+  AllDomainRow[]
+>('domains:listAllDomains');
+export const provisionSubdomainRef = makeFunctionReference<
   'mutation',
-  { saToken: string; domainId: Id<'orgDomains'>; status: 'pending' | 'active' | 'disabled' },
-  Id<'orgDomains'>
->('domains:setDomainStatus');
+  { saToken: string; orgId: Id<'organizations'> },
+  ProvisionSubdomainResult
+>('domains:provisionSubdomain');
 export const setPrimaryRef = makeFunctionReference<
   'mutation',
   { saToken: string; domainId: Id<'orgDomains'> },

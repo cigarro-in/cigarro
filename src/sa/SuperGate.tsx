@@ -130,6 +130,7 @@ export function SuperGate() {
           <span className="font-bold">Cigarro super admin</span>
           <nav className="flex gap-3 text-sm">
             <a href="/sa/stores" className="underline-offset-4 hover:underline">Stores</a>
+            <a href="/sa/domains" className="underline-offset-4 hover:underline">Domains</a>
             <a href="/sa/platform" className="underline-offset-4 hover:underline">Platform config</a>
           </nav>
           <div className="ml-auto">

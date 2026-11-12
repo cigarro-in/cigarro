@@ -7,6 +7,7 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  MutationCtx,
   query,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
@@ -14,23 +15,22 @@ import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import {
   hostRestriction,
+  isCfManagedHost,
   isValidHostname,
   normalizeHost,
   resolveHostDecision,
 } from "./lib/hosts";
+import { appendStatusHistory, deriveDomainStatus } from "./lib/domainStatus";
 import { cfConfig, type CfDomainState } from "./cloudflare";
 
 export { normalizeHost } from "./lib/hosts";
 
-const statusV = v.union(
-  v.literal("pending"),
-  v.literal("active"),
-  v.literal("disabled"),
-);
-
 // Cloudflare polling: every 2 minutes, up to 30 attempts after the add.
 const CF_POLL_MS = 2 * 60 * 1000;
 const CF_MAX_POLLS = 30;
+// Active domains are re-checked every 6h (catches DNS pointed away, SSL trouble).
+// Non-active domains are re-checked on every monitor tick (every 15 min).
+const ACTIVE_RECHECK_MS = 6 * 60 * 60 * 1000;
 
 function platformRoot(): string {
   return normalizeHost(process.env.PLATFORM_ROOT_DOMAIN ?? "cigarro.in");
@@ -40,10 +40,10 @@ function defaultOrgSlug(): string {
   return process.env.DEFAULT_ORG_SLUG ?? "smokeshop";
 }
 
-// Customer-owned hosts are the only ones sent to Cloudflare. Platform hosts
-// (cigarro.in, www, *.cigarro.in) are served by the platform itself.
+// Hosts Cloudflare Pages must serve (customer hosts and store subdomains).
+// The platform root and www.<root> are never sent to Cloudflare.
 function isCfManaged(host: string): boolean {
-  return hostRestriction(host, platformRoot()) === "none";
+  return isCfManagedHost(host, platformRoot());
 }
 
 // Cross-module references, typed by hand: the generated api predates these
@@ -68,12 +68,27 @@ type ApplyArgs = {
   dnsInstructions?: { cnameTarget: string; txtRecords: { name: string; value: string }[] };
 };
 
+type MonitorTarget = {
+  _id: Id<"orgDomains">;
+  hostname: string;
+  status: Doc<"orgDomains">["status"];
+  cfCheckedAt?: number;
+};
+
 const selfRef = {
   getRow: makeFunctionReference<
     "query",
     { domainId: Id<"orgDomains"> },
     Doc<"orgDomains"> | null
   >("domains:getDomainInternal"),
+  listMonitorTargets: makeFunctionReference<"query", Record<string, never>, MonitorTarget[]>(
+    "domains:listMonitorTargets",
+  ),
+  listStoreRows: makeFunctionReference<
+    "query",
+    { orgId: Id<"organizations"> },
+    Doc<"orgDomains">[]
+  >("domains:listStoreRows"),
   applyCf: makeFunctionReference<"mutation", ApplyArgs, null>("domains:applyCfState"),
   beginRefresh: makeFunctionReference<
     "mutation",
@@ -83,25 +98,11 @@ const selfRef = {
   beginRemove: makeFunctionReference<
     "mutation",
     { saToken: string; domainId: Id<"orgDomains"> },
-    {
-      hostname: string;
-      managed: boolean;
-      adminId: string;
-      orgId: Id<"organizations">;
-      kind: "primary" | "alias";
-      status: "pending" | "active" | "disabled";
-    }
+    { hostname: string; cfManaged: boolean; adminId: string }
   >("domains:beginRemove"),
   finishRemove: makeFunctionReference<
     "mutation",
-    {
-      domainId: Id<"orgDomains">;
-      adminId: string;
-      orgId: Id<"organizations">;
-      hostname: string;
-      kind: "primary" | "alias";
-      status: "pending" | "active" | "disabled";
-    },
+    { domainId: Id<"orgDomains">; adminId: string; hostname: string },
     null
   >("domains:finishRemove"),
   provision: makeFunctionReference<"action", { domainId: Id<"orgDomains"> }, null>(
@@ -166,7 +167,30 @@ export const listDomains = query({
       .query("orgDomains")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .collect();
-    return rows.map((r) => ({ ...r, managed: isCfManaged(r.hostname) }));
+    return rows.map((r) => ({ ...r, cfManaged: isCfManaged(r.hostname) }));
+  },
+});
+
+// Every domain on every store, for the /sa domains monitor.
+export const listAllDomains = query({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
+    const rows = await ctx.db.query("orgDomains").collect();
+    const orgs = new Map<string, Doc<"organizations">>();
+    for (const org of await ctx.db.query("organizations").collect()) {
+      orgs.set(org._id, org);
+    }
+    return rows.map((r) => {
+      const org = orgs.get(r.orgId);
+      return {
+        ...r,
+        cfManaged: isCfManaged(r.hostname),
+        storeName: org?.name ?? "(missing store)",
+        storeSlug: org?.slug ?? "",
+        storeActive: org?.active ?? false,
+      };
+    });
   },
 });
 
@@ -199,8 +223,8 @@ export const addDomain = mutation({
     if (existing) throw new ConvexError({ code: "DUPLICATE_HOSTNAME" });
 
     // Fail fast in the UI when Cloudflare is not configured.
-    const managed = restriction === "none";
-    if (managed) cfConfig();
+    const cloudflare = isCfManaged(host);
+    if (cloudflare) cfConfig();
 
     const id = await ctx.db.insert("orgDomains", {
       orgId,
@@ -216,35 +240,74 @@ export const addDomain = mutation({
       action: "orgDomain.add",
       targetType: "orgDomain",
       targetId: id,
-      payload: { hostname: host, kind: "alias", cloudflare: managed },
+      payload: { hostname: host, kind: "alias", cloudflare },
     });
-    if (managed) await ctx.scheduler.runAfter(0, selfRef.provision, { domainId: id });
+    if (cloudflare) await ctx.scheduler.runAfter(0, selfRef.provision, { domainId: id });
     return id;
   },
 });
 
-export const setDomainStatus = mutation({
-  args: { saToken: v.string(), domainId: v.id("orgDomains"), status: statusV },
-  handler: async (ctx, { saToken, domainId, status }) => {
+// Creates the <slug>.<platform root> row (managed, registered on Cloudflare).
+// Becomes primary when the store has none. Plain helper: called from
+// createStore (platform.ts) and from provisionSubdomain below.
+export async function ensureStoreSubdomain(
+  ctx: MutationCtx,
+  args: { orgId: Id<"organizations">; slug: string; adminId: string },
+): Promise<{ created: boolean; hostname: string | null; reason: string | null }> {
+  const root = platformRoot();
+  const skip = (hostname: string | null, reason: string) => ({
+    created: false,
+    hostname,
+    reason,
+  });
+  if (!root) return skip(null, "no_platform_root");
+  // smokeshop is served on cigarro.in itself; it gets no subdomain row.
+  if (args.slug === defaultOrgSlug()) return skip(null, "default_org");
+
+  const hostname = `${args.slug}.${root}`;
+  if (hostRestriction(hostname, root) !== "platform") return skip(hostname, "reserved_label");
+
+  const existing = await ctx.db
+    .query("orgDomains")
+    .withIndex("by_hostname", (q) => q.eq("hostname", hostname))
+    .unique();
+  if (existing) return skip(hostname, "exists");
+
+  const rows = await ctx.db
+    .query("orgDomains")
+    .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+    .collect();
+  const kind = rows.some((r) => r.kind === "primary") ? "alias" : "primary";
+
+  const id = await ctx.db.insert("orgDomains", {
+    orgId: args.orgId,
+    hostname,
+    kind,
+    status: "pending",
+    managed: true,
+    createdAt: Date.now(),
+  });
+  await audit(ctx, {
+    orgId: args.orgId,
+    adminUserId: args.adminId,
+    actorType: "super_admin",
+    action: "orgDomain.add",
+    targetType: "orgDomain",
+    targetId: id,
+    payload: { hostname, kind, managed: true, cloudflare: true },
+  });
+  await ctx.scheduler.runAfter(0, selfRef.provision, { domainId: id });
+  return { created: true, hostname, reason: null };
+}
+
+// "Provision subdomain" for stores created before auto-provisioning.
+export const provisionSubdomain = mutation({
+  args: { saToken: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, { saToken, orgId }) => {
     const sa = await requireSaWrite(ctx, saToken);
-    const row = await ctx.db.get(domainId);
-    if (!row) throw new ConvexError({ code: "DOMAIN_NOT_FOUND" });
-
-    const patch: { status: typeof status; verifiedAt?: number } = { status };
-    if (status === "active" && row.verifiedAt === undefined)
-      patch.verifiedAt = Date.now();
-    await ctx.db.patch(domainId, patch);
-
-    await audit(ctx, {
-      orgId: row.orgId,
-      adminUserId: sa.adminId,
-      actorType: "super_admin",
-      action: "orgDomain.setStatus",
-      targetType: "orgDomain",
-      targetId: domainId,
-      payload: { hostname: row.hostname, from: row.status, to: status },
-    });
-    return domainId;
+    const org = await ctx.db.get(orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+    return await ensureStoreSubdomain(ctx, { orgId, slug: org.slug, adminId: sa.adminId });
   },
 });
 
@@ -288,22 +351,45 @@ export const setPrimary = mutation({
   },
 });
 
-// Removes the row and, for customer hosts, the Cloudflare Pages domain.
-// A Cloudflare failure leaves the row in place so the admin can retry.
+// Deletes the Cloudflare Pages domain first (a 404 counts as already gone),
+// then the row. A Cloudflare failure leaves the row in place so the admin can
+// retry. Removing the primary promotes the store subdomain (or, failing that,
+// an active alias) so the store always has a canonical host.
 export const removeDomain = action({
   args: { saToken: v.string(), domainId: v.id("orgDomains") },
   handler: async (ctx, { saToken, domainId }) => {
     const info = await ctx.runMutation(selfRef.beginRemove, { saToken, domainId });
-    if (info.managed) await ctx.runAction(cfRef.del, { hostname: info.hostname });
+    if (info.cfManaged) await ctx.runAction(cfRef.del, { hostname: info.hostname });
     await ctx.runMutation(selfRef.finishRemove, {
       domainId,
       adminId: info.adminId,
-      orgId: info.orgId,
       hostname: info.hostname,
-      kind: info.kind,
-      status: info.status,
     });
     return domainId;
+  },
+});
+
+// Internal: removes every domain of a store from Cloudflare and the table.
+// Not wired to any UI yet (store deletion/archiving is not implemented).
+export const releaseStoreDomains = internalAction({
+  args: { orgId: v.id("organizations"), adminId: v.string() },
+  handler: async (ctx, { orgId, adminId }) => {
+    const rows = await ctx.runQuery(selfRef.listStoreRows, { orgId });
+    const released: string[] = [];
+    // Non-primary rows first so the primary is removed last and nothing is promoted.
+    const ordered = [...rows].sort((a, b) => Number(a.kind === "primary") - Number(b.kind === "primary"));
+    for (const row of ordered) {
+      if (isCfManaged(row.hostname)) {
+        await ctx.runAction(cfRef.del, { hostname: row.hostname });
+      }
+      await ctx.runMutation(selfRef.finishRemove, {
+        domainId: row._id,
+        adminId,
+        hostname: row.hostname,
+      });
+      released.push(row.hostname);
+    }
+    return released;
   },
 });
 
@@ -315,7 +401,7 @@ export const refreshDomainStatus = action({
       saToken,
       domainId,
     });
-    const state = await syncFromCf(ctx, domainId, hostname);
+    const state = await checkFromCf(ctx, domainId, hostname, { reAdd: true });
     return { cfStatus: state.status };
   },
 });
@@ -327,25 +413,36 @@ async function recordState(
   domainId: Id<"orgDomains">,
   state: CfDomainState,
 ): Promise<void> {
+  const absent = state.status === "absent" || state.status === "deleted";
   await ctx.runMutation(selfRef.applyCf, {
     domainId,
     cfStatus: state.status,
     cfError: state.error,
     cfHostnameId: state.id,
-    dnsInstructions: { cnameTarget: state.cnameTarget, txtRecords: state.txtRecords },
+    ...(absent
+      ? {}
+      : {
+          dnsInstructions: {
+            cnameTarget: state.cnameTarget,
+            txtRecords: state.txtRecords,
+          },
+        }),
   });
 }
 
-// GET from Cloudflare, re-adding when absent. Records the result; rethrows
-// on failure after recording the error text on the row.
-async function syncFromCf(
+// GET from Cloudflare (re-adding when absent if reAdd is set). Records the
+// result; rethrows on failure after recording the error text on the row.
+async function checkFromCf(
   ctx: ActionCtx,
   domainId: Id<"orgDomains">,
   hostname: string,
+  opts: { reAdd: boolean },
 ): Promise<CfDomainState> {
   try {
     let state = await ctx.runAction(cfRef.get, { hostname });
-    if (state.status === "absent") state = await ctx.runAction(cfRef.add, { hostname });
+    if (opts.reAdd && state.status === "absent") {
+      state = await ctx.runAction(cfRef.add, { hostname });
+    }
     await recordState(ctx, domainId, state);
     return state;
   } catch (err) {
@@ -357,6 +454,30 @@ async function syncFromCf(
 export const getDomainInternal = internalQuery({
   args: { domainId: v.id("orgDomains") },
   handler: async (ctx, { domainId }) => ctx.db.get(domainId),
+});
+
+export const listStoreRows = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) =>
+    ctx.db
+      .query("orgDomains")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect(),
+});
+
+export const listMonitorTargets = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<MonitorTarget[]> => {
+    const rows = await ctx.db.query("orgDomains").collect();
+    return rows
+      .filter((r) => isCfManaged(r.hostname))
+      .map((r) => ({
+        _id: r._id,
+        hostname: r.hostname,
+        status: r.status,
+        cfCheckedAt: r.cfCheckedAt,
+      }));
+  },
 });
 
 export const beginRefresh = internalMutation({
@@ -377,16 +498,9 @@ export const beginRemove = internalMutation({
     const sa = await requireSaWrite(ctx, saToken);
     const row = await ctx.db.get(domainId);
     if (!row) throw new ConvexError({ code: "DOMAIN_NOT_FOUND" });
-    const managed = isCfManaged(row.hostname);
-    if (managed) cfConfig();
-    return {
-      hostname: row.hostname,
-      managed,
-      adminId: sa.adminId,
-      orgId: row.orgId,
-      kind: row.kind,
-      status: row.status,
-    };
+    const cfManaged = isCfManaged(row.hostname);
+    if (cfManaged) cfConfig();
+    return { hostname: row.hostname, cfManaged, adminId: sa.adminId };
   },
 });
 
@@ -394,27 +508,53 @@ export const finishRemove = internalMutation({
   args: {
     domainId: v.id("orgDomains"),
     adminId: v.string(),
-    orgId: v.id("organizations"),
     hostname: v.string(),
-    kind: v.union(v.literal("primary"), v.literal("alias")),
-    status: statusV,
   },
-  handler: async (ctx, args) => {
-    const row = await ctx.db.get(args.domainId);
-    if (row) await ctx.db.delete(args.domainId);
+  handler: async (ctx, { domainId, adminId, hostname }) => {
+    const row = await ctx.db.get(domainId);
+    if (!row) return null;
+
+    // Never leave a store without a canonical host: promote the store
+    // subdomain, else an active alias.
+    let promotedHostname: string | null = null;
+    if (row.kind === "primary") {
+      const siblings = (
+        await ctx.db
+          .query("orgDomains")
+          .withIndex("by_org", (q) => q.eq("orgId", row.orgId))
+          .collect()
+      ).filter((r) => r._id !== domainId);
+      const next =
+        siblings.find((r) => r.managed === true) ??
+        siblings.find((r) => r.status === "active") ??
+        null;
+      if (next) {
+        await ctx.db.patch(next._id, { kind: "primary" });
+        promotedHostname = next.hostname;
+      }
+    }
+
+    await ctx.db.delete(domainId);
     await audit(ctx, {
-      orgId: args.orgId,
-      adminUserId: args.adminId,
+      orgId: row.orgId,
+      adminUserId: adminId,
       actorType: "super_admin",
       action: "orgDomain.remove",
       targetType: "orgDomain",
-      targetId: args.domainId,
-      payload: { hostname: args.hostname, kind: args.kind, status: args.status },
+      targetId: domainId,
+      payload: {
+        hostname,
+        kind: row.kind,
+        status: row.status,
+        promotedHostname,
+      },
     });
     return null;
   },
 });
 
+// Single writer for Cloudflare-derived state. Status follows Cloudflare on every
+// check; every transition is written to adminAuditLog as a system action.
 export const applyCfState = internalMutation({
   args: {
     domainId: v.id("orgDomains"),
@@ -432,26 +572,54 @@ export const applyCfState = internalMutation({
     const row = await ctx.db.get(args.domainId);
     if (!row) return null;
 
-    // Only pending rows auto-activate. An admin-disabled row stays disabled.
-    const activate = args.cfStatus === "active" && row.status === "pending";
-    await ctx.db.patch(args.domainId, {
-      cfStatus: args.cfStatus,
-      cfError: args.cfError,
-      cfHostnameId: args.cfHostnameId ?? row.cfHostnameId,
-      dnsInstructions: args.dnsInstructions,
-      cfCheckedAt: Date.now(),
-      ...(activate
-        ? {
-            status: "active" as const,
-            verifiedAt: row.verifiedAt ?? Date.now(),
-          }
-        : {}),
-    });
+    const now = Date.now();
+    const patch: Partial<Doc<"orgDomains">> = { cfCheckedAt: now, cfError: args.cfError };
+
+    if (args.cfStatus !== undefined) {
+      const cfStatus = args.cfStatus;
+      let next = deriveDomainStatus(cfStatus);
+      // An active domain that Cloudflare no longer reports active is an error,
+      // not a quiet return to pending.
+      if (row.status === "active" && next !== "active") next = "error";
+      patch.cfStatus = cfStatus;
+      if (args.cfHostnameId !== undefined) patch.cfHostnameId = args.cfHostnameId;
+      if (args.dnsInstructions !== undefined) patch.dnsInstructions = args.dnsInstructions;
+      if (next === "error" && !args.cfError) {
+        patch.cfError =
+          cfStatus === "absent"
+            ? "Not registered on the Cloudflare Pages project"
+            : `Cloudflare reports ${cfStatus}`;
+      }
+      if (next === "active") {
+        patch.lastActiveAt = now;
+        if (row.verifiedAt === undefined) patch.verifiedAt = now;
+      }
+      if (next !== row.status) {
+        patch.status = next;
+        patch.statusHistory = appendStatusHistory(row.statusHistory, {
+          status: next,
+          at: now,
+          cfStatus,
+        });
+        await ctx.db.insert("adminAuditLog", {
+          orgId: row.orgId,
+          adminUserId: "system",
+          action: "orgDomain.statusChange",
+          targetType: "orgDomain",
+          targetId: args.domainId,
+          payload: { hostname: row.hostname, from: row.status, to: next, cfStatus },
+          createdAt: now,
+        });
+      }
+    }
+
+    await ctx.db.patch(args.domainId, patch);
     return null;
   },
 });
 
-// Scheduled right after addDomain. Adds the domain on Cloudflare, then polls.
+// Scheduled right after addDomain / ensureStoreSubdomain. Adds the domain on
+// Cloudflare, then polls.
 export const provisionDomain = internalAction({
   args: { domainId: v.id("orgDomains") },
   handler: async (ctx, { domainId }) => {
@@ -481,7 +649,7 @@ export const pollDomain = internalAction({
 
     let active = false;
     try {
-      const state = await syncFromCf(ctx, domainId, row.hostname);
+      const state = await checkFromCf(ctx, domainId, row.hostname, { reAdd: true });
       active = state.status === "active";
     } catch {
       // Error already recorded on the row; keep polling.
@@ -491,6 +659,38 @@ export const pollDomain = internalAction({
         domainId,
         attempt: attempt + 1,
       });
+    }
+    return null;
+  },
+});
+
+// Cron (every 15 min, convex/crons.ts). Re-checks every non-active domain on
+// each tick and every active domain at most once per 6h. GET only: a domain
+// missing from Cloudflare is recorded as error, not silently re-added (Refresh
+// now does that).
+export const monitor = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      cfConfig();
+    } catch {
+      return null; // Cloudflare not configured: nothing to monitor.
+    }
+    const targets = await ctx.runQuery(selfRef.listMonitorTargets, {});
+    const now = Date.now();
+    for (const row of targets) {
+      if (
+        row.status === "active" &&
+        row.cfCheckedAt !== undefined &&
+        now - row.cfCheckedAt < ACTIVE_RECHECK_MS
+      ) {
+        continue;
+      }
+      try {
+        await checkFromCf(ctx, row._id, row.hostname, { reAdd: false });
+      } catch {
+        // Error already recorded on the row.
+      }
     }
     return null;
   },

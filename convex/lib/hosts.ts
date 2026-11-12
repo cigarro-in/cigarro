@@ -27,7 +27,7 @@ export type HostDomain<Id extends string> = {
   orgId: Id;
   hostname: string;
   kind: "primary" | "alias";
-  status: "pending" | "active" | "disabled";
+  status: "pending" | "active" | "disabled" | "error";
 };
 
 export type HostLookups<Id extends string> = {
@@ -81,6 +81,19 @@ export function hostRestriction(
     return RESERVED_LABELS.has(label) ? "reserved" : "platform";
   }
   return "none";
+}
+
+// True for hosts that must be registered as Cloudflare Pages custom domains:
+// customer hosts and the <label>.<root> store subdomains. The platform root and
+// www.<root> are served by the platform itself and never sent to Cloudflare.
+export function isCfManagedHost(host: string, platformRoot: string): boolean {
+  const root = normalizeHost(platformRoot);
+  const restriction = hostRestriction(host, platformRoot);
+  if (restriction === "none") return true;
+  if (restriction === "platform") {
+    return root !== "" && host !== root && host !== `www.${root}`;
+  }
+  return false;
 }
 
 // Pure resolution decision. Order: exact active domain -> platform subdomain
