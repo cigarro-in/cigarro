@@ -11,7 +11,7 @@
 // Throws on any failure. The caller logs and falls back to the existing SPA /
 // bot renderer, so a broken SSR bundle never takes the site down.
 
-import { render, homePreloadRequests, fetchPreload, serializePreload, themeIdFromPreload } from './_ssr/entry-server.js';
+import { render, homePreloadRequests, fetchPreload, serializePreload, themeIdFromPreload, trimHomePreload } from './_ssr/entry-server.js';
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg, orgScriptJson } from './lib/org.js';
 
@@ -126,7 +126,9 @@ export async function ssrRender(context) {
   const orgScript = orgScriptJson(org);
 
   const requests = homePreloadRequests(orgInfo);
-  const preload = await fetchPreload(requiredConvexUrl(env), requests, { timeoutMs: PRELOAD_TIMEOUT_MS });
+  const preload = trimHomePreload(
+    await fetchPreload(requiredConvexUrl(env), requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
+  );
   const themeId = themeIdFromPreload(preload, orgInfo.slug);
 
   const rendered = await render({ url: url.pathname + url.search, org: orgInfo, preload, themeId });

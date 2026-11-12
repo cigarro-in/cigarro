@@ -200,9 +200,9 @@ export const MobileHeader = ({ onMenuToggle, isMenuOpen }: MobileHeaderProps) =>
 
           {/* Logo */}
           <Link to="/" className="flex-1 flex justify-center">
-            <h1 className="text-dark font-serif font-normal tracking-tight leading-none text-lg sm:text-xl uppercase">
+            <div className="text-dark font-serif font-normal tracking-tight leading-none text-lg sm:text-xl uppercase">
               {store.brand.logoUrl ? (<img src={store.brand.logoUrl} alt={store.name} width={160} height={48} className="h-10 w-auto object-contain" />) : store.name.toUpperCase()}
-            </h1>
+            </div>
           </Link>
 
           {/* Search Button - Touch-friendly */}

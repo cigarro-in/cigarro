@@ -132,4 +132,6 @@ export interface HomepageData {
   blogPosts: BlogPost[];
   blogSectionConfig: BlogSectionConfig | null;
   categoriesWithProducts?: CategoryWithProducts[];
+  /** Newest active products (name + slug), for the home ItemList JSON-LD. */
+  latestProducts?: Array<{ name: string; slug: string }>;
 }

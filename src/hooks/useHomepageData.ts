@@ -166,6 +166,7 @@ export function useHomepageData() {
     blogPosts: convexPosts.map(mapHomePost),
     blogSectionConfig: blogSecCfg ? mapBlogSection(blogSecCfg) : null,
     categoriesWithProducts,
+    latestProducts: newestFirst.map((p: any) => ({ name: String(p.name), slug: String(p.slug) })),
   };
 
   return { data, isLoading: false, error: null };

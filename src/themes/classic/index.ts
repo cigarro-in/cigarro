@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import type { ThemeManifest } from '../types';
 import './tokens.css';
+import { ClassicShell } from './ClassicShell';
 
 const Home = lazy(() => import('../../pages/home/HomePage').then((m) => ({ default: m.HomePage })));
 const Products = lazy(() => import('../../pages/products/ProductsPage').then((m) => ({ default: m.ProductsPage })));
@@ -20,6 +21,7 @@ export const classicTheme: ThemeManifest = {
   name: 'Classic',
   description: 'Premium editorial design with warm tones and serif typography',
   slots: {
+    Layout: ClassicShell,
     Home,
     Products,
     Category,

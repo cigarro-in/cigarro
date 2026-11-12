@@ -3,6 +3,12 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import Hero from './Hero';
 import { CategoriesScroller } from './CategoriesScroller';
 import { useHomepageData } from '../../hooks/useHomepageData';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+
+// The page's only h1 (logos in the headers are not headings). Visually hidden:
+// the store tagline above the fold is decorative, the SEO title carries the topic.
+const HOME_TITLE = 'Cigarro | Cigarettes and Tobacco Products Online';
 
 // Lazy load non-critical components to improve initial page load
 const FeaturedProducts = lazy(() => import('./FeaturedProducts').then(m => ({ default: m.FeaturedProducts })));
@@ -19,19 +25,39 @@ const SectionFallback = ({ height = "h-96" }: { height?: string }) => (
 
 export function HomePage() {
   const { data, isLoading } = useHomepageData();
+  const { settings: store } = useStoreSettings();
+  const { primaryHost } = useOrgInfo();
   // Admin Homepage toggles; absent row = enabled (existing installs unaffected).
   const on = (name: string) => data?.sectionsEnabled?.[name] !== false;
+
+  // ItemList of the newest products (same list the bot renderer emitted).
+  const latestItemList = data?.latestProducts?.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        name: `Latest products at ${store.name}`,
+        numberOfItems: data.latestProducts.length,
+        itemListElement: data.latestProducts.map((p, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: p.name,
+          url: `https://${primaryHost}/product/${p.slug}`,
+        })),
+      }
+    : null;
 
   return (
     <>
       <SEOHead
-        title="Cigarro | Cigarettes and Tobacco Products Online"
+        title={HOME_TITLE}
         description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
         url="/"
         type="website"
         keywords={['cigarettes online', 'cigarette brands India', 'tobacco products India', 'rolling papers India']}
         image={data?.heroSlides?.[0]?.image_url}
+        extraJsonLd={latestItemList ? [latestItemList] : undefined}
       />
+      <h1 className="sr-only">{HOME_TITLE}</h1>
       {on('hero_section') && <Hero slides={data?.heroSlides} isLoading={isLoading} />}
 
       {/* Same sections on mobile + desktop (each section is responsive) */}

@@ -52,6 +52,33 @@ export function homePreloadRequests(org: OrgInfo): PreloadRequest[] {
   ];
 }
 
+// Fields the home page (and the header search it renders) never reads from the
+// preloaded queries. Dropped before render AND serialization, so the SSR markup
+// and the client's hydration input are built from the same data. Product
+// `description` is kept: the header search indexes it.
+const UNUSED_PRODUCT_FIELDS = ['shortDescription', 'specifications', 'metaDescription', 'metaTitle'];
+const UNUSED_BLOG_FIELDS = ['content', 'metaTitle', 'metaDescription'];
+
+function without(row: unknown, fields: string[]): unknown {
+  if (!row || typeof row !== 'object') return row;
+  const copy: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+  for (const f of fields) delete copy[f];
+  return copy;
+}
+
+export function trimHomePreload(preload: PreloadMap): PreloadMap {
+  const out: PreloadMap = { ...preload };
+  for (const key of Object.keys(out)) {
+    const value = out[key] as { products?: unknown[] } | unknown[] | null;
+    if (key.startsWith('catalog:fullCatalog:') && value && !Array.isArray(value) && Array.isArray(value.products)) {
+      out[key] = { ...value, products: value.products.map((p) => without(p, UNUSED_PRODUCT_FIELDS)) };
+    } else if (key.startsWith('content:listBlogPosts:') && Array.isArray(value)) {
+      out[key] = value.map((row) => without(row, UNUSED_BLOG_FIELDS));
+    }
+  }
+  return out;
+}
+
 function helmetToHead(state: HelmetServerState | undefined): string {
   if (!state) return '';
   return [

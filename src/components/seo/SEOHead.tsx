@@ -36,6 +36,8 @@ interface SEOHeadProps {
   // Crawl directive override — default keeps every existing caller indexable;
   // NotFoundPage passes 'noindex, follow'.
   robots?: string;
+  // Extra JSON-LD blocks emitted after the built-in ones (e.g. ItemList on the home page).
+  extraJsonLd?: Record<string, unknown>[];
 }
 
 export function SEOHead({
@@ -63,7 +65,8 @@ export function SEOHead({
   twitterTitle,
   twitterDescription,
   twitterImage,
-  robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+  robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+  extraJsonLd,
 }: SEOHeadProps) {
   // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
   // The 512px icon is a valid image for Organization/publisher logos (never a share image).
@@ -303,14 +306,11 @@ export function SEOHead({
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:title" content={ogTitle || fullTitle} />
       <meta property="og:description" content={ogDescription || optimizedDescription} />
-      {shareImage && (
-        <>
-          <meta property="og:image" content={shareImage} />
-          <meta property="og:image:alt" content={ogTitle || fullTitle} />
-          <meta property="og:image:width" content="1200" />
-          <meta property="og:image:height" content="630" />
-        </>
-      )}
+      {/* No Fragments here: react-helmet-async drops tags nested in a Fragment. */}
+      {shareImage && <meta property="og:image" content={shareImage} />}
+      {shareImage && <meta property="og:image:alt" content={ogTitle || fullTitle} />}
+      {shareImage && <meta property="og:image:width" content="1200" />}
+      {shareImage && <meta property="og:image:height" content="630" />}
       <meta property="og:site_name" content={siteName} />
       {store.seo.googleSiteVerification && (
         <meta name="google-site-verification" content={store.seo.googleSiteVerification} />
@@ -319,26 +319,19 @@ export function SEOHead({
         <meta name="msvalidate.01" content={store.seo.bingSiteVerification} />
       )}
       <meta property="og:locale" content="en_IN" />
-      {type === 'product' && (
-        <>
-          {price && <meta property="product:price:amount" content={price} />}
-          <meta property="product:price:currency" content={currency} />
-          {brand && <meta property="product:brand" content={brand} />}
-          {availability && <meta property="product:availability" content={availability} />}
-        </>
-      )}
+      {/* No Fragments here either: react-helmet-async drops tags nested in a Fragment. */}
+      {type === 'product' && price && <meta property="product:price:amount" content={price} />}
+      {type === 'product' && <meta property="product:price:currency" content={currency} />}
+      {type === 'product' && brand && <meta property="product:brand" content={brand} />}
+      {type === 'product' && availability && <meta property="product:availability" content={availability} />}
 
       {/* Twitter — must use name=, not property= */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:url" content={canonicalUrl} />
       <meta name="twitter:title" content={twitterTitle || ogTitle || fullTitle} />
       <meta name="twitter:description" content={twitterDescription || ogDescription || optimizedDescription} />
-      {twitterShareImage && (
-        <>
-          <meta name="twitter:image" content={twitterShareImage} />
-          <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />
-        </>
-      )}
+      {twitterShareImage && <meta name="twitter:image" content={twitterShareImage} />}
+      {twitterShareImage && <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />}
 
       {/* Additional Meta Tags */}
       <meta name="robots" content={robots} />
@@ -366,6 +359,12 @@ export function SEOHead({
       <script type="application/ld+json">
         {JSON.stringify(organizationSchema)}
       </script>
+
+      {extraJsonLd?.map((block, i) => (
+        <script key={`extra-ld-${i}`} type="application/ld+json">
+          {JSON.stringify(block)}
+        </script>
+      ))}
     </Helmet>
   );
 }

@@ -343,9 +343,9 @@ const Header = () => {
 
         {/* Center Section - Logo */}
         <Link to="/" className="absolute left-1/2 -translate-x-1/2">
-          <h1 className="text-dark font-serif font-normal tracking-tight leading-none text-2xl uppercase">
+          <div className="text-dark font-serif font-normal tracking-tight leading-none text-2xl uppercase">
             {store.brand.logoUrl ? (<img src={store.brand.logoUrl} alt={store.name} width={160} height={48} className="h-10 w-auto object-contain" />) : store.name.toUpperCase()}
-          </h1>
+          </div>
         </Link>
 
         {/* Right Section - Icons */}
