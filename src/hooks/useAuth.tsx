@@ -3,7 +3,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { convexUrl } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
 import { getSession, storeSession, clearSession, notifyAuthChanged } from '../lib/auth/session';
-import { ORG_SLUG } from '../lib/convex/org';
+import { ORG_SLUG, IS_ADMIN_HOST } from '../lib/convex/org';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 
@@ -147,7 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       res = await fetch('/api/auth/phone-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args),
+        // Admin host: name the store explicitly (the edge only honours it there).
+        body: JSON.stringify(IS_ADMIN_HOST ? { ...args, orgSlug: ORG_SLUG } : args),
       });
     } catch {
       throw new AuthError('Network error — check your connection and try again', {

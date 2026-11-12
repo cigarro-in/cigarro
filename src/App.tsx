@@ -23,7 +23,8 @@ import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
-import { ORG_SLUG } from './lib/convex/org';
+import { ORG_SLUG, ADMIN_PATH_STORE, APP_BASENAME } from './lib/convex/org';
+import { StorePicker } from './adminnew/StorePicker';
 import { ThemeProvider, useTheme } from './themes';
 
 // Phase 3: no toasts anywhere. All success/failure feedback renders inline
@@ -44,8 +45,11 @@ function AdminHostView() {
   // Admin for THIS storefront org only (user.isAdmin spans every org).
   const scopedProfile = useQuery(
     api.userState.getMyProfile,
-    user ? { orgSlug: ORG_SLUG } : 'skip',
+    user && ADMIN_PATH_STORE ? { orgSlug: ORG_SLUG } : 'skip',
   );
+
+  // admin.<root>/ with no store in the path: pick a store (or enter one).
+  if (ADMIN_PATH_STORE === null) return <StorePicker />;
 
   if (isLoading) return null;
 
@@ -306,7 +310,7 @@ function AppContent() {  const { user } = useAuth();
 export default function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename={APP_BASENAME || undefined}>
         <AuthProvider>
           <ConvexAuthProvider>
             <WishlistProvider>

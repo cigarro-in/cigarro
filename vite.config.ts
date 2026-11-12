@@ -28,9 +28,13 @@ export default defineConfig({
         runtimeCaching: [
           // CDN images load directly. Intercepting cross-origin image requests
           // here can make Workbox reject otherwise healthy R2 responses.
-          // Cache API responses (homepage data, products, etc.)
+          // Cache API responses (homepage data, products, etc.). Never on the
+          // admin host: those responses are store-scoped and admin data must
+          // not go stale or cross stores (the admin app is per store path).
           {
-            urlPattern: /\/api\/(homepage-data|products|categories|brands)/i,
+            urlPattern: ({ url }) =>
+              url.hostname.split('.')[0] !== 'admin' &&
+              /\/api\/(homepage-data|products|categories|brands)/i.test(url.pathname),
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-cache',

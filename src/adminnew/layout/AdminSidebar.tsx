@@ -49,6 +49,8 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrg } from '../../lib/convex/useOrg';
+import { ORG_SLUG } from '../../lib/convex/org';
+import { useAdminStores } from '../hooks/useAdminStores';
 
 interface NavItem {
   label: string;
@@ -112,6 +114,7 @@ export function AdminSidebar() {
   const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut } = useAuth();
   const org = useOrg();
+  const { stores } = useAdminStores();
 
   const isActive = (path: string) =>
     path === '/admin'
@@ -146,6 +149,20 @@ export function AdminSidebar() {
             <span className="truncate text-xs text-muted-foreground">Admin</span>
           </span>
         </NavLink>
+        {stores.length > 1 && (
+          <label className="mt-1 block px-2 group-data-[collapsible=icon]:hidden">
+            <span className="sr-only">Switch store</span>
+            <select
+              value={ORG_SLUG}
+              onChange={(event) => window.location.assign(`/${event.target.value}/admin`)}
+              className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+            >
+              {stores.map((store) => (
+                <option key={store.slug} value={store.slug}>{store.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </SidebarHeader>
 
       <SidebarContent>

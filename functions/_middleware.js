@@ -3,7 +3,8 @@
 // and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
-import { resolveRequestOrg, getRequestOrg, orgScriptJson } from './lib/org.js';
+import { resolveRequestOrg, getRequestOrg, orgScriptJson, isAdminHostname } from './lib/org.js';
+import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
 
 export async function onRequest(context) {
   const response = await handleRequest(context);
@@ -23,7 +24,20 @@ async function handleRequest(context) {
 
   if (url.pathname === '/api/crash-logs') return context.next();
 
-  // Unknown host (Convex reachable, no such domain): plain noindex 404.
+  // Admin store lookup failed: refuse rather than act on the default store.
+  if (org?.unavailable) {
+    return new Response('Store lookup unavailable, try again shortly', {
+      status: 503,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Retry-After': '30',
+        'X-Robots-Tag': 'noindex, nofollow',
+      },
+    });
+  }
+
+  // Unknown host (Convex reachable, no such domain) or unknown admin store: plain noindex 404.
   if (org === null) {
     return new Response('Store not found', {
       status: 404,
@@ -38,6 +52,33 @@ async function handleRequest(context) {
   // Alias host (e.g. a registered www domain) folds onto the store's primary host.
   if (org.redirectTo) {
     return Response.redirect(`https://${org.redirectTo}${url.pathname}${url.search}`, 301);
+  }
+
+  const onAdminHost = isAdminHostname(url.hostname);
+
+  // Admin host: /admin/... is the pre-store address. Send it to the default store.
+  if (onAdminHost && (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) {
+    return Response.redirect(`https://${url.host}/${org.slug}${url.pathname}${url.search}`, 302);
+  }
+
+  // Storefront: /admin moved to the per-store admin app on admin.<root>.
+  if (!onAdminHost && (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) {
+    const isRoot = url.pathname === '/admin' || url.pathname === '/admin/';
+    const target = isRoot
+      ? `/${org.slug}/`
+      : `/${org.slug}/admin${url.pathname.slice('/admin'.length)}`;
+    return Response.redirect(`https://admin.${org.primaryHost}${target}${url.search}`, 302);
+  }
+
+  // Per-store admin manifest (the store is the path segment, validated above).
+  if (org.storePath && url.pathname === storeManifestPath(org.slug)) {
+    const brandColor = await fetchStoreBrandColor(context.env, org.slug);
+    return withNoindex(new Response(JSON.stringify(buildAdminManifest(org, brandColor)), {
+      headers: {
+        'Content-Type': 'application/manifest+json; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+      },
+    }));
   }
 
   try {
@@ -96,9 +137,16 @@ async function nextWithOrg(context) {
   if (!type.includes('text/html') || typeof HTMLRewriter === 'undefined') return res;
   const org = getRequestOrg(context);
   const script = `<script>window.__ORG__=${orgScriptJson(org)}</script>`;
-  return new HTMLRewriter()
-    .on('head', { element(el) { el.append(script, { html: true }); } })
-    .transform(res);
+  let rewriter = new HTMLRewriter()
+    .on('head', { element(el) { el.append(script, { html: true }); } });
+  // Admin store path: point the install manifest at this store's own app.
+  if (org.storePath) {
+    const manifestHref = storeManifestPath(org.slug);
+    rewriter = rewriter.on('link[rel="manifest"]', {
+      element(el) { el.setAttribute('href', manifestHref); },
+    });
+  }
+  return rewriter.transform(res);
 }
 
 async function routeRequest(context) {

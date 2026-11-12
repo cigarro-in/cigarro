@@ -4,7 +4,27 @@
 
 const hasWindow = typeof window !== 'undefined';
 
+// Admin host (admin.<root>/<storeSlug>/...): the store is the first path
+// segment. It is read from the URL, so an offline-cached shell still resolves
+// the right store. Mirrors adminStoreFromPath in functions/lib/org.js.
+const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin']);
+const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+
+export const IS_ADMIN_HOST: boolean =
+  hasWindow && window.location.hostname.split('.')[0] === 'admin';
+
+// Store named by the admin path, or null (admin root picker, or not admin host).
+export const ADMIN_PATH_STORE: string | null = (() => {
+  if (!IS_ADMIN_HOST) return null;
+  const first = window.location.pathname.split('/')[1] || '';
+  return STORE_SLUG_RE.test(first) && !ADMIN_RESERVED_SEGMENTS.has(first) ? first : null;
+})();
+
+// React Router basename on the admin host ('' everywhere else).
+export const APP_BASENAME: string = ADMIN_PATH_STORE ? `/${ADMIN_PATH_STORE}` : '';
+
 export const ORG_SLUG: string =
+  ADMIN_PATH_STORE ||
   (hasWindow && window.__ORG__?.slug) ||
   import.meta.env?.VITE_ORG_SLUG ||
   'smokeshop';

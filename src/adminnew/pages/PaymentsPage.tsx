@@ -13,6 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { APP_BASENAME } from '../../lib/convex/org';
 import { convexUrl } from '../../lib/convex/client';
 import { paiseToRupees } from '../../lib/convex/money';
 import { formatINR } from '../../utils/currency';
@@ -613,7 +614,7 @@ function GmailConnectionCard(props: {
     try {
       const r = await connectUrl({
         orgId: props.orgId,
-        returnTo: `${window.location.origin}/admin/payments/settings?gmail=connected`,
+        returnTo: `${window.location.origin}${APP_BASENAME}/admin/payments/settings?gmail=connected`,
       });
       window.location.href = r.url;
     } catch (e: any) {

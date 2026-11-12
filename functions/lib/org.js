@@ -50,21 +50,42 @@ export function getRequestOrg(context) {
   return context.data?.org || fallbackOrg(context.request, context.env);
 }
 
+// Admin host store addressing: admin.<root>/<storeSlug>/... The first path
+// segment is the store. These first segments are app or API paths, never stores.
+const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin']);
+const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+
+export function isAdminHostname(host) {
+  return normalizeHost(host).split('.')[0] === 'admin';
+}
+
+// Store slug named by an admin-host path, or null (root, API, assets, legacy /admin).
+export function adminStoreFromPath(pathname) {
+  const first = String(pathname || '').split('/')[1] || '';
+  if (!STORE_SLUG_RE.test(first) || ADMIN_RESERVED_SEGMENTS.has(first)) return null;
+  return first;
+}
+
 // Returns:
-//   {slug, id, name, primaryHost, isPrimary, redirectTo, admin?, fallback?}  known host
-//   null                                                                   unknown host (Convex reachable)
+//   {slug, id, name, primaryHost, isPrimary, redirectTo, admin?, storePath?, fallback?}  known host
+//   {unavailable: true}   admin store lookup failed (never guess a store)
+//   null                  unknown host or unknown admin store (Convex reachable)
 // Never throws.
 export async function resolveRequestOrg(request, env) {
   const host = requestHost(request);
 
-  // Admin host is app-only and keeps the default org, with no lookup.
-  if (host.split('.')[0] === 'admin') {
+  // Admin host: the store comes from the path. Root, API and asset requests
+  // keep the default org, with no lookup (the SPA picker or login names a store).
+  if (isAdminHostname(host)) {
+    const slug = adminStoreFromPath(new URL(request.url).pathname);
+    if (slug) return resolveAdminStore(env, host, slug);
     return {
       slug: getOrgSlug(env),
       id: null,
       name: FALLBACK_STORE_NAME,
       primaryHost: host.replace(/^admin\./, ''),
       admin: true,
+      storePath: false,
     };
   }
 
@@ -84,6 +105,48 @@ export async function resolveRequestOrg(request, env) {
   const org = resolved ? mapResolved(resolved, host) : null;
   await writeCache(host, org);
   return org === null && isDevHost(host) ? fallbackOrg(request, env) : org;
+}
+
+// Store named by an admin-host path. Cached per store for 60s like hostnames.
+async function resolveAdminStore(env, host, slug) {
+  const cacheKey = `${host}/_store/${slug}`;
+  const cached = await readCache(cacheKey);
+  if (cached !== undefined) return cached === null ? null : adminStoreOrg(cached, host);
+
+  let row;
+  try {
+    row = await lookupOrgBySlug(env, slug);
+  } catch (error) {
+    console.error('Admin store lookup unavailable:', error instanceof Error ? error.message : error);
+    return { unavailable: true };
+  }
+  const store = row ? { slug: row.slug, id: row._id ?? null, name: row.name } : null;
+  await writeCache(cacheKey, store);
+  return store ? adminStoreOrg(store, host) : null;
+}
+
+function adminStoreOrg(store, host) {
+  return {
+    slug: store.slug,
+    id: store.id ?? null,
+    name: store.name,
+    primaryHost: host.replace(/^admin\./, ''),
+    admin: true,
+    storePath: true,
+  };
+}
+
+// Active store by slug (organizations:getBySlug returns null when unknown or inactive).
+async function lookupOrgBySlug(env, slug) {
+  const res = await fetch(`${requiredConvexUrl(env)}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: 'organizations:getBySlug', args: { slug }, format: 'json' }),
+    signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error(`organizations:getBySlug failed: ${body.errorMessage || body.status}`);
+  return body.value ?? null;
 }
 
 function mapResolved(row, host) {
