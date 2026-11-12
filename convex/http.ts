@@ -2,6 +2,8 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { adminPaymentsFallback, isSafeReturnTo } from "./lib/auth";
+import { encryptSecret } from "./lib/crypto";
+import { gmailRedirectUri } from "./gmail";
 
 const http = httpRouter();
 
@@ -29,12 +31,12 @@ http.route({
   }),
 });
 
-// ---------- Google OAuth callback (one-click Gmail connect) ----------
+// ---------- Google OAuth callback (one-click Gmail connect, per store) ----------
 //
 // Google redirects here after the admin approves gmail.readonly access.
-// Verifies the single-use state, exchanges the code for a refresh token,
-// stores it server-side, and shows a plain result page. No auth header —
-// the unguessable `state` (10-min expiry, single use) is the auth.
+// The single-use `state` row (created by gmail.getOAuthUrl for ONE org) is the
+// auth: it is consumed here, the code is exchanged, the refresh token is
+// encrypted and upserted into that org's gmailConnections row only.
 http.route({
   path: "/gmailOAuthCallback",
   method: "GET",
@@ -47,15 +49,20 @@ http.route({
       return oauthPage(false, "Google did not approve access. Go back and try again.");
     }
 
-    const pending: any = await ctx.runQuery(internal.gmail.getOAuthState, { state });
-    if (!pending?.redirectUri) {
-      return oauthPage(false, "This connect link expired or was already used. Start again from Payment Settings.");
-    }
-
+    // Check server config before consuming the single-use state, so a fixable
+    // config problem does not burn the admin's connect attempt.
     const clientId = process.env.GMAIL_CLIENT_ID;
     const clientSecret = process.env.GMAIL_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
       return oauthPage(false, "Server is missing GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET.");
+    }
+    if (!process.env.GMAIL_TOKEN_KEY) {
+      return oauthPage(false, "Server is missing GMAIL_TOKEN_KEY. Add it in Convex env vars and try again.");
+    }
+
+    const pending: any = await ctx.runMutation(internal.gmail.takeOAuthState, { state });
+    if (!pending) {
+      return oauthPage(false, "This connect link expired or was already used. Start again from Payment Settings.");
     }
 
     let tokens: any;
@@ -67,7 +74,7 @@ http.route({
           code,
           client_id: clientId,
           client_secret: clientSecret,
-          redirect_uri: pending.redirectUri,
+          redirect_uri: gmailRedirectUri(),
           grant_type: "authorization_code",
         }).toString(),
       });
@@ -93,19 +100,27 @@ http.route({
       // Non-fatal — token is what matters.
     }
 
+    let refreshTokenEnc: string;
     try {
-      await ctx.runMutation(internal.gmail.finishOAuthConnect, {
-        state,
-        refreshToken: String(tokens.refresh_token),
-        accountEmail,
+      refreshTokenEnc = await encryptSecret(String(tokens.refresh_token));
+    } catch {
+      return oauthPage(false, "Server encryption key is invalid. GMAIL_TOKEN_KEY must be base64 of 32 bytes.");
+    }
+
+    try {
+      await ctx.runMutation(internal.gmail.saveGmailConnection, {
+        orgId: pending.orgId,
+        userId: pending.userId,
+        accountEmail: accountEmail ?? "",
+        refreshTokenEnc,
       });
-    } catch (e: any) {
-      return oauthPage(false, "Connect link expired. Start again from Payment Settings.");
+    } catch {
+      return oauthPage(false, "Could not save the connection. Start again from Payment Settings.");
     }
     // Bounce back to the admin page the flow started from. Google can only
     // redirect to the pre-registered convex.site callback, so this hop is
     // what returns the admin to /admin/payments/settings.
-    const back = (pending as any)?.returnTo;
+    const back = pending.returnTo;
     if (typeof back === "string" && back.length > 0) {
       return Response.redirect(
         isSafeReturnTo(back) ? back : adminPaymentsFallback(),

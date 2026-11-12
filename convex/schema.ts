@@ -396,19 +396,16 @@ export default defineSchema({
   appConfig: defineTable({
     key: v.string(),
     bankSenders: v.optional(v.array(v.string())), // e.g. ["@hdfcbank.bank.in", "@icicibank.com"]
-    // Gmail OAuth poller (the payment-verification feed). Secrets live in
-    // Convex env (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN), never here.
-    // Legacy: the polling enable-toggle was removed. Checks are event-driven
-    // and run whenever the inbox is connected. Field kept (optional) so old
-    // rows validate; nothing reads it.
+    // Gmail: DORMANT legacy single-slot fields. Connections are per store now
+    // (gmailConnections). gmailRefreshToken is cleared by
+    // gmail.migrateLegacyGmail; the other gmail* fields are kept (optional)
+    // so old rows validate. Platform bank-sender allowlist (bankSenders) stays live.
     gmailPollEnabled: v.optional(v.boolean()),
     gmailQuery: v.optional(v.string()),
     gmailOrgId: v.optional(v.id("organizations")),
     gmailLastPollAt: v.optional(v.number()),
     gmailLastError: v.optional(v.string()),
-    // One-click Google connect: refresh token + connected inbox, stored
-    // server-side so nobody pastes tokens. Env GMAIL_REFRESH_TOKEN still
-    // works as fallback when this is unset.
+    // Legacy plaintext refresh token. Cleared by migrateLegacyGmail.
     gmailRefreshToken: v.optional(v.string()),
     gmailAccountEmail: v.optional(v.string()),
     // Pending OAuth handshake (single-use, 10-min expiry).
@@ -420,6 +417,36 @@ export default defineSchema({
     updatedAt: v.number(),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
+
+  // Per-store Gmail connection (one row per org). The refresh token is
+  // AES-GCM encrypted with GMAIL_TOKEN_KEY (convex/lib/crypto.ts); plaintext
+  // never lands in the DB. Replaces the single appConfig.gmailRefreshToken slot.
+  gmailConnections: defineTable({
+    orgId: v.id("organizations"),
+    accountEmail: v.string(),
+    refreshTokenEnc: v.optional(v.string()), // base64(iv || ciphertext); cleared on disconnect
+    status: v.union(
+      v.literal("active"),
+      v.literal("needs_reconnect"),
+      v.literal("disconnected"),
+    ),
+    lastPollAt: v.optional(v.number()),
+    lastSuccessAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    lastErrorAt: v.optional(v.number()),
+    connectedBy: v.string(), // userId of the admin who connected
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  // Single-use OAuth handshake rows (10-minute expiry), one per Connect click.
+  gmailOAuthStates: defineTable({
+    state: v.string(),
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    returnTo: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_state", ["state"]),
 
   adminAuditLog: defineTable({
     orgId: v.id("organizations"),

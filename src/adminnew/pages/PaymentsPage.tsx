@@ -88,7 +88,8 @@ export function PaymentsPage() {
     setChecking(true);
     setCheckNote(null);
     try {
-      const r: any = await checkInbox(org ? { maxMessages: 20, orgId: org._id } : { maxMessages: 20 });
+      if (!org) { setOpError("No store selected"); return; }
+      const r: any = await checkInbox({ maxMessages: 20, orgId: org._id });
       if (r?.error) {
         setOpError(`Inbox check failed: ${r.error}`);
       } else if (r?.skipped) {
@@ -413,9 +414,8 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
 
   const handleCheckInbox = async () => {
     try {
-      const r: any = await triggerGmailPoll(
-        org ? { maxMessages: 20, orgId: org._id } : { maxMessages: 20 },
-      );
+      if (!org) { setSettingsError("No store selected"); return; }
+      const r: any = await triggerGmailPoll({ maxMessages: 20, orgId: org._id });
       if (r?.error) setSettingsError(r.error);
       else setCheckNoteParent?.(
         r?.skipped
@@ -589,17 +589,31 @@ function GmailConnectionCard(props: {
 }) {
   const s = props.status;
   const [connecting, setConnecting] = useState(false);
-  const { status: gmailOpStatus, setError: setGmailError } = useInlineStatus();
+  const [disconnecting, setDisconnecting] = useState(false);
+  const { status: gmailOpStatus, setError: setGmailError, clear: clearGmailStatus } = useInlineStatus();
   const connectUrl = useAction(api.gmail.getOAuthUrl);
-  const disconnect = useMutation(api.gmail.disconnectGmail);
+  const disconnect = useAction(api.gmail.disconnectGmail);
+
+  // Per-store connection state. undefined = loading, null = not connected
+  // (or caller is not an org admin).
+  const connState: 'loading' | 'active' | 'needs_reconnect' | 'none' =
+    s === undefined ? 'loading'
+      : s === null ? 'none'
+      : s.status === 'active' ? 'active'
+      : s.status === 'needs_reconnect' ? 'needs_reconnect'
+      : 'none';
 
   const handleConnect = async () => {
+    if (!props.orgId) {
+      setGmailError('No store selected');
+      return;
+    }
     setConnecting(true);
+    clearGmailStatus();
     try {
       const r = await connectUrl({
-        redirectUri: props.callbackUrl,
+        orgId: props.orgId,
         returnTo: `${window.location.origin}/admin/payments/settings?gmail=connected`,
-        ...(props.orgId ? { orgId: props.orgId } : {}),
       });
       window.location.href = r.url;
     } catch (e: any) {
@@ -609,49 +623,83 @@ function GmailConnectionCard(props: {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Disconnect Gmail? Order auto-confirm will stop.')) return;
+    if (!props.orgId) return;
+    if (!confirm('Disconnect Gmail for this store? Order auto-confirm stops until you reconnect.')) return;
+    setDisconnecting(true);
+    clearGmailStatus();
     try {
-      await disconnect(props.orgId ? { orgId: props.orgId } : {});
-      // No toast: the card badge flips to Not connected in place.
+      const r: any = await disconnect({ orgId: props.orgId });
+      // The card flips to Not connected in place. If Google could not confirm
+      // the revoke, say so inline so the admin can remove access manually.
+      if (r && r.revoked === false) {
+        setGmailError(
+          'Disconnected here, but Google did not confirm revocation. Remove the app at myaccount.google.com/permissions to be sure.',
+        );
+      }
     } catch (e: any) {
       setGmailError(e?.data?.code || 'Disconnect failed');
+    } finally {
+      setDisconnecting(false);
     }
   };
+
+  const lastErrorAt = s?.lastErrorAt ? new Date(s.lastErrorAt).toLocaleString() : null;
+  const lastSuccessAt = s?.lastSuccessAt ? new Date(s.lastSuccessAt).toLocaleString() : null;
 
   return (
     <AdminCard>
       <AdminCardHeader className="flex flex-row items-center justify-between">
         <AdminCardTitle>Bank-email connection</AdminCardTitle>
-        {s === undefined ? (
+        {connState === 'loading' ? (
           <Badge variant="outline">Loading…</Badge>
-        ) : s === null ? (
-          <Badge variant="outline">Unavailable</Badge>
-        ) : s.connected ? (
+        ) : connState === 'active' ? (
           <Badge className="bg-success-muted text-success"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>
+        ) : connState === 'needs_reconnect' ? (
+          <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Reconnect needed</Badge>
         ) : (
           <Badge variant="outline"><XCircle className="w-3 h-3 mr-1" />Not connected</Badge>
         )}
       </AdminCardHeader>
       <AdminCardContent className="space-y-3">
         <InlineStatus status={gmailOpStatus} />
-        {s?.connected ? (
+
+        {connState === 'needs_reconnect' && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+            <p className="text-sm font-semibold text-destructive">
+              Gmail access expired or was revoked
+              {s.accountEmail ? <> for <b>{s.accountEmail}</b></> : null}.
+            </p>
+            <p className="text-xs text-destructive">
+              Bank alerts are not being read, so pending orders will not auto-confirm
+              until you reconnect.
+            </p>
+            <Button onClick={handleConnect} disabled={connecting}>
+              {connecting ? 'Opening Google…' : 'Reconnect Gmail'}
+            </Button>
+          </div>
+        )}
+
+        {connState === 'active' && (
           <p className="text-sm text-muted-foreground">
             Reading bank alerts{s.accountEmail ? <> from <b>{s.accountEmail}</b></> : null}.
             Pending orders auto-confirm — no schedule to manage.
           </p>
-        ) : s === null ? (
-          <p className="text-sm text-muted-foreground">
-            Inbox status is only visible to organization owners and admins.
-          </p>
-        ) : (
+        )}
+
+        {connState === 'none' && (
           <>
             <p className="text-sm text-muted-foreground">
-              Connect the inbox that receives bank alerts. Approve read-only
+              Connect the inbox that receives this store's bank alerts. Approve read-only
               access once — done.
             </p>
+            {s === null && (
+              <p className="text-xs text-muted-foreground">
+                Connection status is only visible to organization owners and admins.
+              </p>
+            )}
             {s && !s.configured && (
               <p className="text-xs text-warning bg-warning-muted border border-warning-muted rounded p-2">
-                Server keys missing (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET).
+                Server keys missing (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_TOKEN_KEY).
                 Add them in the Convex dashboard → Settings → Environment Variables first.
               </p>
             )}
@@ -659,27 +707,45 @@ function GmailConnectionCard(props: {
               First time only: add this redirect URI in your Google Cloud OAuth client:{' '}
               <code className="font-mono break-all">{props.callbackUrl}</code>
             </p>
-            <Button onClick={handleConnect} disabled={connecting || !s?.configured}>
+            <Button onClick={handleConnect} disabled={connecting}>
               {connecting ? 'Opening Google…' : 'Connect with Google'}
             </Button>
           </>
         )}
-        {s && s.lastError && (
-          <p className="text-xs text-destructive">Last error: {s.lastError}</p>
+
+        {s?.lastError && (
+          <InlineStatus
+            status={{
+              kind: 'error',
+              message: `Last error${lastErrorAt ? ` (${lastErrorAt})` : ''}: ${s.lastError}`,
+            }}
+          />
         )}
-        {s && s.lastPollAt && (
+        {connState === 'active' && (
+          <p className="text-xs text-muted-foreground">
+            Last successful check: {lastSuccessAt ?? 'none yet'}
+          </p>
+        )}
+        {s && s.lastPollAt && connState !== 'loading' && (
           <p className="text-xs text-muted-foreground">
             Last poll: {new Date(s.lastPollAt).toLocaleString()}
           </p>
         )}
+
         <div className="flex items-center gap-2">
-          {s?.connected && s?.connectedVia === 'google' && (
-            <Button size="sm" variant="outline" className="border-border text-destructive hover:bg-muted" onClick={handleDisconnect}>
-              Disconnect
+          {(connState === 'active' || connState === 'needs_reconnect') && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-border text-destructive hover:bg-muted"
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+            >
+              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
             </Button>
           )}
           <span className="flex-1" />
-          <Button size="sm" variant="outline" onClick={props.onCheckInbox} disabled={!s?.connected}>
+          <Button size="sm" variant="outline" onClick={props.onCheckInbox} disabled={connState !== 'active'}>
             <RefreshCw className="w-4 h-4 mr-2" /> Check inbox now
           </Button>
         </div>
