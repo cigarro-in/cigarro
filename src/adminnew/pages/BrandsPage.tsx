@@ -47,11 +47,11 @@ export function BrandsPage() {
   const loading = rows === undefined;
 
   const handleAddBrand = () => {
-    navigate('/admin/brands/new');
+    navigate('/brands/new');
   };
 
   const handleEditBrand = (brand: Brand) => {
-    navigate(`/admin/brands/${brand.id}`);
+    navigate(`/brands/${brand.id}`);
   };
 
   const handleBulkDelete = async (brandIds: string[]) => {

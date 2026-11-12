@@ -113,7 +113,7 @@ export function InvoiceFormPage() {
         notes: notes.trim() || undefined,
         idempotencyKey: idempotencyKey.current,
       });
-      navigate(`/admin/invoices/${result.invoiceId}${printAfter ? '?print=1' : ''}`);
+      navigate(`/invoices/${result.invoiceId}${printAfter ? '?print=1' : ''}`);
     } catch (error: any) {
       const code = error?.data?.code;
       setOpError(code === 'INSUFFICIENT_STOCK' ? 'Stock changed while creating this invoice. Review the available quantities and try again.' : error?.message || 'Could not create invoice');
@@ -135,12 +135,12 @@ export function InvoiceFormPage() {
   if (!isNew) {
     if (invoice === undefined) return <div className="p-12 text-center text-muted-foreground">Loading invoice…</div>;
     if (invoice === null) return <div className="p-12 text-center text-muted-foreground">Invoice not found</div>;
-    return <div className="min-h-screen bg-info-muted pb-16"><PageHeader title={invoice.invoiceNumber} description={`Invoice for ${invoice.customerName}`} backUrl="/admin/invoices"><Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / save PDF</Button>{invoice.status !== 'voided' && <Button variant="destructive" disabled={saving} onClick={voidCurrent}><Ban className="mr-2 h-4 w-4" />Void & restore stock</Button>}</PageHeader><div className="mx-auto mt-5 max-w-210"><InlineStatus status={opStatus} /></div>{message && <div className="mx-auto mt-5 max-w-210 rounded-lg border border-success-muted bg-success-muted px-4 py-3 text-sm text-success">{message}</div>}<div className="px-4 pt-7"><InvoiceDocument invoice={invoice} /></div></div>;
+    return <div className="min-h-screen bg-info-muted pb-16"><PageHeader title={invoice.invoiceNumber} description={`Invoice for ${invoice.customerName}`} backUrl="/invoices"><Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / save PDF</Button>{invoice.status !== 'voided' && <Button variant="destructive" disabled={saving} onClick={voidCurrent}><Ban className="mr-2 h-4 w-4" />Void & restore stock</Button>}</PageHeader><div className="mx-auto mt-5 max-w-210"><InlineStatus status={opStatus} /></div>{message && <div className="mx-auto mt-5 max-w-210 rounded-lg border border-success-muted bg-success-muted px-4 py-3 text-sm text-success">{message}</div>}<div className="px-4 pt-7"><InvoiceDocument invoice={invoice} /></div></div>;
   }
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <PageHeader title="Create invoice" description="Record an offline sale and update inventory instantly" backUrl="/admin/invoices">
+      <PageHeader title="Create invoice" description="Record an offline sale and update inventory instantly" backUrl="/invoices">
         <Button variant="outline" disabled={saving} onClick={() => save(false)}><Save className="mr-2 h-4 w-4" />Save</Button>
         <Button disabled={saving} onClick={() => save(true)}><Printer className="mr-2 h-4 w-4" />{saving ? 'Creating…' : 'Save & print'}</Button>
       </PageHeader>

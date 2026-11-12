@@ -85,7 +85,7 @@ export function HeroSlideFormPage() {
       const data: any = slides.find((s: any) => s._id === id);
       if (!data) {
         setOpError('Slide not found');
-        navigate('/admin/homepage');
+        navigate('/homepage');
         return;
       }
       setForm({
@@ -153,7 +153,7 @@ export function HeroSlideFormPage() {
       setOpOk(isEditMode ? 'Slide updated' : 'Slide created');
 
       await invalidateStorefront();
-      navigate('/admin/homepage');
+      navigate('/homepage');
     } catch (error: any) {
       console.error('Error saving slide:', error);
       setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to save slide');
@@ -171,7 +171,7 @@ export function HeroSlideFormPage() {
       await removeSlide({ id: id as any, orgSlug: ORG_SLUG });
       setOpOk('Slide deleted');
       await invalidateStorefront();
-      navigate('/admin/homepage');
+      navigate('/homepage');
     } catch (error: any) {
       console.error('Error deleting slide:', error);
       setOpError('Failed to delete slide');
@@ -193,7 +193,7 @@ export function HeroSlideFormPage() {
       <PageHeader
         title={isEditMode ? 'Edit Slide' : 'New Slide'}
         description={isEditMode ? 'Update hero slide details' : 'Create a new hero slide'}
-        backUrl="/admin/homepage"
+        backUrl="/homepage"
       >
         {isEditMode && (
           <Button

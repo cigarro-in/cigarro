@@ -98,7 +98,7 @@ export function CustomerFormPage() {
         <div className="text-center">
           <h3 className="text-lg font-medium text-foreground">Customer not found</h3>
           <p className="text-muted-foreground">The customer you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/admin/customers')} className="mt-4">
+          <Button onClick={() => navigate('/customers')} className="mt-4">
             Back to Customers
           </Button>
         </div>
@@ -112,7 +112,7 @@ export function CustomerFormPage() {
       <PageHeader
         title={customer.name}
         description={`Customer since ${new Date(customer.created_at).toLocaleDateString()}`}
-        backUrl="/admin/customers"
+        backUrl="/customers"
       >
         {customer.is_admin && (
           <Badge variant="outline">Admin</Badge>
@@ -163,7 +163,7 @@ export function CustomerFormPage() {
             <AdminCardContent>
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <button key={order.id} type="button" onClick={() => navigate(`/admin/orders/${order.id}`)} className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <button key={order.id} type="button" onClick={() => navigate(`/orders/${order.id}`)} className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div>
                       <div className="font-medium text-foreground">
                         #{order.display_order_id}

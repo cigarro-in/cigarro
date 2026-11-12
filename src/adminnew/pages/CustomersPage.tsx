@@ -53,7 +53,7 @@ export function CustomersPage() {
   const loading = rows === undefined;
 
   const handleViewCustomer = (customer: Customer) => {
-    navigate(`/admin/customers/${customer.id}`);
+    navigate(`/customers/${customer.id}`);
   };
 
   const columns = [

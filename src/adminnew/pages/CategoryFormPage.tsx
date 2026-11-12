@@ -78,7 +78,7 @@ export function CategoryFormPage() {
     const data: any = categoryRows.find((c: any) => c.supabaseId === id);
     if (!data) {
       setOpError('Category not found');
-      navigate('/admin/categories');
+      navigate('/categories');
       return;
     }
     setFormData({
@@ -149,7 +149,7 @@ export function CategoryFormPage() {
       // Replace product links (same replace-set semantics as before).
       await linkProducts({ supabaseId: categoryId!, productSupabaseIds: selectedProductIds, orgSlug: ORG_SLUG });
 
-      navigate('/admin/categories');
+      navigate('/categories');
     } catch (error: any) {
       console.error('Error saving category:', error);
       const code = error?.data?.code;
@@ -171,7 +171,7 @@ export function CategoryFormPage() {
     try {
       await removeCategory({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Category deleted successfully');
-      navigate('/admin/categories');
+      navigate('/categories');
     } catch (error: any) {
       console.error('Error deleting category:', error);
       setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete category');
@@ -194,11 +194,11 @@ export function CategoryFormPage() {
       <PageHeader
         title={formData.name || 'Untitled Category'}
         description={isEditMode ? 'Edit category' : 'Create new category'}
-        backUrl="/admin/categories"
+        backUrl="/categories"
       >
         <Button 
           variant="outline" 
-          onClick={() => navigate('/admin/categories')}
+          onClick={() => navigate('/categories')}
         >
           Cancel
         </Button>

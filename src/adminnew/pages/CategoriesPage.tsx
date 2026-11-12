@@ -46,11 +46,11 @@ export function CategoriesPage() {
   const loading = rows === undefined;
 
   const handleAddCategory = () => {
-    navigate('/admin/categories/new');
+    navigate('/categories/new');
   };
 
   const handleEditCategory = (category: Category) => {
-    navigate(`/admin/categories/${category.id}`);
+    navigate(`/categories/${category.id}`);
   };
 
   const handleBulkDelete = async (categoryIds: string[]) => {

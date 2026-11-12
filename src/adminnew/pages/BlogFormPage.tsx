@@ -100,7 +100,7 @@ export function BlogFormPage() {
     const data: any = postRows.find((p: any) => p._id === id);
     if (!data) {
       setOpError('Post not found');
-      navigate('/admin/blogs');
+      navigate('/blogs');
       return;
     }
     setPost({
@@ -191,7 +191,7 @@ export function BlogFormPage() {
       });
       setOpOk(isEditing ? 'Post updated successfully' : 'Post created successfully');
 
-      navigate('/admin/blogs');
+      navigate('/blogs');
     } catch (error: any) {
       console.error('Error saving post:', error);
       const code = error?.data?.code;
@@ -212,7 +212,7 @@ export function BlogFormPage() {
     try {
       await removePost({ id: post.id as any, orgSlug: ORG_SLUG });
       setOpOk('Post deleted');
-      navigate('/admin/blogs');
+      navigate('/blogs');
     } catch (error: any) {
       console.error('Error deleting post:', error);
       setOpError(error?.message || 'Failed to delete post');
@@ -232,7 +232,7 @@ export function BlogFormPage() {
       <PageHeader
         title={isEditing ? `Edit: ${post?.title || 'Post'}` : 'New Blog Post'}
         description={isEditing ? 'Update blog post details' : 'Create a new blog post'}
-        backUrl="/admin/blogs"
+        backUrl="/blogs"
       >
         {isEditing && (
           <Button variant="destructive" size="sm" onClick={handleDelete}>

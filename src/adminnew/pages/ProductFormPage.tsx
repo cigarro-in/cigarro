@@ -112,7 +112,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     populatedRef.current = true;
     if (!editData) {
       setOpError('Product not found');
-      navigate('/admin/products');
+      navigate('/products');
       return;
     }
     const data: any = editData.product;
@@ -378,7 +378,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
 
       setOpOk(isEditMode ? 'Product updated successfully' : 'Product created successfully');
 
-      navigate('/admin/products');
+      navigate('/products');
     } catch (error: any) {
       console.error('Error saving product:', error);
       const code = error?.data?.code;
@@ -402,7 +402,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
     try {
       await removeProduct({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Product deleted successfully');
-      navigate('/admin/products');
+      navigate('/products');
     } catch (error: any) {
       console.error('Error deleting product:', error);
       setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete product');
@@ -428,11 +428,11 @@ export function ProductFormPage({ }: ProductFormPageProps) {
       <PageHeader
         title={formData.name || 'Untitled Product'}
         description={isEditMode ? 'Edit product' : 'Create new product'}
-        backUrl="/admin/products"
+        backUrl="/products"
       >
         <Button
           variant="outline"
-          onClick={() => navigate('/admin/products')}
+          onClick={() => navigate('/products')}
         >
           Cancel
         </Button>
@@ -842,7 +842,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                             className="bg-background border-border"
                           />
                           {variant.id && (
-                            <button type="button" onClick={() => navigate('/admin/inventory')} className="text-xs font-medium text-primary hover:underline">
+                            <button type="button" onClick={() => navigate('/inventory')} className="text-xs font-medium text-primary hover:underline">
                               Adjust live stock in Inventory
                             </button>
                           )}

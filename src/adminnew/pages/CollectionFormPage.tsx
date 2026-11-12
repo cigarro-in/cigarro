@@ -86,7 +86,7 @@ export function CollectionFormPage() {
     const data: any = collectionRows.find((c: any) => c.supabaseId === id);
     if (!data) {
       setOpError('Collection not found');
-      navigate('/admin/collections');
+      navigate('/collections');
       return;
     }
     setFormData({
@@ -155,7 +155,7 @@ export function CollectionFormPage() {
       });
       setOpOk(isEditMode ? 'Collection updated successfully' : 'Collection created successfully');
 
-      navigate('/admin/collections');
+      navigate('/collections');
     } catch (error: any) {
       console.error('Error saving collection:', error);
       const code = error?.data?.code;
@@ -177,7 +177,7 @@ export function CollectionFormPage() {
     try {
       await removeCollection({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Collection deleted successfully');
-      navigate('/admin/collections');
+      navigate('/collections');
     } catch (error: any) {
       console.error('Error deleting collection:', error);
       setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collection');
@@ -200,11 +200,11 @@ export function CollectionFormPage() {
       <PageHeader
         title={formData.title || 'Untitled Collection'}
         description={isEditMode ? 'Edit collection' : 'Create new collection'}
-        backUrl="/admin/collections"
+        backUrl="/collections"
       >
         <Button 
           variant="outline" 
-          onClick={() => navigate('/admin/collections')}
+          onClick={() => navigate('/collections')}
         >
           Cancel
         </Button>

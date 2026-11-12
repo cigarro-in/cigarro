@@ -81,7 +81,7 @@ export function StorePicker() {
             {stores.map((store) => (
               <li key={store.slug}>
                 <a
-                  href={`/${store.slug}/admin`}
+                  href={`/${store.slug}/`}
                   className="flex h-11 items-center justify-between rounded-xl border bg-background px-4 font-semibold text-base"
                 >
                   <span className="truncate">{store.name}</span>

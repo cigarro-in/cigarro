@@ -71,11 +71,11 @@ export function DiscountsPage() {
   const loading = rows === undefined;
 
   const handleAddDiscount = () => {
-    navigate('/admin/discounts/new');
+    navigate('/discounts/new');
   };
 
   const handleEditDiscount = (discount: Discount) => {
-    navigate(`/admin/discounts/${discount.id}`);
+    navigate(`/discounts/${discount.id}`);
   };
 
   const handleBulkDelete = async (discountIds: string[]) => {

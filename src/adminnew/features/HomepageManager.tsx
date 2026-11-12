@@ -401,7 +401,7 @@ export function HomepageManager() {
               Hero Slides ({activeSlides} active)
             </AdminCardTitle>
             <Button 
-              onClick={() => navigate('/admin/hero-slides/new')}
+              onClick={() => navigate('/hero-slides/new')}
               size="sm"
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
@@ -419,7 +419,7 @@ export function HomepageManager() {
                 <Image className="mx-auto h-12 w-12 text-border mb-4" />
                 <p>No hero slides yet</p>
                 <Button 
-                  onClick={() => navigate('/admin/hero-slides/new')}
+                  onClick={() => navigate('/hero-slides/new')}
                   className="mt-4"
                   variant="outline"
                 >
@@ -496,7 +496,7 @@ export function HomepageManager() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/admin/hero-slides/${slide.id}`)}
+                        onClick={() => navigate(`/hero-slides/${slide.id}`)}
                       >
                         Edit
                       </Button>
@@ -545,7 +545,7 @@ export function HomepageManager() {
                     onToggle={handleComponentToggle}
                     onLink={handleCollectionLink}
                     onTitle={handleSectionTitle}
-                    onManage={() => navigate('/admin/collections')}
+                    onManage={() => navigate('/collections')}
                   />
                 ))}
               </div>

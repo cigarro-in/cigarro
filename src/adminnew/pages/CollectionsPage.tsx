@@ -46,11 +46,11 @@ export function CollectionsPage() {
   const loading = rows === undefined;
 
   const handleAddCollection = () => {
-    navigate('/admin/collections/new');
+    navigate('/collections/new');
   };
 
   const handleEditCollection = (collection: Collection) => {
-    navigate(`/admin/collections/${collection.id}`);
+    navigate(`/collections/${collection.id}`);
   };
 
   const handleBulkDelete = async (collectionIds: string[]) => {
@@ -166,7 +166,7 @@ export function CollectionsPage() {
         }}
       >
         <BulkActionsMenu selectedIds={selectedCollections} actions={bulkActions} />
-        <Button variant="outline" onClick={() => navigate('/admin/homepage')}>Homepage</Button>
+        <Button variant="outline" onClick={() => navigate('/homepage')}>Homepage</Button>
         <Button onClick={handleAddCollection}>
           <Plus className="mr-2 h-4 w-4" />
           Add Collection

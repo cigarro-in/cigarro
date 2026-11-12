@@ -47,10 +47,10 @@ Themes own:
 
 ## Admin UI structure
 
-- `src/adminnew/AdminRouter.tsx` — route table. `ADMIN_ROUTES` array drives pages.
+- `src/adminnew/AdminRouter.tsx` — route table. `ADMIN_ROUTES` array drives pages. Paths are router-relative (no `/admin` prefix); the admin host basename is `/<store>`, so `/orders` serves `admin.cigarro.in/<store>/orders`. Build admin links with `adminPath()` / `adminAbsoluteUrl()` from `src/adminnew/lib/paths.ts`. Legacy `/<store>/admin/*` redirects to `/<store>/*`.
 - `src/adminnew/layout/AdminSidebar.tsx` — `ADMIN_NAVIGATION` drives sidebar. Sections: `platform`, `payments`.
-- Payment screens live under `/admin/payments/*`: hub, late payments, unmatched emails, settings.
-- Order detail page `/admin/orders/:id` → `OrderFormPage.tsx` handles both payment actions (mark paid / void / refund) and shipping lifecycle.
+- Payment screens live under `/<store>/payments/*`: hub, late payments, unmatched emails, settings.
+- Order detail page `/<store>/orders/:id` → `OrderFormPage.tsx` handles both payment actions (mark paid / void / refund) and shipping lifecycle.
 
 ## Conventions
 

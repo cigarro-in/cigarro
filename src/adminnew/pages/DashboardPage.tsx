@@ -197,12 +197,12 @@ export function DashboardPage() {
                 <SummaryMetric
                   label="To fulfil"
                   value={data?.processingOrders ?? 0}
-                  onClick={() => navigate('/admin/orders?status=processing')}
+                  onClick={() => navigate('/orders?status=processing')}
                 />
                 <SummaryMetric
                   label="Low stock"
                   value={data?.lowStockCount ?? 0}
-                  onClick={() => navigate('/admin/inventory?lowStock=1')}
+                  onClick={() => navigate('/inventory?lowStock=1')}
                 />
               </CardContent>
             </Card>
@@ -240,7 +240,7 @@ export function DashboardPage() {
                           </TableHeader>
                           <TableBody>
                             {recentOrders.map((order) => {
-                              const openOrder = () => navigate(`/admin/orders/${order.id}`);
+                              const openOrder = () => navigate(`/orders/${order.id}`);
                               return (
                                 <TableRow
                                   key={order.id}
@@ -265,7 +265,7 @@ export function DashboardPage() {
                           </TableBody>
                         </Table>
                       )}
-                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/admin/orders')}>
+                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/orders')}>
                         View all
                         <ArrowRight data-icon="inline-end" aria-hidden />
                       </Button>
@@ -290,7 +290,7 @@ export function DashboardPage() {
                           </TableHeader>
                           <TableBody>
                             {recentCustomers.map((customer) => {
-                              const openCustomer = () => navigate(`/admin/customers/${customer.id}`);
+                              const openCustomer = () => navigate(`/customers/${customer.id}`);
                               return (
                                 <TableRow
                                   key={customer.id}
@@ -319,7 +319,7 @@ export function DashboardPage() {
                           </TableBody>
                         </Table>
                       )}
-                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/admin/customers')}>
+                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/customers')}>
                         View all
                         <ArrowRight data-icon="inline-end" aria-hidden />
                       </Button>
@@ -339,24 +339,24 @@ export function DashboardPage() {
                   <StoreMetric
                     label="Awaiting payment"
                     value={data?.pendingOrders ?? 0}
-                    onClick={() => navigate('/admin/orders?status=pending')}
+                    onClick={() => navigate('/orders?status=pending')}
                   />
                   <StoreMetric
                     label="Shipped"
                     value={data?.shippedOrders ?? 0}
-                    onClick={() => navigate('/admin/orders?status=shipped')}
+                    onClick={() => navigate('/orders?status=shipped')}
                   />
                   <StoreMetric
                     label="Active products"
                     value={`${data?.activeProducts ?? 0} / ${data?.totalProducts ?? 0}`}
-                    onClick={() => navigate('/admin/products')}
+                    onClick={() => navigate('/products')}
                   />
                   <StoreMetric
                     label="Customers"
                     value={data?.totalCustomers ?? 0}
-                    onClick={() => navigate('/admin/customers')}
+                    onClick={() => navigate('/customers')}
                   />
-                  <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/admin/products/new')}>
+                  <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/products/new')}>
                     Add product
                     <ArrowRight data-icon="inline-end" aria-hidden />
                   </Button>

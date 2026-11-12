@@ -75,11 +75,11 @@ export function BlogsPage() {
   const loading = rows === undefined;
 
   const handleAddPost = () => {
-    navigate('/admin/blogs/new');
+    navigate('/blogs/new');
   };
 
   const handleEditPost = (post: BlogPost) => {
-    navigate(`/admin/blogs/${post.id}`);
+    navigate(`/blogs/${post.id}`);
   };
 
   const handleBulkDelete = async (postIds: string[]) => {

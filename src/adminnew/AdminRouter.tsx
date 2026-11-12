@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AdminShell } from './layout/AdminShell';
 import {
   DashboardPage,
@@ -34,55 +34,68 @@ import {
 /**
  * Admin navigation configuration
  * Abstract structure for future website builder conversion
- * Paths are absolute so they match the BrowserRouter location directly.
+ * Paths are router-relative: the basename is `/<store>` on the admin host,
+ * so '/orders' serves https://admin.cigarro.in/<store>/orders.
  */
 export const ADMIN_ROUTES = [
-  { path: '/admin', element: DashboardPage, label: 'Overview', section: 'platform' },
-  { path: '/admin/products', element: ProductsPage, label: 'Products', section: 'platform' },
-  { path: '/admin/categories', element: CategoriesPage, label: 'Categories', section: 'platform' },
-  { path: '/admin/brands', element: BrandsPage, label: 'Brands', section: 'platform' },
-  { path: '/admin/collections', element: CollectionsPage, label: 'Collections', section: 'platform' },
-  { path: '/admin/orders', element: OrdersPage, label: 'Orders', section: 'platform' },
-  { path: '/admin/inventory', element: InventoryPage, label: 'Inventory', section: 'commerce' },
-  { path: '/admin/invoices', element: InvoicesPage, label: 'Invoices', section: 'commerce' },
-  { path: '/admin/customers', element: CustomersPage, label: 'Customers', section: 'platform' },
-  { path: '/admin/discounts', element: DiscountsPage, label: 'Discounts', section: 'platform' },
-  { path: '/admin/homepage', element: HomepagePage, label: 'Homepage', section: 'platform' },
-  { path: '/admin/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
-  { path: '/admin/reviews', element: ReviewsPage, label: 'Reviews', section: 'platform' },
-  { path: '/admin/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
-  { path: '/admin/seo/redirects', element: RedirectsPage, label: 'Redirects', section: 'seo' },
-  { path: '/admin/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
-  { path: '/admin/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
-  { path: '/admin/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },
+  { path: '/', element: DashboardPage, label: 'Overview', section: 'platform' },
+  { path: '/products', element: ProductsPage, label: 'Products', section: 'platform' },
+  { path: '/categories', element: CategoriesPage, label: 'Categories', section: 'platform' },
+  { path: '/brands', element: BrandsPage, label: 'Brands', section: 'platform' },
+  { path: '/collections', element: CollectionsPage, label: 'Collections', section: 'platform' },
+  { path: '/orders', element: OrdersPage, label: 'Orders', section: 'platform' },
+  { path: '/inventory', element: InventoryPage, label: 'Inventory', section: 'commerce' },
+  { path: '/invoices', element: InvoicesPage, label: 'Invoices', section: 'commerce' },
+  { path: '/customers', element: CustomersPage, label: 'Customers', section: 'platform' },
+  { path: '/discounts', element: DiscountsPage, label: 'Discounts', section: 'platform' },
+  { path: '/homepage', element: HomepagePage, label: 'Homepage', section: 'platform' },
+  { path: '/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
+  { path: '/reviews', element: ReviewsPage, label: 'Reviews', section: 'platform' },
+  { path: '/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
+  { path: '/seo/redirects', element: RedirectsPage, label: 'Redirects', section: 'seo' },
+  { path: '/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
+  { path: '/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },
   // Deep links into the Payments tabs (single page, tab picked from the path).
-  { path: '/admin/payments/unmatched', element: PaymentsPage, label: 'Payments', section: 'payments' },
-  { path: '/admin/payments/settings', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/payments/unmatched', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/payments/settings', element: PaymentsPage, label: 'Payments', section: 'payments' },
 ] as const;
+
+/**
+ * Old bookmarks: /<store>/admin/<rest> -> /<store>/<rest>. The edge middleware
+ * issues the 301 first; this covers client-side arrivals (in-app links, cached shells).
+ */
+function LegacyAdminRedirect() {
+  const { pathname, search, hash } = useLocation();
+  const rest = pathname.replace(/^\/admin(?=\/|$)/, '') || '/';
+  return <Navigate to={`${rest}${search}${hash}`} replace />;
+}
 
 export function AdminRouter() {
   return (
     <AdminShell>
       <Routes>
+        <Route path="/admin/*" element={<LegacyAdminRedirect />} />
+
         {/* Form routes - must come before list routes to match :id properly */}
-        <Route path="/admin/products/new" element={<ProductFormPage />} />
-        <Route path="/admin/products/:id" element={<ProductFormPage />} />
-        <Route path="/admin/categories/new" element={<CategoryFormPage />} />
-        <Route path="/admin/categories/:id" element={<CategoryFormPage />} />
-        <Route path="/admin/brands/new" element={<BrandFormPage />} />
-        <Route path="/admin/brands/:id" element={<BrandFormPage />} />
-        <Route path="/admin/collections/new" element={<CollectionFormPage />} />
-        <Route path="/admin/collections/:id" element={<CollectionFormPage />} />
-        <Route path="/admin/orders/:id" element={<OrderFormPage />} />
-        <Route path="/admin/invoices/new" element={<InvoiceFormPage />} />
-        <Route path="/admin/invoices/:id" element={<InvoiceFormPage />} />
-        <Route path="/admin/customers/:id" element={<CustomerFormPage />} />
-        <Route path="/admin/discounts/new" element={<DiscountFormPage />} />
-        <Route path="/admin/discounts/:id" element={<DiscountFormPage />} />
-        <Route path="/admin/hero-slides/new" element={<HeroSlideFormPage />} />
-        <Route path="/admin/hero-slides/:id" element={<HeroSlideFormPage />} />
-        <Route path="/admin/blogs/new" element={<BlogFormPage />} />
-        <Route path="/admin/blogs/:id" element={<BlogFormPage />} />
+        <Route path="/products/new" element={<ProductFormPage />} />
+        <Route path="/products/:id" element={<ProductFormPage />} />
+        <Route path="/categories/new" element={<CategoryFormPage />} />
+        <Route path="/categories/:id" element={<CategoryFormPage />} />
+        <Route path="/brands/new" element={<BrandFormPage />} />
+        <Route path="/brands/:id" element={<BrandFormPage />} />
+        <Route path="/collections/new" element={<CollectionFormPage />} />
+        <Route path="/collections/:id" element={<CollectionFormPage />} />
+        <Route path="/orders/:id" element={<OrderFormPage />} />
+        <Route path="/invoices/new" element={<InvoiceFormPage />} />
+        <Route path="/invoices/:id" element={<InvoiceFormPage />} />
+        <Route path="/customers/:id" element={<CustomerFormPage />} />
+        <Route path="/discounts/new" element={<DiscountFormPage />} />
+        <Route path="/discounts/:id" element={<DiscountFormPage />} />
+        <Route path="/hero-slides/new" element={<HeroSlideFormPage />} />
+        <Route path="/hero-slides/:id" element={<HeroSlideFormPage />} />
+        <Route path="/blogs/new" element={<BlogFormPage />} />
+        <Route path="/blogs/:id" element={<BlogFormPage />} />
         
         {/* List routes */}
         {ADMIN_ROUTES.map(({ path, element: Element }) => (
@@ -90,7 +103,7 @@ export function AdminRouter() {
         ))}
         
         {/* Catch all redirect */}
-        <Route path="*" element={<Navigate to="/admin" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AdminShell>
   );

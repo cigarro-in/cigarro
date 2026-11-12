@@ -83,7 +83,7 @@ export function BrandFormPage() {
     const data: any = brandRows.find((b: any) => b.supabaseId === id);
     if (!data) {
       setOpError('Brand not found');
-      navigate('/admin/brands');
+      navigate('/brands');
       return;
     }
     setFormData({
@@ -154,7 +154,7 @@ export function BrandFormPage() {
         setOpOk('Brand created successfully');
       }
 
-      navigate('/admin/brands');
+      navigate('/brands');
     } catch (error: any) {
       console.error('Error saving brand:', error);
       const code = error?.data?.code;
@@ -176,7 +176,7 @@ export function BrandFormPage() {
     try {
       await removeBrand({ supabaseId: id!, orgSlug: ORG_SLUG });
       setOpOk('Brand deleted successfully');
-      navigate('/admin/brands');
+      navigate('/brands');
     } catch (error: any) {
       console.error('Error deleting brand:', error);
       setOpError(
@@ -203,11 +203,11 @@ export function BrandFormPage() {
       <PageHeader
         title={formData.name || 'Untitled Brand'}
         description={isEditMode ? 'Edit brand' : 'Create new brand'}
-        backUrl="/admin/brands"
+        backUrl="/brands"
       >
         <Button 
           variant="outline" 
-          onClick={() => navigate('/admin/brands')}
+          onClick={() => navigate('/brands')}
         >
           Cancel
         </Button>

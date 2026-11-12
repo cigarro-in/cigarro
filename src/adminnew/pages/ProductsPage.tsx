@@ -69,11 +69,11 @@ export function ProductsPage() {
   const loading = rows === undefined;
 
   const handleAddProduct = () => {
-    navigate('/admin/products/new');
+    navigate('/products/new');
   };
 
   const handleEditProduct = (product: Product) => {
-    navigate(`/admin/products/${product.id}`);
+    navigate(`/products/${product.id}`);
   };
 
   const handleBulkDelete = async (productIds: string[]) => {

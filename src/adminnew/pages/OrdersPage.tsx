@@ -117,7 +117,7 @@ export function OrdersPage() {
   );
 
   const handleEditOrder = (order: Order) => {
-    navigate(`/admin/orders/${order.id}`);
+    navigate(`/orders/${order.id}`);
   };
 
   const handleBulkMarkPaid = async (orderIds: string[]) => {

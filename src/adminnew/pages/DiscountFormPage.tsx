@@ -167,7 +167,7 @@ export function DiscountFormPage() {
         setOpOk('Discount created successfully');
       }
 
-      navigate('/admin/discounts');
+      navigate('/discounts');
     } catch (error: any) {
       console.error('Error saving discount:', error);
       setOpError(
@@ -188,7 +188,7 @@ export function DiscountFormPage() {
     try {
       await removeDiscount({ id: id as any, orgSlug: ORG_SLUG });
       setOpOk('Discount deleted successfully');
-      navigate('/admin/discounts');
+      navigate('/discounts');
     } catch (error: any) {
       console.error('Error deleting discount:', error);
       setOpError(
@@ -226,7 +226,7 @@ export function DiscountFormPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-100 gap-4">
         <p className="text-muted-foreground">Discount not found. It may have been deleted.</p>
-        <Button variant="outline" onClick={() => navigate('/admin/discounts')}>
+        <Button variant="outline" onClick={() => navigate('/discounts')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Discounts
         </Button>
@@ -240,11 +240,11 @@ export function DiscountFormPage() {
       <PageHeader
         title={formData.name || 'Untitled Discount'}
         description={isEditMode ? 'Edit discount' : 'Create new discount'}
-        backUrl="/admin/discounts"
+        backUrl="/discounts"
       >
         <Button 
           variant="outline" 
-          onClick={() => navigate('/admin/discounts')}
+          onClick={() => navigate('/discounts')}
         >
           Cancel
         </Button>

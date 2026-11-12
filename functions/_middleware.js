@@ -69,15 +69,23 @@ async function handleRequest(context) {
 
   // Admin host: /admin/... is the pre-store address. Send it to the default store.
   if (onAdminHost && (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) {
-    return Response.redirect(`https://${url.host}/${org.slug}${url.pathname}${url.search}`, 302);
+    const rest = url.pathname.slice('/admin'.length) || '/';
+    return Response.redirect(`https://${url.host}/${org.slug}${rest}${url.search}`, 302);
+  }
+
+  // Admin host, old per-store address: /<store>/admin/<rest> -> /<store>/<rest> (permanent).
+  // Only the resolved store is accepted, so the target stays on this host.
+  const legacyStoreAdmin = onAdminHost ? url.pathname.match(/^\/([^/]+)\/admin(\/.*)?$/) : null;
+  if (legacyStoreAdmin && legacyStoreAdmin[1] === org.slug) {
+    const rest = legacyStoreAdmin[2] || '/';
+    return Response.redirect(`https://${url.host}/${org.slug}${rest}${url.search}`, 301);
   }
 
   // Storefront: /admin moved to the per-store admin app on admin.<root>.
   if (!onAdminHost && (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) {
     const isRoot = url.pathname === '/admin' || url.pathname === '/admin/';
-    const target = isRoot
-      ? `/${org.slug}/`
-      : `/${org.slug}/admin${url.pathname.slice('/admin'.length)}`;
+    const rest = url.pathname.slice('/admin'.length) || '/';
+    const target = isRoot ? `/${org.slug}/` : `/${org.slug}${rest}`;
     return Response.redirect(`https://admin.${org.primaryHost}${target}${url.search}`, 302);
   }
 

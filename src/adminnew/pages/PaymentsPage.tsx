@@ -13,7 +13,7 @@ import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { APP_BASENAME } from '../../lib/convex/org';
+import { adminAbsoluteUrl } from '../lib/paths';
 import { convexUrl } from '../../lib/convex/client';
 import { paiseToRupees } from '../../lib/convex/money';
 import { formatINR } from '../../utils/currency';
@@ -163,8 +163,8 @@ export function PaymentsPage() {
             recentOrders={recentOrders}
             recentEmails={recentEmails}
             onViewUnmatched={() => setTab('unmatched')}
-            onOpenOrder={(id: string) => navigate(`/admin/orders/${id}`)}
-            onViewOrders={() => navigate('/admin/orders')}
+            onOpenOrder={(id: string) => navigate(`/orders/${id}`)}
+            onViewOrders={() => navigate('/orders')}
           />
         )}
         {tab === 'unmatched' && <UnmatchedTab emails={unmatched} />}
@@ -589,7 +589,7 @@ function GmailConnectionCard(props: {
     try {
       const r = await connectUrl({
         orgId: props.orgId,
-        returnTo: `${window.location.origin}${APP_BASENAME}/admin/payments/settings?gmail=connected`,
+        returnTo: adminAbsoluteUrl('/payments/settings') + '?gmail=connected',
       });
       window.location.href = r.url;
     } catch (e: any) {

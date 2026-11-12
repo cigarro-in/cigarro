@@ -80,7 +80,7 @@ export function OrderFormPage() {
       <div className="flex items-center justify-center min-h-100">
         <div className="text-center">
           <h3 className="text-lg font-medium text-foreground">Order not found</h3>
-          <Button onClick={() => navigate('/admin/orders')} className="mt-4">
+          <Button onClick={() => navigate('/orders')} className="mt-4">
             Back to Orders
           </Button>
         </div>
@@ -178,7 +178,7 @@ export function OrderFormPage() {
       <PageHeader
         title={`Order #${order.displayOrderId}`}
         description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()}`}
-        backUrl="/admin/orders"
+        backUrl="/orders"
       >
         <Badge variant="secondary">
           {order.status}

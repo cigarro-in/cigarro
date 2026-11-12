@@ -66,46 +66,46 @@ interface NavSection {
 
 export const ADMIN_NAVIGATION: NavSection[] = [
   {
-    items: [{ label: 'Overview', path: '/admin', icon: LayoutDashboard }],
+    items: [{ label: 'Overview', path: '/', icon: LayoutDashboard }],
   },
   {
     label: 'Sales',
     items: [
-      { label: 'Orders', path: '/admin/orders', icon: ShoppingCart },
-      { label: 'Customers', path: '/admin/customers', icon: Users },
-      { label: 'Payments', path: '/admin/payments', icon: CreditCard },
-      { label: 'Invoices', path: '/admin/invoices', icon: ReceiptIndianRupee },
+      { label: 'Orders', path: '/orders', icon: ShoppingCart },
+      { label: 'Customers', path: '/customers', icon: Users },
+      { label: 'Payments', path: '/payments', icon: CreditCard },
+      { label: 'Invoices', path: '/invoices', icon: ReceiptIndianRupee },
     ],
   },
   {
     label: 'Catalog',
     items: [
-      { label: 'Products', path: '/admin/products', icon: Package },
-      { label: 'Inventory', path: '/admin/inventory', icon: Boxes },
-      { label: 'Collections', path: '/admin/collections', icon: FolderOpen },
-      { label: 'Categories', path: '/admin/categories', icon: Tags },
-      { label: 'Brands', path: '/admin/brands', icon: Building2 },
+      { label: 'Products', path: '/products', icon: Package },
+      { label: 'Inventory', path: '/inventory', icon: Boxes },
+      { label: 'Collections', path: '/collections', icon: FolderOpen },
+      { label: 'Categories', path: '/categories', icon: Tags },
+      { label: 'Brands', path: '/brands', icon: Building2 },
     ],
   },
   {
     label: 'Growth',
     items: [
-      { label: 'Marketing', path: '/admin/marketing', icon: Megaphone },
-      { label: 'Discounts', path: '/admin/discounts', icon: Percent },
+      { label: 'Marketing', path: '/marketing', icon: Megaphone },
+      { label: 'Discounts', path: '/discounts', icon: Percent },
     ],
   },
   {
     label: 'Storefront',
     items: [
-      { label: 'Homepage', path: '/admin/homepage', icon: Home },
-      { label: 'Reviews', path: '/admin/reviews', icon: Star },
-      { label: 'Blogs', path: '/admin/blogs', icon: FileText },
-      { label: 'Assets', path: '/admin/assets', icon: ImageIcon },
+      { label: 'Homepage', path: '/homepage', icon: Home },
+      { label: 'Reviews', path: '/reviews', icon: Star },
+      { label: 'Blogs', path: '/blogs', icon: FileText },
+      { label: 'Assets', path: '/assets', icon: ImageIcon },
     ],
   },
   {
     label: 'SEO',
-    items: [{ label: 'Redirects', path: '/admin/seo/redirects', icon: ArrowRightLeft }],
+    items: [{ label: 'Redirects', path: '/seo/redirects', icon: ArrowRightLeft }],
   },
 ];
 
@@ -122,7 +122,7 @@ export function AdminSidebar() {
   const { stores } = useAdminStores();
 
   const isActive = (path: string) =>
-    path === '/admin'
+    path === '/'
       ? location.pathname === path
       : location.pathname.startsWith(path);
 
@@ -142,7 +142,7 @@ export function AdminSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <NavLink
-          to="/admin"
+          to="/"
           className="flex h-10 items-center gap-2 rounded-md px-2 outline-none ring-sidebar-ring focus-visible:ring-2"
           onClick={closeMobileSidebar}
         >
@@ -159,7 +159,7 @@ export function AdminSidebar() {
             <span className="sr-only">Switch store</span>
             <select
               value={ORG_SLUG}
-              onChange={(event) => window.location.assign(`/${event.target.value}/admin`)}
+              onChange={(event) => window.location.assign(`/${event.target.value}/`)}
               className="h-8 w-full rounded-md border bg-background px-2 text-sm"
             >
               {stores.map((store) => (
@@ -183,7 +183,7 @@ export function AdminSidebar() {
                       isActive={isActive(item.path)}
                       tooltip={item.label}
                     >
-                      <NavLink to={item.path} end={item.path === '/admin'} onClick={closeMobileSidebar}>
+                      <NavLink to={item.path} end={item.path === '/'} onClick={closeMobileSidebar}>
                         <item.icon aria-hidden />
                         <span>{item.label}</span>
                       </NavLink>
@@ -201,10 +201,10 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={isActive('/admin/settings')}
+              isActive={isActive('/settings')}
               tooltip="Settings"
             >
-              <NavLink to="/admin/settings" onClick={closeMobileSidebar}>
+              <NavLink to="/settings" onClick={closeMobileSidebar}>
                 <Settings aria-hidden />
                 <span>Settings</span>
               </NavLink>
