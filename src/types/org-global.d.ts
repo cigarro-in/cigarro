@@ -8,6 +8,9 @@ declare global {
       id: string | null;
       name: string;
       primaryHost: string;
+      themeId?: string | null;
     };
+    /** Set by the SSR entry when it ships server-rendered markup; enables hydrateRoot in main.tsx. */
+    __SSR__?: boolean;
   }
 }

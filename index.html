@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    
+
+    <!-- Returning age-verified visitors: flag <html> before first paint so the
+         age gate overlay never flashes. Must stay before any stylesheet. -->
+    <script>
+      try {
+        if (localStorage.getItem('ageVerified') === 'true') document.documentElement.dataset.ageok = '1';
+      } catch (e) {
+        // Storage blocked: the overlay renders and the app behaves as before.
+      }
+    </script>
+    <style>html[data-ageok] .age-gate-overlay{display:none}</style>
+
     <!-- DNS Prefetch for faster external connections -->
     <link rel="dns-prefetch" href="https://cdn.cigarro.in">
     <link rel="preconnect" href="https://cdn.cigarro.in" crossorigin>

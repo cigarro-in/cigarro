@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from 'convex/react';
+import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { api } from '../../../convex/_generated/api';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { resolveStoreSettings, type RawStoreSettings, type StoreSettings } from '../../lib/storeSettings';
@@ -14,7 +14,7 @@ export { resolveStoreSettings } from '../../lib/storeSettings';
 
 export function useStoreSettings(): { settings: StoreSettings; loading: boolean } {
   const { slug: orgSlug } = useOrgInfo();
-  const row = useQuery(api.content.getSiteSettings, { orgSlug: orgSlug });
+  const row = usePreloadedOrLive(api.content.getSiteSettings, { orgSlug: orgSlug });
   return useMemo(
     () => ({
       settings: resolveStoreSettings(row as RawStoreSettings | null | undefined),

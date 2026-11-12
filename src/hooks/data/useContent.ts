@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
+import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { api } from '../../../convex/_generated/api';
 import { mergeShippingMethods } from '../../lib/shipping';
 import { useOrgInfo } from '../../lib/org/OrgContext';
@@ -74,7 +75,7 @@ function withCompat(row: any): any {
 
 export function useBlogPosts(limit = 50) {
   const { slug: orgSlug } = useOrgInfo();
-  const rows = useQuery(api.content.listBlogPosts, { limit, orgSlug: orgSlug });
+  const rows = usePreloadedOrLive(api.content.listBlogPosts, { limit, orgSlug: orgSlug });
   return useMemo(
     () => ({
       posts: ((rows ?? []).map(withCompat) as BlogDetailPost[]),
@@ -86,7 +87,7 @@ export function useBlogPosts(limit = 50) {
 
 export function useBlogPost(slug: string | undefined) {
   const { slug: orgSlug } = useOrgInfo();
-  const row = useQuery(
+  const row = usePreloadedOrLive(
     api.content.getBlogPostBySlug,
     slug ? { slug, orgSlug: orgSlug } : 'skip'
   );
@@ -107,7 +108,7 @@ export function useRelatedPosts(categorySlug?: string, excludeSlug?: string, lim
     !categorySlug && !excludeSlug
       ? 'skip'
       : { categorySlug, excludeSlug, limit, orgSlug: orgSlug };
-  const rows = useQuery(api.content.listRelatedPosts, args);
+  const rows = usePreloadedOrLive(api.content.listRelatedPosts, args);
   return useMemo(
     () => ({ posts: ((rows ?? []).map(withCompat) as BlogListPost[]) }),
     [rows],
@@ -116,7 +117,7 @@ export function useRelatedPosts(categorySlug?: string, excludeSlug?: string, lim
 
 export function useBlogCategories() {
   const { slug: orgSlug } = useOrgInfo();
-  const rows = useQuery(api.content.listBlogCategories, { orgSlug: orgSlug });
+  const rows = usePreloadedOrLive(api.content.listBlogCategories, { orgSlug: orgSlug });
   return useMemo(() => ({ categories: rows ?? [] }), [rows]);
 }
 
@@ -159,7 +160,7 @@ function withSlideCompat(row: any): any {
 
 export function useHeroSlides() {
   const { slug: orgSlug } = useOrgInfo();
-  const rows = useQuery(api.content.listHeroSlides, { orgSlug: orgSlug });
+  const rows = usePreloadedOrLive(api.content.listHeroSlides, { orgSlug: orgSlug });
   return useMemo(
     () => ({
       slides: ((rows ?? []).map(withSlideCompat) as HeroSlide[]),
@@ -171,7 +172,7 @@ export function useHeroSlides() {
 
 export function useSectionConfig(name: string | undefined) {
   const { slug: orgSlug } = useOrgInfo();
-  const row = useQuery(
+  const row = usePreloadedOrLive(
     api.content.getSectionConfig,
     name ? { name, orgSlug: orgSlug } : 'skip'
   );
@@ -193,7 +194,7 @@ export function useSectionConfig(name: string | undefined) {
 
 export function useSiteSettings() {
   const { slug: orgSlug } = useOrgInfo();
-  const row = useQuery(api.content.getSiteSettings, { orgSlug: orgSlug });
+  const row = usePreloadedOrLive(api.content.getSiteSettings, { orgSlug: orgSlug });
   return useMemo(() => {
     if (!row) return { settings: null, loading: row === undefined };
     return {

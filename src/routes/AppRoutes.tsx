@@ -1,3 +1,8 @@
+// Client code splitting: every page below is React.lazy so each route ships as
+// its own chunk. SSR NOTE: a server render cannot wait on lazy chunks the way
+// the client can, so the server entry needs eager imports for every route it
+// renders (or a manifest of preloaded chunks). Swap these to static imports
+// there, and keep the lazy versions for the client build.
 import { lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';

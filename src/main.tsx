@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 import { useRegisterSW } from 'virtual:pwa-register/react'
@@ -156,11 +157,34 @@ const UpdateSW = () => {
   return null
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+// Client entry: the router lives here, not in App, so a server entry can render
+// the same <App /> inside <StaticRouter location={...}>. StaticRouter is exported
+// from 'react-router' and re-exported by 'react-router-dom' (react-router 7.9.1;
+// there is no 'react-router-dom/server' subpath).
+const orgInfo = getClientOrgInfo();
+const routedApp = orgInfo.isSa ? (
+  // Super-admin app mounts its own BrowserRouter (src/sa/SaApp.tsx).
+  <App />
+) : (
+  <BrowserRouter basename={orgInfo.basename || undefined}>
+    <App />
+  </BrowserRouter>
+);
+
+const appTree = (
   <React.StrictMode>
-    <OrgProvider org={getClientOrgInfo()}>
-      <App />
+    <OrgProvider org={orgInfo}>
+      {routedApp}
       <UpdateSW />
     </OrgProvider>
-  </React.StrictMode>,
-)
+  </React.StrictMode>
+);
+
+// Hydrate only when the server shipped markup for this page. Nothing sets
+// window.__SSR__ yet, so today this always takes the createRoot path.
+const rootEl = document.getElementById('root')!;
+if (window.__SSR__ === true && rootEl.hasChildNodes()) {
+  ReactDOM.hydrateRoot(rootEl, appTree);
+} else {
+  ReactDOM.createRoot(rootEl).render(appTree);
+}

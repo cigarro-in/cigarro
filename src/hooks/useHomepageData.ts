@@ -8,7 +8,7 @@ import {
 } from '../types/home';
 import { useHeroSlides, useSectionConfig, useBlogPosts } from './data/useContent';
 import { useFullCatalog } from './data/useCatalog';
-import { useQuery } from 'convex/react';
+import { usePreloadedOrLive } from '../lib/ssr/preload';
 import { api } from '../../convex/_generated/api';
 import { useOrgInfo } from '../lib/org/OrgContext';
 
@@ -42,7 +42,7 @@ export function useHomepageData() {
   const { config: categoriesCfg, loading: categoriesLoading } =
     useSectionConfig('categories_section');
   const { posts: convexPosts, loading: blogLoading } = useBlogPosts(6);
-  const homepageComponents = useQuery(api.content.listHomepageComponents, { orgSlug: orgSlug });
+  const homepageComponents = usePreloadedOrLive(api.content.listHomepageComponents, { orgSlug: orgSlug });
 
   const isLoading =
     catalogLoading ||

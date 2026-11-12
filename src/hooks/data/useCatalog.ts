@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { useOrg } from '../../lib/convex/useOrg';
+import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 
 // Theme-safe catalog reads (Convex). Shapes are snake_case rows with ISO
@@ -145,8 +144,8 @@ function buildMaps(bundle: any) {
 // so a fresh object per render would retrigger them infinitely.
 export function useFullCatalog() {
   const { slug: orgSlug } = useOrgInfo();
-  const org = useOrg();
-  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgSlug: orgSlug } : 'skip');
+  // No useOrg() gate: it is a live query and would block preloaded data on the server.
+  const bundle = usePreloadedOrLive(api.catalog.fullCatalog, { orgSlug: orgSlug });
   return useMemo(() => {
     if (!bundle) {
       return {
@@ -177,10 +176,9 @@ export function useFullCatalog() {
 // PDP: single product with variants + brand (legacy shapes).
 export function useCatalogProduct(slug: string | undefined) {
   const { slug: orgSlug } = useOrgInfo();
-  const org = useOrg();
-  const detail = useQuery(
+  const detail = usePreloadedOrLive(
     api.catalog.getProductBySlug,
-    slug && org ? { slug, orgSlug: orgSlug } : 'skip',
+    slug ? { slug, orgSlug: orgSlug } : 'skip',
   );
   return useMemo(() => {
     if (detail === undefined) return { product: null, loading: true as boolean };
@@ -201,6 +199,6 @@ export function useCatalogProduct(slug: string | undefined) {
 // Combos are an empty table in prod: keep the call-site contract (list).
 export function useCatalogCombos() {
   const { slug: orgSlug } = useOrgInfo();
-  const rows = useQuery(api.catalog.listCombos, { activeOnly: true, orgSlug: orgSlug });
+  const rows = usePreloadedOrLive(api.catalog.listCombos, { activeOnly: true, orgSlug: orgSlug });
   return useMemo(() => ({ combos: rows ?? [] }), [rows]);
 }
