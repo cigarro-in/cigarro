@@ -7,6 +7,7 @@ import { useAuth, AuthError, newAuthCorrelationId } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useOTPWidget } from '../../hooks/useOTPWidget';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { setReloadBlocked } from '../../lib/reloadGuard';
 
 interface Props {
   open: boolean;
@@ -216,6 +217,24 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
     enabled: open,
   });
 
+  // While open, automatic reloads (chunk recovery, SW updates) are suppressed
+  // so they cannot wipe the OTP flow.
+  useEffect(() => {
+    if (!open) return;
+    setReloadBlocked(true);
+    return () => setReloadBlocked(false);
+  }, [open]);
+
+  // Script/widget load failure: surface it inline instead of "Loading…" forever.
+  useEffect(() => {
+    if (!open || !otp.loadError) return;
+    setAuthError((prev) => prev ?? toInlineError(
+      'network',
+      "Sign-in couldn't load. Check your connection and reload the page.",
+      'OTP_SCRIPT_LOAD',
+    ));
+  }, [open, otp.loadError]);
+
   // Reset on close
   useEffect(() => {
     if (!open) {
@@ -296,11 +315,11 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
         setResendIn(30);
         focusOtp();
       },
-      onFailed: (msg) => {
+      onFailed: (msg, code) => {
         // Stays on the phone step (no step change here) — the inline error
         // below carries the Retry action.
         const friendly = friendlySendFailureMessage(msg);
-        setAuthError(toInlineError('send_failed', friendly));
+        setAuthError(toInlineError('send_failed', friendly, code));
       },
     });
   };
@@ -355,11 +374,11 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
         setResendIn(30);
         focusOtp();
       },
-      onFailed: (msg) => {
+      onFailed: (msg, code) => {
         // Stays on the otp step (no step change here) — the inline error
         // below carries the resend action via handleErrorRetry.
         const friendly = friendlySendFailureMessage(msg);
-        setAuthError(toInlineError('send_failed', friendly));
+        setAuthError(toInlineError('send_failed', friendly, code));
       },
     });
   };
@@ -414,14 +433,18 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
               />
             </div>
             {authError && (
-              <InlineAuthError error={authError} onRetry={sendOtpNow} retryLabel="Retry" />
+              <InlineAuthError
+                error={authError}
+                onRetry={authError.code === 'OTP_SCRIPT_LOAD' ? () => window.location.reload() : sendOtpNow}
+                retryLabel={authError.code === 'OTP_SCRIPT_LOAD' ? 'Reload page' : 'Retry'}
+              />
             )}
             <button
               type="submit"
               disabled={otp.isLoading || !otp.isLoaded || phoneInput.length !== 10}
               className="w-full h-12 rounded-xl bg-[var(--vv-brand,#8c4630)] text-white font-semibold text-[15px] hover:bg-[var(--vv-brand-hover,#6e3524)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
             >
-              {otp.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : !otp.isLoaded ? 'Loading…' : 'Continue'}
+              {otp.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : !otp.isLoaded ? (otp.loadError ? 'Unavailable' : 'Loading…') : 'Continue'}
             </button>
           </form>
         </StepContainer>

@@ -7,7 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': the app decides when to apply a new worker (see UpdateSW in
+      // src/main.tsx). autoUpdate would reload mid-login.
+      registerType: 'prompt',
       devOptions: {
         enabled: false // Disable in dev to avoid caching issues
       },
@@ -23,7 +25,9 @@ export default defineConfig({
         // Don't cache images in precache (too large)
         globIgnores: ['**/assets/images/**'],
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
+        // Must stay false in prompt mode: the waiting worker activates only
+        // when the app applies the update.
+        skipWaiting: false,
         clientsClaim: true,
         runtimeCaching: [
           // CDN images load directly. Intercepting cross-origin image requests

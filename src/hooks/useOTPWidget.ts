@@ -12,7 +12,8 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import type { MSG91Config } from '../types/msg91';
+import type { MSG91Config, MSG91Error } from '../types/msg91';
+import { reportCrash } from '../lib/crashReporting';
 
 interface OTPWidgetProps {
   onSuccess: (phone: string, countryCode: string, token: string) => void;
@@ -23,8 +24,19 @@ interface OTPWidgetProps {
   enabled?: boolean;
 }
 
+export interface SendOTPCallbacks {
+  onSent?: () => void;
+  // `code` is a stable identifier for the inline error (never contains PII).
+  onFailed?: (message: string, code?: string) => void;
+}
+
 const WIDGET_ID = import.meta.env.VITE_MSG91_WIDGET_ID as string | undefined;
 const TOKEN_AUTH = import.meta.env.VITE_MSG91_TOKEN_AUTH as string | undefined;
+const SCRIPT_URL = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
+// A send that the widget never answers must not leave the spinner running.
+const SEND_TIMEOUT_MS = 20_000;
+const INIT_POLL_MS = 200;
+const INIT_POLL_MAX = 50; // 10 s total
 
 // MSG91 defines a custom element (`h-captcha`) on init. Calling initSendOTP a
 // second time re-runs customElements.define → DOMException → half-init state
@@ -34,19 +46,52 @@ const TOKEN_AUTH = import.meta.env.VITE_MSG91_TOKEN_AUTH as string | undefined;
 // is currently "active".
 type WidgetCallbacks = {
   success: (data: { mobile?: string; countryCode?: string; message?: string }) => void;
-  failure: (err: { message?: string }) => void;
+  failure: (err: MSG91Error) => void;
 };
 const widgetState: {
   loadStarted: boolean;
   initialized: boolean;
+  loadError: string | null;
   activeCallbacks: WidgetCallbacks | null;
   scriptLoadListeners: Array<() => void>;
+  scriptFailListeners: Array<(message: string) => void>;
 } = {
   loadStarted: false,
   initialized: false,
+  loadError: null,
   activeCallbacks: null,
   scriptLoadListeners: [],
+  scriptFailListeners: [],
 };
+
+// Fail the script load for every mounted instance and remember it, so
+// instances mounted later also see the error instead of spinning forever.
+function markLoadFailed(message: string, code: string): void {
+  if (widgetState.loadError) return;
+  widgetState.loadError = message;
+  reportOtpFailure('otp.loadScript', message, code);
+  const listeners = widgetState.scriptFailListeners;
+  widgetState.scriptFailListeners = [];
+  widgetState.scriptLoadListeners = [];
+  for (const fn of listeners) fn(message);
+}
+
+// Provider error codes are short identifiers; strip anything else.
+function providerCodeOf(err: MSG91Error | undefined, fallback: string): string {
+  const raw = (err as { code?: unknown } | undefined)?.code;
+  if (typeof raw !== 'string' && typeof raw !== 'number') return fallback;
+  const clean = String(raw).replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
+  return clean ? `OTP_PROVIDER_${clean}` : fallback;
+}
+
+// Reports never include the phone number: digit runs are masked before send.
+function reportOtpFailure(operation: string, message: string, code: string): void {
+  const masked = message.replace(/\d{4,}/g, '[num]').slice(0, 500);
+  reportCrash(new Error(`[${code}] ${masked}`), { source: 'app', operation });
+}
+
+type SendResult = { ok: true } | { ok: false; message: string; code: string };
+type PendingSend = { id: number; cbs: SendOTPCallbacks; timer: ReturnType<typeof setTimeout> };
 
 export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetProps) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -54,6 +99,7 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
   const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
@@ -62,7 +108,29 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
   onErrorRef.current = onError;
   phoneRef.current = phone;
 
+  const pendingSendRef = useRef<PendingSend | null>(null);
+  const sendSeqRef = useRef(0);
+
   const isConfigured = !!WIDGET_ID && !!TOKEN_AUTH;
+
+  // Settles the in-flight sendOtp exactly once. `id` null means "whatever send
+  // is pending" (the singleton global failure callback carries no request id).
+  const settleSend = useCallback((id: number | null, result: SendResult): boolean => {
+    const pending = pendingSendRef.current;
+    if (!pending || (id !== null && pending.id !== id)) return false;
+    pendingSendRef.current = null;
+    clearTimeout(pending.timer);
+    setIsLoading(false);
+    if (result.ok) {
+      setStep('otp');
+      pending.cbs.onSent?.();
+    } else {
+      setError(result.message);
+      reportOtpFailure('otp.sendOtp', result.message, result.code);
+      pending.cbs.onFailed?.(result.message, result.code);
+    }
+    return true;
+  }, []);
 
   // Register this component's callbacks with the singleton dispatcher so the
   // already-initialized widget's success/failure routes to the current caller.
@@ -81,7 +149,13 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
         );
       },
       failure: (err) => {
-        const message = err.message || 'Verification failed';
+        // A failure during an in-flight send belongs to that send's caller.
+        if (settleSend(null, {
+          ok: false,
+          message: err?.message || 'Failed to send OTP',
+          code: providerCodeOf(err, 'OTP_SEND_FAILED'),
+        })) return;
+        const message = err?.message || 'Verification failed';
         setError(message);
         onErrorRef.current?.(message);
       },
@@ -92,31 +166,26 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
         widgetState.activeCallbacks = null;
       }
     };
-  }, [isConfigured, enabled]);
+  }, [isConfigured, enabled, settleSend]);
 
   // Ensure the MSG91 script is loaded and initSendOTP is called exactly once
   // per page lifetime. Subsequent mounts just mark themselves as loaded.
   useEffect(() => {
     if (!isConfigured) return;
 
-    const markLoadedWhenInitialized = () => {
-      if (widgetState.initialized) {
-        setIsLoaded(true);
-      } else {
-        widgetState.scriptLoadListeners.push(() => setIsLoaded(true));
-      }
-    };
-
     if (widgetState.initialized) {
       setIsLoaded(true);
       return;
     }
-
-    if (widgetState.loadStarted) {
-      markLoadedWhenInitialized();
+    if (widgetState.loadError) {
+      setLoadError(widgetState.loadError);
       return;
     }
 
+    widgetState.scriptLoadListeners.push(() => setIsLoaded(true));
+    widgetState.scriptFailListeners.push((message) => setLoadError(message));
+
+    if (widgetState.loadStarted) return;
     widgetState.loadStarted = true;
 
     const config: MSG91Config = {
@@ -128,57 +197,70 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
     };
 
     const initOnce = () => {
-      if (widgetState.initialized) return;
-      if (!window.initSendOTP) return;
+      if (widgetState.initialized || widgetState.loadError) return;
+      if (typeof window.initSendOTP !== 'function') return;
       try {
         window.initSendOTP(config);
         widgetState.initialized = true;
-        setIsLoaded(true);
-        for (const fn of widgetState.scriptLoadListeners) fn();
+        const listeners = widgetState.scriptLoadListeners;
         widgetState.scriptLoadListeners = [];
-      } catch (e) {
-        setError('OTP widget failed to initialize');
+        widgetState.scriptFailListeners = [];
+        for (const fn of listeners) fn();
+      } catch {
+        markLoadFailed('OTP widget failed to initialize', 'OTP_INIT_FAILED');
       }
     };
 
     const pollForInit = () => {
       let attempts = 0;
-      const max = 50; // 10 s @ 200 ms
       const iv = setInterval(() => {
         attempts += 1;
-        if (window.initSendOTP) {
+        if (typeof window.initSendOTP === 'function') {
           clearInterval(iv);
           initOnce();
-        } else if (attempts >= max) {
+        } else if (attempts >= INIT_POLL_MAX) {
           clearInterval(iv);
-          setError('OTP service took too long to load');
+          markLoadFailed('OTP service took too long to load', 'OTP_LOAD_TIMEOUT');
         }
-      }, 200);
+      }, INIT_POLL_MS);
     };
 
     const existing = document.getElementById('msg91-otp-script');
     if (existing) {
       // Script is already on the page from a previous mount — don't add another.
-      if (window.initSendOTP) initOnce();
+      if (typeof window.initSendOTP === 'function') initOnce();
       else pollForInit();
       return;
     }
 
     const script = document.createElement('script');
     script.id = 'msg91-otp-script';
-    script.src = 'https://control.msg91.com/app/assets/otp-provider/otp-provider.js';
+    script.src = SCRIPT_URL;
     script.async = true;
     script.onload = pollForInit;
-    script.onerror = () => setError('Failed to load OTP service');
+    script.onerror = () => markLoadFailed('Failed to load OTP service', 'OTP_SCRIPT_LOAD');
     document.body.appendChild(script);
   }, [isConfigured]);
 
   const sendOTP = useCallback(
-    (phoneNumber: string, cbs?: { onSent?: () => void; onFailed?: (message: string) => void }) => {
-      if (!isLoaded || !window.sendOtp) {
-        const msg = 'OTP service not ready';
-        setError(msg);
-        cbs?.onFailed?.(msg);
+    (phoneNumber: string, cbs?: SendOTPCallbacks) => {
+      // One send at a time; a second tap while sending is ignored.
+      if (pendingSendRef.current) return;
+
+      const failNow = (message: string, code: string) => {
+        setError(message);
+        reportOtpFailure('otp.sendOtp', message, code);
+        cbs?.onFailed?.(message, code);
+      };
+
+      if (!isLoaded) {
+        if (loadError) failNow(loadError, 'OTP_SCRIPT_LOAD');
+        else failNow('OTP service not ready', 'OTP_NOT_READY');
+        return;
+      }
+      const send = window.sendOtp;
+      if (typeof send !== 'function') {
+        failNow('Sign-in service is unavailable. Reload the page and try again.', 'OTP_UNAVAILABLE');
         return;
       }
 
@@ -189,22 +271,40 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
 
       const formattedPhone = phoneNumber.startsWith('91') ? phoneNumber : `91${phoneNumber}`;
 
-      window.sendOtp(
-        formattedPhone,
-        () => {
-          setStep('otp');
-          setIsLoading(false);
-          cbs?.onSent?.();
-        },
-        (err) => {
-          const msg = err.message || 'Failed to send OTP';
-          setError(msg);
-          setIsLoading(false);
-          cbs?.onFailed?.(msg);
-        }
-      );
+      sendSeqRef.current += 1;
+      const id = sendSeqRef.current;
+      const timer = setTimeout(() => {
+        settleSend(id, {
+          ok: false,
+          message: 'The SMS service took too long to respond. Try again.',
+          code: 'OTP_TIMEOUT',
+        });
+      }, SEND_TIMEOUT_MS);
+      pendingSendRef.current = { id, cbs: cbs ?? {}, timer };
+
+      try {
+        window.sendOtp!(
+          formattedPhone,
+          () => {
+            settleSend(id, { ok: true });
+          },
+          (err) => {
+            settleSend(id, {
+              ok: false,
+              message: err?.message || 'Failed to send OTP',
+              code: providerCodeOf(err, 'OTP_SEND_FAILED'),
+            });
+          }
+        );
+      } catch {
+        settleSend(id, {
+          ok: false,
+          message: 'Could not reach the SMS service. Try again.',
+          code: 'OTP_THROW',
+        });
+      }
     },
-    [isLoaded]
+    [isLoaded, loadError, settleSend]
   );
 
   const verifyOTP = useCallback(
@@ -281,6 +381,7 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
     isConfigured,
     isLoaded,
     isLoading,
+    loadError,
     step,
     phone,
     error,
