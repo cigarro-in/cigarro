@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, startTransition, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
 import { useOrgInfo } from '../lib/org/OrgContext';
@@ -55,7 +55,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   // Guests load localStorage; server state arrives via subscription.
   useEffect(() => {
     if (!useConvexPath) {
-      setLocalItems(readLocalWishlist());
+      startTransition(() => setLocalItems(readLocalWishlist()));
     }
   }, [user?.id, useConvexPath]);
 

@@ -1,11 +1,14 @@
 import { lazy } from 'react';
 import type { ThemeManifest } from '../types';
 import './tokens.css';
+import { VividHome } from './VividHome';
+import VividProductPage from './VividProduct';
 
-const Home = lazy(() => import('./VividHome').then((m) => ({ default: m.VividHome })));
+// Eager: server-rendered home/product must not suspend during hydration (React #421).
+const Home = VividHome;
 const VividShell = lazy(() => import('./VividShell').then((m) => ({ default: m.VividShell })));
 const VividList = lazy(() => import('./VividProductList').then((m) => ({ default: m.VividProductList })));
-const VividProduct = lazy(() => import('./VividProduct'));
+const VividProduct = VividProductPage;
 const VividCart = lazy(() => import('./VividCart'));
 const VividProfile = lazy(() => import('./VividProfile').then((m) => ({ default: m.VividProfile })));
 const VividCategories = lazy(() => import('./VividCategories').then((m) => ({ default: m.VividCategories })));

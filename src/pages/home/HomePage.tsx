@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense } from 'react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import Hero from './Hero';
 import { CategoriesScroller } from './CategoriesScroller';
@@ -10,13 +10,15 @@ import { useOrgInfo } from '../../lib/org/OrgContext';
 // the store tagline above the fold is decorative, the SEO title carries the topic.
 const HOME_TITLE = 'Cigarro | Cigarettes and Tobacco Products Online';
 
-// Lazy load non-critical components to improve initial page load
-const FeaturedProducts = lazy(() => import('./FeaturedProducts').then(m => ({ default: m.FeaturedProducts })));
-const BrandsScroller = lazy(() => import('./BrandsScroller').then(m => ({ default: m.BrandsScroller })));
-const CategoryShowcases = lazy(() => import('./CategoryShowcases').then(m => ({ default: m.CategoryShowcases })));
-const ProductShowcase = lazy(() => import('./ProductShowcase').then(m => ({ default: m.ProductShowcase })));
-const CategoriesGrid = lazy(() => import('./CategoriesGrid').then(m => ({ default: m.CategoriesGrid })));
-const BlogSection = lazy(() => import('./BlogSection').then(m => ({ default: m.BlogSection })));
+// Eager, not React.lazy: the home page is server-rendered (P5-SSR). A lazy section
+// suspends during hydration, leaving its Suspense boundary dehydrated, and any
+// parent state update then throws React #421. The sections ship in the main chunk.
+import { FeaturedProducts } from './FeaturedProducts';
+import { BrandsScroller } from './BrandsScroller';
+import { CategoryShowcases } from './CategoryShowcases';
+import { ProductShowcase } from './ProductShowcase';
+import { CategoriesGrid } from './CategoriesGrid';
+import { BlogSection } from './BlogSection';
 
 // Minimal fallback to prevent layout shifts
 const SectionFallback = ({ height = "h-96" }: { height?: string }) => (

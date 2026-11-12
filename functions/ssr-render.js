@@ -15,8 +15,17 @@ import { render, planSsrRoute, matchSsrRoute, flagCovers, fetchPreload, serializ
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg, orgScriptJson } from './lib/org.js';
 
-const PRELOAD_TIMEOUT_MS = 3000;
-const SSR_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+// Preloads run in parallel (fetchPreload); each one gives up after this long and
+// the client's live query covers it.
+const PRELOAD_TIMEOUT_MS = 1500;
+// Edge cache (Cache API, keyed per host + path): fresh for 60s, served stale for a
+// further 300s while a background re-render refreshes it.
+const SSR_FRESH_SECONDS = 60;
+const SSR_STALE_SECONDS = 300;
+const SSR_CACHE_CONTROL = `public, s-maxage=${SSR_FRESH_SECONDS}, stale-while-revalidate=${SSR_STALE_SECONDS}`;
+// Lifetime of the Cache API entry: long enough to serve the stale window.
+const SSR_STORE_CONTROL = `public, s-maxage=${SSR_FRESH_SECONDS + SSR_STALE_SECONDS}`;
+const STORED_AT_HEADER = 'x-ssr-stored-at';
 
 // Same security set the bot renderer stamps (Function responses bypass _headers).
 const SECURITY_HEADERS = {
@@ -84,12 +93,20 @@ const STATIC_HEAD_TO_REPLACE = [
 
 function injectIntoShell(shell, { html, head, htmlAttrs, org, preload, orgScript }) {
   const headHasJsonLd = /application\/ld\+json/.test(head);
+  // The shell's <noscript> block (a static h1 and nav for no-JS clients) would
+  // add a second <h1> to the SSR markup. The server render already has the page
+  // content, so the fallback is dropped on this path.
   const inject = [
     `<script>window.__ORG__=${orgScript};window.__SSR__=true;</script>`,
     serializePreload(preload),
     head,
   ].join('');
   let rewriter = new HTMLRewriter()
+    .on('noscript', {
+      element(el) {
+        el.remove();
+      },
+    })
     .on('html', {
       element(el) {
         for (const [name, value] of Object.entries(htmlAttrs)) el.setAttribute(name, value);
@@ -114,6 +131,64 @@ function injectIntoShell(shell, { html, head, htmlAttrs, org, preload, orgScript
   return rewriter.transform(new Response(shell, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
 }
 
+// Cache key: host + path, plus ?variant= when present. Every other query
+// parameter is ignored (the rendered page does not depend on it).
+function ssrCacheKey(url) {
+  const variant = url.searchParams.get('variant');
+  const query = variant ? `?variant=${encodeURIComponent(variant)}` : '';
+  return new Request(`https://${url.host}${url.pathname}${query}`);
+}
+
+// Path the page is rendered for: the same pathname + variant the cache key holds.
+function renderPathFor(url) {
+  const variant = url.searchParams.get('variant');
+  return url.pathname + (variant ? `?variant=${encodeURIComponent(variant)}` : '');
+}
+
+// Full server render (Convex preload, React, shell injection). Throws on failure.
+async function renderPage(context, url, orgInfo, org, orgScript) {
+  const { env } = context;
+  const plan = planSsrRoute(url.pathname, orgInfo);
+  if (!plan) throw new Error(`no SSR route for ${url.pathname}`);
+  const preload = plan.trimPreload(
+    await fetchPreload(requiredConvexUrl(env), plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
+  );
+  const themeId = themeIdFromPreload(preload, orgInfo.slug);
+
+  const rendered = await render({ url: renderPathFor(url), org: orgInfo, preload, themeId });
+  const shell = await loadShell(context);
+
+  const transformed = await injectIntoShell(shell, {
+    html: rendered.html,
+    head: rendered.head,
+    htmlAttrs: rendered.htmlAttrs,
+    org,
+    preload,
+    orgScript,
+  });
+  return { body: await transformed.text(), status: rendered.status };
+}
+
+// Response for a rendered page. 404s (missing or inactive entity) are never
+// cached and get the same no-store, noindex headers the bot renderer sends.
+function pageResponse(method, { body, status }, cacheState) {
+  const notFound = status === 404;
+  const headers = new Headers({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': notFound ? 'no-store' : SSR_CACHE_CONTROL,
+    'X-SSR': '1',
+    'x-ssr-cache': cacheState,
+    ...(notFound ? { 'X-Robots-Tag': 'noindex, follow' } : {}),
+    ...SECURITY_HEADERS,
+  });
+  return new Response(method === 'HEAD' ? null : body, { status, headers });
+}
+
+// Cached copy served to the visitor (the stored Cache-Control is for the cache only).
+function cachedResponse(method, cached, cacheState) {
+  return cached.text().then((body) => pageResponse(method, { body, status: 200 }, cacheState));
+}
+
 // Entry point. Returns a Response for the SSR'd path or throws.
 export async function ssrRender(context) {
   const { request, env } = context;
@@ -125,34 +200,51 @@ export async function ssrRender(context) {
   const orgInfo = orgInfoFor(org);
   const orgScript = orgScriptJson(org);
 
-  const plan = planSsrRoute(url.pathname, orgInfo);
-  if (!plan) throw new Error(`no SSR route for ${url.pathname}`);
-  const preload = plan.trimPreload(
-    await fetchPreload(requiredConvexUrl(env), plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
-  );
-  const themeId = themeIdFromPreload(preload, orgInfo.slug);
+  // Only anonymous GETs use the edge cache. Storefront HTML is the same for every
+  // visitor (auth lives in localStorage), so an Authorization header is the only
+  // signal that a response must not be shared.
+  const cache = globalThis.caches?.default;
+  const cacheable = request.method === 'GET' && !request.headers.get('authorization') && cache;
+  if (!cacheable) {
+    const page = await renderPage(context, url, orgInfo, org, orgScript);
+    return pageResponse(request.method, page, 'bypass');
+  }
 
-  const rendered = await render({ url: url.pathname + url.search, org: orgInfo, preload, themeId });
-  const shell = await loadShell(context);
+  const key = ssrCacheKey(url);
+  const cached = await cache.match(key).catch(() => undefined);
+  if (cached) {
+    const storedAt = Number(cached.headers.get(STORED_AT_HEADER) || 0);
+    const ageSeconds = (Date.now() - storedAt) / 1000;
+    if (ageSeconds < SSR_FRESH_SECONDS) {
+      return cachedResponse(request.method, cached, 'hit');
+    }
+    if (ageSeconds < SSR_FRESH_SECONDS + SSR_STALE_SECONDS) {
+      // Stale: answer now, refresh the entry after the response is sent.
+      context.waitUntil(
+        renderPage(context, url, orgInfo, org, orgScript)
+          .then((page) => storePage(context, cache, key, page))
+          .catch((error) => console.error('SSR background refresh failed:', url.pathname, error instanceof Error ? error.message : error)),
+      );
+      return cachedResponse(request.method, cached, 'stale');
+    }
+  }
 
-  const transformed = await injectIntoShell(shell, {
-    html: rendered.html,
-    head: rendered.head,
-    htmlAttrs: rendered.htmlAttrs,
-    org,
-    preload,
-    orgScript,
+  const page = await renderPage(context, url, orgInfo, org, orgScript);
+  await storePage(context, cache, key, page);
+  return pageResponse(request.method, page, 'miss');
+}
+
+// Stores a 200 page in the Cache API with its render time (freshness is judged
+// from the stored time, not from the cache's own TTL).
+async function storePage(context, cache, key, page) {
+  if (page.status !== 200) return;
+  const entry = new Response(page.body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': SSR_STORE_CONTROL,
+      [STORED_AT_HEADER]: String(Date.now()),
+    },
   });
-  const body = await transformed.text();
-
-  // Missing or inactive entity: same no-store, noindex 404 the bot renderer sends.
-  const notFound = rendered.status === 404;
-  const headers = new Headers({
-    'Content-Type': 'text/html; charset=utf-8',
-    'Cache-Control': notFound ? 'no-store' : SSR_CACHE_CONTROL,
-    'X-SSR': '1',
-    ...(notFound ? { 'X-Robots-Tag': 'noindex, follow' } : {}),
-    ...SECURITY_HEADERS,
-  });
-  return new Response(request.method === 'HEAD' ? null : body, { status: rendered.status, headers });
+  context.waitUntil(cache.put(key, entry).catch(() => {}));
 }

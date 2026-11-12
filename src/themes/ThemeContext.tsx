@@ -1,5 +1,5 @@
 import { writeStoredPreference } from '../lib/browserStorage';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, startTransition, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSiteSettings } from '../hooks/data/useContent';
 import { themes, DEFAULT_THEME_ID, getTheme, themeHtmlAttrs } from './registry';
 import type { ThemeManifest } from './types';
@@ -46,7 +46,8 @@ export function ThemeProvider({ children, initialThemeId }: ProviderProps) {
   useEffect(() => {
     const remote = settings?.active_theme;
     if (!remote || !getTheme(remote)) return;
-    setThemeIdState((current) => (current === remote ? current : remote));
+    // Transition: runs during/after hydration; see App.tsx AppContent (#421).
+    startTransition(() => setThemeIdState((current) => (current === remote ? current : remote)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on the remote value only
   }, [settings?.active_theme]);
 

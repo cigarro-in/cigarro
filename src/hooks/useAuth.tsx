@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, startTransition, ReactNode } from 'react';
 import { ConvexHttpClient } from 'convex/browser';
 import { convexUrl } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
@@ -116,7 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void checkSession();
+    // Transition: the anonymous path sets state synchronously; during hydration a
+    // plain update would hit dehydrated Suspense boundaries (React #421).
+    startTransition(() => void checkSession());
     const onStorage = () => void checkSession();
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);

@@ -1,5 +1,5 @@
 import { readStoredPreference } from '../lib/browserStorage';
-import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, startTransition, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
 import { useOrgInfo } from '../lib/org/OrgContext';
@@ -230,8 +230,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Load cart on mount and when user changes
   useEffect(() => {
     if (!isInitialized) {
-      loadCart();
-      setIsInitialized(true);
+      // Transition: storage-derived state must not interrupt hydration (#421).
+      startTransition(() => {
+        loadCart();
+        setIsInitialized(true);
+      });
     }
   }, [isInitialized]);
 

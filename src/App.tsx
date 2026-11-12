@@ -1,5 +1,5 @@
 import { readStoredPreference } from './lib/browserStorage';
-import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, Suspense, startTransition } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider, type HelmetServerState } from 'react-helmet-async';
 import { AgeVerification, AgeGateOverlay } from './components/auth/AgeVerification';
@@ -180,10 +180,15 @@ function AppContent({ helmetContext }: AppContentProps) {
   const appRootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const verified = readStoredPreference('ageVerified') === 'true';
-    setAgeVerified(verified);
-    // Already-verified visitors never see the gate again: offer them the
-    // one-time banner instead so analytics is never silently enabled.
-    if (verified && getConsent() === null) setLegacyConsentNeeded(true);
+    // startTransition: this effect runs right after hydration starts. A plain
+    // update here would reach Suspense boundaries that are still dehydrated
+    // (React #421). A transition lets hydration finish first.
+    startTransition(() => {
+      setAgeVerified(verified);
+      // Already-verified visitors never see the gate again: offer them the
+      // one-time banner instead so analytics is never silently enabled.
+      if (verified && getConsent() === null) setLegacyConsentNeeded(true);
+    });
   }, []);
 
   // Per-store settings from Convex, defaults filled in (was Supabase).
@@ -240,7 +245,7 @@ function AppContent({ helmetContext }: AppContentProps) {
 
   // Gate switched off for this store: there is no entry moment, so offer the banner.
   useEffect(() => {
-    if (!gateActive && getConsent() === null) setLegacyConsentNeeded(true);
+    if (!gateActive && getConsent() === null) startTransition(() => setLegacyConsentNeeded(true));
   }, [gateActive]);
 
   // Apply before paint: storefront top padding must not shift the admin host.
