@@ -5,6 +5,7 @@ import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware
 import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, getRequestOrg, orgScriptJson, isAdminHostname } from './lib/org.js';
 import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
+import { applyRedirect } from './lib/redirects.js';
 
 export async function onRequest(context) {
   const response = await handleRequest(context);
@@ -81,6 +82,15 @@ async function handleRequest(context) {
     }));
   }
 
+  // Storefront per-store redirects (301/302/410 from Convex). Document-style GETs
+  // only: assets, API and function routes never consult the redirect table.
+  if (!onAdminHost && (request.method === 'GET' || request.method === 'HEAD') && isRedirectCandidate(url.pathname)) {
+    const redirected = await applyRedirect(request, org, env, {
+      waitUntil: context.waitUntil.bind(context),
+    });
+    if (redirected) return redirected;
+  }
+
   try {
     const response = await routeRequest(context);
     if (response.status >= 500) {
@@ -119,6 +129,13 @@ async function handleRequest(context) {
     }));
     throw error;
   }
+}
+
+// True for page-like paths: no file extension, not under API, functions or assets.
+function isRedirectCandidate(pathname) {
+  if (pathname === '/api' || pathname.startsWith('/api/')) return false;
+  if (pathname.startsWith('/functions/') || pathname.startsWith('/assets/')) return false;
+  return !/\.[^/]+$/.test(pathname);
 }
 
 // Copy a response with X-Robots-Tag: noindex, nofollow (upstream headers may be immutable).

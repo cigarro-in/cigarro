@@ -28,6 +28,7 @@ import {
   InventoryPage,
   InvoicesPage,
   InvoiceFormPage,
+  RedirectsPage,
 } from './pages';
 
 /**
@@ -50,6 +51,7 @@ export const ADMIN_ROUTES = [
   { path: '/admin/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
   { path: '/admin/reviews', element: ReviewsPage, label: 'Reviews', section: 'platform' },
   { path: '/admin/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
+  { path: '/admin/seo/redirects', element: RedirectsPage, label: 'Redirects', section: 'seo' },
   { path: '/admin/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
   { path: '/admin/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/admin/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },

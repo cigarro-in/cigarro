@@ -1,14 +1,8 @@
 // Per-store 301/302/410 redirects at the edge.
 //
-// NOT wired into functions/_middleware.js. To enable, add these 3 lines in the
-// middleware after the org is resolved and before the page is rendered:
-//
-//   import { applyRedirect } from './lib/redirects.js';
-//   const redirected = await applyRedirect(request, org, env);
-//   if (redirected) return redirected;
-//
-// Pass { waitUntil: context.waitUntil.bind(context) } as a 4th argument so the
-// hit counter write finishes after the response is sent.
+// Wired into functions/_middleware.js for storefront hosts. The middleware passes
+// { waitUntil: context.waitUntil.bind(context) } as the 4th argument so the hit
+// counter write finishes after the response is sent.
 //
 // Lookups go to Convex redirects:lookup, cached 60s in the Cache API (misses
 // are cached too). Any failure returns null, so the page renders as usual.
@@ -17,6 +11,20 @@ import { requiredConvexUrl } from './env.js';
 
 const CACHE_SECONDS = 60;
 const CACHE_HOST = 'https://redirect-cache.internal';
+const HIT_THROTTLE_MS = 60_000;
+const HIT_THROTTLE_MAX_KEYS = 5000;
+
+// Per-isolate throttle: each store+path is counted at most once per window.
+const recentHits = new Map();
+
+function shouldCountHit(orgSlug, path, now = Date.now()) {
+  const key = `${orgSlug}\n${path}`;
+  const last = recentHits.get(key);
+  if (last !== undefined && now - last < HIT_THROTTLE_MS) return false;
+  if (recentHits.size >= HIT_THROTTLE_MAX_KEYS) recentHits.clear();
+  recentHits.set(key, now);
+  return true;
+}
 
 // Mirror of normalizePath in convex/lib/redirectPaths.ts. Keep in sync.
 export function normalizeLookupPath(pathname) {
@@ -93,13 +101,15 @@ export async function applyRedirect(request, org, env, options = {}) {
     const rule = await cachedLookup(env, orgSlug, path);
     if (!rule) return null;
 
-    // Fire-and-forget hit counter. The Convex mutation only increments an
-    // existing row, so unknown paths never write.
-    const hitWrite = convexCall(env, 'mutation', 'redirects:hit', {
-      orgSlug,
-      fromPath: path,
-    }).catch(() => {});
-    if (typeof options.waitUntil === 'function') options.waitUntil(hitWrite);
+    // Fire-and-forget hit counter, throttled per isolate. The Convex mutation
+    // only increments an existing row, so unknown paths never write.
+    if (typeof options.waitUntil === 'function' && shouldCountHit(orgSlug, path)) {
+      const hitWrite = convexCall(env, 'mutation', 'redirects:hit', {
+        orgSlug,
+        fromPath: path,
+      }).catch(() => {});
+      options.waitUntil(hitWrite);
+    }
 
     if (rule.status === 410) return gonePage();
 

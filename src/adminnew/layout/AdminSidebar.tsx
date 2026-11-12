@@ -17,6 +17,7 @@ import {
   ReceiptIndianRupee,
   Settings,
   ShoppingCart,
+  ArrowRightLeft,
   Star,
   Tags,
   Users,
@@ -101,6 +102,10 @@ export const ADMIN_NAVIGATION: NavSection[] = [
       { label: 'Blogs', path: '/admin/blogs', icon: FileText },
       { label: 'Assets', path: '/admin/assets', icon: ImageIcon },
     ],
+  },
+  {
+    label: 'SEO',
+    items: [{ label: 'Redirects', path: '/admin/seo/redirects', icon: ArrowRightLeft }],
   },
 ];
 
