@@ -77,6 +77,16 @@ export function saErrorMessage(e: unknown): string {
       return 'Store not found. Refresh the list.';
     case 'DOMAIN_NOT_FOUND':
       return 'Domain not found. Refresh the list.';
+    case 'CF_NOT_CONFIGURED':
+      return 'Cloudflare is not configured. Set CF_API_TOKEN and CF_ACCOUNT_ID in the Convex environment.';
+    case 'CF_UNREACHABLE':
+      return 'Could not reach Cloudflare. Try again.';
+    case 'CF_API_ERROR':
+      return `Cloudflare rejected the request: ${(e as { data?: { message?: string } })?.data?.message ?? 'unknown error'}`;
+    case 'DOMAIN_NOT_ACTIVE':
+      return 'Only active domains can be made primary. Refresh until Cloudflare reports active.';
+    case 'NOT_CF_MANAGED':
+      return 'Platform hosts are not managed on Cloudflare.';
     case 'MEMBER_NOT_FOUND':
       return 'Member not found. Refresh the list.';
     case 'LAST_OWNER':

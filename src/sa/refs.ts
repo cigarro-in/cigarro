@@ -74,6 +74,11 @@ export const removeMemberRef = makeFunctionReference<
 
 // convex/domains.ts (super-admin variants). Typed by hand: the generated api
 // may predate the module.
+export interface DnsInstructions {
+  cnameTarget: string;
+  txtRecords: { name: string; value: string }[];
+}
+
 export interface DomainRow {
   _id: Id<'orgDomains'>;
   orgId: Id<'organizations'>;
@@ -81,6 +86,12 @@ export interface DomainRow {
   kind: 'primary' | 'alias';
   status: 'pending' | 'active' | 'disabled';
   verifiedAt?: number;
+  // False for platform hosts (cigarro.in, *.cigarro.in): never sent to Cloudflare.
+  managed: boolean;
+  cfStatus?: string;
+  cfError?: string;
+  cfCheckedAt?: number;
+  dnsInstructions?: DnsInstructions;
 }
 
 export const listDomainsRef = makeFunctionReference<
@@ -90,7 +101,7 @@ export const listDomainsRef = makeFunctionReference<
 >('domains:listDomains');
 export const addDomainRef = makeFunctionReference<
   'mutation',
-  { saToken: string; orgId: Id<'organizations'>; hostname: string; kind: 'primary' | 'alias' },
+  { saToken: string; orgId: Id<'organizations'>; hostname: string },
   Id<'orgDomains'>
 >('domains:addDomain');
 export const setDomainStatusRef = makeFunctionReference<
@@ -98,8 +109,18 @@ export const setDomainStatusRef = makeFunctionReference<
   { saToken: string; domainId: Id<'orgDomains'>; status: 'pending' | 'active' | 'disabled' },
   Id<'orgDomains'>
 >('domains:setDomainStatus');
-export const removeDomainRef = makeFunctionReference<
+export const setPrimaryRef = makeFunctionReference<
   'mutation',
+  { saToken: string; domainId: Id<'orgDomains'> },
+  Id<'orgDomains'>
+>('domains:setPrimary');
+export const refreshDomainStatusRef = makeFunctionReference<
+  'action',
+  { saToken: string; domainId: Id<'orgDomains'> },
+  { cfStatus: string }
+>('domains:refreshDomainStatus');
+export const removeDomainRef = makeFunctionReference<
+  'action',
   { saToken: string; domainId: Id<'orgDomains'> },
   Id<'orgDomains'>
 >('domains:removeDomain');

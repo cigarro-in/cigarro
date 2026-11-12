@@ -174,6 +174,17 @@ export default defineSchema({
     kind: v.union(v.literal("primary"), v.literal("alias")),
     status: v.union(v.literal("pending"), v.literal("active"), v.literal("disabled")),
     cfHostnameId: v.optional(v.string()),
+    // Cloudflare Pages domain status (initializing/pending/active/...) and
+    // the DNS records the merchant must add. Written by convex/domains.ts.
+    cfStatus: v.optional(v.string()),
+    cfError: v.optional(v.string()),
+    cfCheckedAt: v.optional(v.number()),
+    dnsInstructions: v.optional(
+      v.object({
+        cnameTarget: v.string(),
+        txtRecords: v.array(v.object({ name: v.string(), value: v.string() })),
+      }),
+    ),
     createdAt: v.number(),
     verifiedAt: v.optional(v.number()),
   })

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -15,15 +15,21 @@ import {
   listDomainsRef,
   listMembersRef,
   listStoresRef,
+  refreshDomainStatusRef,
   removeDomainRef,
   removeMemberRef,
   setDomainStatusRef,
+  setPrimaryRef,
+  type DomainRow,
   type Role,
 } from '../refs';
 
 const ROLES: Role[] = ['owner', 'admin', 'staff', 'customer'];
 type DomainStatus = 'pending' | 'active' | 'disabled';
 const DOMAIN_STATUSES: DomainStatus[] = ['pending', 'active', 'disabled'];
+
+const PRIMARY_WARNING =
+  "Switching primary moves canonical URLs to this domain — do this only after the merchant's DNS is pointed here.";
 
 export function StoreDetailPage() {
   const { orgId: orgParam } = useParams();
@@ -35,10 +41,11 @@ export function StoreDetailPage() {
   const domains = useQuery(listDomainsRef, { saToken: token, orgId });
   const addDomain = useMutation(addDomainRef);
   const setDomainStatus = useMutation(setDomainStatusRef);
-  const removeDomain = useMutation(removeDomainRef);
+  const setPrimary = useMutation(setPrimaryRef);
+  const refreshDomain = useAction(refreshDomainStatusRef);
+  const removeDomain = useAction(removeDomainRef);
   const domainStatus = useInlineStatus();
   const [hostname, setHostname] = useState('');
-  const [kind, setKind] = useState<'primary' | 'alias'>('alias');
 
   const members = useQuery(listMembersRef, { saToken: token, orgId });
   const addAdmin = useMutation(addStoreAdminRef);
@@ -60,9 +67,14 @@ export function StoreDetailPage() {
     e.preventDefault();
     const host = hostname;
     await runDomain(async () => {
-      await addDomain({ saToken: token, orgId, hostname: host, kind });
+      await addDomain({ saToken: token, orgId, hostname: host });
       setHostname('');
-    }, `Added ${host}. It stays pending until set active.`);
+    }, `Added ${host}. It stays pending until Cloudflare reports it active.`);
+  };
+
+  const onMakePrimary = (d: DomainRow) => {
+    if (!window.confirm(`Make ${d.hostname} the primary domain?\n\n${PRIMARY_WARNING}`)) return;
+    void runDomain(() => setPrimary({ saToken: token, domainId: d._id }), `${d.hostname} is now the primary domain.`);
   };
 
   const onAddMember = async (e: React.FormEvent) => {
@@ -76,6 +88,10 @@ export function StoreDetailPage() {
     }
   };
 
+  const pendingWithDns = (domains ?? []).filter(
+    (d) => d.managed && d.status !== 'active' && d.dnsInstructions,
+  );
+
   return (
     <div className="space-y-6">
       <Link to="/sa/stores" className="text-sm underline">Back to stores</Link>
@@ -85,17 +101,14 @@ export function StoreDetailPage() {
 
       <section className="rounded-xl border p-4 space-y-4">
         <h2 className="font-semibold">Domains</h2>
+        <p className="text-sm text-muted-foreground">
+          Customer hostnames are added to the Cloudflare Pages project and get SSL automatically once DNS points here.
+          Platform hosts (cigarro.in) are never sent to Cloudflare.
+        </p>
         <form onSubmit={onAddDomain} className="grid gap-3 sm:grid-cols-4 items-end">
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-3">
             <Label htmlFor="sa-host">Hostname</Label>
             <Input id="sa-host" value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="shop.example.com" required disabled={!writeOpen} />
-          </div>
-          <div>
-            <Label htmlFor="sa-kind">Kind</Label>
-            <select id="sa-kind" className="h-9 w-full rounded-md border px-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value as 'primary' | 'alias')} disabled={!writeOpen}>
-              <option value="alias">alias</option>
-              <option value="primary">primary</option>
-            </select>
           </div>
           <Button type="submit" disabled={!writeOpen}>Add domain</Button>
         </form>
@@ -106,6 +119,7 @@ export function StoreDetailPage() {
                 <TableHead>Hostname</TableHead>
                 <TableHead>Kind</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Cloudflare</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -132,13 +146,43 @@ export function StoreDetailPage() {
                       ))}
                     </select>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell>
+                    {d.managed ? (
+                      <div className="space-y-1">
+                        <span className="font-mono text-sm">{d.cfStatus ?? 'not synced'}</span>
+                        {d.cfError && <p className="text-xs text-red-700">{d.cfError}</p>}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">platform</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right space-x-2 whitespace-nowrap">
+                    {d.managed && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={!writeOpen}
+                        onClick={() =>
+                          void runDomain(
+                            () => refreshDomain({ saToken: token, domainId: d._id }),
+                            `Refreshed ${d.hostname} from Cloudflare.`,
+                          )
+                        }
+                      >
+                        Refresh
+                      </Button>
+                    )}
+                    {d.managed && d.status === 'active' && d.kind === 'alias' && (
+                      <Button variant="secondary" size="sm" disabled={!writeOpen} onClick={() => onMakePrimary(d)}>
+                        Make primary
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
                       disabled={!writeOpen}
                       onClick={() => {
-                        if (window.confirm(`Remove ${d.hostname}?`)) {
+                        if (window.confirm(`Remove ${d.hostname}${d.managed ? ' from Cloudflare Pages' : ''}?`)) {
                           void runDomain(() => removeDomain({ saToken: token, domainId: d._id }), `Removed ${d.hostname}.`);
                         }
                       }}
@@ -151,6 +195,30 @@ export function StoreDetailPage() {
             </TableBody>
           </Table>
         )}
+        <p className="text-sm text-amber-800">{PRIMARY_WARNING}</p>
+
+        {pendingWithDns.map((d) => (
+          <div key={`dns-${d._id}`} className="rounded-lg border bg-muted/40 p-3 space-y-2 text-sm">
+            <p className="font-medium">DNS for {d.hostname}</p>
+            <p>
+              Add a CNAME record: <span className="font-mono">{d.hostname}</span> to{' '}
+              <span className="font-mono">{d.dnsInstructions?.cnameTarget}</span>
+            </p>
+            {d.dnsInstructions && d.dnsInstructions.txtRecords.length > 0 && (
+              <div className="space-y-1">
+                <p>Add these TXT records to verify ownership:</p>
+                {d.dnsInstructions.txtRecords.map((t) => (
+                  <p key={`${t.name}-${t.value}`} className="font-mono break-all">
+                    TXT {t.name} = {t.value}
+                  </p>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Apex domains (no subdomain) need a DNS provider that supports CNAME flattening, or use a www subdomain.
+            </p>
+          </div>
+        ))}
         <InlineStatus status={domainStatus.status} />
       </section>
 
