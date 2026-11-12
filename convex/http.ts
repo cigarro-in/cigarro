@@ -210,6 +210,8 @@ http.route({
       internal.userState.resolvePhoneIdentity,
       {
         phone,
+        // Older edge builds omit orgSlug; they only ever served smokeshop.
+        orgSlug: String(body.orgSlug || "smokeshop"),
         name: body.name ? String(body.name).slice(0, 100) : undefined,
       },
     );

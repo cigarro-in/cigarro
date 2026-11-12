@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import type { UserIdentity } from "convex/server";
 import { Doc, Id } from "../_generated/dataModel";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 
@@ -10,12 +11,32 @@ export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   return identity;
 }
 
+// Store binding for the JWT. phone-verify stamps an `org` claim (the store
+// slug the token was minted for). A token whose claim differs from the store
+// being acted on is rejected. Tokens with NO claim are legacy (minted before
+// per-store auth, valid up to 30 days) and are accepted for smokeshop only.
+// Convex exposes custom JWT claims as extra fields on UserIdentity.
+export function assertTokenOrg(
+  identity: UserIdentity,
+  org: { slug: string },
+) {
+  const claim = identity.org;
+  if (claim === undefined || claim === null) {
+    if (org.slug === "smokeshop") return;
+    throw new ConvexError({ code: "WRONG_STORE" });
+  }
+  if (claim !== org.slug) throw new ConvexError({ code: "WRONG_STORE" });
+}
+
 export async function requireMember(
   ctx: QueryCtx | MutationCtx,
   orgId: Id<"organizations">,
   allowedRoles?: Role[],
 ) {
   const identity = await requireIdentity(ctx);
+  const org = await ctx.db.get(orgId);
+  if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+  assertTokenOrg(identity, org);
   const membership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q) =>

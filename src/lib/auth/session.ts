@@ -1,7 +1,25 @@
 // Own-JWT session: our ES256 token (30d, OTP-renewed).
 // Storage is local only — never committed.
 
-const KEY = 'cigarro.session.v1';
+import { ORG_SLUG } from '../convex/org';
+
+// One session per store. The pre-namespacing key is migrated once, and only
+// into smokeshop: that was the only store the old key ever held a session for.
+const LEGACY_KEY = 'cigarro.session.v1';
+const KEY = `cigarro.session.v1:${ORG_SLUG}`;
+
+function migrateLegacyKey() {
+  try {
+    if (ORG_SLUG !== 'smokeshop') return;
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy === null) return;
+    if (localStorage.getItem(KEY) === null) localStorage.setItem(KEY, legacy);
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // Storage blocked: the user simply signs in again.
+  }
+}
+migrateLegacyKey();
 
 interface StoredSession {
   token: string;

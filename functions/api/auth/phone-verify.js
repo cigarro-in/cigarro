@@ -1,4 +1,5 @@
 import { requiredConvexUrl } from '../../lib/env.js';
+import { getRequestOrg } from '../../lib/org.js';
 /**
  * Phone OTP verification endpoint (MSG91 → own ES256 JWT).
  *
@@ -6,10 +7,10 @@ import { requiredConvexUrl } from '../../lib/env.js';
  *   1. Client verifies OTP via MSG91 widget, gets `access-token` JWT
  *   2. Client POSTs { phone, token, name? } to this endpoint
  *   3. Server verifies the token with MSG91's verifyAccessToken API
- *   4. Server resolves phone -> stable userId via Convex
- *      (resolvePhoneIdentity HTTP action; creates the users row for new
- *      phones, legacy phones keep their existing userId — no Supabase)
- *   5. Server mints our ES256 JWT (sub = userId) and returns it.
+ *   4. Server resolves phone -> stable userId via Convex, scoped to the store
+ *      (resolvePhoneIdentity HTTP action; one users row per store+phone, legacy
+ *      smokeshop phones keep their existing userId — no Supabase)
+ *   5. Server mints our ES256 JWT (sub = userId, org = store slug) and returns it.
  *   6. Client stores it and talks to Convex directly.
  *
  * Env vars required:
@@ -26,6 +27,9 @@ import { requiredConvexUrl } from '../../lib/env.js';
 const OWN_ISSUER = 'https://cigarro.in/auth';
 const OWN_AUDIENCE = 'cigarro-storefront';
 const OWN_TTL_S = 30 * 24 * 60 * 60; // 30 days; re-login is one OTP tap.
+// Store slug shape (matches organizations.slug). Anything else is rejected
+// before it reaches Convex.
+const ORG_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 
 function b64url(bytes) {
   let s = '';
@@ -40,7 +44,7 @@ function b64urlJson(obj) {
 
 // Returns { token } or null when JWT env is not configured (legacy
 // Supabase flow keeps working — the client falls back).
-async function mintOwnJwt(env, userId, phone) {
+async function mintOwnJwt(env, userId, phone, orgSlug) {
   try {
     const jwk = JSON.parse(env.JWT_PRIVATE_JWK || 'null');
     if (!jwk || !jwk.d) return null;
@@ -58,6 +62,8 @@ async function mintOwnJwt(env, userId, phone) {
       aud: OWN_AUDIENCE,
       sub: userId,
       phone,
+      // Store the token was minted for. Convex rejects it on any other store.
+      org: orgSlug,
       iat: now,
       exp: now + OWN_TTL_S,
     });
@@ -71,6 +77,20 @@ async function mintOwnJwt(env, userId, phone) {
     console.error('[phone-verify] own-JWT mint failed:', err.message);
     return null;
   }
+}
+
+// Active store by slug, or null. Uses the public organizations:getBySlug query
+// (returns null for unknown or inactive stores).
+async function lookupOrgBySlug(env, slug) {
+  const res = await fetch(`${requiredConvexUrl(env)}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: 'organizations:getBySlug', args: { slug }, format: 'json' }),
+    signal: AbortSignal.timeout(4000),
+  });
+  const body = await res.json();
+  if (body.status !== 'success') throw new Error('Store lookup failed');
+  return body.value ?? null;
 }
 
 function normalizePhone(phone, countryCode) {
@@ -119,6 +139,24 @@ export async function onRequest(context) {
       return jsonResponse({ error: 'phone and token are required' }, 400, corsHeaders);
     }
 
+    // The store comes from the request host. Only the admin host may name a
+    // store in the body, and only one that exists. TODO: per-store admin login
+    // arrives with the admin PWA; until then staff rights are still enforced
+    // by Convex memberships for the store named here.
+    const requestOrg = getRequestOrg(context);
+    let orgSlug = requestOrg.slug;
+    if (requestOrg.admin === true && body.orgSlug !== undefined) {
+      const requested = String(body.orgSlug || '').trim().toLowerCase();
+      if (!ORG_SLUG_RE.test(requested)) {
+        return jsonResponse({ error: 'Invalid store' }, 400, corsHeaders);
+      }
+      const org = await lookupOrgBySlug(env, requested);
+      if (!org) {
+        return jsonResponse({ error: 'Store not found' }, 404, corsHeaders);
+      }
+      orgSlug = org.slug;
+    }
+
     const msg91AuthKey = env.MSG91_AUTH_KEY;
     const edgeSecret = env.EDGE_SHARED_SECRET;
     const convexUrl = requiredConvexUrl(env);
@@ -146,7 +184,7 @@ export async function onRequest(context) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${edgeSecret}`,
       },
-      body: JSON.stringify({ phone: normalizedPhone, name: name || undefined }),
+      body: JSON.stringify({ phone: normalizedPhone, orgSlug, name: name || undefined }),
     });
     const idBody = await idRes.json().catch(() => null);
     if (!idRes.ok || !idBody?.userId) {
@@ -156,7 +194,7 @@ export async function onRequest(context) {
     const isNewUser = !!idBody.isNewUser;
 
     // 3. Mint our JWT (required — no legacy session anymore).
-    const cigarroToken = await mintOwnJwt(env, userId, normalizedPhone);
+    const cigarroToken = await mintOwnJwt(env, userId, normalizedPhone, orgSlug);
     if (!cigarroToken) {
       throw new Error('Server JWT not configured (JWT_PRIVATE_JWK)');
     }

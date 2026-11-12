@@ -9,6 +9,7 @@ import {
   query,
 } from "./_generated/server";
 import {
+  assertTokenOrg,
   requireIdentity,
   requireOrgAdmin,
   safeReturnTo,
@@ -791,6 +792,9 @@ export const wake = mutation({
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
 
     const identity = await requireIdentity(ctx);
+    const orderOrg = await ctx.db.get(order.orgId);
+    if (!orderOrg) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+    assertTokenOrg(identity, orderOrg);
     if (order.userId !== identity.subject)
       throw new ConvexError({ code: "FORBIDDEN" });
 

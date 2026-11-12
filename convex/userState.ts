@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { requireIdentity, requireMember } from "./lib/auth";
+import { assertTokenOrg, requireIdentity, requireMember } from "./lib/auth";
 import { resolveOrg } from "./lib/org";
 import { normalizePhoneE164 } from "./lib/phone";
 import {
@@ -71,28 +71,33 @@ export const ensureMyProfile = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    const allowedOrgSlug = process.env.CUSTOMER_ORG_SLUG ?? "smokeshop";
-    if (args.orgSlug !== allowedOrgSlug) {
-      throw new ConvexError({ code: "ORG_NOT_ALLOWED" });
-    }
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", allowedOrgSlug))
-      .unique();
-    if (!org || !org.active) {
-      throw new ConvexError({ code: "ORG_INACTIVE" });
-    }
+    // The store is whichever org the caller names, but only if the token was
+    // minted for that store (assertTokenOrg). No env allow-list: every store
+    // gets its own customer membership.
+    const org = await resolveOrg(ctx, args.orgSlug);
+    assertTokenOrg(identity, org);
     const existing = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
+    if (
+      existing &&
+      existing.orgId !== undefined &&
+      existing.orgId !== org._id
+    ) {
+      throw new ConvexError({ code: "WRONG_STORE" });
+    }
     const now = Date.now();
     // Normalize on write: a raw client phone must never overwrite the E.164
-    // form, or the next by_phone lookup forks a second users row.
+    // form, or the next by_org_phone lookup forks a second users row.
     const profilePhone = normalizePhoneE164(args.phone);
     let userId = existing?._id;
     if (existing) {
       await ctx.db.patch(existing._id, {
+        // Pre-backfill legacy row (smokeshop only) claims its store here.
+        ...(existing.orgId === undefined && org.slug === "smokeshop"
+          ? { orgId: org._id }
+          : {}),
         ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
         ...(args.name !== undefined ? { name: args.name } : {}),
         updatedAt: now,
@@ -100,6 +105,7 @@ export const ensureMyProfile = mutation({
     } else {
       userId = await ctx.db.insert("users", {
         userId: identity.subject,
+        orgId: org._id,
         phone: profilePhone,
         name: args.name,
         createdAt: now,
@@ -126,21 +132,37 @@ export const ensureMyProfile = mutation({
 });
 
 // Pre-login identity resolution for the phone-verify edge endpoint (auth
-// cutover: no Supabase). Looks up users.by_phone; mints a row with a fresh
-// stable UUID for new phones. Legacy rows keep their existing userId strings
-// because lookup is by phone, never by id — zero data migration.
+// cutover: no Supabase). Users are per store: lookup is by (orgId, phone), so
+// the same phone shopping two stores gets two rows and two userIds. A new
+// store mints a fresh row. Legacy rows (no orgId, pre-backfill) are smokeshop
+// customers, so they resolve for smokeshop only and keep their userId.
 export const resolvePhoneIdentity = internalMutation({
   args: {
     phone: v.string(),
+    orgSlug: v.string(),
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const org = await resolveOrg(ctx, args.orgSlug);
     const phone = normalizePhoneE164(args.phone) ?? args.phone;
-    const existing = await ctx.db
-      .query("users")
-      .withIndex("by_phone", (q) => q.eq("phone", phone))
-      .first();
     const now = Date.now();
+    let existing = await ctx.db
+      .query("users")
+      .withIndex("by_org_phone", (q) =>
+        q.eq("orgId", org._id).eq("phone", phone),
+      )
+      .first();
+    if (!existing && org.slug === "smokeshop") {
+      const samePhone = await ctx.db
+        .query("users")
+        .withIndex("by_phone", (q) => q.eq("phone", phone))
+        .collect();
+      existing = legacyUserRow(samePhone);
+      if (existing) {
+        // Claim the legacy row for smokeshop in the same write.
+        await ctx.db.patch(existing._id, { orgId: org._id });
+      }
+    }
     if (existing) {
       await ctx.db.patch(existing._id, {
         ...(args.name !== undefined ? { name: args.name } : {}),
@@ -151,12 +173,49 @@ export const resolvePhoneIdentity = internalMutation({
     const userId = crypto.randomUUID();
     await ctx.db.insert("users", {
       userId,
+      orgId: org._id,
       phone,
       name: args.name ?? "Customer",
       createdAt: now,
       updatedAt: now,
     });
     return { userId, isNewUser: true };
+  },
+});
+
+function legacyUserRow(rows: Doc<"users">[]) {
+  return rows.find((r) => r.orgId === undefined) ?? null;
+}
+
+// One-time, resumable backfill: stamps orgId = smokeshop on every users row
+// that predates per-store accounts. Paginates the undefined-orgId partition of
+// by_org_phone with a cursor; patched rows leave that partition, and the cursor
+// never revisits them, so repeat calls converge. Run it until isDone is true.
+//   npx convex run userState:backfillUserOrgs '{"orgSlug":"smokeshop"}'
+//   npx convex run userState:backfillUserOrgs '{"orgSlug":"smokeshop","cursor":"<continueCursor>"}'
+export const backfillUserOrgs = internalMutation({
+  args: {
+    orgSlug: v.string(),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    batchSize: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (args.orgSlug !== "smokeshop")
+      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_SMOKESHOP" });
+    const org = await resolveOrg(ctx, args.orgSlug);
+    const numItems = Math.max(1, Math.min(args.batchSize ?? 200, 500));
+    const page = await ctx.db
+      .query("users")
+      .withIndex("by_org_phone", (q) => q.eq("orgId", undefined))
+      .paginate({ cursor: args.cursor ?? null, numItems });
+    for (const row of page.page) {
+      await ctx.db.patch(row._id, { orgId: org._id });
+    }
+    return {
+      patched: page.page.length,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
   },
 });
 

@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { requireIdentity, requireMember } from "./lib/auth";
+import { assertTokenOrg, requireIdentity, requireMember } from "./lib/auth";
 import {
   assertOrgMatch,
   findOrgDocBySupabase,
@@ -849,6 +849,7 @@ export const getMine = query({
     const org = await resolveOrg(ctx, orgSlug);
     if (order.orgId !== org._id) return null;
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     if (order.userId !== identity.subject) return null;
     return order;
   },
@@ -864,6 +865,7 @@ export const listMyOrders = query({
     const org = await resolveOrg(ctx, orgSlug);
     assertOrgMatch(orgId, org);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     return await ctx.db
       .query("orders")
       .withIndex("by_org_user", (q) =>

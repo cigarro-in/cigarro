@@ -555,15 +555,20 @@ export default defineSchema({
   // Phase 2 keeps these exact strings as the stable identity when the
   // issuer changes (Convex users table maps phone -> legacy userId).
   users: defineTable({
-    // Stable identity, shared across auth providers.
+    // Stable identity, shared across auth providers. Unique per (store, phone):
+    // the same phone shopping two stores gets two rows with two userIds.
     userId: v.string(),
+    // Owning store. Optional only until backfillUserOrgs has run; legacy rows
+    // without it belong to smokeshop.
+    orgId: v.optional(v.id("organizations")),
     phone: v.optional(v.string()), // E.164, e.g. +919876543210
     name: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_phone", ["phone"]),
+    .index("by_phone", ["phone"])
+    .index("by_org_phone", ["orgId", "phone"]),
 
   carts: defineTable({
     orgId: v.id("organizations"),

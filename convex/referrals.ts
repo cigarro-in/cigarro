@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { requireIdentity } from "./lib/auth";
+import { assertTokenOrg, requireIdentity } from "./lib/auth";
 import { inOrg, resolveOrg } from "./lib/org";
 import { creditWallet } from "./wallet";
 import { rupeesToPaise, paiseToRupees } from "./lib/money";
@@ -118,6 +118,7 @@ export const ensureMyReferral = mutation({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const existing = await myReferral(ctx, org, identity.subject);
     if (existing) return toReferral(existing);
     const now = Date.now();
@@ -144,6 +145,7 @@ export const getMyReferral = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const row = await myReferral(ctx, org, identity.subject);
     return row ? toReferral(row) : null;
   },
@@ -336,6 +338,7 @@ export const recordReferral = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     return attach(ctx, org, identity.subject, a.referredUserId, a.referralCode, a.signupSource, a.ipAddress, a.userAgent);
   },
 });
@@ -346,6 +349,7 @@ export const attachReferralLate = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     return attach(ctx, org, identity.subject, a.referredUserId, a.referralCode, "checkout_late");
   },
 });
@@ -356,6 +360,7 @@ export const checkEligibility = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     if (!mine) return { eligible: true, applied: false };
     if (!mine.referredByUserId && !mine.firstOrderCompleted)
@@ -372,6 +377,7 @@ export const checkIfReferred = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     if (!mine?.referredByUserId) return { was_referred: false };
     return {
@@ -390,6 +396,7 @@ export const getReferralStats = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     // No row yet (pre-migration signup): zero stats with no code yet — the
     // row mints on first record/attach, same lazy pattern as users spine.
@@ -424,6 +431,7 @@ export const getReferredUsers = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const scoped = await ctx.db
       .query("referrals")
       .withIndex("by_org_referrer", (q: any) =>
@@ -488,7 +496,8 @@ export const getLeaderboard = query({
       out.push({
         user_id: r.userId,
         user_name: u?.name ?? "A friend",
-        email: u?.phone ?? "",
+        // Public query: never return phone numbers (was u?.phone).
+        email: "",
         referral_code: r.referralCode,
         total_referrals: r.totalReferrals,
         successful_referrals: r.successfulReferrals,

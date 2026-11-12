@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { requireIdentity } from "./lib/auth";
+import { assertTokenOrg, requireIdentity } from "./lib/auth";
 import {
   collectInOrg,
   findOrgDocBySupabase,
@@ -107,6 +107,7 @@ export const listMyReviews = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     const rows = await orgReviewsByUser(ctx, org, identity.subject);
     const products = await collectInOrg(ctx, "catalogProducts", org);
     const bySupabaseId = new Map(products.map((p) => [p.supabaseId, p]));
@@ -137,6 +138,7 @@ export const submitReview = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
+    assertTokenOrg(identity, org);
     if (!Number.isFinite(a.rating) || a.rating < 1 || a.rating > 5)
       throw new ConvexError({ code: "BAD_RATING" });
     const product = await findOrgDocBySupabase(

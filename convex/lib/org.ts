@@ -1,7 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { requireIdentity } from "./auth";
+import { assertTokenOrg, requireIdentity } from "./auth";
 
 type Ctx = QueryCtx | MutationCtx;
 type Org = { _id: Id<"organizations">; slug: string };
@@ -22,6 +22,7 @@ export async function resolveOrg(ctx: Ctx, orgSlug: string) {
 export async function requireOrgAdminBySlug(ctx: Ctx, orgSlug: string) {
   const org = await resolveOrg(ctx, orgSlug);
   const identity = await requireIdentity(ctx);
+  assertTokenOrg(identity, org);
   const membership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q) =>
