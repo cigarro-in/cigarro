@@ -1,9 +1,45 @@
-// Cloudflare Pages middleware for SPA routing and SSR
+// Cloudflare Pages middleware for SPA routing and SSR.
+// The store is resolved from the request hostname once per request (lib/org.js)
+// and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
+import { resolveRequestOrg, getRequestOrg, orgScriptJson } from './lib/org.js';
 
 export async function onRequest(context) {
-  if (new URL(context.request.url).pathname === '/api/crash-logs') return context.next();
+  const response = await handleRequest(context);
+  // *.pages.dev aliases and previews duplicate the store: never index them.
+  const host = new URL(context.request.url).hostname;
+  return host.endsWith('.pages.dev') ? withNoindex(response) : response;
+}
+
+async function handleRequest(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+
+  // Never throws: unknown hosts resolve to null, Convex failures to the default org.
+  const org = await resolveRequestOrg(request, env);
+  context.data = context.data || {};
+  context.data.org = org;
+
+  if (url.pathname === '/api/crash-logs') return context.next();
+
+  // Unknown host (Convex reachable, no such domain): plain noindex 404.
+  if (org === null) {
+    return new Response('Store not found', {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Robots-Tag': 'noindex, nofollow',
+      },
+    });
+  }
+
+  // Alias host (e.g. a registered www domain) folds onto the store's primary host.
+  if (org.redirectTo) {
+    return Response.redirect(`https://${org.redirectTo}${url.pathname}${url.search}`, 301);
+  }
+
   try {
     const response = await routeRequest(context);
     if (response.status >= 500) {
@@ -51,9 +87,24 @@ function withNoindex(res) {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
+// Passes a request on to the static SPA. HTML documents get the store injected
+// into <head> as window.__ORG__ so the client knows its org without env vars.
+// Only this path is rewritten; prerendered bot HTML from ssr-middleware is not.
+async function nextWithOrg(context) {
+  const res = await context.next();
+  const type = res.headers.get('content-type') || '';
+  if (!type.includes('text/html') || typeof HTMLRewriter === 'undefined') return res;
+  const org = getRequestOrg(context);
+  const script = `<script>window.__ORG__=${orgScriptJson(org)}</script>`;
+  return new HTMLRewriter()
+    .on('head', { element(el) { el.append(script, { html: true }); } })
+    .transform(res);
+}
+
 async function routeRequest(context) {
-  const { request, next } = context;
+  const { request } = context;
   const url = new URL(request.url);
+  const next = () => nextWithOrg(context);
 
   // Admin host is app-only: never prerender, never index. Stamp noindex.
   if (url.hostname.split('.')[0] === 'admin') {
@@ -61,7 +112,7 @@ async function routeRequest(context) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow');
     return res;
   }
-  
+
   // Skip middleware for /functions/* routes - let them handle directly
   if (url.pathname.startsWith('/functions/')) {
     return next();
@@ -71,12 +122,15 @@ async function routeRequest(context) {
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
     return withNoindex(await next());
   }
-  
+
   // Apply SSR middleware for bots (must match BOT_USER_AGENTS in ssr-middleware.js —
   // search crawlers + social/AI preview bots, otherwise link previews hit the age-gate SPA)
   const userAgent = request.headers.get('user-agent') || '';
   const botUserAgents = ['googlebot', 'google-extended', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'bytespider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain', 'pinterest', 'slackbot', 'vkshare', 'w3c_validator', 'whatsapp', 'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web', 'anthropic', 'perplexity', 'meta-externalagent', 'meta-externalfetch', 'applebot', 'amazonbot'];
   const isBot = botUserAgents.some(bot => userAgent.toLowerCase().includes(bot));
+
+  // The SSR handler gets the same context, with next() routed through the org injector.
+  const ssrContext = { request, env: context.env, data: context.data, next };
 
   // Bare /blog is not a route (listing lives at /blogs, posts at
   // /blog/:slug): permanent redirect for every UA so no crawler or user
@@ -101,9 +155,9 @@ async function routeRequest(context) {
     url.pathname === '/products' ||
     url.pathname.startsWith('/product/');
   if ((formatParam === 'json' || formatParam === 'md') && isAgentFormatRoute) {
-    return ssrMiddleware(context);
+    return ssrMiddleware(ssrContext);
   }
-  
+
   if (isBot && (
     url.pathname === '/' ||
     url.pathname === '/about' ||
@@ -123,13 +177,13 @@ async function routeRequest(context) {
     url.pathname.startsWith('/brand/') ||
     url.pathname.startsWith('/blog/')
   )) {
-    return ssrMiddleware(context);
+    return ssrMiddleware(ssrContext);
   }
 
   // Bots hitting a path that matches no SPA route get the branded soft 404
   // from ssr-middleware (never the 200 SPA shell). Humans are untouched.
   if (isBot && isUnknownRoutePath(url.pathname)) {
-    return ssrMiddleware(context);
+    return ssrMiddleware(ssrContext);
   }
 
   // Let Cloudflare Pages handle everything else (normal SPA routing)

@@ -1,4 +1,5 @@
 import { requiredConvexUrl } from '../lib/env.js';
+import { getRequestOrg } from '../lib/org.js';
 // Cloudflare Worker for Homepage Data with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -41,13 +42,13 @@ export async function onRequest(context) {
 
     const convexUrl = requiredConvexUrl(env);
     const [bundle, heroSlides, featuredCfg, showcaseCfg, blogSecCfg, blogRows, blogCats] = await Promise.all([
-      cxQuery(convexUrl, 'catalog:fullCatalog', {}),
-      cxQuery(convexUrl, 'content:listHeroSlides', {}),
-      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'featured_products' }),
-      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'product_showcase' }),
-      cxQuery(convexUrl, 'content:getSectionConfig', { name: 'blog_section' }),
-      cxQuery(convexUrl, 'content:listBlogPosts', { limit: 6 }),
-      cxQuery(convexUrl, 'content:listBlogCategories', {}),
+      cxQuery(convexUrl, 'catalog:fullCatalog', { orgSlug }),
+      cxQuery(convexUrl, 'content:listHeroSlides', { orgSlug }),
+      cxQuery(convexUrl, 'content:getSectionConfig', { orgSlug, name: 'featured_products' }),
+      cxQuery(convexUrl, 'content:getSectionConfig', { orgSlug, name: 'product_showcase' }),
+      cxQuery(convexUrl, 'content:getSectionConfig', { orgSlug, name: 'blog_section' }),
+      cxQuery(convexUrl, 'content:listBlogPosts', { orgSlug, limit: 6 }),
+      cxQuery(convexUrl, 'content:listBlogCategories', { orgSlug }),
     ]);
 
     const brandById = new Map((bundle.brands || []).map((b) => [b.supabaseId, b]));

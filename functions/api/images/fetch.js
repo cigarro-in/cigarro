@@ -27,7 +27,7 @@ function json(payload, status = 200) {
   });
 }
 
-async function requireAdmin(request, env) {
+async function requireAdmin(request, env, orgSlug) {
   if (env.UPLOAD_REQUIRE_ADMIN === 'false') return { ok: true };
   const convexUrl = requiredConvexUrl(env);
   const header = request.headers.get('Authorization') || '';
@@ -42,7 +42,7 @@ async function requireAdmin(request, env) {
       },
       body: JSON.stringify({
         path: 'adminStats:checkMyAdmin',
-        args: { orgSlug: env.VITE_ORG_SLUG || 'smokeshop' },
+        args: { orgSlug },
         format: 'json',
       }),
     });
@@ -87,7 +87,7 @@ export async function onRequest(context) {
   if (request.method === 'OPTIONS') return json({}, 200);
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
-  const gate = await requireAdmin(request, env);
+  const gate = await requireAdmin(request, env, getRequestOrg(context).slug);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
 
   const target = new URL(request.url).searchParams.get('url') || '';

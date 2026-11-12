@@ -1,4 +1,5 @@
-import { requiredConvexUrl, getOrgSlug } from './lib/env.js';
+import { requiredConvexUrl } from './lib/env.js';
+import { getRequestOrg } from './lib/org.js';
 // Dynamic sitemap.xml endpoint for Cloudflare Pages
 // Automatically serves fresh sitemap from database
 // URL: https://cigarro.in/sitemap.xml
@@ -35,7 +36,7 @@ export async function onRequest(context) {
     const convexUrl = requiredConvexUrl(env);
 
     // Generate sitemap XML
-    const xml = await generateSitemap(convexUrl, getOrgSlug(env));
+    const xml = await generateSitemap(convexUrl, getRequestOrg(context));
 
     return new Response(xml, {
       headers: {
@@ -74,8 +75,9 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-async function generateSitemap(convexUrl, orgSlug) {
-  const BASE_URL = 'https://cigarro.in';
+async function generateSitemap(convexUrl, org) {
+  const orgSlug = org.slug;
+  const BASE_URL = `https://${org.primaryHost}`;
   const today = new Date().toISOString().split('T')[0];
   // Static pages change rarely — fixed date so Google trusts lastmod.
   // Bump STATIC_LASTMOD only when static page content actually changes.

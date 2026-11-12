@@ -16,6 +16,8 @@ import { requiredConvexUrl } from '../../lib/env.js';
 const CDN_BASE = (env) =>
   (env.CDN_BASE_URL || 'https://cdn.cigarro.in').replace(/\/$/, '');
 const LIB_PREFIX = 'asset_images/';
+// Unprefixed legacy keys under LIB_PREFIX belong to this org only.
+const LEGACY_LIBRARY_ORG = 'smokeshop';
 const MAX_BYTES = 10 * 1024 * 1024;
 
 function json(payload, status = 200) {
@@ -30,7 +32,7 @@ function json(payload, status = 200) {
   });
 }
 
-async function requireAdmin(request, env) {
+async function requireAdmin(request, env, orgSlug) {
   if (env.UPLOAD_REQUIRE_ADMIN === 'false') return { ok: true };
   if (!env.R2_ASSETS) return { ok: false, error: 'R2 binding R2_ASSETS missing' };
   const convexUrl = requiredConvexUrl(env);
@@ -46,7 +48,7 @@ async function requireAdmin(request, env) {
       },
       body: JSON.stringify({
         path: 'adminStats:checkMyAdmin',
-        args: { orgSlug: env.VITE_ORG_SLUG || 'smokeshop' },
+        args: { orgSlug },
         format: 'json',
       }),
     });
@@ -89,12 +91,12 @@ export async function onRequest(context) {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return json({}, 200);
 
-  const gate = await requireAdmin(request, env);
+  const gate = await requireAdmin(request, env, getRequestOrg(context).slug);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
   const bucket = env.R2_ASSETS;
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
-  const orgSlug = String(env.VITE_ORG_SLUG || 'smokeshop');
+  const orgSlug = String(getRequestOrg(context).slug);
   if (!/^[a-z0-9-]{1,50}$/.test(orgSlug)) return json({ error: 'Invalid org configuration' }, 500);
   const tenantPrefix = `${LIB_PREFIX}orgs/${orgSlug}/`;
 
@@ -113,7 +115,7 @@ export async function onRequest(context) {
     const cursorState = decodeListCursor(url.searchParams.get('cursor'));
     const [tenant, legacy] = await Promise.all([
       bucket.list({ prefix, limit: 500, cursor: cursorState.tenant || undefined }),
-      orgSlug === 'smokeshop' && !explicitTenant
+      orgSlug === LEGACY_LIBRARY_ORG && !explicitTenant
         ? bucket.list({ prefix: `${LIB_PREFIX}${relativePrefix ? relativePrefix + '/' : ''}`, limit: 500, cursor: cursorState.legacy || undefined })
         : Promise.resolve(null),
     ]);
@@ -217,7 +219,7 @@ export async function onRequest(context) {
   if (request.method === 'DELETE') {
     const key = String(url.searchParams.get('key') || '');
     const isTenantKey = key.startsWith(tenantPrefix);
-    const isLegacyShopKey = orgSlug === 'smokeshop' && key.startsWith(LIB_PREFIX) && !key.startsWith(`${LIB_PREFIX}orgs/`);
+    const isLegacyShopKey = orgSlug === LEGACY_LIBRARY_ORG && key.startsWith(LIB_PREFIX) && !key.startsWith(`${LIB_PREFIX}orgs/`);
     if (!isTenantKey && !isLegacyShopKey) return json({ error: 'Bad key' }, 400);
     const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
     let usage;

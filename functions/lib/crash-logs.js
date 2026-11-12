@@ -1,4 +1,5 @@
 import { requiredConvexUrl } from './env.js';
+import { getRequestOrg } from './org.js';
 
 // The edge sets source, tenant and reporter; clients cannot impersonate server logs.
 export async function persistCrash(context, report, source = 'cloudflare') {
@@ -16,7 +17,7 @@ export async function persistCrash(context, report, source = 'cloudflare') {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${env.EDGE_SHARED_SECRET}` },
       body: JSON.stringify({
-        orgSlug: env.VITE_ORG_SLUG || 'smokeshop', reporter,
+        orgSlug: getRequestOrg(context).slug, reporter,
         report: {
           source,
           message: String(report.message || 'Unknown error').slice(0, 2000),

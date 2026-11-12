@@ -1,5 +1,5 @@
 import { requiredConvexUrl } from '../lib/env.js';
-// Cache invalidation endpoint: POST https://cigarro.in/api/invalidate-cache
+// Cache invalidation endpoint: POST https://<store host>/api/invalidate-cache
 //
 // Two modes:
 //  1. Real purge (preferred): when CLOUDFLARE_API_TOKEN (Zone:Cache Purge)
@@ -14,18 +14,23 @@ import { requiredConvexUrl } from '../lib/env.js';
 // same subject the SPA uses. Set PURGE_REQUIRE_ADMIN=false to disable
 // (not recommended).
 
-const DEFAULT_PURGE_URLS = [
-  'https://cigarro.in/',
-  'https://cigarro.in/products',
-  'https://cigarro.in/brands',
-  'https://cigarro.in/categories',
-  'https://cigarro.in/blogs',
-  'https://cigarro.in/sitemap.xml',
-  'https://cigarro.in/api/homepage-data',
-  'https://cigarro.in/api/categories',
-  'https://cigarro.in/api/products',
-  'https://cigarro.in/api/brands',
+// Purge paths for the store's own host. Built per request (see defaultPurgeUrls).
+const DEFAULT_PURGE_PATHS = [
+  '/',
+  '/products',
+  '/brands',
+  '/categories',
+  '/blogs',
+  '/sitemap.xml',
+  '/api/homepage-data',
+  '/api/categories',
+  '/api/products',
+  '/api/brands',
 ];
+
+function defaultPurgeUrls(site) {
+  return DEFAULT_PURGE_PATHS.map((path) => `${site}${path}`);
+}
 
 function json(payload, status, cors) {
   return new Response(JSON.stringify(payload), {
@@ -34,7 +39,7 @@ function json(payload, status, cors) {
   });
 }
 
-async function requireAdmin(request, env) {
+async function requireAdmin(request, env, orgSlug) {
   if (env.PURGE_REQUIRE_ADMIN === 'false') return { ok: true };
   const convexUrl = requiredConvexUrl(env);
   const header = request.headers.get('Authorization') || '';
@@ -49,7 +54,7 @@ async function requireAdmin(request, env) {
       },
       body: JSON.stringify({
         path: 'adminStats:checkMyAdmin',
-        args: { orgSlug: env.VITE_ORG_SLUG || 'smokeshop' },
+        args: { orgSlug },
         format: 'json',
       }),
     });
@@ -114,7 +119,7 @@ export async function onRequest(context) {
     return json({ error: 'Method not allowed' }, 405, corsHeaders);
   }
 
-  const gate = await requireAdmin(request, env);
+  const gate = await requireAdmin(request, env, getRequestOrg(context).slug);
   if (!gate.ok) {
     return json({ error: gate.error || 'Unauthorized' }, 401, corsHeaders);
   }
@@ -125,12 +130,13 @@ export async function onRequest(context) {
   } catch {
     body = {};
   }
+  const site = `https://${getRequestOrg(context).primaryHost}`;
   const urls =
     Array.isArray(body.urls) && body.urls.length > 0
       ? body.urls.filter(
-          (u) => typeof u === 'string' && u.startsWith('https://cigarro.in/')
+          (u) => typeof u === 'string' && u.startsWith(`${site}/`)
         ).slice(0, 100)
-      : DEFAULT_PURGE_URLS;
+      : defaultPurgeUrls(site);
 
   // Real purge when credentials exist, warm fallback otherwise.
   const purge = await realPurge(urls, env).catch((err) => ({
