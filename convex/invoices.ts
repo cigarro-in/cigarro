@@ -4,6 +4,7 @@ import { requireOrgAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { changeInventory } from "./lib/inventory";
 import { findOrgDocBySupabase, inOrg } from "./lib/org";
+import { readOrgSiteSettings } from "./lib/siteSettings";
 
 const paymentMethodV = v.union(
   v.literal("cash"),
@@ -19,28 +20,77 @@ const lineV = v.object({
   unitPricePaise: v.number(),
 });
 
-const defaultSettings = (org: { name: string }) => ({
-  prefix: "INV",
-  nextNumber: 1,
-  businessName: org.name,
-  address: undefined,
-  phone: undefined,
-  email: undefined,
-  gstin: undefined,
-  terms: "Thank you for your business.",
-  accentColor: "#9a4f2d",
-});
+const DEFAULT_TERMS = "Thank you for your business.";
+const DEFAULT_ACCENT = "#9a4f2d";
+
+type InvoiceSettingsRow = {
+  businessName: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
+};
+
+const nonEmpty = (s: string | null | undefined) => {
+  const t = s?.trim();
+  return t ? t : undefined;
+};
+
+/**
+ * Seller identity for invoices. Precedence per field:
+ *   invoiceSettings override (if set) -> siteSettings.business -> siteName -> org.name.
+ * invoiceSettings.businessName equal to the internal org name is a legacy
+ * auto-default and is treated as unset, so "Smokeshop" never leaks when a
+ * storefront name exists.
+ */
+function resolveSeller(
+  org: { name: string },
+  site: { siteName?: string; business?: { legalName?: string; gstin?: string; supportEmail?: string; supportPhone?: string; address?: { line1?: string; line2?: string; city?: string; state?: string; pincode?: string } } } | null,
+  row: InvoiceSettingsRow | null,
+) {
+  const business = site?.business;
+  const addr = business?.address;
+  const siteAddress = [
+    addr?.line1,
+    addr?.line2,
+    addr?.city,
+    [addr?.state, addr?.pincode].filter(Boolean).join(" "),
+  ]
+    .map((part) => nonEmpty(part))
+    .filter((part): part is string => Boolean(part))
+    .join(", ");
+  const ownName = row && row.businessName.trim() !== org.name.trim() ? nonEmpty(row.businessName) : undefined;
+  return {
+    businessName:
+      ownName ??
+      nonEmpty(business?.legalName) ??
+      nonEmpty(site?.siteName) ??
+      org.name,
+    address: nonEmpty(row?.address) ?? nonEmpty(siteAddress),
+    phone: nonEmpty(row?.phone) ?? nonEmpty(business?.supportPhone),
+    email: nonEmpty(row?.email) ?? nonEmpty(business?.supportEmail),
+    gstin: (nonEmpty(row?.gstin) ?? nonEmpty(business?.gstin))?.toUpperCase(),
+  };
+}
 
 export const getSettings = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await requireOrgAdmin(ctx, orgId);
-    const [org, settings] = await Promise.all([
-      ctx.db.get(orgId),
+    const org = await ctx.db.get(orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+    const [site, settings] = await Promise.all([
+      readOrgSiteSettings(ctx, org),
       ctx.db.query("invoiceSettings").withIndex("by_org", (q) => q.eq("orgId", orgId)).unique(),
     ]);
-    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
-    return settings ?? defaultSettings(org);
+    const resolved = resolveSeller(org, site, settings);
+    return {
+      prefix: settings?.prefix ?? "INV",
+      nextNumber: settings?.nextNumber ?? 1,
+      ...resolved,
+      terms: settings ? settings.terms : DEFAULT_TERMS,
+      accentColor: settings?.accentColor ?? DEFAULT_ACCENT,
+    };
   },
 });
 
@@ -164,20 +214,26 @@ export const create = mutation({
     const taxPaise = Math.round((taxablePaise * args.taxRateBps) / 10000);
     const totalPaise = taxablePaise + taxPaise;
 
+    const site = await readOrgSiteSettings(ctx, org);
     let settings = await ctx.db
       .query("invoiceSettings")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .unique();
     if (!settings) {
-      const defaults = defaultSettings(org);
+      // Empty businessName = inherit from siteSettings (never persist the org name).
       const settingsId = await ctx.db.insert("invoiceSettings", {
         orgId: args.orgId,
-        ...defaults,
+        prefix: "INV",
+        nextNumber: 1,
+        businessName: "",
+        terms: DEFAULT_TERMS,
+        accentColor: DEFAULT_ACCENT,
         updatedAt: Date.now(),
         updatedBy: identity.subject,
       });
       settings = (await ctx.db.get(settingsId))!;
     }
+    const seller = resolveSeller(org, site, settings);
     const year = new Date().getFullYear();
     const invoiceNumber = `${settings.prefix}-${year}-${String(settings.nextNumber).padStart(4, "0")}`;
     await ctx.db.patch(settings._id, { nextNumber: settings.nextNumber + 1, updatedAt: Date.now() });
@@ -192,12 +248,13 @@ export const create = mutation({
       customerPhone: args.customerPhone?.trim() || undefined,
       customerEmail: args.customerEmail?.trim() || undefined,
       customerAddress: args.customerAddress?.trim() || undefined,
+      // Snapshot taken once at creation; existing invoices are never rewritten.
       seller: {
-        businessName: settings.businessName,
-        address: settings.address,
-        phone: settings.phone,
-        email: settings.email,
-        gstin: settings.gstin,
+        businessName: seller.businessName,
+        address: seller.address,
+        phone: seller.phone,
+        email: seller.email,
+        gstin: seller.gstin,
         terms: settings.terms,
         accentColor: settings.accentColor,
       },
