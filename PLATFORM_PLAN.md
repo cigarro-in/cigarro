@@ -65,6 +65,11 @@ Note: domains live in a separate `orgDomains` table, not a `domains[]` array on 
 - Own manifest (scope `/<store>/`, start_url `/<store>/`), installable, push notifications for new orders/payments later.
 - Bank-email matching per store (see decision Q3). Move Gmail config from `appConfig` to `orgPaymentInbox` table; encrypt refresh tokens (AES-GCM, key in Convex env); per-org OAuth state rows; handle `invalid_grant` (mark disconnected + alert); paginate `messages.list`; Gmail push via `users.watch` + Pub/Sub instead of per-order polling, poll kept as fallback.
 
+### P5-SSR: full server rendering (decided 2026-11-12: Vite SSR on Pages Functions, not RR7 framework)
+Same HTML for humans and bots, hydrate after. Flag `SSR_ROUTES` lists SSR'd routes; others keep the bot renderer until cutover.
+Slices (each shippable): 1 request-scoped org context (org.ts singletons leak across hosts on a shared Worker) · 2 lift BrowserRouter into client entry, hydrateRoot behind flag · 3 age gate as overlay (content stays in DOM) · 4 ThemeProvider takes server initialThemeId, no pre-hydration localStorage · 5 preload-aware data hooks (convex `usePreloadedQuery` payload built server-side via cxQuery) starting with useFullCatalog · 6 SSR build + `functions/ssr-render.js`, flag "/" only · 7 parity harness bot HTML vs SSR HTML (title, canonical, h1, JSON-LD) · 8 flip product → category → category+brand → brand → blog → hubs → static, one per slice, porting bot JSON-LD (offers, carton offer, breadcrumbs) and staticPageDefs copy into React first · 9 delete bot UA lists, generate*HTML, staticPageDefs (keep ?format= feeds). Unknown URLs return 404 for everyone.
+Risks: Worker bundle size (measure storefront-only SSR bundle), TTFB while waiting for Helmet allReady, 46 files touch browser APIs (audit render-time use).
+
 ### P5: SEO, best-in-class (the moat)
 Rendering (decision Q2). Then, per store:
 - Host-aware canonical, robots.txt, sitemap index (products/categories/brands/blog split, lastmod from `updatedAt`, image entries), all generated per host.

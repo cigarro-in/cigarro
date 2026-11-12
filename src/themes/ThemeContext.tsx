@@ -1,7 +1,7 @@
-import { readStoredPreference, writeStoredPreference } from '../lib/browserStorage';
+import { writeStoredPreference } from '../lib/browserStorage';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSiteSettings } from '../hooks/data/useContent';
-import { themes, DEFAULT_THEME_ID, getTheme } from './registry';
+import { themes, DEFAULT_THEME_ID, getTheme, themeHtmlAttrs } from './registry';
 import type { ThemeManifest } from './types';
 
 const STORAGE_KEY = 'activeTheme';
@@ -15,31 +15,53 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+interface ProviderProps {
+  children: ReactNode;
+  /** Theme chosen by the server render. Wins over the edge-injected and default themes. */
+  initialThemeId?: string;
+}
+
+/**
+ * Edge-injected theme id (window.__ORG__.themeId). Read synchronously so that a
+ * client-only render gets the right theme before the Convex query resolves.
+ * Returns undefined on the server, where there is no window.
+ */
+function readEdgeThemeId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const org = (window as Window & { __ORG__?: { themeId?: string | null } }).__ORG__;
+  return org?.themeId ?? undefined;
+}
+
+export function ThemeProvider({ children, initialThemeId }: ProviderProps) {
+  // Render-safe: no storage access here. The first valid candidate wins, else the default.
   const [themeId, setThemeIdState] = useState<string>(() => {
-    if (typeof window === 'undefined') return DEFAULT_THEME_ID;
-    return readStoredPreference(STORAGE_KEY) || DEFAULT_THEME_ID;
+    const candidates = [initialThemeId, readEdgeThemeId()];
+    const found = candidates.find((id) => id && getTheme(id));
+    return found ?? DEFAULT_THEME_ID;
   });
 
   const { settings } = useSiteSettings();
 
+  // Live switch to the Convex active theme after mount. Only changes state when it differs.
   useEffect(() => {
-    // Remote theme comes from Convex site settings.
     const remote = settings?.active_theme;
-    if (remote && remote !== themeId && getTheme(remote)) {
-      setThemeIdState(remote);
-      writeStoredPreference(STORAGE_KEY, remote);
-    }
+    if (!remote || !getTheme(remote)) return;
+    setThemeIdState((current) => (current === remote ? current : remote));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on the remote value only
   }, [settings?.active_theme]);
 
+  // Client-only side effects.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', themeId);
+    const attrs = themeHtmlAttrs(themeId);
+    for (const [name, value] of Object.entries(attrs)) {
+      document.documentElement.setAttribute(name, value);
+    }
+    writeStoredPreference(STORAGE_KEY, themeId);
   }, [themeId]);
 
   const setTheme = (id: string) => {
     if (!getTheme(id)) return;
     setThemeIdState(id);
-    writeStoredPreference(STORAGE_KEY, id);
   };
 
   const value = useMemo<ThemeContextValue>(
