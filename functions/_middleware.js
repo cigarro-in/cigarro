@@ -44,6 +44,13 @@ export async function onRequest(context) {
   }
 }
 
+// Copy a response with X-Robots-Tag: noindex, nofollow (upstream headers may be immutable).
+function withNoindex(res) {
+  const headers = new Headers(res.headers);
+  headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 async function routeRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
@@ -58,6 +65,11 @@ async function routeRequest(context) {
   // Skip middleware for /functions/* routes - let them handle directly
   if (url.pathname.startsWith('/functions/')) {
     return next();
+  }
+
+  // API responses are Function responses (they bypass _headers): never index.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+    return withNoindex(await next());
   }
   
   // Apply SSR middleware for bots (must match BOT_USER_AGENTS in ssr-middleware.js —

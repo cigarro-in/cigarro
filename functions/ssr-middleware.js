@@ -87,6 +87,50 @@ function breadcrumbNavHtml(items) {
   return `<nav aria-label="Breadcrumb"><ol>${links}</ol></nav>`;
 }
 
+// JSON for <script type="application/ld+json">. "<" is escaped so no value can
+// close the script tag early.
+function jsonLd(obj) {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+// ItemList JSON-LD. `items` must be exactly the rows rendered in the visible
+// list, in the same order.
+function itemListJsonLd(name, items) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    numberOfItems: items.length,
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      url: item.url,
+    })),
+  });
+}
+
+// Stored products.canonicalUrl is trusted only when it is an absolute https URL
+// on this site's host AND does not point at a different catalog slug (the drifted
+// rows point at 404 targets). Anything else falls back to the page's self canonical.
+const CATALOG_DETAIL_PATH = /^\/(product|brand|category|blog)\/[^/]+$/;
+function resolveCanonical(stored, selfUrl) {
+  if (typeof stored !== 'string' || !stored.trim()) return selfUrl;
+  let candidate;
+  let self;
+  try {
+    candidate = new URL(stored.trim());
+    self = new URL(selfUrl);
+  } catch {
+    return selfUrl;
+  }
+  if (candidate.protocol !== 'https:' || candidate.hostname !== self.hostname) return selfUrl;
+  const path = candidate.pathname.replace(/\/+$/, '') || '/';
+  const selfPath = self.pathname.replace(/\/+$/, '') || '/';
+  if (path !== selfPath && CATALOG_DETAIL_PATH.test(path)) return selfUrl;
+  return candidate.href;
+}
+
 // Catalog reads come from Convex. Templates below are untouched —
 // Convex rows are adapted to the exact row shapes the templates expect,
 // so bot HTML stays byte-identical (gate: canonical/H1/schema asserted).
@@ -144,7 +188,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
       .map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td></tr>`).join('');
     const specTable = specRows ? `<h2>Specifications</h2><table>${specRows}</table>` : '';
 
-    const canonicalUrl = product.canonical_url || `https://cigarro.in/product/${slug}`;
+    const canonicalUrl = resolveCanonical(product.canonical_url, `https://cigarro.in/product/${slug}`);
     const activeVariants = product.product_variants?.filter(v => v.is_active !== false) || [];
     const variantImages = activeVariants.flatMap(v => v.images || []);
     // Single source of truth (mirrors src/lib/seo/productOffer.ts): the
@@ -470,7 +514,7 @@ async function fetchProductData(slug, cx) {
     kind: 'product',
     name: p.name,
     slug: p.slug,
-    url: p.canonicalUrl || `https://cigarro.in/product/${p.slug}`,
+    url: resolveCanonical(p.canonicalUrl, `https://cigarro.in/product/${p.slug}`),
     brand: brand ? { name: brand.name, url: brand.slug ? `https://cigarro.in/brand/${brand.slug}` : null } : null,
     description: p.shortDescription || (p.description || '').slice(0, 300) || null,
     image: images[0] || null,
@@ -625,6 +669,12 @@ async function generateCategoryHTML(slug, faviconUrl, cx) {
     const canonicalUrl = `https://cigarro.in/category/${slug}`;
     const title = category.meta_title || `${category.name} | Cigarro`;
     const description = category.meta_description || category.description || `Shop premium ${category.name} at Cigarro`;
+    // ItemList mirrors the visible product links below (same rows, same order).
+    const categoryItems = (detail.products || []).slice(0, 12)
+      .map(p => ({ name: p.name, url: `https://cigarro.in/product/${p.slug}` }));
+    const categoryItemListSchema = categoryItems.length > 0
+      ? `\n  <script type="application/ld+json">\n  ${itemListJsonLd(category.name, categoryItems)}\n  </script>`
+      : '';
     // Product links so bots can discover depth
     let productLinks = '';
     try {
@@ -674,7 +724,7 @@ async function generateCategoryHTML(slug, faviconUrl, cx) {
       { name: 'Categories', url: 'https://cigarro.in/categories' },
       { name: category.name, url: canonicalUrl }
     ])}
-  </script>
+  </script>${categoryItemListSchema}
 </head>
 <body>
   ${breadcrumbNavHtml([
@@ -719,6 +769,11 @@ async function generateBrandHTML(slug, faviconUrl, cx) {
     const canonicalUrl = `https://cigarro.in/brand/${slug}`;
     const title = brand.meta_title || `${brand.name} Products | Cigarro`;
     const description = brand.meta_description || brand.description || `Shop premium ${brand.name} cigarettes and tobacco products at Cigarro`;
+    const brandItems = (detail.products || []).slice(0, 12)
+      .map(p => ({ name: p.name, url: `https://cigarro.in/product/${p.slug}` }));
+    const brandItemListSchema = brandItems.length > 0
+      ? `\n  <script type="application/ld+json">\n  ${itemListJsonLd(brand.name, brandItems)}\n  </script>`
+      : '';
     let productLinks = '';
     try {
       const products = (detail.products || []).slice(0, 12);
@@ -769,7 +824,7 @@ async function generateBrandHTML(slug, faviconUrl, cx) {
       { name: 'Brands', url: 'https://cigarro.in/brands' },
       { name: brand.name, url: canonicalUrl }
     ])}
-  </script>
+  </script>${brandItemListSchema}
 </head>
 <body>
   ${breadcrumbNavHtml([
@@ -794,8 +849,251 @@ async function generateBrandHTML(slug, faviconUrl, cx) {
   }
 }
 
+// Default variant rule shared by bot templates (same as the product page):
+// is_default, else deterministic slug/name order.
+function pickDefaultVariant(variants) {
+  const active = variants.filter(x => x.isActive !== false);
+  return active.find(x => x.isDefault === true)
+    || [...active].sort((a, b) =>
+      String(a.variantSlug || a.variantName || '').localeCompare(String(b.variantSlug || b.variantName || '')))[0]
+    || null;
+}
+
+// One Convex read for every listing surface (hubs, category x brand). Only
+// active rows with a slug; price is the default variant price in rupees.
+async function loadCatalogSnapshot(cx) {
+  const full = await cxQuery(cx, 'catalog:fullCatalog', {});
+  const variantsByProduct = new Map();
+  for (const x of full.variants || []) {
+    if (x.isActive === false) continue;
+    const list = variantsByProduct.get(x.productSupabaseId) || [];
+    list.push(x);
+    variantsByProduct.set(x.productSupabaseId, list);
+  }
+  const categoryIdsByProduct = new Map();
+  for (const j of full.productCategories || []) {
+    const list = categoryIdsByProduct.get(j.productSupabaseId) || [];
+    list.push(j.categorySupabaseId);
+    categoryIdsByProduct.set(j.productSupabaseId, list);
+  }
+  const brands = (full.brands || [])
+    .filter(b => b.isActive && b.slug)
+    .map(b => ({ supabaseId: b.supabaseId, name: b.name, slug: b.slug }));
+  const categories = (full.categories || [])
+    .filter(c => c.slug)
+    .map(c => ({ supabaseId: c.supabaseId, name: c.name, slug: c.slug }));
+  const products = (full.products || [])
+    .filter(p => p.isActive !== false && p.slug)
+    .map(p => {
+      const def = pickDefaultVariant(variantsByProduct.get(p.supabaseId) || []);
+      const priceRaw = def ? def.priceRupees : null;
+      const price = priceRaw != null && Number.isFinite(Number(priceRaw)) ? Number(priceRaw) : null;
+      return {
+        supabaseId: p.supabaseId,
+        slug: p.slug,
+        name: String(p.name || p.slug),
+        brandSupabaseId: p.brandSupabaseId || null,
+        categorySupabaseIds: categoryIdsByProduct.get(p.supabaseId) || [],
+        createdAt: Number(p.createdAt) || 0,
+        price,
+      };
+    });
+  return {
+    products,
+    brands,
+    categories,
+    brandsById: new Map(brands.map(b => [b.supabaseId, b])),
+  };
+}
+
+// /category/:category/:brand -> { category, brand } slugs, else null.
+function categoryBrandSlugs(pathname) {
+  const m = pathname.match(/^\/category\/([^/]+)\/([^/]+?)\/?$/);
+  return m ? { category: decodeURIComponent(m[1]), brand: decodeURIComponent(m[2]) } : null;
+}
+
+// /category/:category/:brand: products filtered by BOTH category and brand.
+// Unknown or inactive brand, unknown category, or zero matching products -> null (404).
+async function generateCategoryBrandHTML(categorySlug, brandSlug, faviconUrl, cx) {
+  try {
+    const snap = await loadCatalogSnapshot(cx);
+    const category = snap.categories.find(c => c.slug === categorySlug);
+    const brand = snap.brands.find(b => b.slug === brandSlug);
+    if (!category || !brand) return null;
+    const items = snap.products
+      .filter(p => p.brandSupabaseId === brand.supabaseId && p.categorySupabaseIds.includes(category.supabaseId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (items.length === 0) return null;
+
+    const heading = `${brand.name} ${category.name}`;
+    const title = `${heading} Online India | Cigarro`;
+    const description = `Shop ${heading} online in India at Cigarro: ${items.length} ${items.length === 1 ? 'product' : 'products'} with variant prices in INR. For adults of legal smoking age only.`;
+    const canonicalUrl = `https://cigarro.in/category/${category.slug}/${brand.slug}`;
+    const categoryUrl = `https://cigarro.in/category/${category.slug}`;
+    const listItems = items.map(p => ({
+      name: p.name,
+      url: `https://cigarro.in/product/${p.slug}`,
+      price: p.price,
+    }));
+    const crumbs = [
+      { name: 'Home', url: 'https://cigarro.in/' },
+      { name: category.name, url: categoryUrl },
+      { name: brand.name, url: canonicalUrl },
+    ];
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${canonicalUrl}">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image" content="${OG_DEFAULT_IMAGE}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(heading)}">
+  <meta property="og:site_name" content="Cigarro">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${OG_DEFAULT_IMAGE}">
+  <meta name="twitter:image:alt" content="${escapeHtml(heading)}">
+
+  <script type="application/ld+json">
+  ${jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: heading,
+      description,
+      url: canonicalUrl,
+    })}
+  </script>
+  <script type="application/ld+json">
+  ${itemListJsonLd(heading, listItems)}
+  </script>
+  <script type="application/ld+json">
+  ${breadcrumbJsonLd(crumbs)}
+  </script>
+  <link rel="icon" href="${faviconUrl}">
+</head>
+<body>
+  ${breadcrumbNavHtml(crumbs)}
+  <h1>${escapeHtml(heading)}</h1>
+  <p>${escapeHtml(description)}</p>
+  <ul>
+    ${listItems.map(p => `<li><a href="${escapeHtml(p.url)}">${escapeHtml(p.name)}</a>${p.price != null ? ` — ₹${p.price}` : ''}</li>`).join('\n    ')}
+  </ul>
+  <nav aria-label="Site"><ul>
+    <li><a href="https://cigarro.in/">Home</a></li>
+    <li><a href="https://cigarro.in/products">All products</a></li>
+    <li><a href="https://cigarro.in/categories">Categories</a></li>
+    <li><a href="https://cigarro.in/brands">Brands</a></li>
+  </ul></nav>
+</body>
+</html>`;
+  } catch (error) {
+    console.error('Error generating category+brand HTML:', error);
+    return null;
+  }
+}
+
+// Hub pages (/, /products, /brands, /categories, /blogs) get crawlable link
+// lists read from the same Convex rows the SPA shows, plus ItemList JSON-LD.
+// Any failure returns empty strings so the page keeps title, description and
+// its self canonical.
+const HUB_PATHS = new Set(['/products', '/brands', '/categories', '/blogs']);
+
+function isoDay(value) {
+  const d = value ? new Date(value) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : null;
+}
+
+function scriptLd(json) {
+  return `\n  <script type="application/ld+json">\n  ${json}\n  </script>`;
+}
+
+async function hubContent(pathname, cx) {
+  const empty = { body: '', schema: '' };
+  if (!cx) return empty;
+  const wantsCatalog = pathname !== '/blogs';
+  const wantsPosts = pathname === '/' || pathname === '/blogs';
+  try {
+    const [snap, postRows] = await Promise.all([
+      wantsCatalog ? loadCatalogSnapshot(cx) : Promise.resolve(null),
+      wantsPosts
+        ? cxQuery(cx, 'content:listBlogPosts', { limit: pathname === '/' ? 3 : 50 }).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    const posts = (postRows || [])
+      .map(p => ({ title: p.title, url: `https://cigarro.in/blog/${p.slug}`, date: isoDay(p.publishedAt) }))
+      .filter(p => p.title && p.url);
+    const li = (href, label, suffix = '') =>
+      `<li><a href="${escapeHtml(href)}">${escapeHtml(label)}</a>${suffix}</li>`;
+    const productLi = p => li(`https://cigarro.in/product/${p.slug}`, p.name, p.price != null ? ` — ₹${p.price}` : '');
+    const productItem = p => ({ name: p.name, url: `https://cigarro.in/product/${p.slug}` });
+    const brandUrl = b => `https://cigarro.in/brand/${b.slug}`;
+    const categoryUrl = c => `https://cigarro.in/category/${c.slug}`;
+    const brandCount = b => snap ? snap.products.filter(p => p.brandSupabaseId === b.supabaseId).length : 0;
+    const categoryCount = c => snap ? snap.products.filter(p => p.categorySupabaseIds.includes(c.supabaseId)).length : 0;
+    const postLi = p => `<li><a href="${escapeHtml(p.url)}">${escapeHtml(p.title)}</a>${p.date ? ` — <time datetime="${p.date}">${p.date}</time>` : ''}</li>`;
+    const postItems = posts.map(p => ({ name: p.title, url: p.url }));
+
+    if (pathname === '/') {
+      const latest = [...snap.products].sort((a, b) => b.createdAt - a.createdAt).slice(0, 12);
+      return {
+        body: `
+  <h2>Shop by category</h2>
+  <ul>${snap.categories.map(c => li(categoryUrl(c), c.name)).join('')}</ul>
+  <h2>Shop by brand</h2>
+  <ul>${snap.brands.map(b => li(brandUrl(b), b.name)).join('')}</ul>
+  <h2>Latest products</h2>
+  <ul>${latest.map(productLi).join('')}</ul>
+  <h2>Latest guides</h2>
+  <ul>${posts.slice(0, 3).map(postLi).join('')}</ul>`,
+        schema: scriptLd(itemListJsonLd('Latest products at Cigarro', latest.map(productItem))),
+      };
+    }
+    if (pathname === '/products') {
+      const all = [...snap.products].sort((a, b) => a.name.localeCompare(b.name));
+      return {
+        body: `\n  <h2>Product list</h2>\n  <ul>${all.map(productLi).join('')}</ul>`,
+        schema: scriptLd(itemListJsonLd('All products at Cigarro', all.map(productItem))),
+      };
+    }
+    if (pathname === '/brands') {
+      return {
+        body: `\n  <h2>Brand list</h2>\n  <ul>${snap.brands.map(b => li(brandUrl(b), b.name, ` (${brandCount(b)} products)`)).join('')}</ul>`,
+        schema: scriptLd(itemListJsonLd('Cigarette and tobacco brands', snap.brands.map(b => ({ name: b.name, url: brandUrl(b) })))),
+      };
+    }
+    if (pathname === '/categories') {
+      return {
+        body: `\n  <h2>Category list</h2>\n  <ul>${snap.categories.map(c => li(categoryUrl(c), c.name, ` (${categoryCount(c)} products)`)).join('')}</ul>`,
+        schema: scriptLd(itemListJsonLd('Cigarette and tobacco categories', snap.categories.map(c => ({ name: c.name, url: categoryUrl(c) })))),
+      };
+    }
+    if (pathname === '/blogs') {
+      if (posts.length === 0) return empty;
+      return {
+        body: `\n  <h2>Latest guides</h2>\n  <ul>${posts.map(postLi).join('')}</ul>`,
+        schema: scriptLd(itemListJsonLd('Cigarette brand and product guides', postItems)),
+      };
+    }
+    return empty;
+  } catch (error) {
+    console.error('Hub content failed:', { pathname, error: error.message });
+    return empty;
+  }
+}
+
 // Generate HTML for homepage
-function generateHomepageHTML(faviconUrl) {
+async function generateHomepageHTML(faviconUrl, cx) {
+  const hub = await hubContent('/', cx);
   const canonicalUrl = 'https://cigarro.in/';
   const title = 'Cigarro | Cigarettes and Tobacco Products Online';
   const description = 'Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only.';
@@ -860,12 +1158,13 @@ function generateHomepageHTML(faviconUrl) {
       'query-input': 'required name=search_term_string'
     }
   })}
-  </script>
+  </script>${hub.schema}
 </head>
 <body>
   <h1>Cigarro | Cigarettes and Tobacco Products Online</h1>
   <p>${escapeHtml(description)}</p>
-  
+  ${hub.body}
+
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
     <p>Please enable JavaScript to view the full interactive experience.</p>
@@ -889,18 +1188,22 @@ async function generateStaticPageHTML(pathname, faviconUrl, cx) {
       body: '<h2>Email Cigarro support</h2><p>For an order question, include the order number and phone number used at checkout. For a product question, include the product name or page link.</p><p><a href="mailto:support@cigarro.in">support@cigarro.in</a></p><nav aria-label="Customer policies"><a href="/shipping">Shipping policy</a> · <a href="/returns">Returns policy</a></nav>'
     },
     '/products': {
+      h1: 'All cigarettes and tobacco products',
       title: 'All Cigarettes and Tobacco Products | Cigarro',
       description: 'Browse the current Cigarro catalogue by product, brand, variant, pack option, price and availability.'
     },
     '/categories': {
+      h1: 'Cigarette and tobacco categories',
       title: 'Cigarette and Tobacco Product Categories | Cigarro',
       description: 'Browse cigarettes, rolling papers, filter tips and other available products by category at Cigarro.'
     },
     '/brands': {
+      h1: 'Cigarette and tobacco brands',
       title: 'Cigarette and Tobacco Brands | Cigarro',
       description: 'Browse the cigarette, cigar and rolling accessory brands currently listed in the Cigarro catalogue.'
     },
     '/blogs': {
+      h1: 'Cigarette brand and product guides',
       title: 'Cigarette Brand and Product Guides | Cigarro',
       description: 'Read Cigarro guides to cigarette brands, variants, pack formats and related tobacco products.'
     },
@@ -929,37 +1232,10 @@ async function generateStaticPageHTML(pathname, faviconUrl, cx) {
   const pageInfo = pages[pathname] || pages['/'];
   const canonicalUrl = `https://cigarro.in${pathname}`;
 
-  let postsNav = '';
-  let postsSchema = '';
-  if (pathname === '/blogs' && cx) {
-    try {
-      const rows = await cxQuery(cx, 'content:listBlogPosts', { limit: 50 });
-      const items = (rows || []).map((p) => ({
-        title: p.title,
-        url: `https://cigarro.in/blog/${p.slug}`,
-      }));
-      if (items.length > 0) {
-        postsNav = `<nav aria-label="Blog posts"><ul>\n${items.map((p) => `    <li><a href="${p.url}">${escapeHtml(p.title)}</a></li>`).join('\n')}\n  </ul></nav>`;
-        postsSchema = `
-  <!-- Structured Data: blog listing -->
-  <script type="application/ld+json">
-  ${JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: pageInfo.title,
-    itemListElement: items.map((p, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      url: p.url,
-      name: p.title,
-    })),
-  })}
-  </script>`;
-      }
-    } catch {
-      // Degrade to title + description (still indexable, still self-canonical).
-    }
-  }
+  // Hub pages get crawlable link lists + ItemList JSON-LD (see hubContent).
+  const hub = HUB_PATHS.has(pathname) && cx
+    ? await hubContent(pathname, cx)
+    : { body: '', schema: '' };
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1007,13 +1283,13 @@ async function generateStaticPageHTML(pathname, faviconUrl, cx) {
     description: pageInfo.description,
     url: canonicalUrl
   })}
-  </script>${postsSchema}
+  </script>${hub.schema}
 </head>
 <body>
-  <h1>${escapeHtml(pageInfo.title)}</h1>
+  <h1>${escapeHtml(pageInfo.h1 || pageInfo.title)}</h1>
   <p>${escapeHtml(pageInfo.description)}</p>
   ${pageInfo.body || ''}
-  ${postsNav}
+  ${hub.body}
   
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
@@ -1475,7 +1751,7 @@ export async function onRequest(context) {
 
     // Generate appropriate HTML based on route
     if (url.pathname === '/' || url.pathname === '') {
-      html = generateHomepageHTML(faviconUrl);
+      html = await generateHomepageHTML(faviconUrl, cx);
     } else if (url.pathname === '/agents') {
       html = generateAgentsHTML(faviconUrl);
     } else if (url.pathname === '/about' || url.pathname === '/contact' ||
@@ -1492,10 +1768,16 @@ export async function onRequest(context) {
         if (!html) catalogMiss = true;
       }
     } else if (url.pathname.startsWith('/category/')) {
-      const slug = catalogSlug(url.pathname);
-      if (slug !== null) {
-        html = await generateCategoryHTML(slug, faviconUrl, cx);
+      const pair = categoryBrandSlugs(url.pathname);
+      if (pair) {
+        html = await generateCategoryBrandHTML(pair.category, pair.brand, faviconUrl, cx);
         if (!html) catalogMiss = true;
+      } else {
+        const slug = catalogSlug(url.pathname);
+        if (slug !== null) {
+          html = await generateCategoryHTML(slug, faviconUrl, cx);
+          if (!html) catalogMiss = true;
+        }
       }
     } else if (url.pathname.startsWith('/brand/')) {
       const slug = catalogSlug(url.pathname);
@@ -1532,7 +1814,8 @@ export async function onRequest(context) {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-          'X-Robots-Tag': 'index, follow',
+          // Indexable by default: no X-Robots-Tag on bot HTML. Pages that must
+          // not index set their own noindex (404s, agent formats).
           ...SECURITY_HEADERS,
         }
       });
