@@ -214,12 +214,62 @@ async function writeCache(host, value) {
   }
 }
 
+// Store-facing brand name for every edge output (titles, JSON-LD, robots, PWA):
+// the storefront siteName from content:getSiteSettings when set, else the
+// organizations.name (an internal label such as "Smokeshop").
+export function brandName(org) {
+  return org?.siteName || org?.name || FALLBACK_STORE_NAME;
+}
+
+// Fetches the store's siteName once per request (cached 60s per store on the
+// Cache API, like hostnames). Returns null when unset or unknown; never throws.
+export async function resolveSiteName(env, org) {
+  const cache = globalThis.caches?.default;
+  const key = new Request(`https://${org.primaryHost}/__site_name_cache/${encodeURIComponent(org.slug)}`);
+  try {
+    const hit = cache ? await cache.match(key) : undefined;
+    if (hit) return (await hit.json()).value ?? null;
+  } catch {
+    // Cache is an optimisation only.
+  }
+
+  let siteName;
+  try {
+    const res = await fetch(`${requiredConvexUrl(env)}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'content:getSiteSettings', args: { orgSlug: org.slug }, format: 'json' }),
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    });
+    const body = await res.json();
+    if (body.status !== 'success') throw new Error(`content:getSiteSettings failed: ${body.errorMessage || body.status}`);
+    const raw = body.value?.siteName;
+    siteName = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+  } catch (error) {
+    // Not cached, so the next request retries. The caller falls back to org.name.
+    console.error('Site name unavailable, using org name:', error instanceof Error ? error.message : error);
+    return null;
+  }
+
+  try {
+    if (cache) {
+      await cache.put(key, new Response(JSON.stringify({ value: siteName }), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}` },
+      }));
+    }
+  } catch {
+    // Cache is an optimisation only.
+  }
+  return siteName;
+}
+
 // Injected into <head> of HTML pages so the SPA knows its store.
 export function orgScriptJson(org) {
   return JSON.stringify({
     slug: org.slug,
     id: org.id ?? null,
     name: org.name,
+    siteName: org.siteName ?? null,
     primaryHost: org.primaryHost,
   }).replace(/</g, '\\u003c');
 }

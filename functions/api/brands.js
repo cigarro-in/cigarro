@@ -23,6 +23,7 @@ const iso = (ms) => (ms == null ? null : new Date(ms).toISOString().replace('Z',
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const orgSlug = getRequestOrg(context).slug;
 
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',

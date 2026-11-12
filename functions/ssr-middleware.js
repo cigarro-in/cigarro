@@ -1,5 +1,5 @@
 import { requiredConvexUrl } from './lib/env.js';
-import { getRequestOrg } from './lib/org.js';
+import { getRequestOrg, brandName } from './lib/org.js';
 // SSR Middleware for Cloudflare Pages
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
@@ -2105,7 +2105,7 @@ export async function onRequest(context) {
     const cx = {
       url: requiredConvexUrl(env),
       orgSlug: org.slug,
-      name: org.name,
+      name: brandName(org),
       primaryHost: org.primaryHost,
       site: `https://${org.primaryHost}`,
     };

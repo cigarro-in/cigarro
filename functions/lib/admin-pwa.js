@@ -3,6 +3,7 @@
 // apps (own name, start_url and scope). The storefront manifest is untouched.
 
 import { requiredConvexUrl } from './env.js';
+import { brandName } from './org.js';
 
 const DEFAULT_THEME_COLOR = '#e8e0d2';
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -32,11 +33,12 @@ export async function fetchStoreBrandColor(env, slug) {
 export function buildAdminManifest(store, brandColor) {
   const themeColor = brandColor || DEFAULT_THEME_COLOR;
   const base = `/${store.slug}/`;
+  const brand = brandName(store);
   return {
     id: base,
-    name: `${store.name} Admin`,
-    short_name: String(store.name).slice(0, 12),
-    description: `Admin app for ${store.name}.`,
+    name: `${brand} Admin`,
+    short_name: brand.slice(0, 12),
+    description: `Admin app for ${brand}.`,
     start_url: base,
     scope: base,
     display: 'standalone',

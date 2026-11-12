@@ -20,6 +20,7 @@ async function cxQuery(baseUrl, path, args) {
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const orgSlug = getRequestOrg(context).slug;
 
   // CORS headers
   const corsHeaders = {

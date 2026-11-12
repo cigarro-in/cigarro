@@ -3,7 +3,7 @@
 // and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
-import { resolveRequestOrg, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
+import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
 import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
 import { applyRedirect } from './lib/redirects.js';
 
@@ -25,7 +25,11 @@ async function handleRequest(context) {
   }
 
   // Never throws: unknown hosts resolve to null, Convex failures to the default org.
-  const org = await resolveRequestOrg(request, env);
+  const resolved = await resolveRequestOrg(request, env);
+  // One siteName lookup per request (60s cached): edge output brands with it.
+  const org = resolved && !resolved.unavailable
+    ? { ...resolved, siteName: await resolveSiteName(env, resolved) }
+    : resolved;
   context.data = context.data || {};
   context.data.org = org;
 
@@ -151,6 +155,11 @@ function withNoindex(res) {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
+// Replaces the static index.html robots meta (index, follow) on non-indexed hosts.
+function setNoindexMeta(el) {
+  el.setAttribute('content', 'noindex, nofollow');
+}
+
 // Static SPA shell for /sa: window.__ORG__ is null, window.__IS_SA__ is true.
 // Noindex always (also on the *.pages.dev alias via onRequest).
 async function saShell(context) {
@@ -165,6 +174,7 @@ async function saShell(context) {
   const script = '<script>window.__ORG__=null;window.__IS_SA__=true</script>';
   const rewritten = new HTMLRewriter()
     .on('head', { element(el) { el.append(script, { html: true }); } })
+    .on('meta[name="robots"]', { element: setNoindexMeta })
     .transform(new Response(res.body, { status: res.status, headers }));
   return rewritten;
 }
@@ -180,6 +190,9 @@ async function nextWithOrg(context) {
   const script = `<script>window.__ORG__=${orgScriptJson(org)}</script>`;
   let rewriter = new HTMLRewriter()
     .on('head', { element(el) { el.append(script, { html: true }); } });
+  // Admin host and its store apps are never indexed: the shell's index,follow
+  // meta would contradict the X-Robots-Tag header.
+  if (org.admin) rewriter = rewriter.on('meta[name="robots"]', { element: setNoindexMeta });
   // Admin store path: point the install manifest at this store's own app.
   if (org.storePath) {
     const manifestHref = storeManifestPath(org.slug);

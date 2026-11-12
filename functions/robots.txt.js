@@ -1,7 +1,7 @@
 // Serves /robots.txt per store. The Sitemap line and the agent pointers use the
 // store's primary host (lib/org.js), so each domain advertises its own sitemap.
 
-import { getRequestOrg } from './lib/org.js';
+import { getRequestOrg, brandName } from './lib/org.js';
 
 export function onRequest(context) {
   if (context.request.method !== 'GET' && context.request.method !== 'HEAD') {
@@ -18,7 +18,7 @@ export function onRequest(context) {
   const org = getRequestOrg(context);
   const site = `https://${org.primaryHost}`;
   const body = [
-    `# ${org.name} - Premium Cigarette Marketplace`,
+    `# ${brandName(org)} - Premium Cigarette Marketplace`,
     '# Last updated: December 2025',
     '#',
     `# AI shopping agents: start at ${site}/agents`,
