@@ -3,9 +3,15 @@ import { ConvexError, v } from "convex/values";
 import {
   collectInOrg,
   findOrgDocBySupabase,
+  findOrgDocBySlug,
   inOrg,
   requireOrgAdminBySlug,
 } from "./lib/org";
+import {
+  parseCanonicalUrl,
+  storeHostSet,
+  type CanonicalRef,
+} from "./lib/hosts";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
 import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 
@@ -48,6 +54,55 @@ async function assertOrgSlugUnique(
       r.supabaseId !== except?.supabaseId,
   );
   if (clash) throw new ConvexError({ code: "SLUG_TAKEN", slug });
+}
+
+// canonicalUrl save-time validation. Store hosts = this org's active domains
+// (+ platform subdomain). A same-store canonical must point at an ACTIVE
+// product or published blog post; a canonical to the entity's own URL is
+// stored as empty (the page's own URL is used).
+async function storeHostsForOrg(ctx: any, org: any): Promise<Set<string>> {
+  const rows = await ctx.db
+    .query("orgDomains")
+    .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
+    .collect();
+  return storeHostSet({
+    orgSlug: org.slug,
+    activeHostnames: rows
+      .filter((r: any) => r.status === "active")
+      .map((r: any) => r.hostname),
+    platformRoot: process.env.PLATFORM_ROOT_DOMAIN ?? "cigarro.in",
+    defaultOrgSlug: process.env.DEFAULT_ORG_SLUG ?? "smokeshop",
+  });
+}
+
+async function normalizeCanonicalUrl(
+  ctx: any,
+  org: any,
+  self: CanonicalRef,
+  raw: string | undefined,
+): Promise<string | undefined> {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  const parsed = parseCanonicalUrl(value, await storeHostsForOrg(ctx, org));
+  if (parsed.kind === "invalid")
+    throw new ConvexError({ code: "INVALID_CANONICAL", reason: "NOT_ABSOLUTE_HTTPS" });
+  if (parsed.kind === "external") return value;
+  if (!parsed.ref)
+    throw new ConvexError({ code: "INVALID_CANONICAL", reason: "UNROUTABLE" });
+  if (parsed.ref.type === self.type && parsed.ref.slug === self.slug)
+    return undefined;
+  const target =
+    parsed.ref.type === "product"
+      ? await findOrgDocBySlug(ctx, "catalogProducts", org, parsed.ref.slug)
+      : await findOrgDocBySlug(ctx, "blogPosts", org, parsed.ref.slug);
+  const active =
+    !!target &&
+    (parsed.ref.type === "product"
+      ? target.isActive === true
+      : target.status === "published");
+  if (!active)
+    throw new ConvexError({ code: "INVALID_CANONICAL", reason: "TARGET_NOT_ACTIVE" });
+  return value;
 }
 
 async function findVariantInventoryBalance(
@@ -822,6 +877,13 @@ export const saveProduct = mutation({
       if (!found || !inOrg(found, org)) throw new ConvexError({ code: "NOT_FOUND" });
     }
 
+    const canonicalUrl = await normalizeCanonicalUrl(
+      ctx,
+      org,
+      { type: "product", slug: product.slug.trim() },
+      product.canonicalUrl,
+    );
+
     const now = Date.now();
     let productSupabaseId = supabaseId;
     if (productSupabaseId) {
@@ -834,6 +896,7 @@ export const saveProduct = mutation({
         ...product,
         name: product.name.trim(),
         slug: product.slug.trim(),
+        canonicalUrl,
         orgId,
         updatedAt: now,
       });
@@ -844,6 +907,7 @@ export const saveProduct = mutation({
         ...product,
         name: product.name.trim(),
         slug: product.slug.trim(),
+        canonicalUrl,
         supabaseId: productSupabaseId,
         orgId,
         createdAt: now,
@@ -1371,6 +1435,19 @@ export const saveBlogPost = mutation({
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     if (!post.title.trim() || !post.slug.trim())
       throw new ConvexError({ code: "TITLE_SLUG_REQUIRED" });
+    // Only touch canonicalUrl when the caller sent the key: the blog form
+    // omits it, and an unconditional write would wipe the stored value.
+    const canonicalPatch =
+      post.canonicalUrl === undefined
+        ? {}
+        : {
+            canonicalUrl: await normalizeCanonicalUrl(
+              ctx,
+              org,
+              { type: "blog", slug: post.slug.trim() },
+              post.canonicalUrl,
+            ),
+          };
     // ponytail: like/view counts are reader-derived, never admin inputs.
     const now = Date.now();
     if (id) {
@@ -1379,6 +1456,7 @@ export const saveBlogPost = mutation({
       await assertOrgSlugUnique(ctx, org, "blogPosts", post.slug.trim(), { id });
       await ctx.db.patch(id, {
         ...post,
+        ...canonicalPatch,
         authorName: post.authorName ?? row.authorName,
         title: post.title.trim(),
         slug: post.slug.trim(),
@@ -1391,6 +1469,7 @@ export const saveBlogPost = mutation({
     await assertOrgSlugUnique(ctx, org, "blogPosts", post.slug.trim());
     const newId = await ctx.db.insert("blogPosts", {
       ...post,
+      ...canonicalPatch,
       authorName: post.authorName ?? "Cigarro",
       title: post.title.trim(),
       slug: post.slug.trim(),

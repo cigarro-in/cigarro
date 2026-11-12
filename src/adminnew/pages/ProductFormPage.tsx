@@ -19,6 +19,12 @@ import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
+
+const CANONICAL_ERROR_MESSAGES: Record<string, string> = {
+  NOT_ABSOLUTE_HTTPS: 'Canonical URL must be an absolute https:// URL.',
+  UNROUTABLE: 'On this store, a canonical URL must point to a product or blog page (/product/slug or /blog/slug).',
+  TARGET_NOT_ACTIVE: 'Canonical URL points to a product or blog post that does not exist or is not active.',
+};
 import { ProductFormData, VariantFormData, Brand, Category, generateSlug, calculateProfitMargin } from '../../types/product';
 
 interface ProductFormPageProps { }
@@ -379,6 +385,8 @@ export function ProductFormPage({ }: ProductFormPageProps) {
       setOpError(
         code === 'SLUG_TAKEN'
           ? 'Slug is taken by another product'
+          : code === 'INVALID_CANONICAL'
+            ? CANONICAL_ERROR_MESSAGES[error?.data?.reason] ?? 'Canonical URL is invalid.'
           : code === 'NOT_CATALOG_ADMIN'
             ? 'Admin access required'
             : error.message || 'Failed to save product'
@@ -922,6 +930,7 @@ export function ProductFormPage({ }: ProductFormPageProps) {
                   placeholder="https://example.com/product"
                   className="bg-background border-border"
                 />
+                <p className="text-xs text-muted-foreground">Leave empty to use this page's own URL.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
