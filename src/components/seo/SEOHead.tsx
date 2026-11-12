@@ -38,6 +38,14 @@ interface SEOHeadProps {
   robots?: string;
   // Extra JSON-LD blocks emitted after the built-in ones (e.g. ItemList on the home page).
   extraJsonLd?: Record<string, unknown>[];
+  // Product JSON-LD: exact product name (the title carries the site name too),
+  // every product image (first 5 emitted), and extra Offers beyond the primary
+  // one (e.g. the carton). Bot-parity inputs; see lib/seo/productOffer.ts.
+  productName?: string;
+  productImages?: string[];
+  additionalOffers?: Array<{ price: number; url: string; availability: 'in stock' | 'out of stock' }>;
+  // Alt text for og:image / twitter:image (defaults to the title).
+  imageAlt?: string;
 }
 
 export function SEOHead({
@@ -67,6 +75,10 @@ export function SEOHead({
   twitterImage,
   robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   extraJsonLd,
+  productName,
+  productImages,
+  additionalOffers,
+  imageAlt,
 }: SEOHeadProps) {
   // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
   // The 512px icon is a valid image for Organization/publisher logos (never a share image).
@@ -166,59 +178,59 @@ export function SEOHead({
 
     if (type === 'product' && price) {
       const hasRealReviews = reviewCount != null && reviewCount > 0 && ratingValue != null;
+      const shippingAndReturns = {
+        // Standard shipping: 5-7 business days, free, India-wide
+        shippingDetails: {
+          '@type': 'OfferShippingDetails',
+          shippingRate: { '@type': 'MonetaryAmount', value: 0, currency },
+          shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'IN' },
+          deliveryTime: {
+            '@type': 'ShippingDeliveryTime',
+            handlingTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2, unitCode: 'DAY' },
+            transitTime: { '@type': 'QuantitativeValue', minValue: 5, maxValue: 7, unitCode: 'DAY' }
+          }
+        },
+        // Consumables are non-returnable; damaged/incorrect items get a free
+        // replacement if reported within 48h — full policy at /returns
+        hasMerchantReturnPolicy: {
+          '@type': 'MerchantReturnPolicy',
+          applicableCountry: 'IN',
+          returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+          merchantReturnDays: 2,
+          merchantReturnLink: `${SITE_ORIGIN}/returns`
+        }
+      };
+      const primaryOffer = {
+        '@type': 'Offer',
+        price: Number(price),
+        priceCurrency: currency,
+        availability: `https://schema.org/${availability === 'in stock' ? 'InStock' : 'OutOfStock'}`,
+        url: offerUrl || canonicalUrl,
+        seller: {
+          '@type': 'Organization',
+          name: siteName
+        },
+        ...shippingAndReturns
+      };
+      const extraOffers = (additionalOffers || []).map((o) => ({
+        '@type': 'Offer',
+        price: o.price,
+        priceCurrency: currency,
+        availability: `https://schema.org/${o.availability === 'in stock' ? 'InStock' : 'OutOfStock'}`,
+        url: o.url,
+        seller: { '@type': 'Organization', name: siteName },
+        ...shippingAndReturns
+      }));
       return {
         ...baseData,
         '@type': 'Product',
-        brand: brand ? { '@type': 'Brand', name: brand } : undefined,
+        name: productName ?? fullTitle,
+        image: productImages && productImages.length > 0 ? productImages.slice(0, 5) : shareImage,
+        brand: { '@type': 'Brand', name: brand || siteName },
         category,
-        offers: {
-          '@type': 'Offer',
-          price,
-          priceCurrency: currency,
-          availability: `https://schema.org/${availability === 'in stock' ? 'InStock' : 'OutOfStock'}`,
-          url: offerUrl || canonicalUrl,
-          seller: {
-            '@type': 'Organization',
-            name: siteName
-          },
-          // Standard shipping: 5-7 business days, free, India-wide
-          shippingDetails: {
-            '@type': 'OfferShippingDetails',
-            shippingRate: {
-              '@type': 'MonetaryAmount',
-              value: 0,
-              currency
-            },
-            shippingDestination: {
-              '@type': 'DefinedRegion',
-              addressCountry: 'IN'
-            },
-            deliveryTime: {
-              '@type': 'ShippingDeliveryTime',
-              handlingTime: {
-                '@type': 'QuantitativeValue',
-                minValue: 1,
-                maxValue: 2,
-                unitCode: 'DAY'
-              },
-              transitTime: {
-                '@type': 'QuantitativeValue',
-                minValue: 5,
-                maxValue: 7,
-                unitCode: 'DAY'
-              }
-            }
-          },
-          // Consumables are non-returnable; damaged/incorrect items get a free
-          // replacement if reported within 48h — full policy at /returns
-          hasMerchantReturnPolicy: {
-            '@type': 'MerchantReturnPolicy',
-            applicableCountry: 'IN',
-            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-            merchantReturnDays: 2,
-            merchantReturnLink: `${SITE_ORIGIN}/returns`
-          }
-        },
+        // One Offer for the default variant, plus one per extra variant
+        // (carton). Single offer keeps the object shape existing pages emit.
+        offers: extraOffers.length > 0 ? [primaryOffer, ...extraOffers] : primaryOffer,
         // Only emitted with real reviews — never placeholders (Google spam policy)
         ...(hasRealReviews
           ? {
@@ -308,9 +320,10 @@ export function SEOHead({
       <meta property="og:description" content={ogDescription || optimizedDescription} />
       {/* No Fragments here: react-helmet-async drops tags nested in a Fragment. */}
       {shareImage && <meta property="og:image" content={shareImage} />}
-      {shareImage && <meta property="og:image:alt" content={ogTitle || fullTitle} />}
-      {shareImage && <meta property="og:image:width" content="1200" />}
-      {shareImage && <meta property="og:image:height" content="630" />}
+      {shareImage && <meta property="og:image:alt" content={imageAlt || ogTitle || fullTitle} />}
+      {/* Dimensions are only known for the shipped 1200x630 default share image. */}
+      {shareImage && shareImage === DEFAULT_SHARE_IMAGE && <meta property="og:image:width" content="1200" />}
+      {shareImage && shareImage === DEFAULT_SHARE_IMAGE && <meta property="og:image:height" content="630" />}
       <meta property="og:site_name" content={siteName} />
       {store.seo.googleSiteVerification && (
         <meta name="google-site-verification" content={store.seo.googleSiteVerification} />
@@ -331,7 +344,7 @@ export function SEOHead({
       <meta name="twitter:title" content={twitterTitle || ogTitle || fullTitle} />
       <meta name="twitter:description" content={twitterDescription || ogDescription || optimizedDescription} />
       {twitterShareImage && <meta name="twitter:image" content={twitterShareImage} />}
-      {twitterShareImage && <meta name="twitter:image:alt" content={twitterTitle || ogTitle || fullTitle} />}
+      {twitterShareImage && <meta name="twitter:image:alt" content={imageAlt || twitterTitle || ogTitle || fullTitle} />}
 
       {/* Additional Meta Tags */}
       <meta name="robots" content={robots} />

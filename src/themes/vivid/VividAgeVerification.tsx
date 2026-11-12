@@ -39,9 +39,10 @@ export function VividAgeVerification({
             <Cigarette className="w-6 h-6" />
           </div>
 
-          <h1 className="text-xl font-bold tracking-tight text-[#0f0f12] mb-1">
+          {/* Not an h1: the page's own heading is the single h1 (SSR keeps one per page). */}
+          <p className="text-xl font-bold tracking-tight text-[#0f0f12] mb-1">
             {siteName}
-          </h1>
+          </p>
           <p className="text-xs uppercase tracking-[0.12em] text-[#6b7280] mb-6">
             Premium tobacco marketplace
           </p>

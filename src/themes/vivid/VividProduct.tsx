@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
@@ -8,6 +8,11 @@ import { useWishlist } from '../../hooks/useWishlist';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewItemOnce } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { productBreadcrumbs, productSeoProps } from '../../lib/seo/productSeo';
+import { getDefaultVariant, resolveProductCanonical } from '../../lib/seo/productOffer';
 import { ProductReviews } from '../../components/products/ProductReviews';
 import type { ProductVariant } from '../../types/product';
 
@@ -20,41 +25,44 @@ interface Details {
   brand?: { id: string; name: string };
   meta_title?: string;
   meta_description?: string;
+  canonical_url?: string | null;
+  rating_value?: number | null;
+  review_count?: number | null;
 }
 
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export default function VividProduct() {
+  const { primaryHost } = useOrgInfo();
+  const { settings: storeSettings } = useStoreSettings();
   const { slug } = useParams<{ slug: string }>();
-  const [product, setProduct] = useState<Details | null>(null);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
-  const [selected, setSelected] = useState<ProductVariant | null>(null);
   const [qty, setQty] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // The shopper's variant pick, scoped to the slug it was made on.
+  const [picked, setPicked] = useState<{ slug: string; variantId: string } | null>(null);
   const { addVariantToCart, addToCart, isLoading } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  // Wave 3: product + variants from the Convex catalog (same shapes).
+  // Product + variants from the Convex catalog (preload-aware: same data on the
+  // server render and the first client render). Derived, not effect-synced.
   const { product: catalogProduct, loading: catalogLoading } = useCatalogProduct(slug);
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  useEffect(() => {
-    if (catalogLoading) return;
-    setLoading(true);
-    const data = catalogProduct && (catalogProduct as any).is_active !== false ? catalogProduct : null;
-    if (data) {
-      const p: any = data;
-      setProduct({ ...p, brand: Array.isArray(p.brand) ? p.brand[0] : p.brand });
-      const vars = (p.product_variants || []).filter((v: any) => v.is_active !== false);
-      setVariants(vars);
-      setSelected(vars.find((v: any) => v.is_default) || vars[0] || null);
-    } else {
-      setProduct(null);
-      setVariants([]);
-      setSelected(null);
-    }
-    setLoading(false);
-  }, [slug, catalogProduct, catalogLoading]);
+  const data = catalogProduct && (catalogProduct as any).is_active !== false ? (catalogProduct as any) : null;
+  const product = useMemo<Details | null>(
+    () => (data ? { ...data, brand: Array.isArray(data.brand) ? data.brand[0] : data.brand } : null),
+    [data],
+  );
+  const variants = useMemo<ProductVariant[]>(
+    () => ((data?.product_variants || []) as ProductVariant[]).filter((v) => v.is_active !== false),
+    [data],
+  );
+  const loading = catalogLoading;
+
+  const pickedId = picked && picked.slug === slug ? picked.variantId : null;
+  const selected: ProductVariant | null =
+    variants.find((v) => v.id === pickedId) ?? getDefaultVariant<ProductVariant>(variants);
+  const setSelected = (variant: ProductVariant) =>
+    setPicked({ slug: slug ?? '', variantId: variant.id });
 
   useEffect(() => {
     setActiveImage(0);
@@ -109,10 +117,10 @@ export default function VividProduct() {
   return (
     <>
       <SEOHead
-        title={product.meta_title || product.name}
-        description={product.meta_description || product.short_description || product.description || ''}
-        url={`/product/${product.slug}`}
-        type="product"
+        {...productSeoProps(product, variants, primaryHost, storeSettings.name)}
+      />
+      <BreadcrumbSchema
+        items={productBreadcrumbs(product, primaryHost, resolveProductCanonical(product.canonical_url, `https://${primaryHost}/product/${product.slug}`))}
       />
 
       <div className="px-4 pt-3">

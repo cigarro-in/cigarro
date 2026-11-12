@@ -11,13 +11,9 @@
 // Throws on any failure. The caller logs and falls back to the existing SPA /
 // bot renderer, so a broken SSR bundle never takes the site down.
 
-import { render, homePreloadRequests, fetchPreload, serializePreload, themeIdFromPreload, trimHomePreload } from './_ssr/entry-server.js';
+import { render, planSsrRoute, matchSsrRoute, flagCovers, fetchPreload, serializePreload, themeIdFromPreload } from './_ssr/entry-server.js';
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg, orgScriptJson } from './lib/org.js';
-
-// Only "/" is server-rendered so far. Other paths are added here one by one
-// (P5-SSR slice 8) together with their route in src/routes/ssrRoutes.tsx.
-export const SSR_PATHS = new Set(['/']);
 
 const PRELOAD_TIMEOUT_MS = 3000;
 const SSR_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
@@ -31,7 +27,8 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
 };
 
-// SSR_ROUTES is a comma list of paths (e.g. "/"). Empty or unset = SSR off.
+// SSR_ROUTES is a comma list of patterns: an exact path ("/") or a one-segment
+// wildcard ("/product/*"). Empty or unset = SSR off.
 export function ssrRoutesFromEnv(env) {
   return String(env?.SSR_ROUTES || '')
     .split(',')
@@ -39,8 +36,11 @@ export function ssrRoutesFromEnv(env) {
     .filter(Boolean);
 }
 
+// True when a flag pattern covers the path AND the server bundle has a route
+// for it (src/entry-server.tsx). A flag alone never enables an unported path.
 export function isSsrEnabledFor(pathname, env) {
-  return SSR_PATHS.has(pathname) && ssrRoutesFromEnv(env).includes(pathname);
+  return ssrRoutesFromEnv(env).some((pattern) => flagCovers(pattern, pathname))
+    && matchSsrRoute(pathname) !== null;
 }
 
 // Store shape the client reads from window.__ORG__ (themeId is not part of it).
@@ -125,9 +125,10 @@ export async function ssrRender(context) {
   const orgInfo = orgInfoFor(org);
   const orgScript = orgScriptJson(org);
 
-  const requests = homePreloadRequests(orgInfo);
-  const preload = trimHomePreload(
-    await fetchPreload(requiredConvexUrl(env), requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
+  const plan = planSsrRoute(url.pathname, orgInfo);
+  if (!plan) throw new Error(`no SSR route for ${url.pathname}`);
+  const preload = plan.trimPreload(
+    await fetchPreload(requiredConvexUrl(env), plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
   );
   const themeId = themeIdFromPreload(preload, orgInfo.slug);
 
@@ -144,10 +145,13 @@ export async function ssrRender(context) {
   });
   const body = await transformed.text();
 
+  // Missing or inactive entity: same no-store, noindex 404 the bot renderer sends.
+  const notFound = rendered.status === 404;
   const headers = new Headers({
     'Content-Type': 'text/html; charset=utf-8',
-    'Cache-Control': SSR_CACHE_CONTROL,
+    'Cache-Control': notFound ? 'no-store' : SSR_CACHE_CONTROL,
     'X-SSR': '1',
+    ...(notFound ? { 'X-Robots-Tag': 'noindex, follow' } : {}),
     ...SECURITY_HEADERS,
   });
   return new Response(request.method === 'HEAD' ? null : body, { status: rendered.status, headers });

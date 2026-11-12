@@ -115,3 +115,65 @@ export function getVariantStockNote<
   if (!alt) return `${variantLabel(selected)} out of stock`;
   return `${variantLabel(selected)} out of stock — ${variantLabel(alt)} available`;
 }
+
+// ============================================================================
+// Bot-parity SEO rules (functions/ssr-middleware.js generateProductHTML). The
+// SSR page and the bot HTML must agree on these, so they live here once.
+// ============================================================================
+
+// Variant key used in ?variant=<key> and offer URLs (same normalisation as
+// getVariantOfferUrl). Null when the variant has neither slug nor name.
+export function getVariantKey(variant: {
+  variant_slug?: string;
+  variant_name?: string;
+} | null | undefined): string | null {
+  return variantKey(variant);
+}
+
+// Carton offer: a carton-type variant (not the default) with a genuine higher
+// MRP. Bots index both price points. Null when there is none.
+export function getCartonVariant<T extends {
+  id?: string;
+  variant_type?: string;
+  price?: number;
+  compare_at_price?: number | null;
+}>(variants: T[] | undefined | null, defaultVariant: T | null): T | null {
+  return getActiveVariants(
+    (variants || []) as Array<T & { is_active?: boolean }>,
+  ).find((v) =>
+    v !== defaultVariant &&
+    v.variant_type === 'carton' &&
+    Number.isFinite(Number(v.price)) && Number(v.price) >= 0 &&
+    Number.isFinite(Number(v.compare_at_price)) &&
+    Number(v.compare_at_price) > Number(v.price),
+  ) ?? null;
+}
+
+// Product share/JSON-LD images: every active variant's images in catalog
+// order (bot parity). Empty when the product has no images.
+export function getProductSeoImages(
+  variants: Array<{ images?: string[]; is_active?: boolean }> | undefined | null,
+): string[] {
+  return getActiveVariants(variants).flatMap((v) => (v.images || []).filter(Boolean));
+}
+
+// Canonical URL for a product page. The stored canonical is trusted only when
+// it is an https URL on this host and does not point at another product, brand,
+// category or blog detail page (drifted rows). Otherwise the page's own URL.
+const CATALOG_DETAIL_PATH = /^\/(product|brand|category|blog)\/[^/]+$/;
+export function resolveProductCanonical(stored: string | null | undefined, selfUrl: string): string {
+  if (typeof stored !== 'string' || !stored.trim()) return selfUrl;
+  let candidate: URL;
+  let self: URL;
+  try {
+    candidate = new URL(stored.trim());
+    self = new URL(selfUrl);
+  } catch {
+    return selfUrl;
+  }
+  if (candidate.protocol !== 'https:' || candidate.hostname !== self.hostname) return selfUrl;
+  const path = candidate.pathname.replace(/\/+$/, '') || '/';
+  const selfPath = self.pathname.replace(/\/+$/, '') || '/';
+  if (path !== selfPath && CATALOG_DETAIL_PATH.test(path)) return selfUrl;
+  return candidate.href;
+}

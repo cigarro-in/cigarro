@@ -12,7 +12,23 @@ export async function onRequest(context) {
   const response = await handleRequest(context);
   // *.pages.dev aliases and previews duplicate the store: never index them.
   const host = new URL(context.request.url).hostname;
-  return host.endsWith('.pages.dev') ? withNoindex(response) : response;
+  const withDiag = context.data?.ssrDiag ? withHeader(response, 'x-ssr', context.data.ssrDiag) : response;
+  return host.endsWith('.pages.dev') ? withNoindex(withDiag) : withDiag;
+}
+
+// SSR diagnostics header: "on" (served by SSR), "off" (flag or route not matched),
+// "error:<msg>" (SSR threw, SPA/bot fallback served). Value is ASCII, <= 120 chars.
+function ssrDiagValue(error) {
+  const raw = error instanceof Error ? error.message : String(error);
+  const clean = raw.replace(/[^\x20-\x7e]/g, '?').replace(/\s+/g, ' ').trim().slice(0, 120);
+  return `error:${clean}`;
+}
+
+// Copy a response with one extra header (upstream headers may be immutable).
+function withHeader(res, name, value) {
+  const headers = new Headers(res.headers);
+  headers.set(name, value);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 async function handleRequest(context) {
@@ -212,6 +228,13 @@ async function nextWithOrg(context) {
   return rewriter.transform(res);
 }
 
+// ?format=json|md on a catalog route is an agent feed (any UA), never SSR.
+function isAgentFormatRequest(url) {
+  const format = (url.searchParams.get('format') || '').toLowerCase();
+  if (format !== 'json' && format !== 'md') return false;
+  return url.pathname === '/agents' || url.pathname === '/products' || url.pathname.startsWith('/product/');
+}
+
 async function routeRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -234,12 +257,20 @@ async function routeRequest(context) {
     return withNoindex(await next());
   }
 
-  // Full SSR for paths listed in SSR_ROUTES (flag, default off), every user agent.
-  // Any SSR failure is logged and falls through to the existing bot/SPA behaviour.
-  if (isSsrEnabledFor(url.pathname, context.env) && (request.method === 'GET' || request.method === 'HEAD')) {
+  // Full SSR for paths matched by SSR_ROUTES (flag, default off), every user agent:
+  // bots on an SSR'd route get the same HTML as humans, not the bot renderer.
+  // Agent feeds (?format=json|md) keep their own response. Any SSR failure is
+  // logged and falls through to the existing bot/SPA behaviour.
+  context.data.ssrDiag = 'off';
+  if (isSsrEnabledFor(url.pathname, context.env) &&
+      !isAgentFormatRequest(url) &&
+      (request.method === 'GET' || request.method === 'HEAD')) {
     try {
-      return await ssrRender(context);
+      const ssr = await ssrRender(context);
+      context.data.ssrDiag = 'on';
+      return ssr;
     } catch (error) {
+      context.data.ssrDiag = ssrDiagValue(error);
       console.error('SSR failed, falling back to SPA:', url.pathname, error instanceof Error ? error.message : error);
     }
   }

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { buildRoute } from '../../config/routes';
 import { ArrowLeft, ShoppingCart, Star, ShieldCheck, Truck, Gem, Package, ExternalLink, ChevronLeft, ChevronRight, Minus, Plus, Check, Heart, ChevronDown, ChevronUp, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,6 +9,8 @@ import { Badge } from '../../components/ui/badge';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useCatalogProduct, useFullCatalog, useCatalogCombos } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { productBreadcrumbs, productSeoProps } from '../../lib/seo/productSeo';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { VariantSelector } from '../../components/variants/VariantSelector';
@@ -27,9 +29,10 @@ import {
   getDefaultVariant,
   getVariantAvailability,
   getVariantDiscount,
-  getVariantOfferUrl,
+  getVariantKey,
   getVariantStockNote,
   isVariantInStock,
+  resolveProductCanonical,
 } from '../../lib/seo/productOffer';
 
 // Updated to match new schema - images now on variants, brand via brand_id
@@ -51,22 +54,14 @@ interface ProductDetails {
 
 function ProductPage() {
   const { primaryHost } = useOrgInfo();
+  const { settings: storeSettings } = useStoreSettings();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [product, setProduct] = useState<ProductDetails | null>(null);
-  // Resolved-but-missing (slug not in catalog): render a real 404 instead of
-  // the infinite "Loading..." fallback below.
-  const [notFound, setNotFound] = useState(false);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
-  const [combos, setCombos] = useState<ProductCombo[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [searchParams] = useSearchParams();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showAddedFeedback, setShowAddedFeedback] = useState(false);
-  const [similarProducts, setSimilarProducts] = useState<any[]>([]);
-  const [brandProducts, setBrandProducts] = useState<any[]>([]);
   const [expandedSections, setExpandedSections] = useState({
     description: true,
     details: false,
@@ -76,13 +71,50 @@ function ProductPage() {
   });
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [shouldLoadBrandSection, setShouldLoadBrandSection] = useState(false);
-  const [shouldLoadRecommended, setShouldLoadRecommended] = useState(false);
+  // The shopper's variant pick, scoped to the slug it was made on so that
+  // navigating to another product never carries it over.
+  const [picked, setPicked] = useState<{ slug: string; variantId: string } | null>(null);
   const brandSectionRef = useRef<HTMLDivElement>(null);
   const recommendedSectionRef = useRef<HTMLDivElement>(null);
   const { addToCart, addVariantToCart, addComboToCart, isLoading } = useCart();
   const { isWishlisted, toggleWishlist, isLoading: wishlistLoading, wishlistError } = useWishlist();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+
+  // Catalog reads are preload-aware: the server render and the first client
+  // render see the same data (no effect-driven copies, no window reads).
+  const { product: catalogProduct, loading: catalogProductLoading } =
+    useCatalogProduct(slug);
+  const { products: catalogAllProducts } = useFullCatalog();
+  const { combos: catalogCombos } = useCatalogCombos();
+
+  // Derived during render, never copied into state from an effect: effects do
+  // not run on the server, so an effect-synced product would SSR as "Loading".
+  const notFound = !!slug && !catalogProductLoading &&
+    (!catalogProduct || (catalogProduct as any).is_active === false);
+  const product = notFound || !catalogProduct
+    ? null
+    : (catalogProduct as unknown as ProductDetails);
+  const variants = useMemo(
+    () => (((product as any)?.product_variants || []) as ProductVariant[])
+      .filter((v) => v.is_active !== false),
+    [product],
+  );
+  const combos = catalogCombos as unknown as ProductCombo[];
+  const allProducts = catalogAllProducts as unknown as any[];
+
+  // Variant precedence: the shopper's pick > ?variant=<key> in the URL > the
+  // catalog default. Same rule on the server and the client.
+  const urlVariantKey = (searchParams.get('variant') || '').toLowerCase();
+  const variantFromUrl = urlVariantKey
+    ? variants.find((v) => getVariantKey(v) === urlVariantKey) ?? null
+    : null;
+  const pickedVariantId = picked && picked.slug === slug ? picked.variantId : null;
+  const selectedVariant: ProductVariant | null =
+    variants.find((v) => v.id === pickedVariantId) ??
+    variantFromUrl ??
+    getDefaultVariant<ProductVariant>(variants);
+  const setSelectedVariant = (variant: ProductVariant) =>
+    setPicked({ slug: slug ?? '', variantId: variant.id });
 
   // GA4 view_item: once per product slug, with the offered variant's price.
   // NOTE: this hook must live here with the other hooks — never after the
@@ -106,111 +138,18 @@ function ProductPage() {
     setActiveImage(0);
   }, [selectedVariant]);
 
-  // Store all products for related product lookups
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  // Product + catalog from Convex. Combos resolve via hook (empty table in prod).
-  const { product: catalogProduct, loading: catalogProductLoading } =
-    useCatalogProduct(slug);
-  const { products: catalogAllProducts } = useFullCatalog();
-  const { combos: catalogCombos } = useCatalogCombos();
-
-  useEffect(() => {
-    if (!slug || catalogProductLoading) return;
-    if (!catalogProduct || (catalogProduct as any).is_active === false) {
-      setProduct(null);
-      setNotFound(true);
-      return;
-    }
-    setNotFound(false);
-    const activeVariants = (
-      (catalogProduct as any).product_variants || []
-    ).filter((v: any) => v.is_active !== false);
-    setProduct(catalogProduct as any);
-    setVariants(activeVariants);
-    // Auto-select default variant (single source of truth)
-    const defaultVariant = getDefaultVariant<ProductVariant>(activeVariants);
-    if (defaultVariant) {
-      setSelectedVariant(defaultVariant);
-    }
-    // Combos still need separate fetch (complex nested data)
-    setCombos(catalogCombos as any[]);
-  }, [slug, catalogProduct, catalogProductLoading, catalogCombos]);
-
-  useEffect(() => {
-    setAllProducts(catalogAllProducts as any[]);
-  }, [catalogAllProducts]);
-
-  // Lazy load brand products when section is visible - use cached data
-  useEffect(() => {
-    if (!shouldLoadBrandSection || !product) return;
-
-    // Use cached allProducts if available (instant!)
-    if (allProducts.length > 0) {
-      const brandProds = allProducts
-        .filter((p: any) => p.brand_id === product.brand_id && p.id !== product.id)
-        .slice(0, 3);
-      setBrandProducts(brandProds);
-      return;
-    }
-
-    // Fallback: catalog data always resolves via hook (empty only on error)
-    if (allProducts.length === 0) return;
-    const brandProds = allProducts
-      .filter(
-        (p: any) =>
-          p.brand_id && p.brand_id === product.brand_id && p.id !== product.id,
-      )
+  // Related lists in catalog order (not shuffled), so the server markup and the
+  // first client render list the same products.
+  const brandProducts = useMemo(() => {
+    if (!product || !product.brand_id) return [];
+    return allProducts
+      .filter((p: any) => p.brand_id === product.brand_id && p.id !== product.id)
       .slice(0, 3);
-    setBrandProducts(brandProds);
-  }, [shouldLoadBrandSection, product, allProducts]);
-
-  // Lazy load recommended products when section is visible - use cached data
-  useEffect(() => {
-    if (!shouldLoadRecommended || !product) return;
-
-    // Use cached allProducts if available (instant!)
-    if (allProducts.length > 0) {
-      const otherProducts = allProducts.filter((p: any) => p.id !== product.id);
-      const shuffled = otherProducts.sort(() => Math.random() - 0.5);
-      setSimilarProducts(shuffled.slice(0, 8));
-      return;
-    }
-
-    // Fallback: catalog data always resolves via hook (empty only on error)
-    if (allProducts.length === 0) return;
-    const otherProducts = allProducts.filter((p: any) => p.id !== product.id);
-    const shuffled = [...otherProducts].sort(() => Math.random() - 0.5);
-    setSimilarProducts(shuffled.slice(0, 8));
-  }, [shouldLoadRecommended, product, allProducts]);
-
-  // Intersection Observer for lazy loading
-  useEffect(() => {
-    if (!product) return; // Wait for product to load
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            if (entry.target === brandSectionRef.current) {
-              setShouldLoadBrandSection(true);
-            } else if (entry.target === recommendedSectionRef.current) {
-              setShouldLoadRecommended(true);
-            }
-          }
-        });
-      },
-      { rootMargin: '200px' } // Start loading 200px before section is visible
-    );
-
-    if (brandSectionRef.current) {
-      observer.observe(brandSectionRef.current);
-    }
-    if (recommendedSectionRef.current) {
-      observer.observe(recommendedSectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [product]);
+  }, [product, allProducts]);
+  const similarProducts = useMemo(
+    () => (product ? allProducts.filter((p: any) => p.id !== product.id).slice(0, 8) : []),
+    [product, allProducts],
+  );
 
   const animateDropToCart = () => {
     try {
@@ -431,8 +370,13 @@ function ProductPage() {
   const offerAvailability = getVariantAvailability(offerVariant);
   const offerVariantInStock = isVariantInStock(offerVariant);
   const stockNote = getVariantStockNote(offerVariant, variants);
-  const seoCanonicalUrl = product.canonical_url || `https://${primaryHost}${location.pathname}`;
-  const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
+  // SEO describes the catalog default, never the shopper's pick (shared with
+  // every product theme: lib/seo/productSeo.ts).
+  const defaultVariant = getDefaultVariant<ProductVariant>(variants);
+  const seoCanonicalUrl = resolveProductCanonical(
+    product.canonical_url,
+    `https://${primaryHost}/product/${product.slug}`,
+  );
   // Discount display: only when compare_at_price is a genuine higher MRP.
   const offerDiscount = getVariantDiscount(offerVariant);
   // Add-to-cart guard state: only when stock is positively known to be empty
@@ -471,41 +415,18 @@ function ProductPage() {
   return (
     <div>
       <SEOHead
-        title={offerVariant
-          ? `${product.name} - ${offerVariant.variant_name} | ${brandName}`
-          : product.meta_title || `${product.name} | ${brandName} | Cigarro`
-        }
-        description={product.meta_description || product.short_description || product.description}
+        {...productSeoProps(product, variants, primaryHost, storeSettings.name)}
         keywords={[
           brandName,
           product.name,
           'premium cigarettes',
           'buy online India',
           'authentic tobacco',
-          selectedVariant?.variant_name || '',
+          defaultVariant?.variant_name || '',
           product.origin || ''
         ].filter(Boolean) as string[]}
-        image={gallery[0] || `https://${primaryHost}/og-default.jpg`}
-        url={seoCanonicalUrl}
-        type="product"
-        price={offerVariant ? offerVariant.price.toString() : undefined}
-        currency="INR"
-        availability={offerAvailability}
-        offerUrl={offerUrl}
-        brand={brandName}
-        category={selectedVariant?.variant_type || 'Cigarettes'}
-        // Ratings pipeline: undefined (0 reviews) until real reviews exist.
-        ratingValue={(product as any)?.rating_value ?? undefined}
-        reviewCount={(product as any)?.review_count ?? undefined}
       />
-      <BreadcrumbSchema
-        items={[
-          { name: 'Home', url: `https://${primaryHost}` },
-          { name: 'Products', url: `https://${primaryHost}/products` },
-          { name: brandName, url: `https://${primaryHost}/brand/${brandSlug}` },
-          { name: product.name, url: `https://${primaryHost}/product/${product.slug}` }
-        ]}
-      />
+      <BreadcrumbSchema items={productBreadcrumbs(product, primaryHost, seoCanonicalUrl)} />
       {/* product:price:* meta is emitted once by SEOHead above — do not
           duplicate it here; Helmet would merge both tags into the head. */}
       
@@ -555,7 +476,10 @@ function ProductPage() {
             
             {/* Second Row: Product Name */}
             <div className="-mt-3 mb-1">
-              <motion.h1 
+              {/* Heading role, not <h1>: the desktop layout renders the page's one h1. */}
+              <motion.p
+                role="heading"
+                aria-level={1} 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -563,7 +487,7 @@ function ProductPage() {
                 style={{ fontFamily: 'var(--font-family-serif)' }}
               >
                 {product.name}
-              </motion.h1>
+              </motion.p>
             </div>
             
             {/* Fourth Row: Price */}
@@ -925,7 +849,7 @@ function ProductPage() {
 
             {/* Brand Section */}
             <div ref={brandSectionRef} className="pt-8 border-t border-coyote/30">
-              {shouldLoadBrandSection && (
+              {(
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -992,7 +916,7 @@ function ProductPage() {
 
             {/* Recommended Products Section */}
             <div ref={recommendedSectionRef} className="pt-8 border-t border-coyote/30">
-              {shouldLoadRecommended && similarProducts.length > 0 && (
+              {similarProducts.length > 0 && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
