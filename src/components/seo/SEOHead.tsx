@@ -1,12 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
-import { ORG_PRIMARY_HOST } from '../../lib/convex/org';
-
-// A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
-// The 512px icon is a valid image for Organization/publisher logos (never a share image).
-const SITE_ORIGIN = `https://${ORG_PRIMARY_HOST}`;
-const DEFAULT_SHARE_IMAGE = `${SITE_ORIGIN}/og-default.jpg`;
-const SITE_LOGO_URL = `${SITE_ORIGIN}/icons/android-chrome-512x512.png`;
+import { useOrgInfo } from '../../lib/org/OrgContext';
 
 interface SEOHeadProps {
   title?: string;
@@ -71,6 +65,12 @@ export function SEOHead({
   twitterImage,
   robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
 }: SEOHeadProps) {
+  // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
+  // The 512px icon is a valid image for Organization/publisher logos (never a share image).
+  const { primaryHost } = useOrgInfo();
+  const SITE_ORIGIN = `https://${primaryHost}`;
+  const DEFAULT_SHARE_IMAGE = `${SITE_ORIGIN}/og-default.jpg`;
+  const SITE_LOGO_URL = `${SITE_ORIGIN}/icons/android-chrome-512x512.png`;
   const { settings: store } = useStoreSettings();
   const siteName = store.name;
   const title = titleProp ?? `${siteName} | Cigarettes and Tobacco Products Online`;

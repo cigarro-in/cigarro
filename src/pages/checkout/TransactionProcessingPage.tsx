@@ -8,7 +8,7 @@ import { useCart } from '../../hooks/useCart';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { formatPaiseINR } from '../../lib/convex/money';
 import QRCode from 'qrcode';
 import { motion } from 'framer-motion';
@@ -29,6 +29,7 @@ const PAGE_SHELL =
   'min-h-[100dvh] overflow-y-auto overflow-x-clip bg-creme flex flex-col items-center px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]';
 
 export function TransactionProcessingPage() {
+  const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const location = useLocation();
   const { orderId: orderIdParam } = useParams();
@@ -45,7 +46,7 @@ export function TransactionProcessingPage() {
   const org = useOrg();
   const order = useQuery(
     api.orders.getMine,
-    orderId ? { orgSlug: ORG_SLUG, orderId } : 'skip',
+    orderId ? { orgSlug: orgSlug, orderId } : 'skip',
   );
 
   const [qrCode, setQrCode] = useState<string>('');
@@ -159,7 +160,7 @@ export function TransactionProcessingPage() {
     setRetrying(true);
     setRetryError(null);
     try {
-      const result = await retryMutation({ orgSlug: ORG_SLUG, oldOrderId: orderId });
+      const result = await retryMutation({ orgSlug: orgSlug, oldOrderId: orderId });
       setRetrying(false);
       sessionStorage.setItem('pendingOrderId', String(result.orderId));
       navigate(`/transaction/${result.orderId}`);
@@ -227,7 +228,7 @@ export function TransactionProcessingPage() {
   const orderLabel = orderNumber ? `#${orderNumber}` : `#${order.displayOrderId}`;
   // Download reuses the already-generated QR data URL — same pixels, same
   // server-generated UPI URL. Never regenerate with different params.
-  const qrFilename = `${ORG_SLUG}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
+  const qrFilename = `${orgSlug}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
   const qrDownloadSupported =
     typeof document !== 'undefined' && 'download' in document.createElement('a');
   // Explicit UPI app choices: same params, app-specific scheme so the OS

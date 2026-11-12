@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { resolveStoreSettings, type RawStoreSettings, type StoreSettings } from '../../lib/storeSettings';
 
 export type { StoreSettings, StoreAddress, StoreStateMinAge, RawStoreSettings } from '../../lib/storeSettings';
@@ -13,7 +13,8 @@ export { resolveStoreSettings } from '../../lib/storeSettings';
 // this file: pass the settings down as props instead.
 
 export function useStoreSettings(): { settings: StoreSettings; loading: boolean } {
-  const row = useQuery(api.content.getSiteSettings, { orgSlug: ORG_SLUG });
+  const { slug: orgSlug } = useOrgInfo();
+  const row = useQuery(api.content.getSiteSettings, { orgSlug: orgSlug });
   return useMemo(
     () => ({
       settings: resolveStoreSettings(row as RawStoreSettings | null | undefined),

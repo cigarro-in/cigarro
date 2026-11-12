@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 
 // Theme-safe catalog reads (Convex). Shapes are snake_case rows with ISO
 // timestamps and explicit nulls, so pages keep their logic untouched. Money
@@ -144,8 +144,9 @@ function buildMaps(bundle: any) {
 // Memoized: consumers feed these identities into setState-in-effect syncs,
 // so a fresh object per render would retrigger them infinitely.
 export function useFullCatalog() {
+  const { slug: orgSlug } = useOrgInfo();
   const org = useOrg();
-  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgSlug: ORG_SLUG } : 'skip');
+  const bundle = useQuery(api.catalog.fullCatalog, org ? { orgSlug: orgSlug } : 'skip');
   return useMemo(() => {
     if (!bundle) {
       return {
@@ -175,10 +176,11 @@ export function useFullCatalog() {
 
 // PDP: single product with variants + brand (legacy shapes).
 export function useCatalogProduct(slug: string | undefined) {
+  const { slug: orgSlug } = useOrgInfo();
   const org = useOrg();
   const detail = useQuery(
     api.catalog.getProductBySlug,
-    slug && org ? { slug, orgSlug: ORG_SLUG } : 'skip',
+    slug && org ? { slug, orgSlug: orgSlug } : 'skip',
   );
   return useMemo(() => {
     if (detail === undefined) return { product: null, loading: true as boolean };
@@ -198,6 +200,7 @@ export function useCatalogProduct(slug: string | undefined) {
 
 // Combos are an empty table in prod: keep the call-site contract (list).
 export function useCatalogCombos() {
-  const rows = useQuery(api.catalog.listCombos, { activeOnly: true, orgSlug: ORG_SLUG });
+  const { slug: orgSlug } = useOrgInfo();
+  const rows = useQuery(api.catalog.listCombos, { activeOnly: true, orgSlug: orgSlug });
   return useMemo(() => ({ combos: rows ?? [] }), [rows]);
 }

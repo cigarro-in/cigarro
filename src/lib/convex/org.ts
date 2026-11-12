@@ -1,39 +1,28 @@
-// Store identity for the SPA. The edge injects window.__ORG__ into <head> for
-// HTML responses (functions/_middleware.js), resolved from the request hostname.
-// Build-time VITE_ORG_SLUG and window.location are fallbacks only.
+// Deprecated module-level snapshot of the store identity. Kept so admin
+// (client-only) code and App.tsx keep working. It is evaluated once at import
+// time on the client, so it must NOT be used by anything that can render on a
+// server. Storefront components and hooks use useOrgInfo() from
+// src/lib/org/OrgContext.tsx instead.
 
-const hasWindow = typeof window !== 'undefined';
+import { getClientOrgInfo } from '../org/OrgContext';
 
-// Admin host (admin.<root>/<storeSlug>/...): the store is the first path
-// segment. It is read from the URL, so an offline-cached shell still resolves
-// the right store. Mirrors adminStoreFromPath in functions/lib/org.js.
-const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin', 'sa']);
-const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+const CLIENT_ORG = getClientOrgInfo();
 
-// Citadel super-admin app on the admin host (/sa/...). No store.
-export const IS_SA: boolean =
-  hasWindow && window.location.hostname.split('.')[0] === 'admin' &&
-  (window.location.pathname === '/sa' || window.location.pathname.startsWith('/sa/'));
+/** @deprecated — use useOrgInfo() */
+export const IS_SA: boolean = CLIENT_ORG.isSa;
 
-export const IS_ADMIN_HOST: boolean =
-  hasWindow && window.location.hostname.split('.')[0] === 'admin';
+/** @deprecated — use useOrgInfo() */
+export const IS_ADMIN_HOST: boolean = CLIENT_ORG.isAdminHost;
 
-// Store named by the admin path, or null (admin root picker, or not admin host).
-export const ADMIN_PATH_STORE: string | null = (() => {
-  if (!IS_ADMIN_HOST) return null;
-  const first = window.location.pathname.split('/')[1] || '';
-  return STORE_SLUG_RE.test(first) && !ADMIN_RESERVED_SEGMENTS.has(first) ? first : null;
-})();
+/** @deprecated — use useOrgInfo() (store slug from the admin path, if any, is folded into `slug`) */
+export const ADMIN_PATH_STORE: string | null =
+  CLIENT_ORG.isAdminHost && CLIENT_ORG.basename ? CLIENT_ORG.basename.slice(1) : null;
 
-// React Router basename on the admin host ('' everywhere else).
-export const APP_BASENAME: string = ADMIN_PATH_STORE ? `/${ADMIN_PATH_STORE}` : '';
+/** @deprecated — use useOrgInfo().basename */
+export const APP_BASENAME: string = CLIENT_ORG.basename;
 
-export const ORG_SLUG: string =
-  ADMIN_PATH_STORE ||
-  (hasWindow && window.__ORG__?.slug) ||
-  import.meta.env?.VITE_ORG_SLUG ||
-  'smokeshop';
+/** @deprecated — use useOrgInfo().slug */
+export const ORG_SLUG: string = CLIENT_ORG.slug;
 
-export const ORG_PRIMARY_HOST: string =
-  (hasWindow && window.__ORG__?.primaryHost) ||
-  (hasWindow ? window.location.host : '');
+/** @deprecated — use useOrgInfo().primaryHost */
+export const ORG_PRIMARY_HOST: string = CLIENT_ORG.primaryHost;

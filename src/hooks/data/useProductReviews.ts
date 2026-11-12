@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 
 // Theme-safe reviews surface (Wave 10, Convex-native). Themes must not
 // import convex/react directly — use these hooks.
@@ -16,9 +16,10 @@ export interface ProductReview {
 }
 
 export function useProductReviews(productSupabaseId: string | undefined) {
+  const { slug: orgSlug } = useOrgInfo();
   const data = useQuery(
     api.reviews.listProductReviews,
-    productSupabaseId ? { productSupabaseId, limit: 20, orgSlug: ORG_SLUG } : 'skip'
+    productSupabaseId ? { productSupabaseId, limit: 20, orgSlug: orgSlug } : 'skip'
   );
   const submit = useMutation(api.reviews.submitReview);
   return {
@@ -31,12 +32,13 @@ export function useProductReviews(productSupabaseId: string | undefined) {
       title?: string;
       comment?: string;
       userName?: string;
-    }) => submit({ productSupabaseId: productSupabaseId!, orgSlug: ORG_SLUG, ...args }),
+    }) => submit({ productSupabaseId: productSupabaseId!, orgSlug: orgSlug, ...args }),
   };
 }
 
 export function useMyReviews() {
-  const data = useQuery(api.reviews.listMyReviews, { orgSlug: ORG_SLUG });
+  const { slug: orgSlug } = useOrgInfo();
+  const data = useQuery(api.reviews.listMyReviews, { orgSlug: orgSlug });
   return {
     reviews: (data || []) as (ProductReview & {
       isApproved: boolean;

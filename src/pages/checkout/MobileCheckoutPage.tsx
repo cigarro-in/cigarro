@@ -22,7 +22,7 @@ import { useShippingMethods } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { convex } from '../../lib/convex/client';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 
@@ -39,6 +39,7 @@ const getBrandName = (brand: any): string => {
 
 
 export function MobileCheckoutPage() {
+  const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
@@ -231,7 +232,7 @@ export function MobileCheckoutPage() {
     const checkEligibility = async () => {
       if (!user?.id) return;
       try {
-        const gate = await convex.query(api.referrals.checkEligibility, { orgSlug: ORG_SLUG });
+        const gate = await convex.query(api.referrals.checkEligibility, { orgSlug: orgSlug });
         if (gate.eligible) {
           // New user - eligible
           setIsReferralEligible(true);
@@ -259,7 +260,7 @@ export function MobileCheckoutPage() {
     setIsApplyingReferral(true);
     try {
       const data = await convex.mutation(api.referrals.attachReferralLate, {
-        orgSlug: ORG_SLUG,
+        orgSlug: orgSlug,
         referredUserId: user!.id,
         referralCode: referralCode.trim()
       });
@@ -452,7 +453,7 @@ export function MobileCheckoutPage() {
 
     setIsValidatingCoupon(true);
     try {
-      const result = await validateCouponCode(couponCode.trim());
+      const result = await validateCouponCode(orgSlug, couponCode.trim());
 
       if (result.isValid && result.discount) {
         setAppliedDiscount(result.discount);
@@ -523,7 +524,7 @@ export function MobileCheckoutPage() {
       const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
 
       const result = await createConvexOrder({
-        orgSlug: ORG_SLUG,
+        orgSlug: orgSlug,
         orgId: org._id,
         kind: 'purchase',
         items: buildConvexItems(),

@@ -15,7 +15,7 @@ import { formatINR } from '../../utils/currency';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { paiseToRupees } from '../../lib/convex/money';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { resolveOrderItemImageUrl } from '../../hooks/data/useMyOrders';
@@ -90,6 +90,7 @@ function mapConvexStatus(s: string): Order['status'] {
 }
 
 export function OrdersPage() {
+  const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addMultipleToCart } = useCart();
@@ -100,7 +101,7 @@ export function OrdersPage() {
   const org = useOrg();
   const convexOrders = useQuery(
     api.orders.listMyOrders,
-    org ? { orgId: org._id, orgSlug: ORG_SLUG, limit: 50 } : 'skip',
+    org ? { orgId: org._id, orgSlug: orgSlug, limit: 50 } : 'skip',
   );
   const retryConvexOrder = useMutation(api.orders.retryOrder);
   // Shared catalog subscription for the legacy order-image fallback
@@ -262,7 +263,7 @@ export function OrdersPage() {
       return;
     }
     try {
-      const result = await retryConvexOrder({ orgSlug: ORG_SLUG, oldOrderId: order.id as any });
+      const result = await retryConvexOrder({ orgSlug: orgSlug, oldOrderId: order.id as any });
       if (result.upiUrl) {
         try {
           window.location.href = result.upiUrl;

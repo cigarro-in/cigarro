@@ -20,7 +20,7 @@ import { useMutation } from 'convex/react';
 import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
@@ -42,6 +42,7 @@ const getBrandName = (brand: any): string => {
 };
 
 export function CheckoutPage() {
+  const { slug: orgSlug } = useOrgInfo();
   const { settings: store } = useStoreSettings();
   const navigate = useNavigate();
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
@@ -298,14 +299,14 @@ export function CheckoutPage() {
     setDiscountError('');
 
     try {
-      const validation = await validateCouponCode(couponCode);
+      const validation = await validateCouponCode(orgSlug, couponCode);
       
       if (!validation.isValid) {
         setDiscountError(validation.message || 'Invalid coupon code');
         return;
       }
 
-      const discount = await calculateDiscount(items, couponCode);
+      const discount = await calculateDiscount(orgSlug, items, couponCode);
       
       if (discount && discount.is_applicable) {
         setAppliedDiscount(discount);
@@ -887,14 +888,14 @@ export function CheckoutPage() {
             if (item.combo_id && org) {
               const combos = await convexClient.query(api.catalog.combosBySupabaseIds, {
                 ids: [String(item.combo_id)],
-                orgSlug: ORG_SLUG,
+                orgSlug: orgSlug,
               });
               const live = combos?.[0]?.combo_price;
               if (Number.isFinite(Number(live))) unitRupees = Number(live);
             } else if (org) {
               const found = await convexClient.query(api.catalog.productsBySupabaseIds, {
                 ids: [String(item.id)],
-                orgSlug: ORG_SLUG,
+                orgSlug: orgSlug,
               });
               const variants = found?.[0]?.product_variants || [];
               const match = item.variant_id
@@ -919,7 +920,7 @@ export function CheckoutPage() {
       }
 
       const result = await createConvexOrder({
-        orgSlug: ORG_SLUG,
+        orgSlug: orgSlug,
         orgId: org._id,
         kind: 'purchase',
         items: convexItems,

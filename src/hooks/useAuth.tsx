@@ -3,7 +3,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { convexUrl } from '../lib/convex/client';
 import { api } from '../../convex/_generated/api';
 import { getSession, storeSession, clearSession, notifyAuthChanged } from '../lib/auth/session';
-import { ORG_SLUG, IS_ADMIN_HOST } from '../lib/convex/org';
+import { useOrgInfo } from '../lib/org/OrgContext';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
 
@@ -86,14 +86,15 @@ async function loadConvexUser(client: ConvexHttpClient): Promise<User> {
 
 async function establishCustomerSession(
   token: string,
+  orgSlug: string,
   profile: { phone?: string; name?: string } = {},
 ): Promise<User> {
   const client = new ConvexHttpClient(convexUrl);
   client.setAuth(token);
-  const org = await client.query(api.organizations.getBySlug, { slug: ORG_SLUG });
+  const org = await client.query(api.organizations.getBySlug, { slug: orgSlug });
   if (!org) throw new Error('Store unavailable');
   await client.mutation(api.userState.ensureMyProfile, {
-    orgSlug: ORG_SLUG,
+    orgSlug,
     phone: profile.phone || undefined,
     name: profile.name || undefined,
   });
@@ -101,6 +102,7 @@ async function establishCustomerSession(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { slug: orgSlug, isAdminHost } = useOrgInfo();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authDialog, setAuthDialog] = useState<AuthDialogRequest>({ open: false });
@@ -126,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Own JWT only.
       const session = getSession();
       if (session) {
-        const u = await establishCustomerSession(session.token, {
+        const u = await establishCustomerSession(session.token, orgSlug, {
           phone: session.phone,
         });
         setUser(u);
@@ -149,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Admin host: name the store explicitly (the edge only honours it there).
-        body: JSON.stringify(IS_ADMIN_HOST ? { ...args, orgSlug: ORG_SLUG } : args),
+        body: JSON.stringify(isAdminHost ? { ...args, orgSlug: orgSlug } : args),
       });
     } catch {
       throw new AuthError('Network error — check your connection and try again', {
@@ -180,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // calls would go out unauthenticated until it re-auths (hence the
       // login-then-refresh dance).
       try {
-        const u = await establishCustomerSession(data.cigarro_token, {
+        const u = await establishCustomerSession(data.cigarro_token, orgSlug, {
           phone: phone || undefined,
           name: args.name || undefined,
         });

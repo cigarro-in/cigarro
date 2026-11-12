@@ -5,6 +5,7 @@ import './index.css'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { installCrashReporting } from './lib/crashReporting';
 import { isReloadBlocked } from './lib/reloadGuard';
+import { OrgProvider, getClientOrgInfo } from './lib/org/OrgContext';
 
 installCrashReporting();
 
@@ -157,7 +158,9 @@ const UpdateSW = () => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-    <UpdateSW />
+    <OrgProvider org={getClientOrgInfo()}>
+      <App />
+      <UpdateSW />
+    </OrgProvider>
   </React.StrictMode>,
 )

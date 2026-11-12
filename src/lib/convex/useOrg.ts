@@ -1,7 +1,8 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from './org';
+import { useOrgInfo } from '../org/OrgContext';
 
 export function useOrg() {
-  return useQuery(api.organizations.getBySlug, { slug: ORG_SLUG });
+  const { slug } = useOrgInfo();
+  return useQuery(api.organizations.getBySlug, { slug });
 }

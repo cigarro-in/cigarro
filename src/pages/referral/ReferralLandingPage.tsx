@@ -9,9 +9,11 @@ import { Button } from '../../components/ui/button';
 import { Sparkles, ArrowRight, Gift, Leaf, Heart } from 'lucide-react';
 import { validateReferralCode } from '../../utils/referral/referralService';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { motion } from 'framer-motion';
 
 export default function ReferralLandingPage() {
+  const { slug: orgSlug } = useOrgInfo();
   const { code } = useParams<{ code: string }>();
   const { settings: store } = useStoreSettings();
   const rewardRupees = store.referralRewardRupees;
@@ -43,7 +45,7 @@ export default function ReferralLandingPage() {
     }
 
     setValidating(true);
-    const result = await validateReferralCode(code);
+    const result = await validateReferralCode(orgSlug, code);
     
     setIsValid(result.valid);
     if (result.referrer_name) {

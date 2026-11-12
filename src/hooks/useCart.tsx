@@ -2,7 +2,7 @@ import { readStoredPreference } from '../lib/browserStorage';
 import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
-import { ORG_SLUG, IS_ADMIN_HOST } from '../lib/convex/org';
+import { useOrgInfo } from '../lib/org/OrgContext';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { CartItemWithVariant } from '../types/variants';
@@ -83,6 +83,7 @@ const normalizeCartQuantity = (value: unknown, fallback = 1): number => {
 };
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { slug: orgSlug, isAdminHost } = useOrgInfo();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -207,7 +208,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
   // Storefront-only: the admin host never shops, so it must not subscribe.
-  const useConvexPath = !!user && !!org && !IS_ADMIN_HOST;
+  const useConvexPath = !!user && !!org && !isAdminHost;
   const convexAdd = useMutation(api.userState.addToCart);
   const convexSetQty = useMutation(api.userState.setCartQty);
   const convexRemove = useMutation(api.userState.removeCartLine);
@@ -310,7 +311,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (productIds.length > 0) {
       const rows = await convex.query(api.catalog.productsBySupabaseIds, {
         ids: productIds,
-        orgSlug: ORG_SLUG,
+        orgSlug: orgSlug,
       });
       for (const p of rows || []) productsById[p.id] = p;
     }
@@ -319,7 +320,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (comboIds.length > 0) {
       const rows = await convex.query(api.catalog.combosBySupabaseIds, {
         ids: comboIds,
-        orgSlug: ORG_SLUG,
+        orgSlug: orgSlug,
       });
       for (const c of rows || []) combosById[c.id] = c;
     }

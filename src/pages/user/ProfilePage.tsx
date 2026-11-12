@@ -40,7 +40,7 @@ import { formatINR } from '../../utils/currency';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { paiseToRupees } from '../../lib/convex/money';
 
 interface MembershipTier {
@@ -121,6 +121,7 @@ const membershipTiers: MembershipTier[] = [
 ];
 
 export function ProfilePage() {
+  const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const org = useOrg();
@@ -131,7 +132,7 @@ export function ProfilePage() {
 
   const convexOrders = useQuery(
     api.orders.listMyOrders,
-    org && user ? { orgId: org._id, orgSlug: ORG_SLUG, limit: 200 } : 'skip',
+    org && user ? { orgId: org._id, orgSlug: orgSlug, limit: 200 } : 'skip',
   );
   const walletData = useQuery(
     api.wallet.getMyBalance,

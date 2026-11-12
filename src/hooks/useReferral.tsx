@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useOrgInfo } from '../lib/org/OrgContext';
 import { useStoreSettings } from './data/useStoreSettings';
 import type { ReferralStats, ReferredUser } from '../types/referral';
 import {
@@ -15,6 +16,7 @@ import {
 } from '../utils/referral/referralService';
 
 export function useReferral() {
+  const { slug: orgSlug } = useOrgInfo();
   const { user } = useAuth();
   const { settings: store } = useStoreSettings();
   const [stats, setStats] = useState<ReferralStats | null>(null);
@@ -42,9 +44,9 @@ export function useReferral() {
     setLoading(true);
     try {
       const [statsData, referralsData, referredStatus] = await Promise.all([
-        getUserReferralStats(user.id),
-        getUserReferrals(user.id),
-        checkIfUserWasReferred(user.id)
+        getUserReferralStats(orgSlug, user.id),
+        getUserReferrals(orgSlug, user.id),
+        checkIfUserWasReferred(orgSlug, user.id)
       ]);
 
       setStats(statsData);

@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { recordReferral, checkIfUserWasReferred } from '../../utils/referral/referralService';
 
 export function ReferralTracker() {
+  const { slug: orgSlug } = useOrgInfo();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -15,11 +17,11 @@ export function ReferralTracker() {
 
       try {
         // Check if user is already referred
-        const { was_referred } = await checkIfUserWasReferred(user.id);
+        const { was_referred } = await checkIfUserWasReferred(orgSlug, user.id);
         
         if (!was_referred) {
           // Record the referral
-          const result = await recordReferral({
+          const result = await recordReferral(orgSlug, {
             referred_user_id: user.id,
             referral_code: referralCode,
             signup_source: 'web_tracker'
