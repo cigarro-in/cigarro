@@ -1,8 +1,8 @@
 import { readStoredPreference } from './lib/browserStorage';
-import { useState, useEffect, useLayoutEffect, Suspense } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import { BrowserRouter as Router, useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import { AgeVerification } from './components/auth/AgeVerification';
+import { AgeVerification, AgeGateOverlay } from './components/auth/AgeVerification';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import Header from './components/layout/Header';
 import { MobileLayout } from './components/layout/MobileLayout';
@@ -152,16 +152,31 @@ function AppContent() {  const { user } = useAuth();
     upsertConvexUser(args).catch(() => {});
   }, [user?.id, org?._id]);
   
-  // Check localStorage immediately to prevent flash of age verification
-  const [isAgeVerified, setIsAgeVerified] = useState(() => {
-    return readStoredPreference('ageVerified') === 'true';
-  });
+  // Age gate state. `undefined` = not read yet (first render, and on the server).
+  // The routes always render; while unknown or unverified, the gate overlay sits
+  // on top and the app content is inert. Read in an effect, never in render.
+  const [ageVerified, setAgeVerified] = useState<boolean | undefined>(undefined);
+  const [legacyConsentNeeded, setLegacyConsentNeeded] = useState(false);
+  const appRootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const verified = readStoredPreference('ageVerified') === 'true';
+    setAgeVerified(verified);
+    // Already-verified visitors never see the gate again: offer them the
+    // one-time banner instead so analytics is never silently enabled.
+    if (verified && getConsent() === null) setLegacyConsentNeeded(true);
+  }, []);
 
   // Per-store settings from Convex, defaults filled in (was Supabase).
   const { settings: store, loading: settingsLoading } = useStoreSettings();
   const gateActive = store.ageGate.enabled;
   // A store with the age gate switched off never shows it.
-  const gatePassed = !gateActive || isAgeVerified;
+  const gatePassed = !gateActive || ageVerified === true;
+  const showGate = !gatePassed;
+
+  // Overlay open => app content is inert (not focusable, hidden from AT).
+  useLayoutEffect(() => {
+    appRootRef.current?.toggleAttribute('inert', showGate);
+  }, [showGate]);
 
   // Analytics: load gtag once (consent-denied by default; no collection
   // until the visitor accepts the banner).
@@ -199,17 +214,12 @@ function AppContent() {  const { user } = useAuth();
   const isUserPage = !isAdminPath;
 
   const handleAgeVerified = () => {
-    setIsAgeVerified(true);
+    setAgeVerified(true);
     // Entering through the gate is the consent moment (stated on the gate).
     setConsent('granted');
     trackEvent('age_gate_completed');
   };
 
-  // Already-verified visitors never see the gate again: offer them the
-  // one-time banner instead so analytics is never silently enabled.
-  const [legacyConsentNeeded, setLegacyConsentNeeded] = useState(
-    () => readStoredPreference('ageVerified') === 'true' && getConsent() === null
-  );
   // Gate switched off for this store: there is no entry moment, so offer the banner.
   useEffect(() => {
     if (!gateActive && getConsent() === null) setLegacyConsentNeeded(true);
@@ -224,17 +234,14 @@ function AppContent() {  const { user } = useAuth();
     }
   }, [isAdminHost, isAdminPath]);
 
-  if (!gatePassed) {
-    const ThemedAgeGate = theme.slots.AgeVerification;
-    if (ThemedAgeGate) {
-      return (
-        <Suspense fallback={null}>
-          <ThemedAgeGate onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />
-        </Suspense>
-      );
-    }
-    return <AgeVerification onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />;
-  }
+  const ThemedAgeGate = theme.slots.AgeVerification;
+  const gateContent = ThemedAgeGate ? (
+    <Suspense fallback={null}>
+      <ThemedAgeGate onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />
+    </Suspense>
+  ) : (
+    <AgeVerification onVerify={handleAgeVerified} ageGate={store.ageGate} siteName={store.name} />
+  );
 
   return (
     <HelmetProvider>
@@ -259,6 +266,7 @@ function AppContent() {  const { user } = useAuth();
         )}
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Helmet>
+        <div ref={appRootRef}>
 {isUserPage ? (
         ThemeLayout ? (
           <Suspense fallback={<LoadingSpinner />}>
@@ -303,6 +311,10 @@ function AppContent() {  const { user } = useAuth();
         <Suspense fallback={<LoadingSpinner />}>
           <AppRoutes isAdminRoute={true} />
         </Suspense>
+      )}
+        </div>
+      {showGate && (
+        <AgeGateOverlay label={`Age verification for ${store.name}`}>{gateContent}</AgeGateOverlay>
       )}
     </HelmetProvider>
   );

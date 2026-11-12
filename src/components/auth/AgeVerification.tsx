@@ -1,10 +1,89 @@
 import { readStoredPreference, writeStoredPreference } from '../../lib/browserStorage';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '../ui/button';
 import { motion } from 'framer-motion';
 import { Shield, MapPin, FileText, AlertCircle, Crown } from 'lucide-react';
 import { DEFAULT_AGE_GATE, ageRuleLabel, type StoreSettings } from '../../lib/storeSettings';
 import { siteConfig } from '../../config/site';
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+/**
+ * Full-screen age-gate overlay. The page underneath stays mounted (crawlers
+ * and humans get the same DOM); the caller marks the app content `inert` while
+ * this is shown. This component owns the dialog semantics: focus trap, Escape
+ * ignored, body scroll lock (scrollbar width compensated so nothing shifts),
+ * and focus restore on close. It never changes layout: it is position:fixed.
+ */
+export function AgeGateOverlay({ label, children }: { label: string; children: ReactNode }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Deliberately inert: the gate can only be passed by confirming.
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      const outside = !active || !dialog.contains(active);
+      if (e.shiftKey) {
+        if (outside || active === first || active === dialog) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (outside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    dialogRef.current?.focus({ preventScroll: true });
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+      if (previouslyFocused && previouslyFocused.isConnected) {
+        previouslyFocused.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      tabIndex={-1}
+      className="fixed inset-0 z-[9999] bg-creme outline-none"
+    >
+      {children}
+    </div>
+  );
+}
 
 interface AgeVerificationProps {
   onVerify: () => void;
@@ -20,15 +99,8 @@ export function AgeVerification({
   const rule = ageRuleLabel(ageGate);
   const [isExiting, setIsExiting] = useState(false);
 
-  useEffect(() => {
-    // Check if user has already verified permanently (first ever visit check)
-    const hasVerified = readStoredPreference('ageVerified');
-    if (hasVerified === 'true') {
-      onVerify();
-    }
-  }, [onVerify]);
-
   const handleVerify = () => {
+    if (isExiting) return;
     // Store age verification in local storage (persistent)
     writeStoredPreference('ageVerified', 'true');
     
@@ -138,8 +210,9 @@ export function AgeVerification({
               <p className="text-center text-dark/60 font-sans text-xs md:text-sm leading-relaxed mb-4">
                   Proceeding confirms you are {ageGate.minAge}+ and accept our use of cookies. <a href="/privacy" className="underline underline-offset-2">Privacy</a>
               </p>
-              <Button 
+              <Button
                   onClick={handleVerify}
+                  disabled={isExiting}
                   className="w-full bg-dark text-creme-light hover:bg-canyon hover:text-creme-light py-6 md:py-7 rounded-full font-sans font-medium text-base md:text-lg tracking-wide uppercase transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                   Confirm and Proceed
