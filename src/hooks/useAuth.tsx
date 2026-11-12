@@ -74,6 +74,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function loadConvexUser(client: ConvexHttpClient): Promise<User> {
   const profile = await client.query(api.userState.getMyProfile, {});
+  if (!profile) throw new Error('Profile unavailable');
   return {
     id: profile.userId,
     email: null,

@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { useOrg } from '../lib/convex/useOrg';
+import { IS_ADMIN_HOST } from '../lib/convex/org';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -36,7 +37,8 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const org = useOrg();
 
-  const useConvexPath = !!user && !!org;
+  // Storefront-only: the admin host never shops, so it must not subscribe.
+  const useConvexPath = !!user && !!org && !IS_ADMIN_HOST;
   const convexRows = useQuery(
     api.userState.listWishlist,
     useConvexPath ? { orgId: org!._id } : 'skip'

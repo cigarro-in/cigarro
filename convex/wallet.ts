@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { requireMember, requireOrgAdmin } from "./lib/auth";
+import { optionalMember, requireMember, requireOrgAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { assertPositiveInt } from "./lib/money";
 import { ledgerReason } from "./schema";
@@ -104,16 +104,18 @@ export async function creditWallet(
 
 // ---------- Public queries ----------
 
+// Read queries: an empty balance / ledger for a non-member, never a throw.
 export const getMyBalance = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    const { userId } = await requireMember(ctx, orgId);
+    const member = await optionalMember(ctx, orgId);
+    if (!member) return { balancePaise: 0 };
     const acct = await ctx.db
       .query("walletAccounts")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", orgId).eq("userId", userId),
+        q.eq("orgId", orgId).eq("userId", member.userId),
       )
-      .unique();
+      .first();
     return { balancePaise: acct?.balancePaise ?? 0 };
   },
 });
@@ -124,11 +126,12 @@ export const getMyLedger = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { orgId, limit }) => {
-    const { userId } = await requireMember(ctx, orgId);
+    const member = await optionalMember(ctx, orgId);
+    if (!member) return [];
     return await ctx.db
       .query("walletLedger")
       .withIndex("by_org_user_time", (q) =>
-        q.eq("orgId", orgId).eq("userId", userId),
+        q.eq("orgId", orgId).eq("userId", member.userId),
       )
       .order("desc")
       .take(limit ?? 50);

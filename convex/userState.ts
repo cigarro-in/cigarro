@@ -1,5 +1,10 @@
 import { ConvexError, v } from "convex/values";
-import { assertTokenOrg, requireIdentity, requireMember } from "./lib/auth";
+import {
+  assertTokenOrg,
+  optionalMember,
+  requireIdentity,
+  requireMember,
+} from "./lib/auth";
 import { resolveOrg } from "./lib/org";
 import { normalizePhoneE164 } from "./lib/phone";
 import {
@@ -20,14 +25,17 @@ import { Doc, Id } from "./_generated/dataModel";
 // the Supabase profiles read in useAuth.
 // Pass orgSlug to scope isAdmin to that org (owner/admin of THAT org). Without
 // it, isAdmin is true for admin of ANY org (legacy; do not use for gating).
+// Read query: returns null (never throws) for a signed-out caller. Callers
+// treat null as "no profile yet".
 export const getMyProfile = query({
   args: { orgSlug: v.optional(v.string()) },
   handler: async (ctx, { orgSlug }) => {
-    const identity = await requireIdentity(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
     const user = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-      .unique();
+      .first();
     let isAdmin: boolean;
     if (orgSlug !== undefined) {
       const org = await resolveOrg(ctx, orgSlug).catch(() => null);
@@ -254,11 +262,12 @@ export const upsertUser = mutation({
 export const getMe = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const member = await optionalMember(ctx, args.orgId);
+    if (!member) return null;
     return await ctx.db
       .query("users")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+      .withIndex("by_user", (q) => q.eq("userId", member.userId))
+      .first();
   },
 });
 
@@ -280,11 +289,12 @@ const cartLine = (d: Doc<"carts">) => ({
 export const listCart = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const member = await optionalMember(ctx, args.orgId);
+    if (!member) return [];
     const lines = await ctx.db
       .query("carts")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", userId),
+        q.eq("orgId", args.orgId).eq("userId", member.userId),
       )
       .collect();
     return lines.map(cartLine);
@@ -475,11 +485,12 @@ export const replaceCart = mutation({
 export const listWishlist = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const member = await optionalMember(ctx, args.orgId);
+    if (!member) return [];
     const rows = await ctx.db
       .query("wishlists")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", userId),
+        q.eq("orgId", args.orgId).eq("userId", member.userId),
       )
       .collect();
     return rows.map((r) => ({ productId: r.productId, createdAt: r.createdAt }));
@@ -515,11 +526,12 @@ export const toggleWishlist = mutation({
 export const listAddresses = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const { userId } = await requireMember(ctx, args.orgId);
+    const member = await optionalMember(ctx, args.orgId);
+    if (!member) return [];
     const rows = await ctx.db
       .query("savedAddresses")
       .withIndex("by_org_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", userId),
+        q.eq("orgId", args.orgId).eq("userId", member.userId),
       )
       .collect();
     // Deterministic order (oldest first) so "default else newest (last)"

@@ -23,7 +23,7 @@ import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
-import { ORG_SLUG, ADMIN_PATH_STORE, APP_BASENAME, IS_SA } from './lib/convex/org';
+import { ORG_SLUG, ADMIN_PATH_STORE, APP_BASENAME, IS_SA, IS_ADMIN_HOST } from './lib/convex/org';
 import { SaApp } from './sa/SaApp';
 import { StorePicker } from './adminnew/StorePicker';
 import { ThemeProvider, useTheme } from './themes';
@@ -74,7 +74,7 @@ function AdminHostView() {
 
   if (scopedProfile === undefined) return null;
 
-  if (!scopedProfile.isAdmin) {
+  if (!scopedProfile?.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-creme px-4">
         <div className="text-center space-y-3 max-w-sm">
@@ -145,7 +145,7 @@ function AppContent() {  const { user } = useAuth();
   // Phase 1: maintain the Convex user spine (lazy backfill — creates the row
   // on first seen session; isAdmin stays on Supabase profiles until Phase 2).
   useEffect(() => {
-    if (!user || !org) return;
+    if (!user || !org || IS_ADMIN_HOST) return;
     const args: { orgId: typeof org._id; phone?: string; name?: string } = { orgId: org._id };
     if (user.phone) args.phone = user.phone;
     if (user.name) args.name = user.name;

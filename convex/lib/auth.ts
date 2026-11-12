@@ -17,16 +17,25 @@ export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
 // being acted on is rejected. Tokens with NO claim are legacy (minted before
 // per-store auth, valid up to 30 days) and are accepted for smokeshop only.
 // Convex exposes custom JWT claims as extra fields on UserIdentity.
+// Non-throwing form of the store binding check. True when the token may act
+// on `org`. Writes use assertTokenOrg (throws WRONG_STORE); read queries use
+// this so a wrong-store token yields an empty result instead of a crash.
+export function tokenMatchesOrg(
+  identity: UserIdentity,
+  org: { slug: string },
+): boolean {
+  const claim = identity.org;
+  if (claim === undefined || claim === null) return org.slug === "smokeshop";
+  return claim === org.slug;
+}
+
 export function assertTokenOrg(
   identity: UserIdentity,
   org: { slug: string },
 ) {
-  const claim = identity.org;
-  if (claim === undefined || claim === null) {
-    if (org.slug === "smokeshop") return;
+  if (!tokenMatchesOrg(identity, org)) {
     throw new ConvexError({ code: "WRONG_STORE" });
   }
-  if (claim !== org.slug) throw new ConvexError({ code: "WRONG_STORE" });
 }
 
 export async function requireMember(
@@ -38,16 +47,39 @@ export async function requireMember(
   const org = await ctx.db.get(orgId);
   if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
   assertTokenOrg(identity, org);
+  // .first(), not .unique(): a duplicate membership row must not surface as a
+  // plain Error (redacted to "Server Error" in prod).
   const membership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q) =>
       q.eq("orgId", orgId).eq("userId", identity.subject),
     )
-    .unique();
+    .first();
   if (!membership) throw new ConvexError({ code: "NOT_A_MEMBER" });
   if (allowedRoles && !allowedRoles.includes(membership.role)) {
     throw new ConvexError({ code: "FORBIDDEN", role: membership.role });
   }
+  return { identity, membership, userId: identity.subject };
+}
+
+// Read-side membership: never throws. Returns null for a signed-out caller,
+// an unknown org, a wrong-store token, or a non-member. Customer read queries
+// return an empty result for null; writes keep using requireMember.
+export async function optionalMember(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<"organizations">,
+) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+  const org = await ctx.db.get(orgId);
+  if (!org || !tokenMatchesOrg(identity, org)) return null;
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_org_user", (q) =>
+      q.eq("orgId", orgId).eq("userId", identity.subject),
+    )
+    .first();
+  if (!membership) return null;
   return { identity, membership, userId: identity.subject };
 }
 

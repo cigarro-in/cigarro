@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { assertTokenOrg, requireIdentity, requireMember } from "./lib/auth";
+import { requireMember, tokenMatchesOrg } from "./lib/auth";
 import {
   assertOrgMatch,
   findOrgDocBySupabase,
@@ -841,15 +841,17 @@ export const retryOrder = mutation({
 
 // ---------- Queries ----------
 
+// Read queries below never throw for a signed-out, wrong-store or unknown-store
+// caller: they return null / [] instead.
 export const getMine = query({
   args: { orgSlug: v.string(), orderId: v.id("orders") },
   handler: async (ctx, { orgSlug, orderId }) => {
     const order = await ctx.db.get(orderId);
     if (!order) return null;
-    const org = await resolveOrg(ctx, orgSlug);
-    if (order.orgId !== org._id) return null;
-    const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    const org = await resolveOrg(ctx, orgSlug).catch(() => null);
+    if (!org || order.orgId !== org._id) return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || !tokenMatchesOrg(identity, org)) return null;
     if (order.userId !== identity.subject) return null;
     return order;
   },
@@ -862,10 +864,10 @@ export const listMyOrders = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { orgSlug, orgId, limit }) => {
-    const org = await resolveOrg(ctx, orgSlug);
-    assertOrgMatch(orgId, org);
-    const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    const org = await resolveOrg(ctx, orgSlug).catch(() => null);
+    if (!org || orgId !== org._id) return [];
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || !tokenMatchesOrg(identity, org)) return [];
     return await ctx.db
       .query("orders")
       .withIndex("by_org_user", (q) =>
