@@ -81,7 +81,7 @@ async function generateSitemap(convexUrl, org) {
   const today = new Date().toISOString().split('T')[0];
   // Static pages change rarely — fixed date so Google trusts lastmod.
   // Bump STATIC_LASTMOD only when static page content actually changes.
-  const STATIC_LASTMOD = '2026-09-07';
+  const STATIC_LASTMOD = '2026-11-12';
   
   // Static pages (NO user-specific pages like cart!)
   const staticPages = [

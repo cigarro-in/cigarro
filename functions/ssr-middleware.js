@@ -1176,124 +1176,526 @@ async function generateHomepageHTML(faviconUrl, cx) {
 </html>`;
 }
 
-// Generate HTML for static pages. For /blogs the bot body also lists the
-// latest posts (crawlable internal links); failures degrade to title + desc.
-async function generateStaticPageHTML(pathname, faviconUrl, cx) {
-  const pages = {
+// Static company, policy and hub pages. Bot HTML is rendered from this plain-data
+// table. The copy mirrors src/pages/company/* and src/pages/legal/* (and the hub
+// SEOHead text). TODO(duplication): the React pages keep their own copy. Keep both
+// in sync until these pages are prerendered from one shared module.
+const SUPPORT_EMAIL = 'support@cigarro.in';
+const POLICY_UPDATED = '20 September 2026';
+
+function staticPageDefs(name) {
+  const policyLinks = [
+    { href: '/terms', label: 'Terms of service' },
+    { href: '/privacy', label: 'Privacy policy' },
+    { href: '/shipping', label: 'Shipping policy' },
+    { href: '/returns', label: 'Returns and refunds' },
+  ];
+  const supportMail = { href: `mailto:${SUPPORT_EMAIL}`, label: SUPPORT_EMAIL };
+
+  return {
     '/about': {
-      title: `About ${cx.name} | Online Cigarette Store in India`,
-      description: `Learn how ${cx.name} helps adult customers in India browse cigarette brands, compare pack options and find clear product information online.`,
-      body: `<h2>Clear information makes choosing simpler.</h2><p>${cx.name} organises products by brand and category, with listings designed to show the variant, format, quantity and current price before an order is placed.</p><nav aria-label="Explore ${cx.name}"><a href="/products">Browse products</a> · <a href="/brands">Explore brands</a> · <a href="/contact">Contact support</a></nav>`
+      crumb: 'About',
+      title: `About ${name} | Online Cigarette Store in India`,
+      description: `Learn how ${name} helps adult customers in India browse cigarette brands, compare pack options and find clear product information online.`,
+      h1: 'Buying cigarettes online should not feel confusing.',
+      intro: [
+        `${name} is an online cigarette store for adult customers in India. We bring brands, variants, pack details and pricing together so you can find what you are looking for without working through vague listings.`,
+      ],
+      sections: [
+        {
+          heading: `Why ${name} exists`,
+          paragraphs: [
+            'Cigarette listings can be difficult to navigate. Product names vary, pack information is often incomplete, and availability is not always obvious.',
+            `We built ${name} to make that experience more straightforward. Products are organised by brand and category, while each listing is designed to show the variant, format, quantity and current price before you place an order.`,
+            `${name} is still improving. Our focus is practical: clearer product information, a better-organised catalogue and support that is easy to reach when something is unclear.`,
+          ],
+        },
+        {
+          heading: 'Ways to browse',
+          items: [
+            { href: '/brands', label: 'Find the brand you know', text: 'Search the catalogue directly or browse all available brands in one place.' },
+            { href: '/products', label: 'Compare the details that matter', text: 'See the variant, pack format, quantity, price and availability before you order.' },
+            { href: '/contact', label: 'Ask when something is unclear', text: 'Get help with a product, an existing order or using the website.' },
+          ],
+        },
+        {
+          heading: 'Tobacco is not an ordinary product.',
+          paragraphs: [
+            `${name} is intended only for adults of legal smoking age. Tobacco and nicotine products carry serious health risks and can be addictive. We do not encourage anyone who does not already use tobacco to begin.`,
+          ],
+        },
+      ],
+      related: [
+        { href: '/terms', label: 'Terms of service' },
+        { href: '/privacy', label: 'Privacy policy' },
+        { href: '/contact', label: `Contact ${name}` },
+      ],
     },
+
     '/contact': {
-      title: `Contact ${cx.name} | Order and Product Support`,
-      description: `Contact ${cx.name} for help with an order, a product listing, shipping or using the online store. Email support@cigarro.in.`,
-      body: `<h2>Email ${cx.name} support</h2><p>For an order question, include the order number and phone number used at checkout. For a product question, include the product name or page link.</p><p><a href="mailto:support@cigarro.in">support@cigarro.in</a></p><nav aria-label="Customer policies"><a href="/shipping">Shipping policy</a> · <a href="/returns">Returns policy</a></nav>`
+      crumb: 'Contact',
+      title: `Contact ${name} | Order and Product Support`,
+      description: `Contact ${name} for help with an order, a product listing, shipping or using the online store. Email ${SUPPORT_EMAIL}.`,
+      h1: 'Tell us what you need help with.',
+      intro: [
+        'Questions about an order, a product listing or the website are all welcome. Send the useful details in your first message and we can give you a clearer answer.',
+      ],
+      sections: [
+        {
+          heading: 'Email support',
+          paragraphs: [
+            `Email is the current support channel for ${name}. Send your question with the relevant product link or order number and we will reply with the information available to us.`,
+          ],
+          links: [supportMail],
+        },
+        {
+          heading: 'Put the right details in your message',
+          items: [
+            { label: 'An existing order', text: 'Include your order number and the phone number used at checkout so we can identify it.' },
+            { label: 'A product question', text: 'Send the product name or page link and tell us exactly what you need to know.' },
+            { label: 'A damaged or incorrect item', text: 'Include your order number and clear photos. Review the returns policy before writing.' },
+          ],
+        },
+        {
+          heading: 'The answer may already be here.',
+          links: [
+            { href: '/shipping', label: 'Read shipping policy' },
+            { href: '/returns', label: 'Read returns policy' },
+          ],
+        },
+      ],
+      related: [
+        { href: '/shipping', label: 'Shipping policy' },
+        { href: '/returns', label: 'Returns and refunds' },
+      ],
     },
+
+    '/legal': {
+      crumb: 'Policies',
+      title: `${name} Policies | Terms, Privacy, Shipping and Returns`,
+      description: `Find ${name}'s terms of service, privacy policy, shipping information and returns and refunds policy.`,
+      h1: 'The important information, without the fine-print maze.',
+      intro: [
+        'Start with the policy that matches your question. Each page explains the current position and how to contact ' + name + ' when you need help.',
+      ],
+      sections: [
+        {
+          heading: 'Adults of legal smoking age only',
+          paragraphs: [
+            'Tobacco and nicotine products carry serious health risks and can be addictive. Age verification may be required before an order is accepted or delivered.',
+          ],
+        },
+        {
+          heading: 'Policies',
+          items: [
+            { href: '/terms', label: 'Terms of Service', text: 'The rules that apply when you browse the website, create an account or place an order.' },
+            { href: '/privacy', label: 'Privacy Policy', text: 'What personal information we collect, why we use it and how to make a data request.' },
+            { href: '/shipping', label: 'Shipping Policy', text: 'Delivery availability, shipping options, tracking and age verification information.' },
+            { href: '/returns', label: 'Returns and Refunds', text: 'What to do when an order arrives damaged, defective or different from what you ordered.' },
+          ],
+        },
+      ],
+      related: [],
+    },
+
+    '/terms': {
+      crumb: 'Terms of Service',
+      parent: true,
+      title: `Terms of Service | ${name}`,
+      description: `Read the terms that apply when you browse, create an account or place an order with ${name}.`,
+      h1: 'Terms of Service',
+      intro: [],
+      sections: [
+        {
+          heading: 'Age Verification Required',
+          paragraphs: [
+            `You must be 18 years or older to purchase tobacco products from ${name}. By using our services, you confirm that you are of legal smoking age in your jurisdiction.`,
+          ],
+        },
+        {
+          heading: '1. Acceptance of Terms',
+          paragraphs: [`By accessing or using ${name}, you agree to these terms. If you do not agree, please do not use the website or place an order.`],
+        },
+        {
+          heading: '2. Product Information',
+          paragraphs: ['All product descriptions, images, and specifications are provided for informational purposes. We strive for accuracy but cannot guarantee that all information is complete, reliable, or error-free.'],
+        },
+        {
+          heading: '3. Health Disclaimer',
+          paragraphs: ['Important: Tobacco products are harmful to your health and may cause serious health conditions including cancer, heart disease, and respiratory problems. Smoking is addictive and can be fatal. We strongly advise against tobacco use and encourage smoking cessation.'],
+        },
+        {
+          heading: '4. Age Restrictions',
+          paragraphs: ['You must be at least 18 years old to purchase tobacco products. We reserve the right to request age verification and refuse service to anyone who cannot provide adequate proof of age.'],
+        },
+        {
+          heading: '5. Payment and Billing',
+          paragraphs: ['Prices and availability can change. Payment instructions and the final payable amount are shown during checkout. We may refuse or cancel an order when we cannot lawfully or operationally fulfil it.'],
+        },
+        {
+          heading: '6. Limitation of Liability',
+          paragraphs: [`To the extent permitted by applicable law, ${name} is not liable for indirect, incidental or consequential loss resulting from use of the website or products. Nothing in these terms excludes a right that cannot lawfully be excluded.`],
+        },
+        {
+          heading: '7. Modifications to Terms',
+          paragraphs: ['We reserve the right to modify these terms at any time. Changes will be effective immediately upon posting. Your continued use of our services constitutes acceptance of the modified terms.'],
+        },
+        {
+          heading: 'Questions?',
+          paragraphs: [`Questions: ${SUPPORT_EMAIL}. Last updated: ${POLICY_UPDATED}.`],
+          links: [supportMail],
+        },
+      ],
+      related: [
+        { href: '/privacy', label: 'Privacy policy' },
+        { href: '/shipping', label: 'Shipping policy' },
+        { href: '/returns', label: 'Returns and refunds' },
+      ],
+    },
+
+    '/privacy': {
+      crumb: 'Privacy Policy',
+      parent: true,
+      title: `Privacy Policy | ${name}`,
+      description: `Learn what personal information ${name} collects, why it is used, when it may be shared and how to make a privacy request.`,
+      h1: 'Privacy Policy',
+      intro: [
+        `This policy explains what information ${name} collects, why we use it, when it may be shared and how you can contact us about it.`,
+      ],
+      sections: [
+        {
+          heading: '1. Information We Collect',
+          paragraphs: ['We collect information you provide directly to us, such as when you create an account, make a purchase, or contact us for support. This may include:'],
+          items: ['Name and contact information (email, phone, address)', 'Order amounts, payment status and transaction references', 'Account identifiers and preferences', 'Communication history and support requests', 'Purchase history and product preferences'],
+        },
+        {
+          heading: '2. How We Use Your Information',
+          paragraphs: ['We use the information we collect to:'],
+          items: ['Process transactions and fulfill orders', 'Provide customer support and respond to inquiries', 'Improve our services and user experience', 'Send important updates about your account or orders', 'Comply with legal requirements and regulations', 'Prevent fraud and ensure platform security'],
+        },
+        {
+          heading: '3. Data Security',
+          paragraphs: ['We use technical and organisational safeguards intended to protect personal information. No online service can guarantee absolute security, so please contact us if you believe your account or information has been misused.'],
+        },
+        {
+          heading: '4. Cookies and Tracking',
+          paragraphs: ['We use cookies and similar technologies to enhance your browsing experience, analyze site traffic, and personalize content. You can control cookie settings through your browser preferences.'],
+          items: ['Essential cookies: Required for basic website functionality', 'Analytics cookies: Help us understand how visitors use our site', 'Preference cookies: Remember your settings and preferences'],
+        },
+        {
+          heading: '5. Information Sharing',
+          paragraphs: ['We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:'],
+          items: ['With service providers who assist in our operations (shipping, payment processing)', 'When required by law or to protect our rights and safety', 'In connection with a business transfer or acquisition', 'With your explicit consent'],
+        },
+        {
+          heading: '6. Your Rights',
+          paragraphs: ['Subject to applicable law, you may ask us to:'],
+          items: ['Access and review your personal information', 'Request correction of inaccurate data', 'Request deletion of your personal information', 'Opt-out of marketing communications', 'Provide a copy of information associated with your account', 'Stop optional communications'],
+        },
+        {
+          heading: '7. Marketing Communications',
+          paragraphs: ['We may send you marketing communications about our products and services. You can opt-out of these communications at any time by clicking the unsubscribe link in our emails or by contacting us directly. We will still send you important transactional and account-related communications.'],
+        },
+        {
+          heading: 'Privacy Questions?',
+          paragraphs: [`Privacy and data requests: ${SUPPORT_EMAIL}. Last updated: ${POLICY_UPDATED}.`],
+          links: [supportMail],
+        },
+      ],
+      related: [
+        { href: '/terms', label: 'Terms of service' },
+        { href: '/shipping', label: 'Shipping policy' },
+        { href: '/returns', label: 'Returns and refunds' },
+      ],
+    },
+
+    '/shipping': {
+      crumb: 'Shipping Policy',
+      parent: true,
+      title: `Shipping and Delivery Policy | ${name}`,
+      description: `See how ${name} delivery availability, shipping options, dispatch, tracking and age verification work for orders within India.`,
+      h1: 'Shipping Policy',
+      intro: [
+        'Available delivery methods, estimated times and any shipping charge are shown at checkout before you place the order. Availability still depends on the delivery pin code.',
+      ],
+      sections: [
+        {
+          heading: '1. Delivery Areas',
+          paragraphs: ['We currently ship only within India. Serviceability depends on the delivery pin code and the available delivery partner.'],
+          items: ['Enter the complete address and pin code during checkout', 'Delivery options may differ by location', 'Some remote or restricted pin codes may not be serviceable', 'An order may be cancelled and refunded if delivery cannot be arranged'],
+          note: "If you're unsure about delivery to your location, please contact our customer support team before placing your order.",
+        },
+        {
+          heading: '2. Delivery Times',
+          paragraphs: ['Choose a delivery speed at checkout. Each option shows its estimated time and any charge before you place the order.'],
+          items: ['The estimate begins after the order is confirmed for fulfilment', 'Tracking information is shared when the delivery partner provides it'],
+          note: 'Delivery dates are estimates, not guarantees. Carrier delays and service interruptions can affect them.',
+        },
+        {
+          heading: '3. Packaging and Handling',
+          paragraphs: ['Orders are packed for transport using the product and order information available to us:'],
+          items: ['Protective outer packaging is used where appropriate', 'The shipping label contains the information required for delivery', 'Check the parcel and items promptly after delivery', 'Report damage or an incorrect item within 48 hours'],
+        },
+        {
+          heading: '4. Age Verification and Delivery',
+          paragraphs: ['Due to legal requirements, all tobacco product deliveries require age verification:'],
+          items: ['Recipient must be 18 years or older', 'Valid government-issued ID required at delivery', 'Delivery cannot be left unattended', 'Someone of legal age must be present to receive the package', 'Failed age verification will result in package return'],
+        },
+        {
+          heading: '5. Delivery Issues and Returns',
+          paragraphs: ['If you experience any issues with your delivery:'],
+          items: ['Contact our customer support immediately', 'We will review the order details and evidence', 'An eligible damaged or incorrect item may be replaced or refunded', 'Failed deliveries due to age verification are non-refundable', 'Damage or an incorrect item must be reported within 48 hours of delivery'],
+        },
+        {
+          heading: '6. International Shipping',
+          paragraphs: [`${name} does not currently offer international shipping.`],
+          items: ['Orders require an Indian delivery address', 'International forwarding is not supported'],
+          note: 'The website will be updated if this policy changes.',
+        },
+        {
+          heading: '7. Tracking Your Order',
+          paragraphs: ['Once your order is dispatched, you will receive:'],
+          items: ['A dispatch update when the order leaves for delivery', 'A tracking number or link when supplied by the delivery partner', 'Carrier updates and an estimated arrival date where available', `Order status in your ${name} account`],
+        },
+        {
+          heading: 'Shipping questions?',
+          paragraphs: [`Shipping support: ${SUPPORT_EMAIL}. Last updated: ${POLICY_UPDATED}.`],
+          links: [supportMail],
+        },
+      ],
+      related: [
+        { href: '/returns', label: 'Returns and refunds' },
+        { href: '/terms', label: 'Terms of service' },
+      ],
+    },
+
+    '/returns': {
+      crumb: 'Returns and Refunds',
+      parent: true,
+      title: 'Returns and Refunds Policy | ' + name,
+      description: `Read ${name}'s policy for non-returnable tobacco products and how to report a damaged, defective or incorrect item within 48 hours.`,
+      h1: 'Returns & Refunds Policy',
+      intro: [
+        'Because tobacco products are consumable goods, we do not accept change-of-mind returns or exchanges after dispatch. Please review the product, variant and quantity before ordering.',
+      ],
+      sections: [
+        {
+          heading: '1. When to Report a Problem',
+          paragraphs: ['Contact us if an order arrives with one of these issues:'],
+          items: ['Damaged in transit: Products that arrive physically damaged (crushed, broken, leaking)', 'Incorrect items: You received a different product than what you ordered', 'Manufacturing defects: Sealed products with visible manufacturing flaws'],
+          note: 'All claims must be reported within 48 hours of delivery with clear photos of the issue.',
+        },
+        {
+          heading: '2. How We Resolve Eligible Claims',
+          paragraphs: ['We review the order details and evidence before confirming a resolution. Depending on the issue and availability, we may:'],
+          items: ['Replace the damaged, defective or incorrect item', 'Refund the affected item when a suitable replacement is unavailable', 'Ask for further information needed to assess the claim'],
+          note: 'Do not dispose of an affected item until support confirms that it is no longer required for review.',
+        },
+        {
+          heading: '3. What We Cannot Accept',
+          paragraphs: ['The following are not eligible for any replacement or refund:'],
+          items: ['Change of mind or taste preference', 'Opened or partially used products', 'Products stored improperly after delivery', 'A delivery refused because age verification could not be completed', 'Delivery address errors provided by customer', 'Natural variations in tobacco products (leaf color, draw, burn)'],
+        },
+        {
+          heading: '4. How to Report an Issue',
+          paragraphs: ['If your order qualifies under section 1, here is the process:'],
+          items: ['Take clear photos of the issue within 48 hours of delivery', `Email ${SUPPORT_EMAIL} with your order number and photos`, 'Keep the item and its packaging while the claim is reviewed', 'Wait for support to confirm the available resolution', 'If a replacement ships, tracking information will be shared when available'],
+        },
+        {
+          heading: '5. Refunds',
+          paragraphs: ['A refund may be approved when:'],
+          items: ['An eligible item cannot be replaced', 'An order is cancelled before fulfilment and payment has already been received', 'A refund is required by applicable law'],
+          note: 'The available refund method and expected processing time will be confirmed when the refund is approved.',
+        },
+        {
+          heading: '6. Rolling Papers & Accessories',
+          paragraphs: ['For a damaged, defective or incorrect non-tobacco accessory:'],
+          items: ['Report the issue within 48 hours of delivery', 'Keep the item unused and in its original packaging', `Email ${SUPPORT_EMAIL} with the order number and clear photos`, 'Support will confirm whether a replacement, return or refund applies'],
+        },
+        {
+          heading: 'Returns support',
+          paragraphs: [`Returns support: ${SUPPORT_EMAIL}. Last updated: ${POLICY_UPDATED}.`],
+          links: [supportMail],
+        },
+      ],
+      related: [
+        { href: '/shipping', label: 'Shipping policy' },
+        { href: '/terms', label: 'Terms of service' },
+      ],
+    },
+
     '/products': {
+      crumb: 'Products',
+      title: `All Cigarettes and Tobacco Products | ${name}`,
+      description: `Browse the current ${name} catalogue by product, brand, variant, pack option, price and availability.`,
       h1: 'All cigarettes and tobacco products',
-      title: `All Cigarettes and Tobacco Products | ${cx.name}`,
-      description: `Browse the current ${cx.name} catalogue by product, brand, variant, pack option, price and availability.`
+      sections: [],
+      related: [],
     },
     '/categories': {
+      crumb: 'Categories',
+      title: `Cigarette and Tobacco Product Categories | ${name}`,
+      description: `Browse cigarettes, rolling papers, filter tips and other available products by category at ${name}.`,
       h1: 'Cigarette and tobacco categories',
-      title: `Cigarette and Tobacco Product Categories | ${cx.name}`,
-      description: `Browse cigarettes, rolling papers, filter tips and other available products by category at ${cx.name}.`
+      sections: [],
+      related: [],
     },
     '/brands': {
+      crumb: 'Brands',
+      title: `Cigarette and Tobacco Brands | ${name}`,
+      description: `Browse the cigarette, cigar and rolling accessory brands currently listed in the ${name} catalogue.`,
       h1: 'Cigarette and tobacco brands',
-      title: `Cigarette and Tobacco Brands | ${cx.name}`,
-      description: `Browse the cigarette, cigar and rolling accessory brands currently listed in the ${cx.name} catalogue.`
+      sections: [],
+      related: [],
     },
     '/blogs': {
+      crumb: 'Guides',
+      title: `Cigarette Brand and Product Guides | ${name}`,
+      description: `Read ${name} guides to cigarette brands, variants, pack formats and related tobacco products.`,
       h1: 'Cigarette brand and product guides',
-      title: `Cigarette Brand and Product Guides | ${cx.name}`,
-      description: `Read ${cx.name} guides to cigarette brands, variants, pack formats and related tobacco products.`
+      sections: [],
+      related: [],
     },
-    '/terms': {
-      title: `Terms of Service | ${cx.name}`,
-      description: `Read the terms that apply when you browse, create an account or place an order with ${cx.name}.`
-    },
-    '/privacy': {
-      title: `Privacy Policy | ${cx.name}`,
-      description: `Learn what personal information ${cx.name} collects, why it is used, when it may be shared and how to make a privacy request.`
-    },
-    '/shipping': {
-      title: `Shipping and Delivery Policy | ${cx.name}`,
-      description: `See how ${cx.name} delivery availability, shipping options, dispatch, tracking and age verification work for orders within India.`
-    },
-    '/returns': {
-      title: 'Returns & Replacement Policy - Damaged Items',
-      description: `Returns policy for ${cx.name}: damaged or incorrect tobacco items are replaced free if reported within 48 hours of delivery. Consumables are otherwise non-returnable.`
-    },
-    '/legal': {
-      title: `${cx.name} Policies | Terms, Privacy, Shipping and Returns`,
-      description: `Find ${cx.name}'s terms of service, privacy policy, shipping information and returns and refunds policy.`
-    }
   };
+}
 
-  const pageInfo = pages[pathname] || pages['/'];
+function renderStaticSection(section) {
+  const paragraphs = (section.paragraphs || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  const items = (section.items || []).length
+    ? `<ul>${section.items.map(item => typeof item === 'string'
+        ? `<li>${escapeHtml(item)}</li>`
+        : `<li>${item.href ? `<a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>` : escapeHtml(item.label)}${item.text ? ` — ${escapeHtml(item.text)}` : ''}</li>`
+      ).join('')}</ul>`
+    : '';
+  const note = section.note ? `<p>Note: ${escapeHtml(section.note)}</p>` : '';
+  const links = (section.links || []).length
+    ? `<p>${section.links.map(l => `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`).join(' · ')}</p>`
+    : '';
+  return `\n  <section>\n  <h2>${escapeHtml(section.heading)}</h2>${paragraphs}${items}${note}${links}\n  </section>`;
+}
+
+// Contact JSON-LD from store business settings (content:getSiteSettings). Emits
+// nothing when no business fields are configured.
+async function contactBusinessLd(cx) {
+  const settings = await cxQuery(cx, 'content:getSiteSettings', {}).catch(() => null);
+  const b = settings && settings.business;
+  if (!b) return '';
+  const addr = b.address || {};
+  const hasAddress = [addr.line1, addr.city, addr.state, addr.pincode].some(Boolean);
+  const hasContact = Boolean(b.supportEmail || b.supportPhone);
+  if (!hasAddress && !hasContact && !b.legalName) return '';
+  const org = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: b.legalName || cx.name,
+    url: `${cx.site}/`,
+  };
+  if (b.gstin) org.taxID = b.gstin;
+  if (hasAddress) {
+    org.address = {
+      '@type': 'PostalAddress',
+      streetAddress: [addr.line1, addr.line2].filter(Boolean).join(', ') || undefined,
+      addressLocality: addr.city || undefined,
+      addressRegion: addr.state || undefined,
+      postalCode: addr.pincode || undefined,
+      addressCountry: 'IN',
+    };
+  }
+  if (hasContact) {
+    org.contactPoint = {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      email: b.supportEmail || undefined,
+      telephone: b.supportPhone || undefined,
+      areaServed: 'IN',
+    };
+  }
+  return scriptLd(jsonLd(org));
+}
+
+// Bot HTML for the static pages and hub pages in staticPageDefs. Breadcrumb
+// nav and BreadcrumbList JSON-LD share one model (see breadcrumbJsonLd).
+async function generateStaticPageHTML(pathname, faviconUrl, cx) {
+  const def = staticPageDefs(cx.name)[pathname];
+  if (!def) return null;
   const canonicalUrl = `${cx.site}${pathname}`;
+  const crumbs = [{ name: 'Home', url: `${cx.site}/` }];
+  if (def.parent) crumbs.push({ name: 'Policies', url: `${cx.site}/legal` });
+  crumbs.push({ name: def.crumb, url: canonicalUrl });
 
   // Hub pages get crawlable link lists + ItemList JSON-LD (see hubContent).
-  const hub = HUB_PATHS.has(pathname) && cx
+  const hub = HUB_PATHS.has(pathname)
     ? await hubContent(pathname, cx)
     : { body: '', schema: '' };
+  const contactLd = pathname === '/contact' ? await contactBusinessLd(cx) : '';
+
+  const intro = def.intro && def.intro.length ? def.intro : [def.description];
+  const related = (def.related || []).length
+    ? `\n  <nav aria-label="Related pages"><ul>${def.related.map(l => `<li><a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a></li>`).join('')}</ul></nav>`
+    : '';
+  const footerNav = `\n  <nav aria-label="Explore ${escapeHtml(cx.name)}"><ul>` +
+    '<li><a href="/products">All products</a></li>' +
+    '<li><a href="/brands">Brands</a></li>' +
+    '<li><a href="/categories">Categories</a></li>' +
+    '<li><a href="/blogs">Guides</a></li>' +
+    '<li><a href="/about">About</a></li>' +
+    '<li><a href="/contact">Contact</a></li>' +
+    '<li><a href="/legal">Policies</a></li>' +
+    '</ul></nav>';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <!-- Favicon -->
   <link rel="icon" href="${faviconUrl}">
   <link rel="shortcut icon" href="${faviconUrl}">
   <link rel="apple-touch-icon" href="${faviconUrl}">
-  
+
   <!-- Primary Meta Tags -->
-  <title>${escapeHtml(pageInfo.title)}</title>
-  <meta name="title" content="${escapeHtml(pageInfo.title)}">
-  <meta name="description" content="${escapeHtml(pageInfo.description)}">
+  <title>${escapeHtml(def.title)}</title>
+  <meta name="title" content="${escapeHtml(def.title)}">
+  <meta name="description" content="${escapeHtml(def.description)}">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="${canonicalUrl}">
-  
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">
-  <meta property="og:title" content="${escapeHtml(pageInfo.title)}">
-  <meta property="og:description" content="${escapeHtml(pageInfo.description)}">
+  <meta property="og:title" content="${escapeHtml(def.title)}">
+  <meta property="og:description" content="${escapeHtml(def.description)}">
   <meta property="og:image" content="${ogDefaultImage(cx)}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="${escapeHtml(pageInfo.title)}">
-  <meta property="og:site_name" content="${cx.name}">
-  
+  <meta property="og:image:alt" content="${escapeHtml(def.title)}">
+  <meta property="og:site_name" content="${escapeHtml(cx.name)}">
+
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="${canonicalUrl}">
-  <meta name="twitter:title" content="${escapeHtml(pageInfo.title)}">
-  <meta name="twitter:description" content="${escapeHtml(pageInfo.description)}">
+  <meta name="twitter:title" content="${escapeHtml(def.title)}">
+  <meta name="twitter:description" content="${escapeHtml(def.description)}">
   <meta name="twitter:image" content="${ogDefaultImage(cx)}">
-  <meta name="twitter:image:alt" content="${escapeHtml(pageInfo.title)}">
-  
+  <meta name="twitter:image:alt" content="${escapeHtml(def.title)}">
+
   <!-- Structured Data -->
-  <script type="application/ld+json">
-  ${JSON.stringify({
+  ${scriptLd(jsonLd({
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    name: pageInfo.title,
-    description: pageInfo.description,
-    url: canonicalUrl
-  })}
-  </script>${hub.schema}
+    name: def.title,
+    description: def.description,
+    url: canonicalUrl,
+  }))}${scriptLd(breadcrumbJsonLd(crumbs).replace(/</g, '\\u003c'))}${contactLd}${hub.schema}
 </head>
 <body>
-  <h1>${escapeHtml(pageInfo.h1 || pageInfo.title)}</h1>
-  <p>${escapeHtml(pageInfo.description)}</p>
-  ${pageInfo.body || ''}
-  ${hub.body}
-  
+  ${breadcrumbNavHtml(crumbs)}
+  <h1>${escapeHtml(def.h1)}</h1>
+  ${intro.map(p => `<p>${escapeHtml(p)}</p>`).join('\n  ')}
+  ${(def.sections || []).map(renderStaticSection).join('')}
+  ${hub.body}${related}${footerNav}
+
   <!-- This content is for search engines. Real users get the SPA. -->
   <noscript>
     <p>Please enable JavaScript to view the full interactive experience.</p>
