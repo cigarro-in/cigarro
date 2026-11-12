@@ -12,6 +12,7 @@ import {
   storeHostSet,
   type CanonicalRef,
 } from "./lib/hosts";
+import { dropRedirectForLivePath, recordSlugChange } from "./redirects";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
 import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 
@@ -581,6 +582,7 @@ export const createBrand = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await dropRedirectForLivePath(ctx, orgId, "brand", rest.slug.trim());
     return { supabaseId };
   },
 });
@@ -591,6 +593,7 @@ export const updateBrand = mutation({
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     const row = await findOrgDocBySupabase(ctx, "catalogBrands", org, supabaseId);
     if (!row || !inOrg(row, org)) throw new ConvexError({ code: "NOT_FOUND" });
+    const prevSlug = row.slug;
     await assertOrgSlugUnique(ctx, org, "catalogBrands", patch.slug.trim(), {
       supabaseId,
     });
@@ -601,6 +604,8 @@ export const updateBrand = mutation({
       orgId,
       updatedAt: Date.now(),
     });
+    if (prevSlug !== patch.slug.trim())
+      await recordSlugChange(ctx, orgId, "brand", prevSlug, patch.slug.trim());
     return { supabaseId };
   },
 });
@@ -742,6 +747,7 @@ export const createCategory = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await dropRedirectForLivePath(ctx, orgId, "category", rest.slug.trim());
     return { supabaseId };
   },
 });
@@ -752,6 +758,7 @@ export const updateCategory = mutation({
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     const row = await findOrgDocBySupabase(ctx, "catalogCategories", org, supabaseId);
     if (!row || !inOrg(row, org)) throw new ConvexError({ code: "NOT_FOUND" });
+    const prevSlug = row.slug;
     await assertOrgSlugUnique(ctx, org, "catalogCategories", patch.slug.trim(), {
       supabaseId,
     });
@@ -762,6 +769,8 @@ export const updateCategory = mutation({
       orgId,
       updatedAt: Date.now(),
     });
+    if (prevSlug !== patch.slug.trim())
+      await recordSlugChange(ctx, orgId, "category", prevSlug, patch.slug.trim());
     return { supabaseId };
   },
 });
@@ -889,6 +898,7 @@ export const saveProduct = mutation({
     if (productSupabaseId) {
       const row = await findOrgDocBySupabase(ctx, "catalogProducts", org, productSupabaseId);
       if (!row || !inOrg(row, org)) throw new ConvexError({ code: "NOT_FOUND" });
+      const prevSlug = row.slug;
       await assertOrgSlugUnique(ctx, org, "catalogProducts", product.slug.trim(), {
         supabaseId: productSupabaseId,
       });
@@ -900,6 +910,8 @@ export const saveProduct = mutation({
         orgId,
         updatedAt: now,
       });
+      if (prevSlug !== product.slug.trim())
+        await recordSlugChange(ctx, orgId, "product", prevSlug, product.slug.trim());
     } else {
       await assertOrgSlugUnique(ctx, org, "catalogProducts", product.slug.trim());
       productSupabaseId = crypto.randomUUID();
@@ -913,6 +925,7 @@ export const saveProduct = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      await dropRedirectForLivePath(ctx, orgId, "product", product.slug.trim());
     }
     const pid = productSupabaseId!;
 
@@ -1453,6 +1466,7 @@ export const saveBlogPost = mutation({
     if (id) {
       const row = await ctx.db.get(id);
       if (!row || !inOrg(row as any, org)) throw new ConvexError({ code: "NOT_FOUND" });
+      const prevSlug = row.slug;
       await assertOrgSlugUnique(ctx, org, "blogPosts", post.slug.trim(), { id });
       await ctx.db.patch(id, {
         ...post,
@@ -1464,6 +1478,8 @@ export const saveBlogPost = mutation({
         orgId,
         updatedAt: now,
       });
+      if (prevSlug !== post.slug.trim())
+        await recordSlugChange(ctx, orgId, "blog", prevSlug, post.slug.trim());
       return { id };
     }
     await assertOrgSlugUnique(ctx, org, "blogPosts", post.slug.trim());
@@ -1479,6 +1495,7 @@ export const saveBlogPost = mutation({
       publishedAt: post.status === "published" ? now : undefined,
       updatedAt: now,
     });
+    await dropRedirectForLivePath(ctx, orgId, "blog", post.slug.trim());
     return { id: newId };
   },
 });

@@ -20,6 +20,7 @@ export { PaymentsPage } from './PaymentsPage';
 export { InventoryPage } from './InventoryPage';
 export { InvoicesPage } from './InvoicesPage';
 export { MarketingPage } from './MarketingPage';
+export { RedirectsPage } from './RedirectsPage';
 
 // Form pages
 export { ProductFormPage } from './ProductFormPage';

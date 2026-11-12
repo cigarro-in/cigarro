@@ -1077,4 +1077,27 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_product", ["orgId", "productSupabaseId"])
     .index("by_org_user_product", ["orgId", "userId", "productSupabaseId"]),
+
+  // ---------- Per-store 301/302/410 redirects ----------
+  // fromPath: normalized (lowercase, no query, no trailing slash except "/").
+  // toPath: normalized path or https URL; "" for 410. Invariant maintained by
+  // convex/redirects.ts: no toPath is itself a fromPath of the same org
+  // (chains are collapsed) and no redirect loops.
+  orgRedirects: defineTable({
+    orgId: v.id("organizations"),
+    fromPath: v.string(),
+    toPath: v.string(),
+    status: v.union(v.literal(301), v.literal(302), v.literal(410)),
+    source: v.union(
+      v.literal("manual"),
+      v.literal("import"),
+      v.literal("slug_change"),
+    ),
+    hits: v.number(),
+    lastHitAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org_from", ["orgId", "fromPath"])
+    .index("by_org", ["orgId"]),
 });
