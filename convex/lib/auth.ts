@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { UserIdentity } from "convex/server";
 import { Doc, Id } from "../_generated/dataModel";
+import { sha256Hex } from "./citadelAuth";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 
 export type Role = Doc<"memberships">["role"];
@@ -57,28 +58,70 @@ export async function requireOrgAdmin(
   return requireMember(ctx, orgId, ["admin", "owner"]);
 }
 
-// Interim platform-admin gate: userIds listed (comma-separated) in the
-// PLATFORM_ADMIN_USER_IDS Convex env var. Missing/empty env denies everyone.
-function platformAdminIds(): string[] {
-  return (process.env.PLATFORM_ADMIN_USER_IDS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+// ---------- Citadel super-admin sessions ----------
+//
+// The SPA holds an opaque token (sessionStorage) minted by /api/sa/exchange.
+// Only its SHA-256 is stored (saSessions.tokenHash). Idle timeout is measured
+// from lastSeenAt, which only mutations touch (queries are read-only).
+
+const SA_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+
+export type SaErrorCode = "NOT_SIGNED_IN" | "WRITE_REQUIRED" | "WRITE_EXPIRED";
+
+function saError(code: SaErrorCode): never {
+  throw new ConvexError({ code });
 }
 
-// Non-throwing variant for reads that must return null to non-admins.
-export async function getPlatformAdminIdentity(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return null;
-  return platformAdminIds().includes(identity.subject) ? identity : null;
+// Live session for a token hash, or null (missing, revoked, past hard cap,
+// idle). Used by the HTTP layer, which only ever sees the hash.
+export async function liveSaSessionByHash(
+  ctx: QueryCtx | MutationCtx,
+  tokenHash: string,
+): Promise<Doc<"saSessions"> | null> {
+  const s = await ctx.db
+    .query("saSessions")
+    .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+    .unique();
+  if (!s || s.revokedAt) return null;
+  const now = Date.now();
+  if (s.expiresAt <= now) return null;
+  if (now - s.lastSeenAt > SA_IDLE_TIMEOUT_MS) return null;
+  return s;
 }
 
-// Replaced by Citadel `requireSaWrite` once super-admin SSO lands.
-export async function requirePlatformAdmin(ctx: QueryCtx | MutationCtx) {
-  const identity = await requireIdentity(ctx);
-  if (!platformAdminIds().includes(identity.subject))
-    throw new ConvexError({ code: "NOT_PLATFORM_ADMIN" });
-  return identity;
+// Live session for a raw token, or null.
+export async function findLiveSaSession(
+  ctx: QueryCtx | MutationCtx,
+  saToken: string,
+): Promise<Doc<"saSessions"> | null> {
+  if (typeof saToken !== "string" || saToken.length < 20 || saToken.length > 256) {
+    return null;
+  }
+  return liveSaSessionByHash(ctx, await sha256Hex(saToken));
+}
+
+// Read access for super-admin queries. Never writes.
+export async function requireSaSession(
+  ctx: QueryCtx | MutationCtx,
+  saToken: string,
+): Promise<Doc<"saSessions">> {
+  const s = await findLiveSaSession(ctx, saToken);
+  if (!s) saError("NOT_SIGNED_IN");
+  return s;
+}
+
+// Write access: session must be live AND carry an unexpired write window.
+// Touches lastSeenAt (mutations only).
+export async function requireSaWrite(
+  ctx: MutationCtx,
+  saToken: string,
+): Promise<Doc<"saSessions">> {
+  const s = await requireSaSession(ctx, saToken);
+  const now = Date.now();
+  if (!s.write) saError("WRITE_REQUIRED");
+  if (!s.writeExpiresAt || s.writeExpiresAt <= now) saError("WRITE_EXPIRED");
+  await ctx.db.patch(s._id, { lastSeenAt: now });
+  return s;
 }
 
 // OAuth/redirect targets: only cigarro.in (+ subdomains) over https, and

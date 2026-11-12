@@ -52,11 +52,18 @@ export function getRequestOrg(context) {
 
 // Admin host store addressing: admin.<root>/<storeSlug>/... The first path
 // segment is the store. These first segments are app or API paths, never stores.
-const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin']);
+const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin', 'sa']);
 const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 
 export function isAdminHostname(host) {
   return normalizeHost(host).split('.')[0] === 'admin';
+}
+
+// Citadel super-admin app: admin.<root>/sa/... It is not a store, so no store is
+// injected and the page is never indexed.
+export function isSaPath(pathname) {
+  const p = String(pathname || '');
+  return p === '/sa' || p.startsWith('/sa/');
 }
 
 // Store slug named by an admin-host path, or null (root, API, assets, legacy /admin).

@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { requirePlatformAdmin } from "./lib/auth";
+import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import {
   hostRestriction,
@@ -66,9 +66,9 @@ export const resolveByHost = query({
 // ---------- Platform-admin management ----------
 
 export const listDomains = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    await requirePlatformAdmin(ctx);
+  args: { saToken: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, { saToken, orgId }) => {
+    await requireSaSession(ctx, saToken);
     return await ctx.db
       .query("orgDomains")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -78,12 +78,13 @@ export const listDomains = query({
 
 export const addDomain = mutation({
   args: {
+    saToken: v.string(),
     orgId: v.id("organizations"),
     hostname: v.string(),
     kind: kindV,
   },
-  handler: async (ctx, { orgId, hostname, kind }) => {
-    const identity = await requirePlatformAdmin(ctx);
+  handler: async (ctx, { saToken, orgId, hostname, kind }) => {
+    const sa = await requireSaWrite(ctx, saToken);
     const org = await ctx.db.get(orgId);
     if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
 
@@ -128,7 +129,8 @@ export const addDomain = mutation({
     });
     await audit(ctx, {
       orgId,
-      adminUserId: identity.subject,
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
       action: "orgDomain.add",
       targetType: "orgDomain",
       targetId: id,
@@ -139,9 +141,9 @@ export const addDomain = mutation({
 });
 
 export const setDomainStatus = mutation({
-  args: { domainId: v.id("orgDomains"), status: statusV },
-  handler: async (ctx, { domainId, status }) => {
-    const identity = await requirePlatformAdmin(ctx);
+  args: { saToken: v.string(), domainId: v.id("orgDomains"), status: statusV },
+  handler: async (ctx, { saToken, domainId, status }) => {
+    const sa = await requireSaWrite(ctx, saToken);
     const row = await ctx.db.get(domainId);
     if (!row) throw new ConvexError({ code: "DOMAIN_NOT_FOUND" });
 
@@ -152,7 +154,8 @@ export const setDomainStatus = mutation({
 
     await audit(ctx, {
       orgId: row.orgId,
-      adminUserId: identity.subject,
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
       action: "orgDomain.setStatus",
       targetType: "orgDomain",
       targetId: domainId,
@@ -163,16 +166,17 @@ export const setDomainStatus = mutation({
 });
 
 export const removeDomain = mutation({
-  args: { domainId: v.id("orgDomains") },
-  handler: async (ctx, { domainId }) => {
-    const identity = await requirePlatformAdmin(ctx);
+  args: { saToken: v.string(), domainId: v.id("orgDomains") },
+  handler: async (ctx, { saToken, domainId }) => {
+    const sa = await requireSaWrite(ctx, saToken);
     const row = await ctx.db.get(domainId);
     if (!row) throw new ConvexError({ code: "DOMAIN_NOT_FOUND" });
 
     await ctx.db.delete(domainId);
     await audit(ctx, {
       orgId: row.orgId,
-      adminUserId: identity.subject,
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
       action: "orgDomain.remove",
       targetType: "orgDomain",
       targetId: domainId,

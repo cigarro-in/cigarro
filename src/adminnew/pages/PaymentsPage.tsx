@@ -75,7 +75,6 @@ export function PaymentsPage() {
     api.organizations.getSettings,
     org ? { orgId: org._id } : 'skip',
   );
-  const appConfig = useQuery(api.appConfig.get, {});
   // null = caller is not an admin of this org (UI shows "Unavailable").
   const gmailStatus = useQuery(
     api.gmail.getGmailStatus,
@@ -170,7 +169,7 @@ export function PaymentsPage() {
         )}
         {tab === 'unmatched' && <UnmatchedTab emails={unmatched} />}
         {tab === 'settings' && (
-          <SettingsTab org={org} settings={settings} appConfig={appConfig} gmailStatus={gmailStatus} setCheckNoteParent={setCheckNote} />
+          <SettingsTab org={org} settings={settings} gmailStatus={gmailStatus} setCheckNoteParent={setCheckNote} />
         )}
       </div>
     </div>
@@ -346,10 +345,9 @@ function BankEmailRow({ email }: { email: any }) {
 
 // ---------- Settings ----------
 
-function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStatus: any; setCheckNoteParent?: (s: string | null) => void }) {
-  const { org, settings, appConfig, gmailStatus, setCheckNoteParent } = props;
+function SettingsTab(props: { org: any; settings: any; gmailStatus: any; setCheckNoteParent?: (s: string | null) => void }) {
+  const { org, settings, gmailStatus, setCheckNoteParent } = props;
   const update = useMutation(api.organizations.updateSettings);
-  const setAppConfig = useMutation(api.appConfig.set);
   const triggerGmailPoll = useAction(api.gmail.triggerPoll);
 
   const [upiVpa, setUpiVpa] = useState('');
@@ -552,32 +550,9 @@ function SettingsTab(props: { org: any; settings: any; appConfig: any; gmailStat
         )}
       </AdminCard>
 
-      {appConfig === null && (
-        <p className="text-xs text-muted-foreground">
-          Platform bank-sender config is restricted to platform admins.
-        </p>
-      )}
-      <PlatformConfigCard
-        customSenders={(appConfig as any)?.customBankSenders ?? []}
-        defaultSenders={(appConfig as any)?.defaultBankSenders ?? []}
-        mergedSenders={appConfig?.bankSenders ?? []}
-        onSave={async (sendersCsv) => {
-          try {
-            await setAppConfig({
-              bankSenders: sendersCsv
-                .split(/[\n,]/)
-                .map((s) => s.trim())
-                .filter(Boolean),
-            });
-            // No success toast: PlatformConfigCard shows its own inline note.
-          } catch (e: any) {
-            const code = e?.data?.code;
-            if (code === 'NOT_PLATFORM_ADMIN')
-              setSettingsError('Only platform admins can edit platform config');
-            else setSettingsError(code || 'Save failed');
-          }
-        }}
-      />
+      <p className="text-xs text-muted-foreground">
+        Platform bank-sender config moved to the super-admin app (Platform config).
+      </p>
     </div>
   );
 }
@@ -755,89 +730,3 @@ function GmailConnectionCard(props: {
   );
 }
 
-function PlatformConfigCard(props: {
-  customSenders: string[];
-  defaultSenders: string[];
-  mergedSenders: string[];
-  onSave: (sendersCsv: string) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [sendersCsv, setSendersCsv] = useState(props.customSenders.join('\n'));
-  const [saving, setSaving] = useState(false);
-  // Inline save confirmation (replaces the old success toast).
-  const [savedNote, setSavedNote] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSendersCsv(props.customSenders.join('\n'));
-  }, [props.customSenders]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSavedNote(null);
-    try {
-      await props.onSave(sendersCsv);
-      // No toast: the note + updated "Currently searched" list confirm it.
-      setSavedNote(`Saved ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <AdminCard>
-      <AdminCardHeader>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 text-sm font-semibold"
-        >
-          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          Platform Config (owners only)
-        </button>
-      </AdminCardHeader>
-      {open && (
-        <AdminCardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            These settings apply to every tenant. Only users with an <b>owner</b> role
-            on any org can save.
-          </p>
-          <div>
-            <Label>Additional bank-alert senders</Label>
-            <textarea
-              className="w-full rounded-md border border-border p-2 text-sm font-mono"
-              rows={4}
-              value={sendersCsv}
-              onChange={(e) => setSendersCsv(e.target.value)}
-              placeholder={'@icicibank.com\nalerts@sbi.co.in'}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              One per line. Gmail <code>from:</code> patterns. These are <b>added</b>
-              to the built-in defaults (HDFC) — they don't replace them. Max 20 entries.
-            </p>
-            <div className="mt-3 rounded-lg bg-muted border p-3 text-xs">
-              <p className="font-semibold mb-1">Currently searched ({props.mergedSenders.length})</p>
-              <ul className="space-y-0.5">
-                {props.mergedSenders.map((s) => (
-                  <li key={s} className="font-mono text-foreground">
-                    {s}
-                    {props.defaultSenders.includes(s) && (
-                      <span className="text-muted-foreground ml-2">(default)</span>
-                    )}
-                    {props.customSenders.includes(s) && !props.defaultSenders.includes(s) && (
-                      <span className="text-info ml-2">(custom)</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save platform config'}
-            </Button>
-            {savedNote && <span className="text-xs text-success">{savedNote}</span>}
-          </div>
-        </AdminCardContent>
-      )}
-    </AdminCard>
-  );
-}

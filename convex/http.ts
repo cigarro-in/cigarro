@@ -4,6 +4,7 @@ import { httpAction } from "./_generated/server";
 import { adminPaymentsFallback, isSafeReturnTo } from "./lib/auth";
 import { encryptSecret } from "./lib/crypto";
 import { gmailRedirectUri } from "./gmail";
+import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
 
 const http = httpRouter();
 
@@ -255,6 +256,15 @@ http.route({
     );
   }),
 });
+
+// Citadel super-admin SSO (see convex/saHttp.ts). CORS is handled inside the
+// handlers: only admin.cigarro.in and localhost origins are allowed.
+http.route({ path: "/api/sa/exchange", method: "POST", handler: saExchange });
+http.route({ path: "/api/sa/exchange", method: "OPTIONS", handler: saPreflight });
+http.route({ path: "/api/sa/me", method: "GET", handler: saMe });
+http.route({ path: "/api/sa/me", method: "OPTIONS", handler: saPreflight });
+http.route({ path: "/api/sa/logout", method: "POST", handler: saLogout });
+http.route({ path: "/api/sa/logout", method: "OPTIONS", handler: saPreflight });
 
 // ---------- CORS preflight ----------
 const preflight = httpAction(async () => {

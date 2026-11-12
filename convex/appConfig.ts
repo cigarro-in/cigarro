@@ -1,14 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getPlatformAdminIdentity, requirePlatformAdmin } from "./lib/auth";
+import { requireSaSession, requireSaWrite } from "./lib/auth";
+import { audit } from "./lib/audit";
 
 const KEY = "singleton";
 
-/**
- * Platform-admin read — returns platform-wide config like the bank-alert
- * sender list. Non-platform-admins get null.
- */
- // Sender patterns used for the Gmail `from:` search. Domain-level is safer
+// Sender patterns used for the Gmail `from:` search. Domain-level is safer
 // than exact address — HDFC can rotate sender addresses without breaking us.
 // The template parser's senderRegex does the final check to decide which
 // matched emails are genuine transaction alerts.
@@ -34,10 +31,13 @@ export function mergeSenders(custom: string[] | undefined): string[] {
   return out;
 }
 
+/**
+ * Super-admin read (Citadel session) — platform-wide bank-alert sender list.
+ */
 export const get = query({
-  args: {},
-  handler: async (ctx) => {
-    if (!(await getPlatformAdminIdentity(ctx))) return null;
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
     const row = await ctx.db
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", KEY))
@@ -51,13 +51,12 @@ export const get = query({
 });
 
 /**
- * Internal-ish read for the Gmail poller — returns the merged sender list
- * (custom + defaults, deduped) used to build the Gmail search query.
+ * Super-admin read — the merged sender list (custom + defaults, deduped).
  */
 export const getBankSenders = query({
-  args: {},
-  handler: async (ctx) => {
-    if (!(await getPlatformAdminIdentity(ctx))) return null;
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
     const row = await ctx.db
       .query("appConfig")
       .withIndex("by_key", (q) => q.eq("key", KEY))
@@ -67,19 +66,19 @@ export const getBankSenders = query({
 });
 
 /**
- * Mutation — callable only by a PLATFORM_ADMIN_USER_IDS member.
+ * Super-admin write (Citadel session with an open write window).
  */
 export const set = mutation({
   args: {
+    saToken: v.string(),
     bankSenders: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    // Interim: replaced by Citadel `requireSaWrite` once super-admin SSO lands.
-    const identity = await requirePlatformAdmin(ctx);
+    const sa = await requireSaWrite(ctx, args.saToken);
 
     const patch: Record<string, unknown> = {
       updatedAt: Date.now(),
-      updatedBy: identity.subject,
+      updatedBy: sa.adminId,
     };
 
     if (args.bankSenders !== undefined) {
@@ -100,5 +99,13 @@ export const set = mutation({
     } else {
       await ctx.db.insert("appConfig", { key: KEY, ...patch } as any);
     }
+    await audit(ctx, {
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
+      action: "platform.bankSenders.set",
+      targetType: "appConfig",
+      targetId: KEY,
+      payload: { customCount: args.bankSenders?.length ?? null },
+    });
   },
 });

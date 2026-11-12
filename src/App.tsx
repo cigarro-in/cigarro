@@ -23,7 +23,8 @@ import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
-import { ORG_SLUG, ADMIN_PATH_STORE, APP_BASENAME } from './lib/convex/org';
+import { ORG_SLUG, ADMIN_PATH_STORE, APP_BASENAME, IS_SA } from './lib/convex/org';
+import { SaApp } from './sa/SaApp';
 import { StorePicker } from './adminnew/StorePicker';
 import { ThemeProvider, useTheme } from './themes';
 
@@ -308,6 +309,8 @@ function AppContent() {  const { user } = useAuth();
 }
 
 export default function App() {
+  // Citadel super-admin app (admin host /sa/*): no store, no storefront providers.
+  if (IS_SA) return <SaApp />;
   return (
     <ErrorBoundary>
       <Router basename={APP_BASENAME || undefined}>

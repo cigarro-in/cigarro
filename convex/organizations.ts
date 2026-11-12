@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { role } from "./schema";
 
@@ -171,6 +172,44 @@ export const getSettings = query({
 //
 // Marked as internal mutation so it's not exposed over the public API.
 
+// Shared by seedOrg (CLI bootstrap) and platform.createStore (super-admin).
+// Throws SLUG_TAKEN / ALIAS_TAKEN; inserts no memberships.
+export async function insertOrganization(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    name: string;
+    upiVpa: string;
+    bankEmailAlias: string;
+    walletEnabled?: boolean;
+  },
+): Promise<Id<"organizations">> {
+  const existing = await ctx.db
+    .query("organizations")
+    .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+    .unique();
+  if (existing) throw new ConvexError({ code: "SLUG_TAKEN" });
+
+  const aliasConflict = await ctx.db
+    .query("organizations")
+    .withIndex("by_alias", (q) => q.eq("bankEmailAlias", args.bankEmailAlias))
+    .unique();
+  if (aliasConflict) throw new ConvexError({ code: "ALIAS_TAKEN" });
+
+  return await ctx.db.insert("organizations", {
+    slug: args.slug,
+    name: args.name,
+    upiVpa: args.upiVpa,
+    bankEmailAlias: args.bankEmailAlias,
+    walletEnabled: args.walletEnabled ?? true,
+    slotTimeoutMs: DEFAULT_SLOT_TIMEOUT_MS,
+    quarantineMs: DEFAULT_QUARANTINE_MS,
+    slotsPerBase: DEFAULT_SLOTS_PER_BASE,
+    active: true,
+    createdAt: Date.now(),
+  });
+}
+
 export const seedOrg = internalMutation({
   args: {
     slug: v.string(),
@@ -181,30 +220,7 @@ export const seedOrg = internalMutation({
     walletEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .unique();
-    if (existing) throw new ConvexError({ code: "SLUG_TAKEN" });
-
-    const aliasConflict = await ctx.db
-      .query("organizations")
-      .withIndex("by_alias", (q) => q.eq("bankEmailAlias", args.bankEmailAlias))
-      .unique();
-    if (aliasConflict) throw new ConvexError({ code: "ALIAS_TAKEN" });
-
-    const orgId = await ctx.db.insert("organizations", {
-      slug: args.slug,
-      name: args.name,
-      upiVpa: args.upiVpa,
-      bankEmailAlias: args.bankEmailAlias,
-      walletEnabled: args.walletEnabled ?? true,
-      slotTimeoutMs: DEFAULT_SLOT_TIMEOUT_MS,
-      quarantineMs: DEFAULT_QUARANTINE_MS,
-      slotsPerBase: DEFAULT_SLOTS_PER_BASE,
-      active: true,
-      createdAt: Date.now(),
-    });
+    const orgId = await insertOrganization(ctx, args);
 
     await ctx.db.insert("memberships", {
       orgId,

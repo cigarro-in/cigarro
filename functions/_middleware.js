@@ -3,7 +3,7 @@
 // and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
-import { resolveRequestOrg, getRequestOrg, orgScriptJson, isAdminHostname } from './lib/org.js';
+import { resolveRequestOrg, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
 import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
 import { applyRedirect } from './lib/redirects.js';
 
@@ -17,6 +17,12 @@ export async function onRequest(context) {
 async function handleRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
+
+  // Citadel super-admin app (admin host /sa/*): serve the SPA with no store.
+  // Checked before store resolution so /sa is never looked up as a slug.
+  if (isAdminHostname(url.hostname) && isSaPath(url.pathname)) {
+    return saShell(context);
+  }
 
   // Never throws: unknown hosts resolve to null, Convex failures to the default org.
   const org = await resolveRequestOrg(request, env);
@@ -143,6 +149,24 @@ function withNoindex(res) {
   const headers = new Headers(res.headers);
   headers.set('X-Robots-Tag', 'noindex, nofollow');
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+// Static SPA shell for /sa: window.__ORG__ is null, window.__IS_SA__ is true.
+// Noindex always (also on the *.pages.dev alias via onRequest).
+async function saShell(context) {
+  const res = await context.next();
+  const type = res.headers.get('content-type') || '';
+  const headers = new Headers(res.headers);
+  headers.set('X-Robots-Tag', 'noindex, nofollow');
+  headers.set('Cache-Control', 'no-store');
+  if (!type.includes('text/html') || typeof HTMLRewriter === 'undefined') {
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  }
+  const script = '<script>window.__ORG__=null;window.__IS_SA__=true</script>';
+  const rewritten = new HTMLRewriter()
+    .on('head', { element(el) { el.append(script, { html: true }); } })
+    .transform(new Response(res.body, { status: res.status, headers }));
+  return rewritten;
 }
 
 // Passes a request on to the static SPA. HTML documents get the store injected

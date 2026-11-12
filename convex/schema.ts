@@ -449,14 +449,40 @@ export default defineSchema({
   }).index("by_state", ["state"]),
 
   adminAuditLog: defineTable({
-    orgId: v.id("organizations"),
+    // Optional: platform (super-admin) writes are not scoped to a store.
+    orgId: v.optional(v.id("organizations")),
     adminUserId: v.string(),
+    // Optional: rows written before Citadel super-admin SSO have no actor type.
+    actorType: v.optional(v.union(v.literal("store_admin"), v.literal("super_admin"))),
+    actorId: v.optional(v.string()),
     action: v.string(),
     targetType: v.string(),
     targetId: v.string(),
     payload: v.any(),
     createdAt: v.number(),
   }).index("by_org_time", ["orgId", "createdAt"]),
+
+  // Citadel super-admin sessions. Only the SHA-256 of the opaque bearer token
+  // is stored; the raw token exists only in the browser's sessionStorage.
+  saSessions: defineTable({
+    tokenHash: v.string(),
+    adminId: v.string(), // Citadel `sub`
+    citadelSid: v.string(),
+    write: v.boolean(),
+    writeExpiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    lastSeenAt: v.number(), // idle timeout clock (10 min)
+    expiresAt: v.number(), // createdAt + 1 h hard cap
+    revokedAt: v.optional(v.number()),
+  }).index("by_tokenHash", ["tokenHash"]),
+
+  // Launch-token jti replay guard. Rows are swept once `exp` has passed.
+  saExchangedJtis: defineTable({
+    jti: v.string(),
+    exp: v.number(), // seconds, from the JWT
+  })
+    .index("by_jti", ["jti"])
+    .index("by_exp", ["exp"]),
 
   inventoryBalances: defineTable({
     orgId: v.id("organizations"),

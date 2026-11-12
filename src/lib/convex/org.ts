@@ -7,8 +7,13 @@ const hasWindow = typeof window !== 'undefined';
 // Admin host (admin.<root>/<storeSlug>/...): the store is the first path
 // segment. It is read from the URL, so an offline-cached shell still resolves
 // the right store. Mirrors adminStoreFromPath in functions/lib/org.js.
-const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin']);
+const ADMIN_RESERVED_SEGMENTS = new Set(['api', 'assets', 'icons', 'fonts', 'functions', 'admin', 'sa']);
 const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+
+// Citadel super-admin app on the admin host (/sa/...). No store.
+export const IS_SA: boolean =
+  hasWindow && window.location.hostname.split('.')[0] === 'admin' &&
+  (window.location.pathname === '/sa' || window.location.pathname.startsWith('/sa/'));
 
 export const IS_ADMIN_HOST: boolean =
   hasWindow && window.location.hostname.split('.')[0] === 'admin';
