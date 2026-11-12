@@ -1126,4 +1126,14 @@ export default defineSchema({
   })
     .index("by_org_from", ["orgId", "fromPath"])
     .index("by_org", ["orgId"]),
+
+  // One row per one-time data migration (convex/migrations.ts). "done" rows are
+  // never re-run; "failed" rows are retried until runs reaches the cap.
+  migrations: defineTable({
+    name: v.string(),
+    status: v.union(v.literal("done"), v.literal("failed")),
+    result: v.optional(v.string()),
+    runs: v.number(),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
 });

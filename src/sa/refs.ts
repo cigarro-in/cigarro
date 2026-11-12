@@ -28,6 +28,21 @@ export interface MemberRow {
   createdAt: number;
 }
 
+export interface MigrationRow {
+  _id: Id<'migrations'>;
+  name: string;
+  status: 'done' | 'failed';
+  result: string | null;
+  runs: number;
+  updatedAt: number;
+}
+
+export const listMigrationsRef = makeFunctionReference<
+  'query',
+  { saToken: string },
+  MigrationRow[]
+>('platform:listMigrations');
+
 export const listStoresRef = makeFunctionReference<'query', { saToken: string }, StoreRow[]>(
   'platform:listStores',
 );

@@ -24,6 +24,27 @@ const RESERVED_SLUGS = new Set([
   "www",
 ]);
 
+// ---------- migrations ----------
+
+// Read-only view of the one-time migration ledger (convex/migrations.ts).
+export const listMigrations = query({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
+    const rows = await ctx.db.query("migrations").collect();
+    return rows
+      .map((r) => ({
+        _id: r._id,
+        name: r.name,
+        status: r.status,
+        result: r.result ?? null,
+        runs: r.runs,
+        updatedAt: r.updatedAt,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
 // ---------- stores ----------
 
 export const listStores = query({
