@@ -7,6 +7,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 import { installCrashReporting } from './lib/crashReporting';
 import { isReloadBlocked } from './lib/reloadGuard';
 import { OrgProvider, getClientOrgInfo } from './lib/org/OrgContext';
+import { themeIdFromPreload } from './lib/ssr/themeFromPreload';
 
 installCrashReporting();
 
@@ -162,12 +163,17 @@ const UpdateSW = () => {
 // from 'react-router' and re-exported by 'react-router-dom' (react-router 7.9.1;
 // there is no 'react-router-dom/server' subpath).
 const orgInfo = getClientOrgInfo();
+// Server-rendered page: start from the same theme the server used (the preload
+// carries the store's active_theme), so the first client render matches the markup.
+const ssrThemeId = window.__SSR__ === true
+  ? themeIdFromPreload(window.__PRELOAD__ ?? {}, orgInfo.slug)
+  : undefined;
 const routedApp = orgInfo.isSa ? (
   // Super-admin app mounts its own BrowserRouter (src/sa/SaApp.tsx).
   <App />
 ) : (
   <BrowserRouter basename={orgInfo.basename || undefined}>
-    <App />
+    <App initialThemeId={ssrThemeId} />
   </BrowserRouter>
 );
 
@@ -180,8 +186,8 @@ const appTree = (
   </React.StrictMode>
 );
 
-// Hydrate only when the server shipped markup for this page. Nothing sets
-// window.__SSR__ yet, so today this always takes the createRoot path.
+// Hydrate only when the server shipped markup for this page (flag SSR_ROUTES).
+// Otherwise the SPA mounts from scratch as before.
 const rootEl = document.getElementById('root')!;
 if (window.__SSR__ === true && rootEl.hasChildNodes()) {
   ReactDOM.hydrateRoot(rootEl, appTree);

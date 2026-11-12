@@ -3,7 +3,7 @@
 // the client can, so the server entry needs eager imports for every route it
 // renders (or a manifest of preloaded chunks). Swap these to static imports
 // there, and keep the lazy versions for the client build.
-import { lazy } from 'react';
+import { createContext, lazy, useContext, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -65,7 +65,14 @@ interface AppRoutesProps {
   location?: any; // Used for frozen routing animations
 }
 
+// Server render only: the SSR entry supplies a route table (src/routes/ssrRoutes.tsx,
+// eager imports for the SSR'd paths). Absent on the client, so the client bundle
+// never imports the SSR routes.
+export const RoutesOverrideContext = createContext<((location: unknown) => ReactNode) | null>(null);
+
 export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) => {
+  const override = useContext(RoutesOverrideContext);
+  if (override && !isAdminRoute) return <>{override(location)}</>;
   if (isAdminRoute) {
     // AdminRouter has its own Routes component, so we render it directly
     return <AdminRouter />;

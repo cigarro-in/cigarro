@@ -1,7 +1,7 @@
 import { readStoredPreference } from './lib/browserStorage';
 import { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
-import { Helmet, HelmetProvider } from 'react-helmet-async';
+import { Helmet, HelmetProvider, type HelmetServerState } from 'react-helmet-async';
 import { AgeVerification, AgeGateOverlay } from './components/auth/AgeVerification';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import Header from './components/layout/Header';
@@ -141,17 +141,16 @@ function StorefrontAuthHost() {
   );
 }
 
-// Initial age-gate state. Returning verified visitors get `true` on the very
-// first client render, so the overlay never flashes. The inline script in
-// index.html sets html[data-ageok] before any app code runs, and the CSS rule
-// there hides the overlay for server-rendered markup. Guarded so the server
-// (no document) gets `undefined`.
-function initialAgeVerified(): boolean | undefined {
-  if (typeof document === 'undefined') return undefined;
-  return document.documentElement.dataset.ageok === '1' ? true : undefined;
+/** Server render collects Helmet tags here (set by the SSR entry; absent on the client). */
+export interface HelmetServerContext {
+  helmet?: HelmetServerState;
 }
 
-function AppContent() {
+interface AppContentProps {
+  helmetContext?: HelmetServerContext;
+}
+
+function AppContent({ helmetContext }: AppContentProps) {
   const info = useOrgInfo();
   const { user } = useAuth();
   const { theme } = useTheme();
@@ -171,11 +170,12 @@ function AppContent() {
     upsertConvexUser(args).catch(() => {});
   }, [user?.id, org?._id]);
 
-  // Age gate state. `undefined` = not read yet (server, or first client render
-  // of a visitor who has not verified). The routes always render; while
-  // unknown or unverified, the gate overlay sits on top and the app content is
-  // inert. Storage is read in an effect, never in render.
-  const [ageVerified, setAgeVerified] = useState<boolean | undefined>(initialAgeVerified);
+  // Age gate state. `undefined` = not read yet. This is the SAME value on the
+  // server render and the first client render (hydration must match), even for
+  // returning verified visitors: the overlay is always in the first render, and
+  // the index.html inline script + CSS (html[data-ageok]) hide it before paint.
+  // Storage is read in an effect, never in render, then the effect settles it.
+  const [ageVerified, setAgeVerified] = useState<boolean | undefined>(undefined);
   const [legacyConsentNeeded, setLegacyConsentNeeded] = useState(false);
   const appRootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -262,7 +262,7 @@ function AppContent() {
   );
 
   return (
-    <HelmetProvider>
+    <HelmetProvider context={helmetContext}>
       <ReferralTracker />
       <StorefrontAuthHost />
       {/* Consent banner must render on admin routes too: admins are
@@ -342,7 +342,14 @@ function AppContent() {
   );
 }
 
-export default function App() {
+export interface AppProps {
+  /** Theme chosen by the server render (SSR only). Client omits it. */
+  initialThemeId?: string;
+  /** Helmet collection context for the server render; the client omits it. */
+  helmetContext?: HelmetServerContext;
+}
+
+export default function App({ initialThemeId, helmetContext }: AppProps = {}) {
   const info = useOrgInfo();
   // Citadel super-admin app (admin host /sa/*): no store, no storefront providers.
   // SaApp brings its own router, so this branch must not be wrapped by the entry's router.
@@ -353,8 +360,8 @@ export default function App() {
         <ConvexAuthProvider>
           <WishlistProvider>
             <CartProvider>
-              <ThemeProvider>
-                <AppContent />
+              <ThemeProvider initialThemeId={initialThemeId}>
+                <AppContent helmetContext={helmetContext} />
               </ThemeProvider>
             </CartProvider>
           </WishlistProvider>

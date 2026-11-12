@@ -6,6 +6,7 @@ import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
 import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
 import { applyRedirect } from './lib/redirects.js';
+import { isSsrEnabledFor, ssrRender } from './ssr-render.js';
 
 export async function onRequest(context) {
   const response = await handleRequest(context);
@@ -231,6 +232,16 @@ async function routeRequest(context) {
   // API responses are Function responses (they bypass _headers): never index.
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
     return withNoindex(await next());
+  }
+
+  // Full SSR for paths listed in SSR_ROUTES (flag, default off), every user agent.
+  // Any SSR failure is logged and falls through to the existing bot/SPA behaviour.
+  if (isSsrEnabledFor(url.pathname, context.env) && (request.method === 'GET' || request.method === 'HEAD')) {
+    try {
+      return await ssrRender(context);
+    } catch (error) {
+      console.error('SSR failed, falling back to SPA:', url.pathname, error instanceof Error ? error.message : error);
+    }
   }
 
   // Apply SSR middleware for bots (must match BOT_USER_AGENTS in ssr-middleware.js —

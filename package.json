@@ -63,7 +63,8 @@
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build && npm run build:copy-seo",
+            "build": "vite build && npm run build:ssr && npm run build:copy-seo",
+            "build:ssr": "vite build --config vite.ssr.config.ts",
             "build:copy-seo": "node -e \"const fs=require('fs');const f=[['public/llms.txt','dist/llms.txt'],['public/manifest.json','dist/manifest.json'],['_redirects','dist/_redirects'],['_headers','dist/_headers']];for(const [s,d] of f){try{if(fs.existsSync(s)){fs.copyFileSync(s,d);console.log('copied',s,'->',d)}else{console.log('skip missing',s)}}catch(e){console.log('copy failed',s,e.message)}}\"",
             "preview": "vite preview",
             "convex:dev": "convex dev",
