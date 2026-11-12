@@ -18,6 +18,7 @@ import { useStoreSettings } from './hooks/data/useStoreSettings';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
+import { ORG_PRIMARY_HOST } from './lib/convex/org';
 import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
@@ -74,11 +75,11 @@ function AdminHostView() {
         <div className="text-center space-y-3 max-w-sm">
           <p className="font-bold text-lg">Access denied</p>
           <p className="text-sm text-muted-foreground">
-            {user.phone || 'This number'} isn't an admin account. Use it on cigarro.in for shopping.
+            {user.phone || 'This number'} isn't an admin account. Use it on {ORG_PRIMARY_HOST} for shopping.
           </p>
           <div className="flex gap-2 justify-center">
             <a
-              href="https://cigarro.in"
+              href={`https://${ORG_PRIMARY_HOST}`}
               className="h-11 px-6 inline-flex items-center rounded-xl bg-canyon text-creme font-semibold text-[15px]"
             >
               Go to store
@@ -152,7 +153,7 @@ function AppContent() {  const { user } = useAuth();
   });
 
   // Per-store settings from Convex, defaults filled in (was Supabase).
-  const { settings: store } = useStoreSettings();
+  const { settings: store, loading: settingsLoading } = useStoreSettings();
   const gateActive = store.ageGate.enabled;
   // A store with the age gate switched off never shows it.
   const gatePassed = !gateActive || isAgeVerified;
@@ -160,8 +161,9 @@ function AppContent() {  const { user } = useAuth();
   // Analytics: load gtag once (consent-denied by default; no collection
   // until the visitor accepts the banner).
   useEffect(() => {
-    initAnalytics();
-  }, []);
+    if (settingsLoading) return;
+    initAnalytics(store.seo.gaMeasurementId);
+  }, [settingsLoading, store.seo.gaMeasurementId]);
 
   const isAdminHost =
     typeof window !== 'undefined' && window.location.hostname.split('.')[0] === 'admin';
@@ -255,7 +257,7 @@ function AppContent() {  const { user } = useAuth();
 {isUserPage ? (
         ThemeLayout ? (
           <Suspense fallback={<LoadingSpinner />}>
-            <ThemeLayout>
+            <ThemeLayout storeName={store.name} logoUrl={store.brand.logoUrl} legalName={store.business.legalName || store.name}>
               <PageTransition>
                 <Suspense fallback={<LoadingSpinner />}>
                   <AppRoutes isAdminRoute={false} location={location} />

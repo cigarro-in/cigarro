@@ -12,7 +12,7 @@ export function VividCategories() {
       <SEOHead
         title="All Categories"
         description="Browse all categories of premium tobacco products."
-        url="https://cigarro.in/categories"
+        url="/categories"
         type="website"
       />
 

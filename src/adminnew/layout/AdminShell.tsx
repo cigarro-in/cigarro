@@ -1,3 +1,4 @@
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { ReactNode } from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '../../components/ui/sidebar';
 import { AdminSidebar } from './AdminSidebar';
@@ -12,6 +13,7 @@ interface AdminShellProps {
  * Shell stays mounted during navigation to prevent flickering
  */
 export function AdminShell({ children }: AdminShellProps) {
+  const { settings: store } = useStoreSettings();
   return (
     <SidebarProvider data-admin-shell>
       <AdminSidebar />
@@ -20,7 +22,7 @@ export function AdminShell({ children }: AdminShellProps) {
           <SidebarTrigger />
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">C</span>
-            <span className="text-sm font-semibold">Cigarro</span>
+            <span className="text-sm font-semibold">{store.name}</span>
           </div>
         </header>
         <main className="flex-1">

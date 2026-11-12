@@ -6,9 +6,12 @@ import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 
 interface Props {
   children: ReactNode;
+  storeName: string;
+  logoUrl: string;
+  legalName: string;
 }
 
-export function VividShell({ children }: Props) {
+export function VividShell({ children, storeName, logoUrl, legalName }: Props) {
   const { totalItems } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -32,12 +35,18 @@ export function VividShell({ children }: Props) {
       <header className="sticky top-0 z-40 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
         <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
-            <span className="w-9 h-9 rounded-full bg-[var(--color-foreground)] text-[var(--color-surface)] grid place-items-center text-sm font-black">
-              C
-            </span>
-            <span className="hidden sm:inline font-bold text-[var(--color-foreground)] tracking-tight">
-              Cigarro
-            </span>
+            {logoUrl ? (
+                <img src={logoUrl} alt={storeName} width={36} height={36} className="h-9 w-9 object-contain" />
+              ) : (
+                <>
+                  <span className="w-9 h-9 rounded-full bg-[var(--color-foreground)] text-[var(--color-surface)] grid place-items-center text-sm font-black">
+                    {storeName.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="hidden sm:inline font-bold text-[var(--color-foreground)] tracking-tight">
+                    {storeName}
+                  </span>
+                </>
+              )}
           </Link>
 
           <form onSubmit={onSearchSubmit} className="flex-1 max-w-xl mx-auto">
@@ -79,7 +88,7 @@ export function VividShell({ children }: Props) {
       <footer className="hidden md:block mt-12 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="max-w-[1280px] mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
-            <h4 className="text-[var(--color-foreground)] font-bold mb-3">Cigarro</h4>
+            <h4 className="text-[var(--color-foreground)] font-bold mb-3">{storeName}</h4>
             <p className="text-[var(--color-muted-foreground)] leading-relaxed">
               Premium tobacco marketplace. 18+ only.
             </p>
@@ -111,7 +120,7 @@ export function VividShell({ children }: Props) {
           />
         </div>
         <div className="border-t border-[var(--color-border)] py-4 text-center text-xs text-[var(--color-muted-foreground)]">
-          © {new Date().getFullYear()} Cigarro. All rights reserved.
+          © {new Date().getFullYear()} {legalName}. All rights reserved.
         </div>
       </footer>
 

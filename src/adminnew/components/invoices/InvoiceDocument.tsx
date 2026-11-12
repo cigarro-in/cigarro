@@ -116,7 +116,7 @@ export function InvoiceDocument({ invoice }: { invoice: PrintableInvoice }) {
               {invoice.seller.address && <div className="mt-1 whitespace-pre-line">{invoice.seller.address}</div>}
               <div className="mt-1">{[invoice.seller.phone, invoice.seller.email].filter(Boolean).join(' · ')}</div>
             </div>
-            <div className="text-right"><div className="text-lg font-bold tracking-[0.22em] text-[#211d1a]">CIGARRO</div><div className="mt-1 uppercase tracking-[0.16em]">Original for recipient</div></div>
+            <div className="text-right"><div className="text-lg font-bold tracking-[0.22em] text-[#211d1a]">{invoice.seller.businessName.toUpperCase()}</div><div className="mt-1 uppercase tracking-[0.16em]">Original for recipient</div></div>
           </footer>
         </div>
       </article>

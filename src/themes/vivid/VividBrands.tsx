@@ -39,7 +39,7 @@ export function VividBrands() {
 
   return (
     <>
-      <SEOHead title="Brands" description="Shop by brand" url="https://cigarro.in/brands" type="website" />
+      <SEOHead title="Brands" description="Shop by brand" url="/brands" type="website" />
 
       <div className="max-w-[1280px] mx-auto px-4 py-6">
         <header className="vv-page-header">

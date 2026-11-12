@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 interface FooterBrand { id: string; name: string; slug: string; }
 
 const Footer = () => {
+  const { settings: store } = useStoreSettings();
   const [brands, setBrands] = useState<FooterBrand[]>([]);
   // Wave 3: footer brand list from the Convex catalog.
   const { brands: catalogBrands, loading } = useFullCatalog();
@@ -41,11 +43,11 @@ const Footer = () => {
                 Clear information. Straightforward support.
               </h3>
               <a
-                href="mailto:support@cigarro.in"
+                href={`mailto:${store.business.supportEmail}`}
                 className="inline-flex items-center gap-2 text-dark hover:text-canyon transition-colors"
               >
                 <Mail className="w-5 h-5" />
-                support@cigarro.in
+                {store.business.supportEmail}
               </a>
             </div>
             
@@ -142,7 +144,7 @@ const Footer = () => {
             <div className="text-center">
               {/* Copyright */}
               <div className="text-coyote text-base leading-relaxed">
-                {new Date().getFullYear()} Cigarro. All rights reserved.
+                {new Date().getFullYear()} {store.business.legalName || store.name}. All rights reserved.
               </div>
             </div>
           </div>

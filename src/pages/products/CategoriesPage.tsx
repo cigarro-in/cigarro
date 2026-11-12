@@ -68,7 +68,7 @@ export function CategoriesPage() {
       <SEOHead 
         title="Product Categories - Browse by Category"
         description="Explore our organized categories of premium cigarettes, cigars, and tobacco products. Find exactly what you're looking for by browsing our curated categories."
-        url="https://cigarro.in/categories"
+        url="/categories"
       />
       
       <div className="py-12 bg-background">

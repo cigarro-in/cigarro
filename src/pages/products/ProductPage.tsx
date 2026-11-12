@@ -22,6 +22,7 @@ import { ProductReviews } from '../../components/products/ProductReviews';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import { trackViewItemOnce } from '../../lib/analytics/ga';
+import { ORG_PRIMARY_HOST } from '../../lib/convex/org';
 import {
   getDefaultVariant,
   getVariantAvailability,
@@ -429,7 +430,7 @@ function ProductPage() {
   const offerAvailability = getVariantAvailability(offerVariant);
   const offerVariantInStock = isVariantInStock(offerVariant);
   const stockNote = getVariantStockNote(offerVariant, variants);
-  const seoCanonicalUrl = product.canonical_url || `https://cigarro.in${location.pathname}`;
+  const seoCanonicalUrl = product.canonical_url || `https://${ORG_PRIMARY_HOST}${location.pathname}`;
   const offerUrl = getVariantOfferUrl(seoCanonicalUrl, offerVariant);
   // Discount display: only when compare_at_price is a genuine higher MRP.
   const offerDiscount = getVariantDiscount(offerVariant);
@@ -483,7 +484,7 @@ function ProductPage() {
           selectedVariant?.variant_name || '',
           product.origin || ''
         ].filter(Boolean) as string[]}
-        image={gallery[0] || 'https://cigarro.in/og-default.jpg'}
+        image={gallery[0] || `https://${ORG_PRIMARY_HOST}/og-default.jpg`}
         url={seoCanonicalUrl}
         type="product"
         price={offerVariant ? offerVariant.price.toString() : undefined}
@@ -498,10 +499,10 @@ function ProductPage() {
       />
       <BreadcrumbSchema
         items={[
-          { name: 'Home', url: 'https://cigarro.in' },
-          { name: 'Products', url: 'https://cigarro.in/products' },
-          { name: brandName, url: `https://cigarro.in/brand/${brandSlug}` },
-          { name: product.name, url: `https://cigarro.in/product/${product.slug}` }
+          { name: 'Home', url: `https://${ORG_PRIMARY_HOST}` },
+          { name: 'Products', url: `https://${ORG_PRIMARY_HOST}/products` },
+          { name: brandName, url: `https://${ORG_PRIMARY_HOST}/brand/${brandSlug}` },
+          { name: product.name, url: `https://${ORG_PRIMARY_HOST}/product/${product.slug}` }
         ]}
       />
       {/* product:price:* meta is emitted once by SEOHead above — do not

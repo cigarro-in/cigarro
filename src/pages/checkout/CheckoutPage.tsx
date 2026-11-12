@@ -21,6 +21,7 @@ import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { ORG_SLUG } from '../../lib/convex/org';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../../components/ui/alert-dialog';
@@ -41,6 +42,7 @@ const getBrandName = (brand: any): string => {
 };
 
 export function CheckoutPage() {
+  const { settings: store } = useStoreSettings();
   const navigate = useNavigate();
   const { items: cartItems, totalPrice: cartTotalPrice, clearCart, getCartItemPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
@@ -336,7 +338,7 @@ export function CheckoutPage() {
       const QRCode = await import('qrcode');
       
       // Create UPI payment URL with estimated amount
-      const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${tempTransactionId}&tn=${tempTransactionId}`;
+      const upiURL = `upi://pay?pa=${payVpa}&pn=${encodeURIComponent(store.name)}&am=${finalTotal}&tid=${tempTransactionId}&tn=${tempTransactionId}`;
       
       // Generate QR code
       const qrDataURL = await QRCode.toDataURL(upiURL, {
@@ -832,7 +834,7 @@ export function CheckoutPage() {
     if (!payVpa) return;
     try {
       const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-      const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+      const upiURL = `upi://pay?pa=${payVpa}&pn=${encodeURIComponent(store.name)}&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
       
       const qrDataURL = await QRCode.toDataURL(upiURL, {
         width: 256,
@@ -979,7 +981,7 @@ export function CheckoutPage() {
     // In a real app, you would send the payment link via email/SMS
     // For now, we'll just copy the UPI link to clipboard
     const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-    const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+    const upiURL = `upi://pay?pa=${payVpa}&pn=${encodeURIComponent(store.name)}&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
     
     try {
       await navigator.clipboard.writeText(upiURL);
@@ -1608,7 +1610,7 @@ export function CheckoutPage() {
                         <Button
                           onClick={() => {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-                            const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+                            const upiURL = `upi://pay?pa=${payVpa}&pn=${encodeURIComponent(store.name)}&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             window.location.href = upiURL;
                           }}
                           disabled={!payVpa}
@@ -1652,7 +1654,7 @@ export function CheckoutPage() {
                           disabled={!payVpa}
                           onClick={() => {
                             const transactionId = `TXN${Date.now().toString().slice(-8)}`;
-                            const upiURL = `upi://pay?pa=${payVpa}&pn=Cigarro&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
+                            const upiURL = `upi://pay?pa=${payVpa}&pn=${encodeURIComponent(store.name)}&am=${finalTotal}&tid=${transactionId}&tn=${transactionId}`;
                             navigator.clipboard.writeText(upiURL).catch(() => {
                               setOpError('Copy failed — long-press the QR instead');
                             });

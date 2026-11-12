@@ -36,7 +36,7 @@ export function AboutPage() {
       <SEOHead
         title="About Cigarro | Online Cigarette Store in India"
         description="Learn how Cigarro helps adult customers in India browse cigarette brands, compare pack options and find clear product information online."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['about Cigarro', 'online cigarette store India', 'cigarette brands India']}
       />

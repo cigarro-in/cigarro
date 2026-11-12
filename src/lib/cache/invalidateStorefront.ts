@@ -15,8 +15,10 @@ export async function invalidateStorefront() {
   invalidatePrefix('products:');
 
   // 2. Cloudflare edge cache (only meaningful in production)
+  // The edge injects the store's primary host; absent in dev, so dev never purges.
+  const primaryHost = typeof window !== 'undefined' ? window.__ORG__?.primaryHost : undefined;
   const isProduction =
-    typeof window !== 'undefined' && window.location.hostname === 'cigarro.in';
+    !!primaryHost && window.location.hostname === primaryHost.split(':')[0];
   if (!isProduction) return;
 
   try {

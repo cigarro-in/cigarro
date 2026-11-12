@@ -92,7 +92,7 @@ export function PrivacyPage() {
       <SEOHead
         title="Privacy Policy | Cigarro"
         description="Learn what personal information Cigarro collects, why it is used, when it may be shared and how to make a privacy request."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
       />

@@ -38,7 +38,7 @@ export function LegalPage() {
       <SEOHead
         title="Cigarro Policies | Terms, Privacy, Shipping and Returns"
         description="Find Cigarro's terms of service, privacy policy, shipping information and returns and refunds policy."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['Cigarro policies', 'Cigarro terms', 'Cigarro privacy', 'Cigarro shipping', 'Cigarro returns']}
       />

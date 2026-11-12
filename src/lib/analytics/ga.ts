@@ -10,8 +10,10 @@
 // on import.meta). Vite only inlines the exact pattern; `import.meta?.env`
 // sails through the build untouched and is always undefined in the browser,
 // which silently kills the whole tag. That exact bug shipped here before.
-const MEASUREMENT_ID: string | undefined =
+const ENV_MEASUREMENT_ID: string | undefined =
   import.meta.env.VITE_GA_MEASUREMENT_ID || undefined;
+// Resolved in initAnalytics: the store setting wins, the env var is the fallback.
+let MEASUREMENT_ID: string | undefined = ENV_MEASUREMENT_ID;
 
 const CONSENT_KEY = 'cigarro-analytics-consent';
 
@@ -42,12 +44,14 @@ function safeSet(key: string, value: string): void {
   }
 }
 
-export function initAnalytics(): void {
+export function initAnalytics(storeMeasurementId?: string): void {
   if (initialized || typeof window === 'undefined' || typeof document === 'undefined') return;
-  if (!MEASUREMENT_ID) {
-    console.warn('[analytics] VITE_GA_MEASUREMENT_ID is not set — skipping GA init.');
+  const id = storeMeasurementId || ENV_MEASUREMENT_ID;
+  if (!id) {
+    console.warn('[analytics] no GA measurement ID (store setting or VITE_GA_MEASUREMENT_ID) — skipping GA init.');
     return;
   }
+  MEASUREMENT_ID = id;
   initialized = true;
   window.dataLayer = window.dataLayer || [];
   window.gtag = function (...args: unknown[]) {
@@ -77,7 +81,7 @@ export function getConsent(): ConsentChoice | null {
 let scriptInjected = false;
 
 function injectScript(): void {
-  if (scriptInjected || typeof document === 'undefined' || !MEASUREMENT_ID) return;
+  if (scriptInjected || !initialized || typeof document === 'undefined' || !MEASUREMENT_ID) return;
   scriptInjected = true;
   const script = document.createElement('script');
   script.async = true;

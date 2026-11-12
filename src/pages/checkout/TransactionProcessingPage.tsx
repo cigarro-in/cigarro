@@ -227,7 +227,7 @@ export function TransactionProcessingPage() {
   const orderLabel = orderNumber ? `#${orderNumber}` : `#${order.displayOrderId}`;
   // Download reuses the already-generated QR data URL — same pixels, same
   // server-generated UPI URL. Never regenerate with different params.
-  const qrFilename = `cigarro-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
+  const qrFilename = `${ORG_SLUG}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
   const qrDownloadSupported =
     typeof document !== 'undefined' && 'download' in document.createElement('a');
   // Explicit UPI app choices: same params, app-specific scheme so the OS

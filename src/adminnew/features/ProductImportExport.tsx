@@ -244,7 +244,7 @@ export function ProductImportExport({ products }: Props) {
     const ws = XLSX.utils.json_to_sheet(sample, { header: header as unknown as string[] });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
-    XLSX.writeFile(wb, 'cigarro-products-template.xlsx');
+    XLSX.writeFile(wb, `${ORG_SLUG}-products-template.xlsx`);
   };
 
   const onExport = async () => {
@@ -314,7 +314,7 @@ export function ProductImportExport({ products }: Props) {
       const ws = XLSX.utils.json_to_sheet(rows, { header: header as unknown as string[] });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Products');
-      XLSX.writeFile(wb, `cigarro-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `${ORG_SLUG}-products-${new Date().toISOString().slice(0, 10)}.xlsx`);
       setOpOk(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`);
     } catch (err: any) {
       console.error(err);

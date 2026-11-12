@@ -53,7 +53,7 @@ export function VividHome() {
       <SEOHead
         title="Cigarro | Cigarettes and Tobacco Products Online"
         description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
-        url="https://cigarro.in/"
+        url="/"
         type="website"
       />
 

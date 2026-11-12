@@ -12,7 +12,7 @@ export function ReturnsPage() {
       <SEOHead
         title="Returns and Refunds Policy | Cigarro"
         description="Read Cigarro's policy for non-returnable tobacco products and how to report a damaged, defective or incorrect item within 48 hours."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['returns policy', 'refund policy', 'tobacco returns', 'damaged items replacement']}
       />

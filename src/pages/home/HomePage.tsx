@@ -27,7 +27,7 @@ export function HomePage() {
       <SEOHead
         title="Cigarro | Cigarettes and Tobacco Products Online"
         description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
-        url="https://cigarro.in/"
+        url="/"
         type="website"
         keywords={['cigarettes online', 'cigarette brands India', 'tobacco products India', 'rolling papers India']}
         image={data?.heroSlides?.[0]?.image_url}

@@ -1,3 +1,4 @@
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import type { LucideIcon } from 'lucide-react';
 import {
   Boxes,
@@ -106,6 +107,7 @@ function getInitial(value?: string | null) {
 }
 
 export function AdminSidebar() {
+  const { settings: store } = useStoreSettings();
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut } = useAuth();
@@ -140,7 +142,7 @@ export function AdminSidebar() {
             {getInitial(org?.name)}
           </span>
           <span className="grid min-w-0 flex-1 text-left leading-tight">
-            <span className="truncate text-sm font-semibold">{org?.name || 'Cigarro'}</span>
+            <span className="truncate text-sm font-semibold">{org?.name || store.name}</span>
             <span className="truncate text-xs text-muted-foreground">Admin</span>
           </span>
         </NavLink>

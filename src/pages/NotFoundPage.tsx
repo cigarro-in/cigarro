@@ -24,7 +24,7 @@ export function NotFoundPage() {
       <SEOHead
         title="Page not found"
         description="The page you requested does not exist. Search the Cigarro catalog or browse products, categories and brands."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         robots="noindex, follow"
         keywords={[]}

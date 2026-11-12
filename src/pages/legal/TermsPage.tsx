@@ -11,7 +11,7 @@ export function TermsPage() {
       <SEOHead
         title="Terms of Service | Cigarro"
         description="Read the terms that apply when you browse, create an account or place an order with Cigarro."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
       />

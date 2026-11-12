@@ -111,7 +111,7 @@ export default function VividProduct() {
       <SEOHead
         title={product.meta_title || product.name}
         description={product.meta_description || product.short_description || product.description || ''}
-        url={`https://cigarro.in/product/${product.slug}`}
+        url={`/product/${product.slug}`}
         type="product"
       />
 

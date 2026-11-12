@@ -1,10 +1,12 @@
 import { Helmet } from 'react-helmet-async';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { ORG_PRIMARY_HOST } from '../../lib/convex/org';
 
 // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
 // The 512px icon is a valid image for Organization/publisher logos (never a share image).
-const DEFAULT_SHARE_IMAGE = 'https://cigarro.in/og-default.jpg';
-const SITE_LOGO_URL = 'https://cigarro.in/icons/android-chrome-512x512.png';
+const SITE_ORIGIN = `https://${ORG_PRIMARY_HOST}`;
+const DEFAULT_SHARE_IMAGE = `${SITE_ORIGIN}/og-default.jpg`;
+const SITE_LOGO_URL = `${SITE_ORIGIN}/icons/android-chrome-512x512.png`;
 
 interface SEOHeadProps {
   title?: string;
@@ -47,7 +49,7 @@ export function SEOHead({
   description: descriptionProp,
   keywords = ['cigarettes online', 'cigarette brands India', 'tobacco products India'],
   image,
-  url = 'https://cigarro.in',
+  url = '/',
   type = 'website',
   author,
   publishedTime,
@@ -89,13 +91,13 @@ export function SEOHead({
     } else {
       // Handle relative URLs
       const cleanPath = url.split('?')[0]; // Remove query params
-      cleanUrl = `https://cigarro.in${cleanPath}`;
+      cleanUrl = `${SITE_ORIGIN}${cleanPath}`;
     }
     
     // Normalize trailing slashes
     // Homepage should have trailing slash, other pages should not
-    if (cleanUrl === 'https://cigarro.in' || cleanUrl === 'https://cigarro.in/') {
-      return 'https://cigarro.in/';
+    if (cleanUrl === SITE_ORIGIN || cleanUrl === `${SITE_ORIGIN}/`) {
+      return `${SITE_ORIGIN}/`;
     }
     
     // Remove trailing slashes from all other pages
@@ -116,6 +118,37 @@ export function SEOHead({
   const optimizedDescription = description.length > 160 
     ? description.substring(0, 157) + '...'
     : description;
+
+  const logoUrl = store.brand.logoUrl || SITE_LOGO_URL;
+  const addr = store.business.address;
+  const postalAddress = {
+    '@type': 'PostalAddress',
+    ...(addr.line1 || addr.line2 ? { streetAddress: [addr.line1, addr.line2].filter(Boolean).join(', ') } : {}),
+    ...(addr.city ? { addressLocality: addr.city } : {}),
+    ...(addr.state ? { addressRegion: addr.state } : {}),
+    ...(addr.pincode ? { postalCode: addr.pincode } : {}),
+    addressCountry: 'IN'
+  };
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: siteName,
+    ...(store.business.legalName ? { legalName: store.business.legalName } : {}),
+    url: SITE_ORIGIN,
+    logo: logoUrl,
+    description: store.seo.defaultDescription,
+    address: postalAddress,
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'Customer Service',
+      availableLanguage: ['English', 'Hindi'],
+      ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
+      ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {})
+    },
+    ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
+    ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {}),
+    sameAs: Object.values(store.socials).filter((u) => u.startsWith('http'))
+  };
 
   // Generate structured data based on type
   const generateStructuredData = () => {
@@ -180,7 +213,7 @@ export function SEOHead({
             applicableCountry: 'IN',
             returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
             merchantReturnDays: 2,
-            merchantReturnLink: 'https://cigarro.in/returns'
+            merchantReturnLink: `${SITE_ORIGIN}/returns`
           }
         },
         // Only emitted with real reviews — never placeholders (Google spam policy)
@@ -223,7 +256,7 @@ export function SEOHead({
           name: siteName,
           logo: {
             '@type': 'ImageObject',
-            url: SITE_LOGO_URL
+            url: logoUrl
           }
         },
         datePublished: publishedTime,
@@ -237,15 +270,15 @@ export function SEOHead({
       publisher: {
         '@type': 'Organization',
         name: siteName,
-        url: 'https://cigarro.in',
+        url: SITE_ORIGIN,
         logo: {
           '@type': 'ImageObject',
-          url: SITE_LOGO_URL
+          url: logoUrl
         }
       },
       potentialAction: {
         '@type': 'SearchAction',
-        target: 'https://cigarro.in/products?search={search_term_string}',
+        target: `${SITE_ORIGIN}/products?search={search_term_string}`,
         'query-input': 'required name=search_term_string'
       }
     };
@@ -331,26 +364,7 @@ export function SEOHead({
 
       {/* Additional Organization Schema */}
       <script type="application/ld+json">
-        {JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: siteName,
-          url: 'https://cigarro.in',
-          logo: SITE_LOGO_URL,
-          description: store.seo.defaultDescription,
-          address: {
-            '@type': 'PostalAddress',
-            addressCountry: 'IN'
-          },
-          contactPoint: {
-            '@type': 'ContactPoint',
-            contactType: 'Customer Service',
-            availableLanguage: ['English', 'Hindi'],
-            ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
-            ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {})
-          },
-          sameAs: Object.values(store.socials).filter((u) => u.startsWith('http'))
-        })}
+        {JSON.stringify(organizationSchema)}
       </script>
     </Helmet>
   );

@@ -32,7 +32,7 @@ export function ContactPage() {
       <SEOHead
         title="Contact Cigarro | Order and Product Support"
         description="Contact Cigarro for help with an order, a product listing, shipping or using the online store. Email support@cigarro.in."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['contact Cigarro', 'Cigarro support', 'Cigarro order help']}
       />

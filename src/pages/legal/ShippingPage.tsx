@@ -21,7 +21,7 @@ export function ShippingPage() {
       <SEOHead
         title="Shipping and Delivery Policy | Cigarro"
         description="See how Cigarro delivery availability, shipping options, dispatch, tracking and age verification work for orders within India."
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
         keywords={['shipping policy', 'delivery information', 'shipping costs', 'delivery times India']}
       />

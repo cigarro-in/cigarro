@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
 import { InstallPWA } from '../pwa/InstallPWA';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { 
   ShoppingBag, 
   Heart, 
@@ -29,6 +30,7 @@ interface MobileMenuProps {
 }
 
 export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
+  const { settings: store } = useStoreSettings();
   const { user, signOut } = useAuth();
   const { wishlistCount } = useWishlist();
 
@@ -97,7 +99,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
             </button>
             
             <div className="mb-4">
-                <h1 className="text-3xl font-serif text-foreground tracking-tight">CIGARRO</h1>
+                <h1 className="text-3xl font-serif text-foreground tracking-tight">{store.brand.logoUrl ? (<img src={store.brand.logoUrl} alt={store.name} width={160} height={48} className="h-10 w-auto object-contain" />) : store.name.toUpperCase()}</h1>
             </div>
             
             {user ? (

@@ -53,7 +53,7 @@ export function VividWishlist() {
 
   return (
     <>
-      <SEOHead title="Wishlist" description="Your saved items" url="https://cigarro.in/wishlist" type="website" />
+      <SEOHead title="Wishlist" description="Your saved items" url="/wishlist" type="website" />
 
       <div className="max-w-[1280px] mx-auto px-4 py-6">
         <header className="vv-page-header flex items-start justify-between gap-4">

@@ -13,8 +13,10 @@ import { SearchResult } from '../../types/variants';
 import Fuse from 'fuse.js';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { InstallPWA } from '../pwa/InstallPWA';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 const Header = () => {
+  const { settings: store } = useStoreSettings();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { requestAuth } = useAuthDialog();
@@ -342,7 +344,7 @@ const Header = () => {
         {/* Center Section - Logo */}
         <Link to="/" className="absolute left-1/2 -translate-x-1/2">
           <h1 className="text-dark font-serif font-normal tracking-tight leading-none text-2xl uppercase">
-            CIGARRO
+            {store.brand.logoUrl ? (<img src={store.brand.logoUrl} alt={store.name} width={160} height={48} className="h-10 w-auto object-contain" />) : store.name.toUpperCase()}
           </h1>
         </Link>
 

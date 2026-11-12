@@ -76,7 +76,7 @@ export function VividAddresses() {
 
   return (
     <>
-      <SEOHead title="Addresses" description="Saved delivery addresses" url="https://cigarro.in/addresses" type="website" />
+      <SEOHead title="Addresses" description="Saved delivery addresses" url="/addresses" type="website" />
 
       <div className="max-w-[720px] mx-auto px-4 py-6">
         <header className="vv-page-header flex items-start justify-between gap-4">

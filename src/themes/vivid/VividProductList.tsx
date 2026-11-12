@@ -113,7 +113,7 @@ export function VividProductList({ mode }: Props) {
       <SEOHead
         title={title}
         description={categoryDescription || 'Premium tobacco products'}
-        url={`https://cigarro.in${location.pathname}`}
+        url={location.pathname}
         type="website"
       />
 

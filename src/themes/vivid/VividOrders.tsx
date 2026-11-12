@@ -19,7 +19,7 @@ export function VividOrders() {
 
   return (
     <>
-      <SEOHead title="Your orders" description="Order history" url="https://cigarro.in/orders" type="website" />
+      <SEOHead title="Your orders" description="Order history" url="/orders" type="website" />
 
       <div className="max-w-[880px] mx-auto px-4 py-6">
         <header className="vv-page-header">

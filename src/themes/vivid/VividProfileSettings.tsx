@@ -42,7 +42,7 @@ export function VividProfileSettings() {
 
   return (
     <>
-      <SEOHead title="Settings" description="Account settings" url="https://cigarro.in/profile/settings" type="website" />
+      <SEOHead title="Settings" description="Account settings" url="/profile/settings" type="website" />
 
       <div className="max-w-[560px] mx-auto px-4 py-6">
         <header className="vv-page-header">

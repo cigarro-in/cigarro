@@ -42,7 +42,7 @@ export function VividProfile() {
 
   return (
     <>
-      <SEOHead title="Your account" description="Manage your account" url="https://cigarro.in/profile" type="website" />
+      <SEOHead title="Your account" description="Manage your account" url="/profile" type="website" />
 
       <div className="max-w-[880px] mx-auto px-4 py-6">
         {/* Identity card */}

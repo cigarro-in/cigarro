@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Bot, Search, MapPin, AlertTriangle, BookOpen, Ban } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
-import { siteConfig } from '../../config/site';
+import { ORG_PRIMARY_HOST } from '../../lib/convex/org';
 
 /**
  * AgentsPage — dead-simple static doc for AI shopping agents.
@@ -16,8 +16,8 @@ export function AgentsPage() {
     <>
       <SEOHead
         title={`Shopping Agents — Start Here | ${store.name}`}
-        description={`Machine-readable guide for AI shopping agents: catalog entry points, search template, variant semantics, and compliance rules for ${siteConfig.domain}. ${store.ageGate.minAge}+ only.`}
-        url="https://cigarro.in/agents"
+        description={`Machine-readable guide for AI shopping agents: catalog entry points, search template, variant semantics, and compliance rules for ${ORG_PRIMARY_HOST}. ${store.ageGate.minAge}+ only.`}
+        url="/agents"
       />
       <main className="main-container py-10 md:py-16 max-w-3xl">
         <p className="suptitle text-canyon mb-3 flex items-center gap-2">
@@ -65,7 +65,7 @@ export function AgentsPage() {
             <Search className="w-5 h-5 text-canyon" /> Search
           </h2>
           <p className="text-dark/70 text-sm md:text-base mb-2">URL-addressable search template (use this, don&apos;t guess):</p>
-          <p className="font-mono text-sm bg-dark/5 rounded-lg px-3 py-2.5 mb-2">https://cigarro.in/products?search={'{query}'}</p>
+          <p className="font-mono text-sm bg-dark/5 rounded-lg px-3 py-2.5 mb-2">https://{ORG_PRIMARY_HOST}/products?search={'{query}'}</p>
           <p className="text-dark/60 text-sm leading-relaxed">
             Tip: include the pack size in the query — e.g. <em>“Dunhill Red carton”</em>, <em>“Marlboro Gold packet”</em>.
             Search understands packet / carton / half-carton / combo synonyms.
