@@ -2,11 +2,7 @@ import { ConvexError } from "convex/values";
 import type { UserIdentity } from "convex/server";
 import { Doc, Id } from "../_generated/dataModel";
 import { sha256Hex } from "./citadelAuth";
-import {
-  PRE_RENAME_LEGACY_SLUG,
-  isLegacyOrg,
-  storeSlugTaken,
-} from "./legacyOrg";
+import { PRE_RENAME_LEGACY_SLUG, isLegacyOrg } from "./legacyOrg";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 
 export type Role = Doc<"memberships">["role"];
@@ -21,31 +17,35 @@ export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
 // slug the token was minted for). A token whose claim differs from the store
 // being acted on is rejected. Tokens with NO claim are legacy (minted before
 // per-store auth) and are accepted for the legacy org only.
-// Pre-rename tokens carry the claim `smokeshop` (the legacy org's old slug):
-// they match the legacy org only while no store holds `smokeshop`, and match a
-// store named `smokeshop` only if issued after that store was created (so a
-// legacy token can never act on the new store).
+// Pre-rename tokens carry the claim `smokeshop` (the legacy org's old slug),
+// which the new `smokeshop` store's tokens also carry; see below.
 // Convex exposes custom JWT claims as extra fields on UserIdentity.
 export async function tokenMatchesOrg(
   ctx: QueryCtx | MutationCtx,
   identity: UserIdentity,
-  org: { slug: string; _creationTime: number },
+  org: { _id: Id<"organizations">; slug: string; _creationTime: number },
 ): Promise<boolean> {
   const claim = identity.org;
   if (claim === undefined || claim === null) return isLegacyOrg(org);
   if (claim !== PRE_RENAME_LEGACY_SLUG) return claim === org.slug;
-  if (org.slug === PRE_RENAME_LEGACY_SLUG) {
-    const iat = identity.iat;
-    return typeof iat === "number" && iat * 1000 >= org._creationTime;
-  }
-  if (isLegacyOrg(org)) return !(await storeSlugTaken(ctx, PRE_RENAME_LEGACY_SLUG));
-  return false;
+  // `smokeshop` names two stores over time: the legacy org (pre-rename tokens)
+  // and the new store that took the slug. User ids are minted per store, so the
+  // subject's users row tells them apart. (`iat` can't: Convex does not expose
+  // standard JWT claims on UserIdentity.)
+  if (org.slug !== PRE_RENAME_LEGACY_SLUG && !isLegacyOrg(org)) return false;
+  const rows = await ctx.db
+    .query("users")
+    .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+    .collect();
+  return rows.some(
+    (r) => r.orgId === org._id || (r.orgId === undefined && isLegacyOrg(org)),
+  );
 }
 
 export async function assertTokenOrg(
   ctx: QueryCtx | MutationCtx,
   identity: UserIdentity,
-  org: { slug: string; _creationTime: number },
+  org: { _id: Id<"organizations">; slug: string; _creationTime: number },
 ) {
   if (!(await tokenMatchesOrg(ctx, identity, org))) {
     throw new ConvexError({ code: "WRONG_STORE" });

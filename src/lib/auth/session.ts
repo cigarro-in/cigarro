@@ -1,7 +1,7 @@
 // Own-JWT session: our ES256 token (30d, OTP-renewed).
 // Storage is local only — never committed.
 
-import { ORG_SLUG } from '../convex/org';
+import { ORG_SLUG, IS_ADMIN_HOST } from '../convex/org';
 import { LEGACY_ORG_SLUG } from '../org/legacyOrg';
 
 // One session per store. The pre-namespacing key is migrated once, and only
@@ -15,7 +15,8 @@ const KEY = `cigarro.session.v1:${ORG_SLUG}`;
 function migrateLegacyKey() {
   try {
     if (ORG_SLUG !== LEGACY_ORG_SLUG) return;
-    const preRename = localStorage.getItem(PRE_RENAME_KEY);
+    // Skipped on the admin host: there the pre-rename key holds the new `smokeshop` store's session.
+    const preRename = IS_ADMIN_HOST ? null : localStorage.getItem(PRE_RENAME_KEY);
     if (preRename !== null) {
       if (localStorage.getItem(KEY) === null) localStorage.setItem(KEY, preRename);
       localStorage.removeItem(PRE_RENAME_KEY);
