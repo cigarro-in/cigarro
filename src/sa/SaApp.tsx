@@ -5,6 +5,7 @@ import { convex } from '../lib/convex/client';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { Callback } from './Callback';
 import { SuperGate } from './SuperGate';
+import { OverviewPage } from './pages/OverviewPage';
 import { StoresPage } from './pages/StoresPage';
 import { StoreDetailPage } from './pages/StoreDetailPage';
 import { PlatformConfigPage } from './pages/PlatformConfigPage';
@@ -34,14 +35,15 @@ export function SaApp() {
           <Routes>
             <Route path="/sa/callback" element={<Callback />} />
             <Route element={<SuperGate />}>
-              <Route path="/sa" element={<Navigate to="/sa/stores" replace />} />
+              <Route path="/sa" element={<Navigate to="/sa/overview" replace />} />
+              <Route path="/sa/overview" element={<ErrorBoundary variant="inline"><OverviewPage /></ErrorBoundary>} />
               <Route path="/sa/stores" element={<ErrorBoundary variant="inline"><StoresPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId" element={<ErrorBoundary variant="inline"><StoreDetailPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId/import" element={<ErrorBoundary variant="inline"><StoreImportPage /></ErrorBoundary>} />
               <Route path="/sa/domains" element={<ErrorBoundary variant="inline"><DomainsPage /></ErrorBoundary>} />
               <Route path="/sa/platform" element={<ErrorBoundary variant="inline"><PlatformConfigPage /></ErrorBoundary>} />
             </Route>
-            <Route path="*" element={<Navigate to="/sa/stores" replace />} />
+            <Route path="*" element={<Navigate to="/sa/overview" replace />} />
           </Routes>
         </BrowserRouter>
       </ConvexProvider>

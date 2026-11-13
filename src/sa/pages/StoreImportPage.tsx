@@ -1,14 +1,22 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
+import {
+  Banner,
+  Button,
+  Card,
+  CardSection,
+  DataTable,
+  Input,
+  Label,
+  Page,
+  Skeleton,
+  type Column,
+} from '../../adminnew/ui';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { useSa } from '../SuperGate';
 import { saErrorMessage } from '../session';
+import { formatCount } from '../saUi';
 import {
   importBlogPostsRef,
   importSeedRedirectsRef,
@@ -37,6 +45,8 @@ interface StepResult {
   summary: string;
 }
 
+type Notice = { tone: 'success' | 'critical'; text: string };
+
 async function readJson<T>(file: File): Promise<T> {
   return JSON.parse(await file.text()) as T;
 }
@@ -64,7 +74,7 @@ export function StoreImportPage() {
   const [redirectName, setRedirectName] = useState('');
   const [results, setResults] = useState<StepResult[]>([]);
   const [running, setRunning] = useState(false);
-  const status = useInlineStatus();
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const plan: ImportPlan | null = useMemo(() => {
     if (!normalized || !store) return null;
@@ -81,10 +91,10 @@ export function StoreImportPage() {
       setNormalized(data);
       setFileName(file.name);
       setResults([]);
-      status.setOk(`Loaded ${file.name}.`);
+      setNotice({ tone: 'success', text: `Loaded ${file.name}.` });
     } catch (err) {
       setNormalized(null);
-      status.setError(err instanceof Error ? err.message : 'Could not read that file.');
+      setNotice({ tone: 'critical', text: err instanceof Error ? err.message : 'Could not read that file.' });
     }
   };
 
@@ -103,7 +113,7 @@ export function StoreImportPage() {
       setRedirectRows(rows);
       setRedirectName(file.name);
     } catch {
-      status.setError('Could not read the redirects file.');
+      setNotice({ tone: 'critical', text: 'Could not read the redirects file.' });
     }
   };
 
@@ -113,7 +123,7 @@ export function StoreImportPage() {
       setImageMap(await readJson<ImageMap>(file));
       setMapName(file.name);
     } catch {
-      status.setError('Could not read the image map file.');
+      setNotice({ tone: 'critical', text: 'Could not read the image map file.' });
     }
   };
 
@@ -121,6 +131,7 @@ export function StoreImportPage() {
     if (!plan || !store) return;
     setRunning(true);
     setResults([]);
+    setNotice(null);
     const log: StepResult[] = [];
     const push = (r: StepResult) => {
       log.push(r);
@@ -178,109 +189,132 @@ export function StoreImportPage() {
         }
         push({ entity: 'Redirects', batches: redirectBatches.length, summary: `${imported} imported, ${failed} failed (re-run is safe)` });
       }
-      status.setOk(`Import finished for "${store.slug}".`);
+      setNotice({ tone: 'success', text: `Import finished for "${store.slug}".` });
     } catch (err) {
-      status.setError(`Import stopped: ${saErrorMessage(err)}. Re-run after fixing; completed rows are updated in place.`);
+      setNotice({
+        tone: 'critical',
+        text: `Import stopped: ${saErrorMessage(err)}. Re-run after fixing; completed rows are updated in place.`,
+      });
     } finally {
       setRunning(false);
     }
   };
 
+  const resultColumns: Column<StepResult>[] = [
+    { id: 'step', header: 'Step', cell: (r) => r.entity },
+    { id: 'batches', header: 'Batches', align: 'right', cell: (r) => <span className="tabular-nums">{r.batches}</span> },
+    { id: 'outcome', header: 'Outcome', cell: (r) => <span className="text-[var(--admin-text-muted)]">{r.summary}</span> },
+  ];
+
   if (!store && stores !== undefined) {
-    return <p className="p-6 text-sm">Store not found. <Link to="/sa/stores">Back to stores</Link></p>;
+    return (
+      <Page title="Import catalog" backTo="/sa/stores">
+        <Card>
+          <p className="text-sm text-[var(--admin-text-muted)]">This store was not found.</p>
+          <Link to="/sa/stores" className="mt-2 inline-block text-sm font-medium text-[var(--admin-primary)] hover:underline">
+            Back to stores
+          </Link>
+        </Card>
+      </Page>
+    );
   }
 
-  return (
-    <div className="space-y-6 p-6">
-      <div>
-        <Link to={`/sa/stores/${orgId}`} className="text-sm underline">← {store?.name ?? 'Store'}</Link>
-        <h1 className="mt-2 text-xl font-semibold">Import catalog from Dukaan</h1>
-        <p className="text-sm text-muted-foreground">
-          Upload the normalized export produced by <code>scripts/dukaan-import/crawl.mjs</code>. Re-running is safe: rows are matched by their source IDs.
-        </p>
-      </div>
+  const fileField = (id: string, label: string, accept: string, onPick: (f: File | undefined) => void, hint: string) => (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} type="file" accept={accept} disabled={running} onChange={(e) => onPick(e.target.files?.[0])} />
+      <p className="text-xs text-[var(--admin-text-muted)]">{hint}</p>
+    </div>
+  );
 
-      {!writeOpen && (
-        <p className="text-sm text-amber-700">Write access is closed. Re-launch from Citadel to import.</p>
+  const planRows: [string, number][] = plan
+    ? [
+        ['Categories', plan.counts.categories],
+        ['Products', plan.counts.products],
+        ['Variants', plan.counts.variants],
+        ['Images referenced', plan.counts.images],
+        ['Blog posts', plan.counts.blogs],
+        ['Static pages (drafts)', plan.counts.staticPages],
+      ]
+    : [];
+
+  return (
+    <Page
+      title={store ? `Import into ${store.name}` : <Skeleton className="inline-block h-6 w-56 align-middle" />}
+      backTo={`/sa/stores/${orgId}`}
+    >
+      {!writeOpen && <Banner tone="warning">Write access is closed. Re-launch from Citadel to import.</Banner>}
+      {notice && (
+        <Banner tone={notice.tone} onDismiss={() => setNotice(null)}>
+          {notice.text}
+        </Banner>
       )}
 
-      <section className="space-y-3">
-        <div className="grid gap-2">
-          <Label htmlFor="import-normalized">Normalized export (normalized.json)</Label>
-          <Input id="import-normalized" type="file" accept="application/json,.json" onChange={(e) => void onPickNormalized(e.target.files?.[0])} />
-          {fileName && <p className="text-xs text-muted-foreground">{fileName}</p>}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="import-map">Image map (image-map.json, optional)</Label>
-          <Input id="import-map" type="file" accept="application/json,.json" onChange={(e) => void onPickMap(e.target.files?.[0])} />
-          {mapName && <p className="text-xs text-muted-foreground">{mapName} · {Object.keys(imageMap).length} entries</p>}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="import-redirects">Redirects (redirects.csv, optional)</Label>
-          <Input id="import-redirects" type="file" accept=".csv,text/csv" onChange={(e) => void onPickRedirects(e.target.files?.[0])} />
-          {redirectName && <p className="text-xs text-muted-foreground">{redirectName} · {redirectRows.length} rows</p>}
-        </div>
-        <div className="grid gap-2 max-w-sm">
-          <Label htmlFor="import-theme">Theme id to activate</Label>
-          <Input id="import-theme" value={activeTheme} onChange={(e) => setActiveTheme(e.target.value.trim())} />
-        </div>
-      </section>
+      <Card title="Source files">
+        <CardSection>
+          <div className="grid gap-5">
+            {fileField(
+              'import-normalized',
+              'Normalized export (normalized.json)',
+              'application/json,.json',
+              (f) => void onPickNormalized(f),
+              fileName || 'Produced by scripts/dukaan-import/crawl.mjs',
+            )}
+            {fileField(
+              'import-map',
+              'Image map (image-map.json, optional)',
+              'application/json,.json',
+              (f) => void onPickMap(f),
+              mapName ? `${mapName} · ${formatCount(Object.keys(imageMap).length)} entries` : 'Maps Dukaan image URLs to uploaded copies',
+            )}
+            {fileField(
+              'import-redirects',
+              'Redirects (redirects.csv, optional)',
+              '.csv,text/csv',
+              (f) => void onPickRedirects(f),
+              redirectName ? `${redirectName} · ${formatCount(redirectRows.length)} rows` : 'Columns: from, to, status',
+            )}
+            <div className="grid max-w-sm gap-1.5">
+              <Label htmlFor="import-theme">Theme to activate</Label>
+              <Input id="import-theme" value={activeTheme} disabled={running} onChange={(e) => setActiveTheme(e.target.value.trim())} />
+            </div>
+          </div>
+        </CardSection>
+      </Card>
 
       {plan && (
-        <section className="space-y-3">
-          <h2 className="font-medium">Plan</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Entity</TableHead>
-                <TableHead>Count</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow><TableCell>Categories</TableCell><TableCell>{plan.counts.categories}</TableCell></TableRow>
-              <TableRow><TableCell>Products</TableCell><TableCell>{plan.counts.products}</TableCell></TableRow>
-              <TableRow><TableCell>Variants</TableCell><TableCell>{plan.counts.variants}</TableCell></TableRow>
-              <TableRow><TableCell>Images referenced</TableCell><TableCell>{plan.counts.images}</TableCell></TableRow>
-              <TableRow><TableCell>Blog posts</TableCell><TableCell>{plan.counts.blogs}</TableCell></TableRow>
-              <TableRow><TableCell>Static pages (drafts)</TableCell><TableCell>{plan.counts.staticPages}</TableCell></TableRow>
-            </TableBody>
-          </Table>
+        <Card
+          title="Plan"
+          footer={
+            <Button variant="primary" onClick={() => void run()} disabled={running || !writeOpen} loading={running}>
+              {running ? 'Importing' : `Import into ${store?.slug ?? 'store'}`}
+            </Button>
+          }
+        >
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+            {planRows.map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs font-medium text-[var(--admin-text-muted)]">{label}</dt>
+                <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--admin-text)]">{formatCount(value)}</dd>
+              </div>
+            ))}
+          </dl>
           {plan.unmappedImages.length > 0 && (
-            <p className="text-sm text-amber-700">
-              {plan.unmappedImages.length} image URLs have no uploaded copy and would still point at Dukaan. Upload images first (scripts/dukaan-import/images.mjs) and attach the image map.
-            </p>
+            <div className="mt-5">
+              <Banner tone="warning">
+                {formatCount(plan.unmappedImages.length)} image URLs have no uploaded copy and would still point at Dukaan. Upload images
+                first (scripts/dukaan-import/images.mjs) and attach the image map.
+              </Banner>
+            </div>
           )}
-          <Button onClick={() => void run()} disabled={running || !writeOpen}>
-            {running ? 'Importing…' : `Import into ${store?.slug ?? 'store'}`}
-          </Button>
-        </section>
+        </Card>
       )}
 
       {results.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="font-medium">Results</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Step</TableHead>
-                <TableHead>Batches</TableHead>
-                <TableHead>Outcome</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {results.map((r) => (
-                <TableRow key={r.entity}>
-                  <TableCell>{r.entity}</TableCell>
-                  <TableCell>{r.batches}</TableCell>
-                  <TableCell>{r.summary}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
+        <Card title="Results" padding="none">
+          <DataTable columns={resultColumns} rows={results} getRowId={(r) => r.entity} />
+        </Card>
       )}
-
-      <InlineStatus status={status.status} />
-    </div>
+    </Page>
   );
 }

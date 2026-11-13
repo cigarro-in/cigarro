@@ -1,6 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { action, internalMutation, mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { normalizePhoneE164 } from "./lib/phone";
@@ -297,5 +299,132 @@ export const removeMember = mutation({
       payload: { userId: m.userId, role: m.role },
     });
     return membershipId;
+  },
+});
+
+// ---------- platform overview (read-only, additive) ----------
+
+const DAY_MS = 86_400_000;
+// Asia/Kolkata has no DST, so a fixed offset gives the store-local day start.
+const IST_OFFSET_MS = 19_800_000;
+// Paid = counted as revenue (same definition as adminStats.getDashboardStats).
+const REVENUE_STATUSES = ["paid", "late_paid"] as const;
+
+function istDayStart(now: number): number {
+  return Math.floor((now + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS;
+}
+
+type GmailState = "connected" | "needs_reconnect" | "not_connected";
+
+// Per-store numbers shared by listStoreStats and platformOverview. Reads only.
+async function collectStoreStats(
+  ctx: QueryCtx,
+  org: Doc<"organizations">,
+  now: number,
+) {
+  const weekStart = now - 7 * DAY_MS;
+  const dayStart = istDayStart(now);
+
+  let orders7d = 0;
+  let gmv7dPaise = 0;
+  let ordersToday = 0;
+  let gmvTodayPaise = 0;
+  for (const status of REVENUE_STATUSES) {
+    const rows = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status", (q) =>
+        q.eq("orgId", org._id).eq("status", status).gte("createdAt", weekStart),
+      )
+      .collect();
+    for (const o of rows) {
+      orders7d += 1;
+      gmv7dPaise += o.finalAmountPaise;
+      if (o.createdAt >= dayStart) {
+        ordersToday += 1;
+        gmvTodayPaise += o.finalAmountPaise;
+      }
+    }
+  }
+
+  const setting = await ctx.db
+    .query("siteSettings")
+    .withIndex("by_org_key", (q) => q.eq("orgId", org._id).eq("key", "main"))
+    .unique();
+
+  const gmailRows = await ctx.db
+    .query("gmailConnections")
+    .withIndex("by_org", (q) => q.eq("orgId", org._id))
+    .collect();
+  const active = gmailRows.find((g) => g.status === "active") ?? null;
+  const gmail: GmailState = active
+    ? "connected"
+    : gmailRows.some((g) => g.status === "needs_reconnect")
+      ? "needs_reconnect"
+      : "not_connected";
+
+  const domains = await ctx.db
+    .query("orgDomains")
+    .withIndex("by_org", (q) => q.eq("orgId", org._id))
+    .collect();
+
+  return {
+    orgId: org._id,
+    theme: setting?.activeTheme ?? null,
+    orders7d,
+    gmv7dPaise,
+    ordersToday,
+    gmvTodayPaise,
+    gmail,
+    gmailEmail: active?.accountEmail ?? null,
+    domainCount: domains.length,
+    domainsNotActive: domains.filter((d) => d.status !== "active").length,
+  };
+}
+
+// One row per store: theme, 7-day paid orders, Gmail connection state.
+export const listStoreStats = query({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
+    const now = Date.now();
+    const orgs = await ctx.db.query("organizations").collect();
+    return await Promise.all(orgs.map((org) => collectStoreStats(ctx, org, now)));
+  },
+});
+
+// Platform-wide totals for the super-admin overview.
+export const platformOverview = query({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
+    const now = Date.now();
+    const orgs = await ctx.db.query("organizations").collect();
+    const rows = await Promise.all(orgs.map((org) => collectStoreStats(ctx, org, now)));
+    let ordersToday = 0;
+    let gmvTodayPaise = 0;
+    let orders7d = 0;
+    let gmv7dPaise = 0;
+    let domainsNotActive = 0;
+    let storesGmailNotConnected = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      ordersToday += r.ordersToday;
+      gmvTodayPaise += r.gmvTodayPaise;
+      orders7d += r.orders7d;
+      gmv7dPaise += r.gmv7dPaise;
+      domainsNotActive += r.domainsNotActive;
+      if (orgs[i].active && r.gmail !== "connected") storesGmailNotConnected += 1;
+    }
+    return {
+      storeCount: orgs.length,
+      activeStoreCount: orgs.filter((o) => o.active).length,
+      ordersToday,
+      orders7d,
+      gmvTodayPaise,
+      gmv7dPaise,
+      storesGmailNotConnected,
+      domainsNotActive,
+      generatedAt: now,
+    };
   },
 });

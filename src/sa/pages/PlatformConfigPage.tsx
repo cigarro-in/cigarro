@@ -1,26 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { Button } from '../../components/ui/button';
-import { Label } from '../../components/ui/label';
-import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  CardSection,
+  DataTable,
+  EmptyState,
+  Label,
+  Page,
+  Textarea,
+  useButtonFeedback,
+  type Column,
+} from '../../adminnew/ui';
 import { api } from '../../../convex/_generated/api';
 import { useSa } from '../SuperGate';
-import { saErrorMessage } from '../session';
-import { listMigrationsRef, runPendingMigrationsRef } from '../refs';
+import { runSa, formatCount, formatDateTime } from '../saUi';
+import { listMigrationsRef, runPendingMigrationsRef, type MigrationRow } from '../refs';
 
-// Moved from the store admin Payments page (Platform Config card). Platform-wide
-// bank-alert senders shared by every store.
+// Platform-wide bank-alert senders shared by every store, plus the one-time
+// migration runner. Migrations run only when the button is pressed.
 export function PlatformConfigPage() {
   const { token, writeOpen } = useSa();
   const appConfig = useQuery(api.appConfig.get, { saToken: token });
   const setAppConfig = useMutation(api.appConfig.set);
   const migrations = useQuery(listMigrationsRef, { saToken: token });
   const runPendingMigrations = useAction(runPendingMigrationsRef);
-  const status = useInlineStatus();
-  const migrationStatus = useInlineStatus();
-  const [running, setRunning] = useState(false);
+
+  const migrationFb = useButtonFeedback();
+  const [lastRun, setLastRun] = useState<{ at: number; entries: [string, string][] } | null>(null);
+
+  const saveFb = useButtonFeedback();
   const [csv, setCsv] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const customSenders = appConfig?.customBankSenders ?? [];
   const defaultSenders = appConfig?.defaultBankSenders ?? [];
@@ -33,115 +46,169 @@ export function PlatformConfigPage() {
   }, [customKey]);
 
   const onSave = async () => {
-    setSaving(true);
-    try {
-      await setAppConfig({
-        saToken: token,
-        bankSenders: csv.split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
-      });
-      status.setOk(`Saved ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`);
-    } catch (err) {
-      status.setError(saErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
+    const senders = csv
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const ok = await saveFb.run(() => runSa(() => setAppConfig({ saToken: token, bankSenders: senders })));
+    if (ok !== undefined) setSavedAt(Date.now());
   };
 
   const onRunMigrations = async () => {
-    setRunning(true);
-    migrationStatus.clear();
-    try {
-      const summary = await runPendingMigrations({ saToken: token });
-      const entries = Object.entries(summary);
-      const text = entries.length === 0
-        ? 'No migrations pending.'
-        : entries.map(([name, result]) => `${name}: ${result}`).join('; ');
-      migrationStatus.setOk(text);
-    } catch (err) {
-      migrationStatus.setError(saErrorMessage(err));
-    } finally {
-      setRunning(false);
-    }
+    const summary = await migrationFb.run(() => runSa(() => runPendingMigrations({ saToken: token })));
+    if (summary === undefined) return;
+    setLastRun({ at: Date.now(), entries: Object.entries(summary) });
   };
 
+  const migrationColumns: Column<MigrationRow>[] = [
+    {
+      id: 'name',
+      header: 'Migration',
+      cell: (m) => <span className="break-all font-mono text-[13px]">{m.name}</span>,
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (m) =>
+        m.status === 'done' ? <Badge tone="success" dot>Done</Badge> : <Badge tone="critical" dot>Failed</Badge>,
+    },
+    {
+      id: 'runs',
+      header: 'Runs',
+      align: 'right',
+      hideBelow: 'sm',
+      cell: (m) => <span className="tabular-nums">{m.runs}</span>,
+    },
+    {
+      id: 'updated',
+      header: 'Updated',
+      hideBelow: 'md',
+      cell: (m) => <span className="whitespace-nowrap text-[13px] text-[var(--admin-text-muted)]">{formatDateTime(m.updatedAt)}</span>,
+    },
+    {
+      id: 'result',
+      header: 'Result',
+      cell: (m) => <span className="break-all font-mono text-xs text-[var(--admin-text-muted)]">{m.result ?? '-'}</span>,
+    },
+  ];
+
+  const pendingCount = (migrations ?? []).filter((m) => m.status === 'failed').length;
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold">Platform config</h1>
-      <p className="text-sm text-muted-foreground">
-        These settings apply to every store. Senders are added to the built-in defaults, never replace them. Max 20 entries.
-      </p>
-      <div className="rounded-xl border p-4 space-y-3">
-        <Label htmlFor="sa-senders">Additional bank-alert senders</Label>
-        <textarea
-          id="sa-senders"
-          className="w-full rounded-md border border-border p-2 text-sm font-mono"
-          rows={4}
-          value={csv}
-          onChange={(e) => setCsv(e.target.value)}
-          placeholder={'@icicibank.com\nalerts@sbi.co.in'}
-          disabled={!writeOpen}
-        />
-        <div className="rounded-lg bg-muted border p-3 text-xs">
-          <p className="font-semibold mb-1">Currently searched ({mergedSenders.length})</p>
-          <ul className="space-y-0.5">
-            {mergedSenders.map((s) => (
-              <li key={s} className="font-mono">
-                {s}
-                {defaultSenders.includes(s) && <span className="text-muted-foreground ml-2">(default)</span>}
-                {customSenders.includes(s) && !defaultSenders.includes(s) && <span className="ml-2">(custom)</span>}
-              </li>
-            ))}
-          </ul>
+    <Page title="Platform config">
+      {/* Migrations first: the one action that changes production data. */}
+      <Card title="One-time migrations">
+        <CardSection>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[13px] text-[var(--admin-text-muted)]">
+                Runs only when you press the button. Completed migrations never run again. Failed ones retry, up to 5 runs.
+              </p>
+              <Button
+                variant="primary"
+                size="lg"
+                className="shrink-0"
+                state={migrationFb.state}
+                disabled={!writeOpen || migrationFb.busy}
+                onClick={() => void onRunMigrations()}
+              >
+                Run pending migrations
+              </Button>
+            </div>
+
+            {migrationFb.error && <Banner tone="critical">{migrationFb.error.message}</Banner>}
+
+            {lastRun && (
+              <div className="rounded-[var(--admin-radius-sm)] border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)]">
+                <div className="flex items-center justify-between gap-3 border-b border-[var(--admin-border)] px-3 py-2">
+                  <p className="text-sm font-semibold text-[var(--admin-text)]">
+                    {lastRun.entries.length === 0 ? 'Nothing to run' : `Ran ${formatCount(lastRun.entries.length)} migration${lastRun.entries.length === 1 ? '' : 's'}`}
+                  </p>
+                  <span className="text-xs text-[var(--admin-text-muted)]">{formatDateTime(lastRun.at)}</span>
+                </div>
+                {lastRun.entries.length === 0 ? (
+                  <p className="px-3 py-3 text-[13px] text-[var(--admin-text-muted)]">No migrations pending.</p>
+                ) : (
+                  <ul className="divide-y divide-[var(--admin-border)]">
+                    {lastRun.entries.map(([name, result]) => (
+                      <li key={name} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-3">
+                        <span className="font-mono text-[13px] text-[var(--admin-text)]">{name}</span>
+                        <span className="break-all font-mono text-xs text-[var(--admin-text-muted)]">{result}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </CardSection>
+        <div className="border-t border-[var(--admin-border)]">
+          <DataTable
+            columns={migrationColumns}
+            rows={migrations}
+            getRowId={(m) => m._id}
+            loading={migrations === undefined}
+            empty={<EmptyState title="No migrations have run yet" description="Pending migrations appear here after the first run." />}
+          />
         </div>
-        <Button onClick={() => void onSave()} disabled={!writeOpen || saving}>
-          {saving ? 'Saving...' : 'Save platform config'}
-        </Button>
-        <InlineStatus status={status.status} />
-      </div>
-      <div className="rounded-xl border p-4 space-y-3">
-        <p className="text-sm font-semibold">One-time migrations</p>
-        <p className="text-xs text-muted-foreground">
-          Runs only when you press the button. Done rows are never re-run. Failed rows retry up to 5 runs.
-        </p>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => void onRunMigrations()} disabled={!writeOpen || running}>
-            {running ? 'Running...' : 'Run pending migrations'}
-          </Button>
-        </div>
-        <InlineStatus status={migrationStatus.status} />
-        {migrations === undefined ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        ) : migrations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No migrations have run yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b text-muted-foreground">
-                <tr>
-                  <th className="py-1 pr-3 font-medium">Name</th>
-                  <th className="py-1 pr-3 font-medium">Status</th>
-                  <th className="py-1 pr-3 font-medium">Runs</th>
-                  <th className="py-1 pr-3 font-medium">Updated</th>
-                  <th className="py-1 font-medium">Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                {migrations.map((m) => (
-                  <tr key={m._id} className="border-b align-top">
-                    <td className="py-1 pr-3 font-mono">{m.name}</td>
-                    <td className="py-1 pr-3">{m.status}</td>
-                    <td className="py-1 pr-3">{m.runs}</td>
-                    <td className="py-1 pr-3 whitespace-nowrap">
-                      {new Date(m.updatedAt).toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-1 font-mono break-all">{m.result ?? '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {pendingCount > 0 && (
+          <div className="px-4 py-3">
+            <Banner tone="warning">
+              {pendingCount} migration{pendingCount === 1 ? ' has' : 's have'} failed. Run again after checking the result.
+            </Banner>
           </div>
         )}
-      </div>
-    </div>
+      </Card>
+
+      <Card title="Bank-alert senders">
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] text-[var(--admin-text-muted)]">
+            Added to the built-in defaults for every store, never replacing them. One per line or comma-separated, up to 20.
+          </p>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sa-senders">Additional senders</Label>
+            <Textarea
+              id="sa-senders"
+              className="font-mono text-[13px]"
+              rows={4}
+              value={csv}
+              onChange={(e) => setCsv(e.target.value)}
+              placeholder={'@icicibank.com\nalerts@sbi.co.in'}
+              disabled={!writeOpen || saveFb.busy}
+            />
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-[var(--admin-text-muted)]">Searched now ({formatCount(mergedSenders.length)})</p>
+            {mergedSenders.length === 0 ? (
+              <p className="text-[13px] text-[var(--admin-text-muted)]">No senders configured.</p>
+            ) : (
+              <ul className="flex flex-wrap gap-1.5">
+                {mergedSenders.map((s) => {
+                  const isDefault = defaultSenders.includes(s);
+                  const isCustom = customSenders.includes(s) && !isDefault;
+                  return (
+                    <li key={s}>
+                      <Badge tone={isCustom ? 'attention' : 'neutral'}>
+                        <span className="font-mono">{s}</span>
+                        <span className="text-[var(--admin-text-subtle)]">{isDefault ? 'default' : isCustom ? 'custom' : ''}</span>
+                      </Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="primary" state={saveFb.state} disabled={!writeOpen || saveFb.busy || appConfig === undefined} onClick={() => void onSave()}>
+              Save senders
+            </Button>
+            {savedAt !== null && !saveFb.error && (
+              <span className="text-[13px] text-[var(--admin-text-muted)]">Saved {formatDateTime(savedAt)}</span>
+            )}
+          </div>
+          {saveFb.error && <Banner tone="critical">{saveFb.error.message}</Banner>}
+        </div>
+      </Card>
+    </Page>
   );
 }

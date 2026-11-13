@@ -207,3 +207,42 @@ export const importSeedRedirectsRef = makeFunctionReference<
   },
   { imported: number; failed: number }
 >('redirects:importSeedRedirectsForOrg');
+
+// ---- Overview and per-store stats (convex/platform.ts, read-only).
+export type GmailState = 'connected' | 'needs_reconnect' | 'not_connected';
+
+export interface StoreStatsRow {
+  orgId: Id<'organizations'>;
+  theme: string | null;
+  orders7d: number;
+  gmv7dPaise: number;
+  ordersToday: number;
+  gmvTodayPaise: number;
+  gmail: GmailState;
+  gmailEmail: string | null;
+  domainCount: number;
+  domainsNotActive: number;
+}
+
+export interface PlatformOverview {
+  storeCount: number;
+  activeStoreCount: number;
+  ordersToday: number;
+  orders7d: number;
+  gmvTodayPaise: number;
+  gmv7dPaise: number;
+  storesGmailNotConnected: number;
+  domainsNotActive: number;
+  generatedAt: number;
+}
+
+export const listStoreStatsRef = makeFunctionReference<
+  'query',
+  { saToken: string },
+  StoreStatsRow[]
+>('platform:listStoreStats');
+export const platformOverviewRef = makeFunctionReference<
+  'query',
+  { saToken: string },
+  PlatformOverview
+>('platform:platformOverview');

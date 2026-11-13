@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Banner, Button, Skeleton } from '../adminnew/ui';
+import { AuthFrame } from './saUi';
 import { CITADEL_HUB_URL, exchangeLaunchToken, writeStoredSa } from './session';
 
 // Route: /sa/callback. Citadel redirects here with the launch JWT in the
@@ -33,18 +35,26 @@ export function Callback() {
   }, [navigate]);
 
   if (!error) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Signing in...</div>;
+    return (
+      <AuthFrame>
+        <h1 className="text-xl font-semibold text-[var(--admin-text)]">Signing in</h1>
+        <div className="mt-5 space-y-3" aria-busy="true" aria-label="Signing in">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      </AuthFrame>
+    );
   }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div role="alert" className="max-w-sm space-y-4 text-center">
-        <p className="rounded-xl border border-red-300 bg-red-50 px-3 py-2.5 text-[13px] font-semibold text-red-700">
-          {error}
-        </p>
-        <a href={CITADEL_HUB_URL} className="inline-flex h-11 items-center rounded-xl border px-6 font-semibold">
-          Back to Citadel
-        </a>
+    <AuthFrame>
+      <h1 className="text-xl font-semibold text-[var(--admin-text)]">Sign-in failed</h1>
+      <div className="mt-5 flex flex-col gap-3">
+        <Banner tone="critical">{error}</Banner>
+        <Button asChild variant="secondary" size="lg" fullWidth>
+          <a href={CITADEL_HUB_URL}>Back to Citadel</a>
+        </Button>
       </div>
-    </div>
+    </AuthFrame>
   );
 }

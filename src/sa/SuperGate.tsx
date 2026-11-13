@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/button';
-import { InlineStatus, useInlineStatus } from '../components/common/InlineStatus';
+import { Banner, Button, Skeleton } from '../adminnew/ui';
+import { AuthFrame } from './saUi';
+import { SaShell } from './SaShell';
 import {
   CITADEL_HUB_URL,
   clearStoredSa,
@@ -40,7 +41,7 @@ export function SuperGate() {
   const [state, setState] = useState<GateState>({ kind: 'checking' });
   const [tick, setTick] = useState(0);
   const navigate = useNavigate();
-  const status = useInlineStatus();
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Re-read /me once a minute: keeps the idle clock alive and refreshes the
   // write window. A 401 drops the session.
@@ -68,12 +69,12 @@ export function SuperGate() {
         });
       })
       .catch((e: Error) => {
-        if (!cancelled) status.setError(e.message);
+        if (!cancelled) setFetchError(e.message);
       });
     return () => {
       cancelled = true;
     };
-    // status is stable enough for this one-shot effect; tick drives refreshes.
+    // tick drives refreshes; the effect is intentionally keyed on it alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
@@ -91,26 +92,31 @@ export function SuperGate() {
   }, [state, navigate]);
 
   if (state.kind === 'checking') {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Checking session...</div>;
+    return (
+      <AuthFrame>
+        <div className="space-y-3" aria-busy="true" aria-label="Checking session">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          {fetchError && <Banner tone="critical">{fetchError}</Banner>}
+        </div>
+      </AuthFrame>
+    );
   }
 
   if (state.kind === 'missing') {
+    const message = state.reason ?? 'Open this app from Citadel to sign in.';
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="max-w-sm text-center space-y-4">
-          <p className="text-lg font-bold">Super admin</p>
-          <p className="text-sm text-muted-foreground">
-            {state.reason ?? 'Open this app from Citadel to sign in.'}
-          </p>
-          <a
-            href={CITADEL_HUB_URL}
-            className="inline-flex h-11 items-center rounded-xl bg-primary px-6 font-semibold text-primary-foreground"
-          >
-            Open from Citadel
-          </a>
-          <InlineStatus status={status.status} />
+      <AuthFrame>
+        <h1 className="text-xl font-semibold text-[var(--admin-text)]">Super admin</h1>
+        <p className="mt-1 text-sm text-[var(--admin-text-muted)]">{message}</p>
+        <div className="mt-5 flex flex-col gap-3">
+          <Button asChild variant="primary" size="lg" fullWidth>
+            <a href={CITADEL_HUB_URL}>Open from Citadel</a>
+          </Button>
+          {fetchError && <Banner tone="critical">{fetchError}</Banner>}
         </div>
-      </div>
+      </AuthFrame>
     );
   }
 
@@ -125,27 +131,9 @@ export function SuperGate() {
 
   return (
     <SaContext.Provider value={value}>
-      <div className="min-h-screen bg-background">
-        <header className="border-b px-4 py-3 flex flex-wrap items-center gap-4">
-          <span className="font-bold">Cigarro super admin</span>
-          <nav className="flex gap-3 text-sm">
-            <a href="/sa/stores" className="underline-offset-4 hover:underline">Stores</a>
-            <a href="/sa/domains" className="underline-offset-4 hover:underline">Domains</a>
-            <a href="/sa/platform" className="underline-offset-4 hover:underline">Platform config</a>
-          </nav>
-          <div className="ml-auto">
-            <Button variant="secondary" onClick={() => void signOut()}>Sign out</Button>
-          </div>
-        </header>
-        {!writeOpen && (
-          <div role="status" className="border-b bg-amber-50 px-4 py-2 text-sm text-amber-900">
-            Read-only. Write access expired. Re-launch from Citadel to edit.
-          </div>
-        )}
-        <main className="mx-auto max-w-5xl p-4 space-y-6">
-          <Outlet />
-        </main>
-      </div>
+      <SaShell adminId={state.adminId} writeOpen={writeOpen} onSignOut={() => void signOut()}>
+        <Outlet />
+      </SaShell>
     </SaContext.Provider>
   );
 }
