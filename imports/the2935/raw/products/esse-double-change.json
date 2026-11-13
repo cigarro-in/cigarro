@@ -1,0 +1,163 @@
+{
+  "url": "https://mydukaan.io/the2935/products/esse-double-change",
+  "product": {
+    "id": 36576103,
+    "uuid": "b9cc3e18-74bc-46dd-a519-a7ee2d675b59",
+    "slug": "esse-double-change",
+    "name": "Esse Double Change Applemint and Wine",
+    "price": 1200,
+    "compare_at": 1245,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 3,
+    "default_sku": 62387638,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/d9b79883-2e20-451b-9202-0b5f4b651858.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/75aebf9f-13da-45f9-9c3c-5c8c9abae8af.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/9c0c4deb-f594-459a-92d8-8896288920fe.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/3fac2e8d-6930-433b-aecb-00e44cb39b6a.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/823efbca-acde-4dca-8e23-ed5834b33759.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/b12a7d31-5bae-4a9e-9f14-d2447c3740cc.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/500ab7f3-564d-40c6-b010-37b672ed0c31.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/cc2baa9a-b0dc-4e82-93e6-5f24f8da5a98.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/1ce33912-61d4-4b83-ae4c-5a8df1a38c03.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/3ad04876-4d11-4260-b9d3-151b29a67599.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/0d1b5620-12fc-497f-9384-1785384f90cc.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/02c4fdf2-9a9f-47fd-962b-b280cff1e6c5.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/3a9f736a-bef5-4b93-982b-6de522ab0658.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/e93f705b-1a63-4964-a330-c5b5355f0c35.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/1058f6b0-2be7-44a7-a4c3-dccb51b03b70.jpg"
+    ],
+    "videos": [],
+    "description": "<h4><span>ESSE DOUBLE CHANGE </span></h4>\n<h3>Applemint and Wine</h3>\n<p>Changing of flavors from rich to fresh upon breaking the capsules</p>\n<h3><br>Esse double change cigratte comes with 2 switches inside filter contains two different flavours Applemint and Wine</h3>\n<ul>\n<li>\n<div>\n<div>\n<h5>Length</h5>\n<p>100mm</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Tar/Nicotine</h5>\n<p>Tar 4.0mg / Nic. 0.40mg</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Launch Date</h5>\n<p>2013.06.10</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Price</h5>\n<p>Undefined</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Feature</h5>\n<p>초슬림 캡슐 담배</p>\n</div>\n</div>\n</li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "HALF CARTON (FIVE PACKETS)",
+          "CARTON (TEN PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62387638,
+        "uuid": "c38e87bb-249b-4f9d-817f-ad657eaf2dbe",
+        "code": "",
+        "price": 1200,
+        "compare_at": 1245,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d9b79883-2e20-451b-9202-0b5f4b651858.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d9b79883-2e20-451b-9202-0b5f4b651858.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      },
+      {
+        "id": 62387639,
+        "uuid": "0521ef43-d0ff-44f2-b27e-8c8e00782f6b",
+        "code": "",
+        "price": 2400,
+        "compare_at": 2490,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/cc2baa9a-b0dc-4e82-93e6-5f24f8da5a98.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/cc2baa9a-b0dc-4e82-93e6-5f24f8da5a98.jpeg",
+          "https://dms.mydukaan.io/original/jpeg/media/1058f6b0-2be7-44a7-a4c3-dccb51b03b70.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (TEN PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T14:55:45.871755Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

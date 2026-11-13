@@ -1,0 +1,479 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/cigarette",
+  "h1": "Cigarette",
+  "title": "Premium Imported Quality Cigarettes | Best Prices Online",
+  "canonical": "https://mydukaan.io/the2935/collections/cigarette",
+  "metaDescription": "Explore our wide range of premium imported cigarettes online in India. Enjoy unbeatable prices, fast delivery, and trusted customer service – all from one reliable source.",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/4f47064e-df93-4ed6-a115-f9b38232f0ab.png",
+  "introHtml": "<h1>SmokeShop.co.in offers a wide range of premium imported cigarettes online in India.</h1>",
+  "childSlugs": [
+    "camel",
+    "david-off",
+    "dunhill",
+    "esse",
+    "marlboro",
+    "rothmans",
+    "mond"
+  ],
+  "countText": 42,
+  "productSlugs": [
+    "sobranie-cocktail",
+    "sobranie-black-russian-cigarettes",
+    "pine-superslims",
+    "esse-double-change-applemint-and-orange",
+    "mond-watermelon",
+    "davidoff-white-superslim-1mg",
+    "esse-change-4mg-1",
+    "mond-orange-mint-1",
+    "mond-grapes",
+    "mond-strawberry",
+    "marlboro-double-burst",
+    "dunhill-switch-silver",
+    "dunhill-white-1mg",
+    "benson-and-hedge-red-imported",
+    "davidoff-gold-8mg-slim",
+    "davidoff-gold-8mg",
+    "davidoff-white-1mg-slim",
+    "marlboro-fuse-beyond",
+    "classic-connect",
+    "dunhill-3-mg",
+    "benson-and-hedge-light-1",
+    "esse-double-change",
+    "gudang-garam",
+    "davidoff-white"
+  ],
+  "productsRaw": [
+    {
+      "id": 48094882,
+      "uuid": "abfed4b9-a8a2-40d1-a48e-8acde0f35d42",
+      "slug": "sobranie-cocktail",
+      "name": "Sobranie Cocktail",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/a513e230-b346-4b46-a905-ec261267bcfa.webp"
+      ],
+      "price": 999,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60221558,
+      "sku_count": 2
+    },
+    {
+      "id": 48025509,
+      "uuid": "8f4dcddc-e8e2-4d45-9b68-b28517485101",
+      "slug": "sobranie-black-russian-cigarettes",
+      "name": "Sobranie Black Russian Cigarettes",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/31eb0991-17f0-4019-8087-24f0fdf44e07.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/30e71649-4b1f-4584-930b-02c6b858cad0.webp"
+      ],
+      "price": 999,
+      "compare_at": 1199,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 60068852,
+      "sku_count": 2
+    },
+    {
+      "id": 47686498,
+      "uuid": "b27636d7-17a8-467b-bdee-f877b3e7ca5c",
+      "slug": "pine-superslims",
+      "name": "PINE SUPERSLIMS",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/05faf74b-e636-4f94-9718-a0541c9563e6.webp"
+      ],
+      "price": 2750,
+      "compare_at": 2990,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 62386924,
+      "sku_count": 2
+    },
+    {
+      "id": 47686288,
+      "uuid": "10f65d6c-9ba7-4326-b1dc-907af8b1dc1c",
+      "slug": "esse-double-change-applemint-and-orange",
+      "name": "Esse Double Change Orange and Applemint",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/19f17bb4-6b73-4c29-bb62-a4bdb878fbdd.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/6745c0a3-e6cd-4c27-ab1a-2718a201030c.jpg"
+      ],
+      "price": 1125,
+      "compare_at": 1245,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62386828,
+      "sku_count": 2
+    },
+    {
+      "id": 47683460,
+      "uuid": "13e4b472-9dcf-4362-8307-6ee891429dbd",
+      "slug": "mond-watermelon",
+      "name": "Mond WATERMELON",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/f8b129a6-dbca-4709-b926-1a3e3d54f72e.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/1424b08f-9cc3-44cd-a2ba-c777481af142.webp"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58975930,
+      "sku_count": 2
+    },
+    {
+      "id": 47606930,
+      "uuid": "64629715-506d-4c62-baca-0f784dee5414",
+      "slug": "davidoff-white-superslim-1mg",
+      "name": "Davidoff White SUPERSLIM 1MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/55e588ac-9c8f-4e1b-8524-1524538fceec.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/0c4615d6-9c69-4e0d-8ab2-7e48077eb2eb.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 3,
+      "default_sku": 58826138,
+      "sku_count": 2
+    },
+    {
+      "id": 47523044,
+      "uuid": "1194b78e-cdaf-48a5-bcd2-77f591cba65a",
+      "slug": "esse-change-4mg-1",
+      "name": "Esse Change 4mg",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/784f3559-db36-4a69-88a5-14aa622a9806.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/7c7fd152-4b63-443d-b6fb-88b866b954d8.jpeg"
+      ],
+      "price": 2250,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58658364,
+      "sku_count": 2
+    },
+    {
+      "id": 47348777,
+      "uuid": "db2253b4-8a0a-4ead-ad37-229895c839f0",
+      "slug": "mond-orange-mint-1",
+      "name": "Mond ORANGE MINT",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/5bd22956-f43e-44f2-b39d-13c42a7ed63e.jpg"
+      ],
+      "price": 950,
+      "compare_at": 1000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 62387458,
+      "sku_count": 2
+    },
+    {
+      "id": 47348770,
+      "uuid": "a5274834-5cec-4703-9fa0-8c3fdbafd571",
+      "slug": "mond-grapes",
+      "name": "Mond GRAPES",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/16ab874e-c9de-44a1-a162-8832cb80478f.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/758e4510-3720-4bc5-967d-1e789186090f.jpg"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 62387453,
+      "sku_count": 2
+    },
+    {
+      "id": 47348765,
+      "uuid": "af137602-40ed-44e5-bba9-418c986d9725",
+      "slug": "mond-strawberry",
+      "name": "Mond Strawberry",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/fbd909c5-51dc-4ebf-ac1b-cb875b4ce27d.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/c6224bef-82bf-452b-b796-9dda410e7206.jpg"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 4,
+      "default_sku": 58337425,
+      "sku_count": 2
+    },
+    {
+      "id": 47292052,
+      "uuid": "f0a594a8-8132-4888-b8b6-8f85e692df66",
+      "slug": "marlboro-double-burst",
+      "name": "Marlboro Double Burst",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/e199a240-b693-47f1-917f-fad340b28440.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/dc342657-4da6-4e58-b2e8-b7714dd39345.jpg"
+      ],
+      "price": 3300,
+      "compare_at": 3400,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58188235,
+      "sku_count": 2
+    },
+    {
+      "id": 47292045,
+      "uuid": "42f2edb7-e314-4e01-9d32-7809c9258ef9",
+      "slug": "dunhill-switch-silver",
+      "name": "Dunhill 8MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/ce5099b0-e145-413d-9499-001eca9f8f86.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/bc254a5a-80d6-414b-b6de-c55ecb1bafcd.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 58188227,
+      "sku_count": 2
+    },
+    {
+      "id": 47292025,
+      "uuid": "06242f23-6ab6-4b67-9793-ed590776dfdb",
+      "slug": "dunhill-white-1mg",
+      "name": "Dunhill WHITE 1MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/9b72f52e-d786-46c2-8557-b071aa82291d.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/ad572851-b9b0-4ea2-808f-06b6db776c51.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 58188204,
+      "sku_count": 2
+    },
+    {
+      "id": 47292006,
+      "uuid": "af9910df-28dd-4bbd-abf1-9c57fac934e4",
+      "slug": "benson-and-hedge-red-imported",
+      "name": "Benson And Hedge RED (Imported)",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/d2541c14-e8b7-494b-9c75-39b4804d0c02.jpg"
+      ],
+      "price": 3800,
+      "compare_at": 4000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58187985,
+      "sku_count": 2
+    },
+    {
+      "id": 43545477,
+      "uuid": "d4a9e1a7-8963-44a8-902d-fed15f96d40c",
+      "slug": "davidoff-gold-8mg-slim",
+      "name": "Davidoff GOLD 7MG SLIM",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b6a68de1-c5bf-4a3a-915d-7f97dbbe5087.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/04883567-4cc7-4685-9110-a5c64f5256aa.png"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 52094907,
+      "sku_count": 2
+    },
+    {
+      "id": 43545474,
+      "uuid": "bda2476f-9b82-466a-bd32-abda82a1630a",
+      "slug": "davidoff-gold-8mg",
+      "name": "Davidoff GOLD 7MG KING SIZE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/7c06cbbd-48cf-4343-bf46-acfb719c451f.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/10b5b241-7895-4869-95bb-0090fb9ff9eb.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 4,
+      "default_sku": 52094901,
+      "sku_count": 2
+    },
+    {
+      "id": 43545471,
+      "uuid": "745600c0-8029-440a-bc43-6431071aad22",
+      "slug": "davidoff-white-1mg-slim",
+      "name": "Davidoff White 1MG SLIM",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/3193e131-982b-416a-a420-2e26a76f4c6b.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 11,
+      "default_sku": 52094887,
+      "sku_count": 2
+    },
+    {
+      "id": 43256854,
+      "uuid": "c6a6964a-b321-450c-bad2-145ea107838d",
+      "slug": "marlboro-fuse-beyond",
+      "name": "Marlboro Fuse Beyond",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/c2d07543-a219-46d7-be41-ded11a5904bc.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/c55b7965-6752-4b4f-8335-096cdafaf184.png"
+      ],
+      "price": 4800,
+      "compare_at": 0,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 51195889,
+      "sku_count": 1
+    },
+    {
+      "id": 43256810,
+      "uuid": "0d219d67-cd17-43d1-9ad7-65315595e572",
+      "slug": "classic-connect",
+      "name": "Classic Connect",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/74cb5a12-3264-497a-a101-2d66bd9b37eb.jpeg",
+        "https://dms.mydukaan.io/original/jpeg/media/c968df40-bfc0-472d-9023-4c4ed4e8284c.jpg"
+      ],
+      "price": 3900,
+      "compare_at": 0,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62417440,
+      "sku_count": 1
+    },
+    {
+      "id": 38684109,
+      "uuid": "791c8197-c72b-4a59-b441-bd8888ca1b81",
+      "slug": "dunhill-3-mg",
+      "name": "Dunhill GREY 3MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/fafcb9d3-8754-4b13-9222-2a986ad3c1e9.webp",
+        "https://dms.mydukaan.io/original/jpeg/upload_file_service/d68410f1-ef12-4dd6-b1e5-1049d9c7cb3c/1665693879322-jpeg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 43169796,
+      "sku_count": 2
+    },
+    {
+      "id": 38684107,
+      "uuid": "0ac5690c-16a1-4f81-9926-b2e3b81b58db",
+      "slug": "benson-and-hedge-light-1",
+      "name": "Benson And Hedges BLUE GOLD",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/fd7ef8d0-03b9-43ce-8979-6f6967630cec.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp"
+      ],
+      "price": 3300,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 44322510,
+      "sku_count": 2
+    },
+    {
+      "id": 36576103,
+      "uuid": "b9cc3e18-74bc-46dd-a519-a7ee2d675b59",
+      "slug": "esse-double-change",
+      "name": "Esse Double Change Applemint and Wine",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d9b79883-2e20-451b-9202-0b5f4b651858.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/75aebf9f-13da-45f9-9c3c-5c8c9abae8af.jpg"
+      ],
+      "price": 1200,
+      "compare_at": 1245,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 3,
+      "default_sku": 62387638,
+      "sku_count": 2
+    },
+    {
+      "id": 36576094,
+      "uuid": "cd9ca3cd-33ac-4214-abf1-8e93d0769fbb",
+      "slug": "gudang-garam",
+      "name": "Gudang Garam",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/40779f43-03cc-4d20-ad09-2bb17e876296.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/6fb2830a-3acc-41a9-95cb-a9509da032fd.jpeg"
+      ],
+      "price": 4500,
+      "compare_at": 5000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 12,
+      "default_sku": 45611002,
+      "sku_count": 2
+    },
+    {
+      "id": 36576092,
+      "uuid": "4ca12401-5d0b-4d6b-9bbc-95175283473f",
+      "slug": "davidoff-white",
+      "name": "Davidoff White 1MG KING SIZE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/ba034d88-497b-4671-a1f8-eb70c0ee3e69.webp",
+        "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.9,
+      "reviews": 10,
+      "default_sku": 52195486,
+      "sku_count": 2
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "url": "https://mydukaan.io/the2935/products/classic-mild",
+  "product": {
+    "id": 2601846,
+    "uuid": "bb0e5ae4-5bb8-4ba2-bd01-5acab2be12dc",
+    "slug": "classic-mild",
+    "name": "Classic Mild",
+    "price": 4800,
+    "compare_at": 0,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 62417447,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/dbd00d3f-ae32-4b00-976a-18ddfab4213a.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/5a1c9055-489e-4b5b-b4c1-c1b120bc66fb.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/726ca6c9-00d2-473e-a65a-60b6f8e87ea5.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/0bec9cfb-2581-4d3b-ad5b-941f0dc338ca.webp"
+    ],
+    "videos": [],
+    "description": "<p>Classic mild cigarettes</p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON (10 PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62417447,
+        "uuid": "9187c56a-4c51-4f60-b97a-aca5b013ee6d",
+        "code": "",
+        "price": 4800,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/5a1c9055-489e-4b5b-b4c1-c1b120bc66fb.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/5a1c9055-489e-4b5b-b4c1-c1b120bc66fb.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (10 PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-04-06T20:55:46.98217Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

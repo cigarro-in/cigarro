@@ -1,0 +1,150 @@
+{
+  "url": "https://mydukaan.io/the2935/products/benson-and-hedge-light-1",
+  "product": {
+    "id": 38684107,
+    "uuid": "0ac5690c-16a1-4f81-9926-b2e3b81b58db",
+    "slug": "benson-and-hedge-light-1",
+    "name": "Benson And Hedges BLUE GOLD",
+    "price": 3300,
+    "compare_at": 0,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 2,
+    "default_sku": 44322510,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/fd7ef8d0-03b9-43ce-8979-6f6967630cec.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/2b312883-b76e-481f-a2a8-722f1d86eb61.webp"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 44322510,
+        "uuid": "b569b9c5-76d6-47d4-be1c-cbe1a904de3b",
+        "code": "",
+        "price": 3300,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387635,
+        "uuid": "fc5750e0-b455-4410-8787-37563798baba",
+        "code": "",
+        "price": 1650,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/657cc634-b91f-4f36-b408-056b51415200.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T14:52:36.9787Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

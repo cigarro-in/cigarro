@@ -1,0 +1,152 @@
+{
+  "url": "https://mydukaan.io/the2935/products/rajnigandha-pearls",
+  "product": {
+    "id": 45876764,
+    "uuid": "2beef25d-9f06-4bbb-9465-7ccc4a643be6",
+    "slug": "rajnigandha-pearls",
+    "name": "RAJNIGANDHA SILVER PEARLS",
+    "price": 60,
+    "compare_at": 0,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 56313024,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/0bb359d6-4131-44a3-8e0b-9de32a6aab87.png",
+      "https://dms.mydukaan.io/original/jpeg/media/e3eeec6c-7b1d-48d9-a857-a7372b31a80f.png",
+      "https://dms.mydukaan.io/original/jpeg/media/af503270-733e-47b8-965b-76a98cffa07f.png",
+      "https://dms.mydukaan.io/original/jpeg/media/6cce5b0f-4e6a-4d07-87ca-c6988f2ad814.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/f5eb1ce9-b21e-4962-b108-ee0469a8fd84.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>Country of Origin : India</li>\n<li>Weight : 6g</li>\n<li>Pack : Blister Pack<br><br>Rajnigandha Pearls are handpicked cardamom seeds that are blended with the best quality saffron and are coated with glittering silver leaves. Rajnigandha Pearls is our traditional mouth freshener in a modern avatar with a true fusion of heart melting taste and superb freshness that will surely entice every taste bud.</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Mouth Freshners",
+      "slug": "mouth-freshners"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "PACKET",
+          "BOX (PACK OF 5)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 56313024,
+        "uuid": "d8a8ce76-ff37-4b83-a8e2-62fd591425ea",
+        "code": "",
+        "price": 60,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/0bb359d6-4131-44a3-8e0b-9de32a6aab87.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/0bb359d6-4131-44a3-8e0b-9de32a6aab87.png"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "PACKET"
+        }
+      },
+      {
+        "id": 56313025,
+        "uuid": "227d64c8-c690-4b3c-8529-0b29011a2160",
+        "code": "",
+        "price": 300,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/af503270-733e-47b8-965b-76a98cffa07f.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/af503270-733e-47b8-965b-76a98cffa07f.png"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "BOX (PACK OF 5)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2025-01-14T18:32:33.645148Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

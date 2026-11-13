@@ -1,0 +1,157 @@
+{
+  "url": "https://mydukaan.io/the2935/products/dunhill-switch-silver",
+  "product": {
+    "id": 47292045,
+    "uuid": "42f2edb7-e314-4e01-9d32-7809c9258ef9",
+    "slug": "dunhill-switch-silver",
+    "name": "Dunhill 8MG",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 58188227,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/ce5099b0-e145-413d-9499-001eca9f8f86.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/bc254a5a-80d6-414b-b6de-c55ecb1bafcd.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/517a47c3-dc15-4438-af96-e3c327f568df.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/521a939b-ae0f-46ca-ab63-c8a968704860.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/97bbaebc-432d-4e95-809e-089f71a77b57.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/4ba23526-fd1f-4b3f-84fd-5bb9fd36b656.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/3e279c6b-77d1-45ac-a48c-834c3815d3cb.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/69e2d629-75fb-4da8-82dc-e412bd3cb31d.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/603124a5-9c88-43d5-ad17-47c7a9479e05.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/e4318f72-433f-44ac-a292-38911058f4d0.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>TAR: 8 MG<br><br></li>\n<li>NICOTINE: 0.6 MG<br><br></li>\n<li>ONE PACKET CONTAINS TWENTY CIGRETTES (PACK OF TWENTY).<br><br></li>\n<li>ONE CARTON CONTAINS TEN PACKETS OF TWENTY CIGRETTES (BOX OF TWO HUNDRED).<br><br></li>\n<li>Dunhill cigarettes are produced by <a href=\"https://smokeshop.co.in/categories/dunhill\" rel=\"nofollow noopener\" target=\"_blank\">Bristish American Tobacco.</a><br><br><br><br></li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "size",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58188227,
+        "uuid": "dace74ff-0073-4bf4-ac46-a8641f31dfa0",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/e4318f72-433f-44ac-a292-38911058f4d0.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/e4318f72-433f-44ac-a292-38911058f4d0.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Carton"
+        }
+      },
+      {
+        "id": 62387448,
+        "uuid": "68911ed7-3a5a-49bc-892a-ef0572a780ad",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/69e2d629-75fb-4da8-82dc-e412bd3cb31d.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/69e2d629-75fb-4da8-82dc-e412bd3cb31d.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-07T04:09:19.799006Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

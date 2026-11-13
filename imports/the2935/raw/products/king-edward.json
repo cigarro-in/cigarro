@@ -1,0 +1,153 @@
+{
+  "url": "https://mydukaan.io/the2935/products/king-edward",
+  "product": {
+    "id": 47603807,
+    "uuid": "975b43dd-29dc-46a8-9f10-b6df53741ea6",
+    "slug": "king-edward",
+    "name": "King Edward",
+    "price": 850,
+    "compare_at": 900,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 58820802,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/3d7b966a-8b82-46cc-9286-5b5019a728a6.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/aa6eae9e-6226-40d7-91c0-82e109e9c1b4.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/6c21d7c8-94d3-4639-881f-450dfc566b54.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/0f2151d9-fd1b-4263-94bd-8afc1d357cd3.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/76754f00-9d89-4dbf-b974-652c71b10445.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/86ed8b49-f723-4b7b-8c2d-7fcc014835c3.webp"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigar",
+      "slug": "cigar"
+    },
+    "options": [
+      {
+        "name": "Quantity",
+        "values": [
+          "Packet",
+          "Carton"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58820802,
+        "uuid": "b39f1585-99f5-488e-b3e9-9dc724dc48ee",
+        "code": "",
+        "price": 850,
+        "compare_at": 900,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/86ed8b49-f723-4b7b-8c2d-7fcc014835c3.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/86ed8b49-f723-4b7b-8c2d-7fcc014835c3.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "Packet"
+        }
+      },
+      {
+        "id": 58820803,
+        "uuid": "98a7ba8a-0821-4c20-b52e-1e89a3d452d6",
+        "code": "",
+        "price": 8500,
+        "compare_at": 9000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/6c21d7c8-94d3-4639-881f-450dfc566b54.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/6c21d7c8-94d3-4639-881f-450dfc566b54.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "Carton"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:22:14.021108Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

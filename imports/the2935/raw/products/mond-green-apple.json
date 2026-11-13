@@ -1,0 +1,132 @@
+{
+  "url": "https://mydukaan.io/the2935/products/mond-green-apple",
+  "product": {
+    "id": 48094874,
+    "uuid": "c8aa212a-29d0-4ca4-b0ae-12d8a7f7c9f6",
+    "slug": "mond-green-apple",
+    "name": "MOND GREEN APPLE",
+    "price": 1900,
+    "compare_at": 1990,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 60221517,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/037210fe-d669-40b8-8d67-e9609a9069b8.webp"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li><strong>TAR: 5MG<br></strong></li>\n<li><strong>NICOTINE: 0.4MG<br></strong></li>\n<li><strong>BLEND: AMERICAN<br></strong></li>\n<li><strong>FLAVOUR: GREEN APPLE<br><br></strong></li>\n<li><strong>CIGARETTE TYPE: SUPERSLIM<br></strong></li>\n<li><strong>LENGTH: 99MM<br></strong></li>\n<li><strong>FILTER: MONOACETATE<br></strong></li>\n<li><strong>PACKET CONTAINS: 20 CIGRATTES<br></strong></li>\n<li>\n<div>\n<p><strong>CARTON CONTAINS: 10 PACKETS </strong></p>\n</div>\n<div></div>\n<div></div>\n<div> </div>\n</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "mond",
+      "slug": "mond"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 60221517,
+        "uuid": "e2af32b0-5d19-471e-ba77-c30ed0e128b2",
+        "code": "",
+        "price": 1900,
+        "compare_at": 1990,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/037210fe-d669-40b8-8d67-e9609a9069b8.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/037210fe-d669-40b8-8d67-e9609a9069b8.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T12:43:42.703912Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

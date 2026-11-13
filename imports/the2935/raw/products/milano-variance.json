@@ -1,0 +1,148 @@
+{
+  "url": "https://mydukaan.io/the2935/products/milano-variance",
+  "product": {
+    "id": 34195093,
+    "uuid": "2132550b-f851-4a73-ae1b-fff0b909affb",
+    "slug": "milano-variance",
+    "name": "Milano LONDON 1MG cigarette",
+    "price": 3300,
+    "compare_at": 3500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 60897669,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg"
+    ],
+    "videos": [],
+    "description": "<p>Introducing the Milano LONDON 1MG Cigarettes, the perfect blend of sophistication and smoothness for the discerning smoker. Crafted to provide a refined smoking experience, these cigarettes are designed with precision to offer a mild yet satisfying flavor that doesn’t compromise on quality. Whether you&#39;re enjoying a moment of solitude or sharing a relaxing evening with friends, Milano LONDON 1MG serves as your reliable companion, embodying elegance and style in each puff.<br><br>- 🌬️ Smooth and mild flavor for a gentle smoking experience <br><br>- 🎩 Elegantly designed packaging that reflects sophistication <br><br>- 🕒 Perfect for those who appreciate a lighter smoke at any time of day <br><br>- 🌍 Made with high-quality tobacco sourced from trusted growers <br><br>- 🎉 Ideal for celebrations or quiet moments alike! <br><br>Experience the art of smoking with Milano LONDON 1MG, where every moment is an occasion to savor!</p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON (10 PACKETS)",
+          "HALF CARTON (5 PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 60897669,
+        "uuid": "f82588e2-9a53-44f9-84f6-e710240e64fe",
+        "code": "",
+        "price": 3300,
+        "compare_at": 3500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (10 PACKETS)"
+        }
+      },
+      {
+        "id": 62387784,
+        "uuid": "90e8ab57-bc55-455d-8908-c1f5191a61d7",
+        "code": "",
+        "price": 1650,
+        "compare_at": 1750,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (5 PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-10T02:55:09.761041Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

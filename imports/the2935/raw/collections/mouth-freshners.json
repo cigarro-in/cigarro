@@ -1,0 +1,34 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/mouth-freshners",
+  "h1": "Mouth Freshners",
+  "title": "Affordable Quality Mouth Fresheners - Refresh Your Breath",
+  "canonical": "https://mydukaan.io/the2935/collections/mouth-freshners",
+  "metaDescription": "Explore our wide range of mouth freshners. Perfect for refreshing your breath after meals. Made with natural ingredients. Shop now for a fresh breath!",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/aec2b71d-f6cb-4909-8171-81681851f896.png",
+  "introHtml": null,
+  "childSlugs": [],
+  "countText": 1,
+  "productSlugs": [
+    "rajnigandha-pearls"
+  ],
+  "productsRaw": [
+    {
+      "id": 45876764,
+      "uuid": "2beef25d-9f06-4bbb-9465-7ccc4a643be6",
+      "slug": "rajnigandha-pearls",
+      "name": "RAJNIGANDHA SILVER PEARLS",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/0bb359d6-4131-44a3-8e0b-9de32a6aab87.png",
+        "https://dms.mydukaan.io/original/jpeg/media/e3eeec6c-7b1d-48d9-a857-a7372b31a80f.png"
+      ],
+      "price": 60,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 56313024,
+      "sku_count": 2
+    }
+  ]
+}

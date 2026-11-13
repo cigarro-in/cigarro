@@ -1,0 +1,153 @@
+{
+  "url": "https://mydukaan.io/the2935/products/marlboro-light-imported",
+  "product": {
+    "id": 2837911,
+    "uuid": "e698f56b-cb19-4dd3-b4df-b377bfe2c5f2",
+    "slug": "marlboro-light-imported",
+    "name": "Marlboro Light IMPORTED",
+    "price": 3300,
+    "compare_at": 3500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 5,
+    "default_sku": 43170213,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/b77fe1a4-75dd-4bf7-b7e3-613f7fc13d01.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/3c34fee1-ef57-4d05-9643-3c0fd2be823e.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/ec638ea6-1d45-49c4-ac80-99d4944895ce.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/de36e3e8-9da8-4350-9c81-eeac8b074c55.webp"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>Tar: 8 mg<br><br></li>\n<li>Nicotine: 0.6 mg<br><br></li>\n<li>\n<div>\n<div>\n<p>Carbon Monoxide: 9 mg<br><br></p>\n<ul>\n<li>Marlboro cigarettes are produced by <a href=\"https://smokeshop.co.in/categories/marlboro\" rel=\"nofollow noopener\" target=\"_blank\">Philip Morris International</a>.<br><br></li>\n<li>ONE PACKET CONTAINS TWENTY CIGRETTES (PACK OF TWENTY).<br><br></li>\n<li>ONE CARTON CONTAINS TEN PACKETS OF TWENTY CIGRETTES (PACK OF TWO HUNDRED).</li>\n</ul>\n<p> </p>\n</div>\n</div>\n</li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 43170213,
+        "uuid": "401b23c8-d598-49a7-8007-8885473e6de8",
+        "code": "",
+        "price": 3300,
+        "compare_at": 3500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/3c34fee1-ef57-4d05-9643-3c0fd2be823e.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/3c34fee1-ef57-4d05-9643-3c0fd2be823e.webp",
+          "https://dms.mydukaan.io/original/jpeg/media/de36e3e8-9da8-4350-9c81-eeac8b074c55.webp",
+          "https://dms.mydukaan.io/original/jpeg/media/ec638ea6-1d45-49c4-ac80-99d4944895ce.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387793,
+        "uuid": "d4c065c5-1578-4a90-90f7-8a7877fb6e25",
+        "code": "",
+        "price": 1650,
+        "compare_at": 1750,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/de36e3e8-9da8-4350-9c81-eeac8b074c55.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/de36e3e8-9da8-4350-9c81-eeac8b074c55.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-07T10:49:24.434971Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

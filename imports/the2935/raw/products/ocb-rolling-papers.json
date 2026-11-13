@@ -1,0 +1,151 @@
+{
+  "url": "https://mydukaan.io/the2935/products/ocb-rolling-papers",
+  "product": {
+    "id": 2603685,
+    "uuid": "f0364c9b-2156-4825-b546-9acc00e7fb56",
+    "slug": "ocb-rolling-papers",
+    "name": "OCB Slim Premium",
+    "price": 75,
+    "compare_at": 100,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 58406317,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/155ec979-83f9-4b08-8b79-c8e760e79033.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/af4379ae-db29-47be-a9e0-c712dac65bd4.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/a650cf85-defb-4f46-a42a-6564dc96d1ad.jpg",
+      "https://dms.mydukaan.io/original/jpeg/644186/74614216-4508-4730-824d-f3a3a68c65b2.png"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>BRAND: OCB</li>\n<li>GROUP: LONG ROLLING SHEETS</li>\n<li>One booklet contains 32 sheets.</li>\n<li>Dimensions: 109x44 mm.</li>\n<li>Made of linen paper. Natural arabic gum glue.</li>\n<li>Slow-burning, thin, transparent rolling paper with a watermark.</li>\n<li>Black packaging with a hologram of the highest quality.<br><br><br><br><br><br></li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Rolling Paper & Accesories",
+      "slug": "rolling-paper"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Single Booklet",
+          "Box (50 Booklets)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58406317,
+        "uuid": "bb4a4769-9e52-4cf9-b30d-500c74b221c7",
+        "code": "",
+        "price": 75,
+        "compare_at": 100,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/155ec979-83f9-4b08-8b79-c8e760e79033.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/155ec979-83f9-4b08-8b79-c8e760e79033.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Single Booklet"
+        }
+      },
+      {
+        "id": 58406318,
+        "uuid": "4e2df60d-4a6d-472a-a8c0-67c4783afb2a",
+        "code": "",
+        "price": 75,
+        "compare_at": 100,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/a650cf85-defb-4f46-a42a-6564dc96d1ad.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/a650cf85-defb-4f46-a42a-6564dc96d1ad.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Box (50 Booklets)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2024-12-21T17:16:40.031822Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

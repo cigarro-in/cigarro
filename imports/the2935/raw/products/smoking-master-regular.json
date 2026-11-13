@@ -1,0 +1,123 @@
+{
+  "url": "https://mydukaan.io/the2935/products/smoking-master-regular",
+  "product": {
+    "id": 48025334,
+    "uuid": "1d9f79ff-9979-4825-a25e-e11456fd4b5e",
+    "slug": "smoking-master-regular",
+    "name": "SMOKING MASTER REGULAR",
+    "price": 89,
+    "compare_at": 199,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 60068484,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/c9a10d0b-4c36-4582-ae90-49db043972fc.png"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "smoking",
+      "slug": "smoking"
+    },
+    "options": [],
+    "skus": [
+      {
+        "id": 60068484,
+        "uuid": "8ab8a726-c4ff-4331-b427-2b59af2243f2",
+        "code": "",
+        "price": 89,
+        "compare_at": 199,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/c9a10d0b-4c36-4582-ae90-49db043972fc.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/c9a10d0b-4c36-4582-ae90-49db043972fc.png"
+        ],
+        "in_stock": true,
+        "options": {}
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2025-06-22T13:53:15.263086Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

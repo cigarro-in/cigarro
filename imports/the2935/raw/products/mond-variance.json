@@ -1,0 +1,150 @@
+{
+  "url": "https://mydukaan.io/the2935/products/mond-variance",
+  "product": {
+    "id": 2838057,
+    "uuid": "8cab9583-0640-4a86-95b8-7b15fdeb009d",
+    "slug": "mond-variance",
+    "name": "Mond Variance",
+    "price": 2250,
+    "compare_at": 2500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 6,
+    "default_sku": 58188253,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/5b7975f8-b7be-4a93-be74-43ec85115a5c.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/8b8c9cd3-f226-4510-8996-789235ee4dd7.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/442817de-4bb2-4e3f-b643-4fe6224c1987.jpg"
+    ],
+    "videos": [],
+    "description": "<h2><strong>Mord variance slim cigarette with menthol and blueberry flavour switch</strong></h2>\n<div>\n<p>Mond Variance Blueberry menthol is a double switch cigarette with an ice ball and a blueberry ball, both of which provide a super cool fragrance that is light, soft, and smooth inhale. If you don&#39;t like any of the flavors, you can just squeeze a single ball.</p>\n<p><strong>Pack of 20</strong> Superslim Cigarettes.</p>\n</div>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58188253,
+        "uuid": "b9df83e6-60f2-4881-992e-5cce7351de5e",
+        "code": "",
+        "price": 2250,
+        "compare_at": 2500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/442817de-4bb2-4e3f-b643-4fe6224c1987.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/442817de-4bb2-4e3f-b643-4fe6224c1987.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387789,
+        "uuid": "34cdaf33-5ac5-4855-8577-4783352258e5",
+        "code": "",
+        "price": 1125,
+        "compare_at": 1250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/8b8c9cd3-f226-4510-8996-789235ee4dd7.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/8b8c9cd3-f226-4510-8996-789235ee4dd7.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-13T05:20:07.15755Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

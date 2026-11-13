@@ -1,0 +1,71 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/cigar",
+  "h1": "Cigar",
+  "title": "Premium Quality Imported Cigars Online - Best Prices & Selection",
+  "canonical": "https://mydukaan.io/the2935/collections/cigar",
+  "metaDescription": "Explore our wide range of premium Imported cigars. Perfect for all occasions. Enjoy the best prices, fast shipping, and top-notch customer service. Shop now!",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/af4bb926-9823-4c95-b91e-afe7d980525b.png",
+  "introHtml": "<h1><strong>Welcome to our Cigar Collection</strong></h1>\n<p>Indulge in the rich aromas and exquisite flavors of our premium cigar selection at Smokeshop.co.in. Each cigar in our collection is meticulously crafted to offer you a luxurious smoking experience unlike any other. Whether you are a seasoned cigar aficionado or new to the world of cigars, our curated range caters to all preferences and palates.</p>\n<p> </p>\n<p>Discover a variety of blends, sizes, and shapes that have been expertly handcrafted to deliver unparalleled satisfaction with every puff. From bold and robust flavors to smooth and mellow profiles, our cigars are sourced from renowned manufacturers to ensure the highest quality for our customers.</p>\n<p> </p>\n<p>Enhance your smoking ritual and elevate your relaxation time by exploring our cigar collection. Each cigar is a testament to our dedication to providing you with exceptional products that ignite the senses and create unforgettable moments.</p>",
+  "childSlugs": [],
+  "countText": 3,
+  "productSlugs": [
+    "king-edward-chocolate",
+    "phillies-blunt-chocolate",
+    "king-edward"
+  ],
+  "productsRaw": [
+    {
+      "id": 48025377,
+      "uuid": "e54a5ee2-c5a4-4e6a-b845-b3da91c161ee",
+      "slug": "king-edward-chocolate",
+      "name": "KING EDWARD CHOCOLATE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/240b221d-3909-49f5-9e2e-d1a7d0325453.webp"
+      ],
+      "price": 999,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62386683,
+      "sku_count": 2
+    },
+    {
+      "id": 47603826,
+      "uuid": "1d17f6d5-3fd8-4a99-b7d3-1b5f97c2e5d5",
+      "slug": "phillies-blunt-chocolate",
+      "name": "Phillies Blunt Chocolate",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/de1dfb24-7976-4a33-a860-0543a465807a.png",
+        "https://dms.mydukaan.io/original/jpeg/media/19c2481c-2f60-417a-b31d-355814259a2a.jpg"
+      ],
+      "price": 850,
+      "compare_at": 900,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58820830,
+      "sku_count": 2
+    },
+    {
+      "id": 47603807,
+      "uuid": "975b43dd-29dc-46a8-9f10-b6df53741ea6",
+      "slug": "king-edward",
+      "name": "King Edward",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/3d7b966a-8b82-46cc-9286-5b5019a728a6.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/aa6eae9e-6226-40d7-91c0-82e109e9c1b4.webp"
+      ],
+      "price": 850,
+      "compare_at": 900,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58820802,
+      "sku_count": 2
+    }
+  ]
+}

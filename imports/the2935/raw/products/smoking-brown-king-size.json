@@ -1,0 +1,123 @@
+{
+  "url": "https://mydukaan.io/the2935/products/smoking-brown-king-size",
+  "product": {
+    "id": 48025328,
+    "uuid": "b6f256d7-01d7-428d-9de1-2a2584798338",
+    "slug": "smoking-brown-king-size",
+    "name": "SMOKING BROWN KING SIZE",
+    "price": 99,
+    "compare_at": 199,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 60068473,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/b84cd100-2cfd-4a8a-a4e1-74b926240fb5.png"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "smoking",
+      "slug": "smoking"
+    },
+    "options": [],
+    "skus": [
+      {
+        "id": 60068473,
+        "uuid": "9022dda8-a8ce-4af4-9bb9-96db1a8f114f",
+        "code": "",
+        "price": 99,
+        "compare_at": 199,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/b84cd100-2cfd-4a8a-a4e1-74b926240fb5.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/b84cd100-2cfd-4a8a-a4e1-74b926240fb5.png"
+        ],
+        "in_stock": true,
+        "options": {}
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2025-06-22T13:56:41.79178Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

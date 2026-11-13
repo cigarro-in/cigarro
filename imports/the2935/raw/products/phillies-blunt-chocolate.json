@@ -1,0 +1,150 @@
+{
+  "url": "https://mydukaan.io/the2935/products/phillies-blunt-chocolate",
+  "product": {
+    "id": 47603826,
+    "uuid": "1d17f6d5-3fd8-4a99-b7d3-1b5f97c2e5d5",
+    "slug": "phillies-blunt-chocolate",
+    "name": "Phillies Blunt Chocolate",
+    "price": 850,
+    "compare_at": 900,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 2,
+    "default_sku": 58820830,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/de1dfb24-7976-4a33-a860-0543a465807a.png",
+      "https://dms.mydukaan.io/original/jpeg/media/19c2481c-2f60-417a-b31d-355814259a2a.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/e5b4a217-435f-4a57-8aa5-958aa3d7af6e.png"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigar",
+      "slug": "cigar"
+    },
+    "options": [
+      {
+        "name": "Quantity",
+        "values": [
+          "Packet",
+          "Carton"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58820830,
+        "uuid": "4e67e197-9dfc-41f8-b406-ea83ee407190",
+        "code": "",
+        "price": 850,
+        "compare_at": 900,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/e5b4a217-435f-4a57-8aa5-958aa3d7af6e.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/e5b4a217-435f-4a57-8aa5-958aa3d7af6e.png"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "Packet"
+        }
+      },
+      {
+        "id": 58820831,
+        "uuid": "b411a5ff-20c8-4931-ac66-51726a894a49",
+        "code": "",
+        "price": 8500,
+        "compare_at": 9000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/19c2481c-2f60-417a-b31d-355814259a2a.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/19c2481c-2f60-417a-b31d-355814259a2a.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "Carton"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:21:17.367629Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

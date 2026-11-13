@@ -1,0 +1,129 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/dunhill",
+  "h1": "DUNHILL",
+  "title": "Dunhill Luxury Products - Exclusive Collection Online",
+  "canonical": "https://mydukaan.io/the2935/collections/dunhill",
+  "metaDescription": "Explore our wide range of Dunhill luxury products. Enjoy exclusive deals and discounts on your favorite items. Quality guaranteed. Shop now!",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/647343ef-1eaf-49dd-8c8c-79d03b853945.png",
+  "introHtml": "<h1>Dunhill was founded in London on 10 March 1907 when tobacconist and inventor Alfred Dunhill opened a small tobacconist&#39;s shop on Duke Street in the St James&#39;s area.<br><img src=\"https://dms.mydukaan.io/original/webp/media/88a8d05a-ce94-4a30-9fac-c0635b0739aa.png\" alt=\"\" width=\"230\" height=\"160\" loading=\"lazy\" decoding=\"async\"></h1>\n<h2>Known for its lingering spicy taste and unique smell, <strong>Dunhill is a preferred choice for those who enjoy luxury smoking experiences</strong>. Pros: Luxury brand. Variety of flavours.</h2>",
+  "childSlugs": [],
+  "countText": 6,
+  "productSlugs": [
+    "dunhill-6mg",
+    "dunhill-international",
+    "dunhill-switch-silver",
+    "dunhill-white-1mg",
+    "dunhill-3-mg",
+    "dunhill-switch"
+  ],
+  "productsRaw": [
+    {
+      "id": 47572665,
+      "uuid": "666258d5-5416-447b-a0bc-53f9709aeda5",
+      "slug": "dunhill-6mg",
+      "name": "Dunhill 6MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/dfdec6e5-c9d7-4d9c-b188-6ec5ed2a1b38.jpeg",
+        "https://dms.mydukaan.io/original/jpeg/media/2b680972-9347-4c5f-b6f8-20ba46772457.jpeg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58760805,
+      "sku_count": 2
+    },
+    {
+      "id": 47567110,
+      "uuid": "d25f895e-ce4f-4566-9dc8-8af486e91afb",
+      "slug": "dunhill-international",
+      "name": "Dunhill International",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/31a75b36-188a-4bdf-a4cf-4b879475f8da.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/a181b208-1477-4f1a-b022-2790a7693691.jpg"
+      ],
+      "price": 4400,
+      "compare_at": 4990,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 58748345,
+      "sku_count": 1
+    },
+    {
+      "id": 47292045,
+      "uuid": "42f2edb7-e314-4e01-9d32-7809c9258ef9",
+      "slug": "dunhill-switch-silver",
+      "name": "Dunhill 8MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/ce5099b0-e145-413d-9499-001eca9f8f86.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/bc254a5a-80d6-414b-b6de-c55ecb1bafcd.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 58188227,
+      "sku_count": 2
+    },
+    {
+      "id": 47292025,
+      "uuid": "06242f23-6ab6-4b67-9793-ed590776dfdb",
+      "slug": "dunhill-white-1mg",
+      "name": "Dunhill WHITE 1MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/9b72f52e-d786-46c2-8557-b071aa82291d.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/ad572851-b9b0-4ea2-808f-06b6db776c51.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 58188204,
+      "sku_count": 2
+    },
+    {
+      "id": 38684109,
+      "uuid": "791c8197-c72b-4a59-b441-bd8888ca1b81",
+      "slug": "dunhill-3-mg",
+      "name": "Dunhill GREY 3MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/fafcb9d3-8754-4b13-9222-2a986ad3c1e9.webp",
+        "https://dms.mydukaan.io/original/jpeg/upload_file_service/d68410f1-ef12-4dd6-b1e5-1049d9c7cb3c/1665693879322-jpeg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 43169796,
+      "sku_count": 2
+    },
+    {
+      "id": 2601652,
+      "uuid": "a47f966f-e81e-4a20-917c-d764fd42667b",
+      "slug": "dunhill-switch",
+      "name": "Dunhill Switch",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/9a64ad24-0963-429a-8923-9904f0437e47.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/709c5d0a-8fa2-4ff8-b607-e08d1c00b5d2.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 3,
+      "default_sku": 62387670,
+      "sku_count": 2
+    }
+  ]
+}

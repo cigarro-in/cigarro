@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/davidoff-white",
+  "product": {
+    "id": 36576092,
+    "uuid": "4ca12401-5d0b-4d6b-9bbc-95175283473f",
+    "slug": "davidoff-white",
+    "name": "Davidoff White 1MG KING SIZE",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 4.9,
+    "reviews": 10,
+    "default_sku": 52195486,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/ba034d88-497b-4671-a1f8-eb70c0ee3e69.webp",
+      "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg"
+    ],
+    "videos": [],
+    "description": "<p>Discover the refined elegance of Davidoff White 1MG King Size, a tobacco experience like no other. Crafted for the discerning smoker, these king-size cigarettes offer a smooth and balanced flavor profile that caters to those who appreciate subtlety and sophistication. Each puff reveals the distinctive notes of quality tobacco, carefully blended for a consistent and pleasurable smoking experience. Perfect for any occasion, Davidoff White provides a moment of tranquility while embodying luxury in every detail.<br><br>- 🌟 Smooth and subtle flavor profile for a refined smoking experience <br><br>- 🎉 Ideal for social gatherings or a relaxing moment alone <br><br>- ✅ Crafted with quality tobacco for a consistent taste <br><br>- 🚬 King size for a longer, satisfying smoke <br><br>- 🎁 Elegantly packaged, making it a perfect gift for tobacco connoisseurs</p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "size",
+        "values": [
+          "Carton",
+          "Half Carton (5 Packets)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 52195486,
+        "uuid": "52704939-741b-42cd-86cc-fe281c167ab5",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Carton"
+        }
+      },
+      {
+        "id": 52195487,
+        "uuid": "208c04a8-0032-4344-b378-4fe34a6d7357",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Half Carton (5 Packets)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-12T12:31:16.31885Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

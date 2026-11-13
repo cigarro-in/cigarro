@@ -1,0 +1,162 @@
+{
+  "url": "https://mydukaan.io/the2935/products/marlboro-double-burst",
+  "product": {
+    "id": 47292052,
+    "uuid": "f0a594a8-8132-4888-b8b6-8f85e692df66",
+    "slug": "marlboro-double-burst",
+    "name": "Marlboro Double Burst",
+    "price": 3300,
+    "compare_at": 3400,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 2,
+    "default_sku": 58188235,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/e199a240-b693-47f1-917f-fad340b28440.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/dc342657-4da6-4e58-b2e8-b7714dd39345.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/74acd731-4862-4820-9e9a-f2da793f66b2.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/0ac6c200-53df-4337-856e-06919ae5b837.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/cacf18b2-ddff-4630-b38f-e0c78a77889d.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/c498eb16-6c95-4437-8939-83548aef7c1f.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/7fd41ec7-8500-4b23-8a0a-5d0deea6ff82.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/8d8f1585-87b5-4241-876e-b84010d01e24.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/141c7b36-2775-4d44-8c48-75bfe225b415.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d5b0720b-4db8-4dba-a5eb-1580b4cfb29c.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d7b4a29b-e9ce-45e9-8854-16394ff9982b.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/bd5a8bdb-be59-457e-bb25-97625fd31d40.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/5a54b0b2-b0ec-43c9-aaa6-7f06a7c11513.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/3f13d8d1-ccd2-494e-9c9f-827fe14e4cb7.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/953999e0-c7f9-4523-9193-68b2a754517b.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>Tar: 5 mg<br><br></li>\n<li>\n<p>Nicotine: 0.4 mg<br><br></p>\n</li>\n<li><strong>ONE PACKET CONTAINS TWENTY CIGRETTES (PACK OF TWENTY).<br></strong></li>\n<li><strong>ONE CARTON CONTAINS TEN PACKETS OF TWENTY CIGRETTES (BOX OF TWO HUNDRED).<br><br></strong></li>\n<li><strong>Marlboro cigarettes are produced by Philip Morris International.<br><br><br>Marlboro Double Burst is a distinctive cigarette offering a customizable smoking experience through its innovative dual capsule technology. Each cigarette contains two crushable capsules within the filter: the Freshball and the Iceball. By crushing these capsules, smokers can tailor their flavor experience, choosing between a fresh menthol taste, an icy cool sensation, or a combination of both.<br>The cigarette is crafted with selected premium tobaccos, delivering a smooth and satisfying smoke. It has a tar content of 5 mg and nicotine content of 0.4 mg per cigarette.<br></strong></li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "size",
+        "values": [
+          "CARTON",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58188235,
+        "uuid": "0015e9c6-e31a-41df-bc8e-823db2744e5d",
+        "code": "",
+        "price": 3300,
+        "compare_at": 3400,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/5a54b0b2-b0ec-43c9-aaa6-7f06a7c11513.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/5a54b0b2-b0ec-43c9-aaa6-7f06a7c11513.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "CARTON"
+        }
+      },
+      {
+        "id": 62387445,
+        "uuid": "3588374d-3e71-48c3-92b3-c0d6db697031",
+        "code": "",
+        "price": 1650,
+        "compare_at": 1700,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/141c7b36-2775-4d44-8c48-75bfe225b415.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/141c7b36-2775-4d44-8c48-75bfe225b415.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-10T03:53:22.80718Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

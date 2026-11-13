@@ -1,0 +1,154 @@
+{
+  "url": "https://mydukaan.io/the2935/products/dunhill-switch",
+  "product": {
+    "id": 2601652,
+    "uuid": "a47f966f-e81e-4a20-917c-d764fd42667b",
+    "slug": "dunhill-switch",
+    "name": "Dunhill Switch",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 3,
+    "default_sku": 62387670,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/9a64ad24-0963-429a-8923-9904f0437e47.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/709c5d0a-8fa2-4ff8-b607-e08d1c00b5d2.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/7cf3a1e7-6fee-4f2f-88fc-a73928495f11.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/100b4de0-372d-4ca6-8080-ce0cd9216f1e.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/3cca1b49-5461-458a-badf-726dbc10cac4.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/f93830d1-8628-40bb-a884-3c0d92048ffa.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/f1b883ea-846e-4458-8002-c666ad385b3c.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>TAR: 8 MG<br><br></li>\n<li>NICOTINE: 0.6 MG<br><br></li>\n<li>ONE PACKET CONTAINS TWENTY CIGRETTES (PACK OF TWENTY).<br><br></li>\n<li>ONE CARTON CONTAINS TEN PACKETS OF TWENTY CIGRETTES (BOX OF TWO HUNDRED).<br><br></li>\n<li>Dunhill cigarettes are produced by <a href=\"https://smokeshop.co.in/categories/dunhill\" rel=\"nofollow noopener\" target=\"_blank\">Bristish American Tobacco.</a><br><br><br><br></li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62387670,
+        "uuid": "2861f973-01a4-4d37-a027-d4104992852e",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/f1b883ea-846e-4458-8002-c666ad385b3c.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/f1b883ea-846e-4458-8002-c666ad385b3c.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387671,
+        "uuid": "5be582ac-a8ef-4efd-85fa-ef492ba1497b",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/3cca1b49-5461-458a-badf-726dbc10cac4.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/3cca1b49-5461-458a-badf-726dbc10cac4.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T15:04:57.348259Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

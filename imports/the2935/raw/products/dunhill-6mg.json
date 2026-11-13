@@ -1,0 +1,151 @@
+{
+  "url": "https://mydukaan.io/the2935/products/dunhill-6mg",
+  "product": {
+    "id": 47572665,
+    "uuid": "666258d5-5416-447b-a0bc-53f9709aeda5",
+    "slug": "dunhill-6mg",
+    "name": "Dunhill 6MG",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 2,
+    "default_sku": 58760805,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/dfdec6e5-c9d7-4d9c-b188-6ec5ed2a1b38.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/2b680972-9347-4c5f-b6f8-20ba46772457.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/ce196c80-3947-4c65-80b3-fdb24d40d7a7.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/41e59be2-13ef-4d2b-a94b-f00bf10779ee.jpeg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>TAR: 6MG<br><br></li>\n<li>NICOTINE: 0.6MG<br><br><br></li>\n<li>ONE PACKET CONTAINS 20 CIGRETTES (PACK OF TWENTY)<br><br></li>\n<li>ONE CARTON CONTAINS 10 PACKETS OF TWENTY CIGRETTES (BOX OF TWO HUNDRED)\n<h4><br>Dunhill cigarettes are produced by <strong>Bristish American Tobacco.<br><br><br><br><br><br></strong></h4>\n<p> </p>\n</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "DUNHILL",
+      "slug": "dunhill"
+    },
+    "options": [
+      {
+        "name": "Quantity",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58760805,
+        "uuid": "356d05aa-7b29-40ba-9db3-b5b02ee4ecd1",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/41e59be2-13ef-4d2b-a94b-f00bf10779ee.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/41e59be2-13ef-4d2b-a94b-f00bf10779ee.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "Carton"
+        }
+      },
+      {
+        "id": 62387440,
+        "uuid": "75dba451-2dfc-435f-b175-385c6d242679",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/dfdec6e5-c9d7-4d9c-b188-6ec5ed2a1b38.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/dfdec6e5-c9d7-4d9c-b188-6ec5ed2a1b38.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "Quantity": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:23:48.320567Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

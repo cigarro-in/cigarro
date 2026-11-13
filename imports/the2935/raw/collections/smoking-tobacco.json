@@ -1,0 +1,72 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/smoking-tobacco",
+  "h1": "PIPE & ROLLING TOBACCO",
+  "title": "Premium Quality Smoking Tobacco | Best Tobacco Online",
+  "canonical": "https://mydukaan.io/the2935/collections/smoking-tobacco",
+  "metaDescription": "Explore our wide range of premium quality smoking tobacco. Perfect for all your smoking needs. Experience the rich, smooth, and satisfying flavor today.",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/7b4a49ea-d064-48b4-8be3-b20c62cd9b3e.jpg",
+  "introHtml": null,
+  "childSlugs": [],
+  "countText": 3,
+  "productSlugs": [
+    "american-spirit-yellow-30g",
+    "golden-virginia",
+    "american-spirit-smoking-tobacco"
+  ],
+  "productsRaw": [
+    {
+      "id": 47661078,
+      "uuid": "79a6626d-8839-407f-a0d3-d123ce604685",
+      "slug": "american-spirit-yellow-30g",
+      "name": "American Spirit Yellow - 30g",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/afb7889a-a07e-48fb-9c79-6fe0f7947dea.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/5e55bdee-5104-4f7d-a21d-112ed3a770db.webp"
+      ],
+      "price": 900,
+      "compare_at": 999,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58921959,
+      "sku_count": 2
+    },
+    {
+      "id": 36576009,
+      "uuid": "3621af42-21f2-4002-b158-305616749f72",
+      "slug": "golden-virginia",
+      "name": "Golden Virginia THE ORIGINAL",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/af91f574-dd58-46d9-890a-21015fff4c77.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/1b29e152-5c09-4ac1-aceb-371ca8a6a9ce.jpeg"
+      ],
+      "price": 1100,
+      "compare_at": 1150,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 4,
+      "default_sku": 58740808,
+      "sku_count": 2
+    },
+    {
+      "id": 2838242,
+      "uuid": "a8697f59-f4fc-4ab2-9403-a87719e17d0a",
+      "slug": "american-spirit-smoking-tobacco",
+      "name": "Natural American Spirit (Original Blend) - 30g",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/756b4f47-0b6e-4bac-94e7-7bad6ac26f31.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/81e825bd-b9f7-4053-baf2-2edbca840856.jpg"
+      ],
+      "price": 999,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 56312441,
+      "sku_count": 2
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/marlboro-advance",
+  "product": {
+    "id": 2602891,
+    "uuid": "7f6b1215-d717-424f-9059-9424c250a9bb",
+    "slug": "marlboro-advance",
+    "name": "Marlboro Advance",
+    "price": 4800,
+    "compare_at": 0,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 62417430,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/b606478b-de32-4945-8ec3-15134803c67c.webp"
+    ],
+    "videos": [],
+    "description": "<p> </p>\n<h5><strong>Product Details</strong><br>Brand: Marlboro<br>Variant: Advance<br>Type: Filter Cigarettes</h5>\n<p> </p>\n<h5>Packaging Information<br>Packet: Contains 20 cigarettes</h5>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "Half Carton (5 Packets)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62417430,
+        "uuid": "dcdf916f-2e14-4226-ade8-e121499062b8",
+        "code": "",
+        "price": 4800,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62417431,
+        "uuid": "9ab39ed3-79af-4680-b191-13b4ab73579e",
+        "code": "",
+        "price": 2400,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Half Carton (5 Packets)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-04-06T20:45:29.611707Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

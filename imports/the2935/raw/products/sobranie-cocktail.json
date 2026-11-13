@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/sobranie-cocktail",
+  "product": {
+    "id": 48094882,
+    "uuid": "abfed4b9-a8a2-40d1-a48e-8acde0f35d42",
+    "slug": "sobranie-cocktail",
+    "name": "Sobranie Cocktail",
+    "price": 999,
+    "compare_at": 0,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 60221558,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/a513e230-b346-4b46-a905-ec261267bcfa.webp"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li><strong>TAR: 5MG<br></strong></li>\n<li><strong>NICOTINE: 0.5MG<br><br><br></strong><strong>Each cigarette in the pack is made in a different pastel color.<br>The tobacco products of this brand belong to the premium segment.<br>The Sobranie Cocktail cigarette variety is rightfully considered the pearl of the brand&#39;s collection.<br>Today, this design is truly unique, as it is no longer found in any other brand. You can choose cigarettes by color depending on your mood.<br><br></strong></li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "PACKET",
+          "CARTON"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 60221558,
+        "uuid": "a58219d9-eaef-4fcd-9585-d13b2c955cc9",
+        "code": "",
+        "price": 999,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "PACKET"
+        }
+      },
+      {
+        "id": 60221559,
+        "uuid": "f9227c1e-69da-4ce6-a512-9b958e6cce19",
+        "code": "",
+        "price": 9900,
+        "compare_at": 9990,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/856f8ddc-ca7f-492e-a9a8-838d1ce866e6.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-07T17:25:36.429782Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

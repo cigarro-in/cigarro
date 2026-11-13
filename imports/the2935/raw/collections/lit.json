@@ -1,0 +1,33 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/lit",
+  "h1": "LIT",
+  "title": "LIT | The Smoke Shop",
+  "canonical": "https://mydukaan.io/the2935/collections/lit",
+  "metaDescription": null,
+  "ogImage": "https://dms.mydukaan.io/original/jpeg/media/59a9b0b6-2191-46ba-b12e-7a9bf3ac268c.jpg",
+  "introHtml": null,
+  "childSlugs": [],
+  "countText": 1,
+  "productSlugs": [
+    "lit-420-high-society"
+  ],
+  "productsRaw": [
+    {
+      "id": 47934115,
+      "uuid": "6ee438b3-3dc9-4f74-a9d0-e512981a51d8",
+      "slug": "lit-420-high-society",
+      "name": "LIT 420 HIGH SOCIETY",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/6381ab08-d61c-46c9-9440-b01a77be37fa.webp"
+      ],
+      "price": 199,
+      "compare_at": 222,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 59746763,
+      "sku_count": 1
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/ocb",
+  "h1": "OCB",
+  "title": "OCB ROLLING PAPERS AND ACCESSORIES",
+  "canonical": "https://mydukaan.io/the2935/collections/ocb",
+  "metaDescription": "Explore our wide range of OCB rolling papers. Made from natural materials for a smooth, even burn. Perfect for every smoking enthusiast's needs.",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/28683d58-09d3-4be1-b746-6761515a4edd.jpg",
+  "introHtml": "<h1><strong>OCB Papers + Tips </strong><br>Rolling made simple</h1>\n<p>Since 1918, the OCB brand has been perfecting the paper-making process for rolling papers. Focused on maximum thinness and slowest burn, OCB papers are a favorite worldwide. </p>",
+  "childSlugs": [],
+  "countText": 2,
+  "productSlugs": [
+    "ocb-brown-rolling-paper-2",
+    "ocb-rolling-papers"
+  ],
+  "productsRaw": [
+    {
+      "id": 2603777,
+      "uuid": "a448bd28-ce48-4d38-bf4e-2d17a828ca55",
+      "slug": "ocb-brown-rolling-paper-2",
+      "name": "OCB Slim UNBLEACHED",
+      "images": [
+        "https://dms.mydukaan.io/original/webp/media/31eda59d-4cd6-4ecd-94e2-c0815419f7d9.jpeg",
+        "https://dms.mydukaan.io/original/jpeg/644186/77710352-a281-4d44-9d2b-3461e771f2eb.png"
+      ],
+      "price": 75,
+      "compare_at": 100,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58406326,
+      "sku_count": 2
+    },
+    {
+      "id": 2603685,
+      "uuid": "f0364c9b-2156-4825-b546-9acc00e7fb56",
+      "slug": "ocb-rolling-papers",
+      "name": "OCB Slim Premium",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/155ec979-83f9-4b08-8b79-c8e760e79033.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/af4379ae-db29-47be-a9e0-c712dac65bd4.jpg"
+      ],
+      "price": 75,
+      "compare_at": 100,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58406317,
+      "sku_count": 2
+    }
+  ]
+}

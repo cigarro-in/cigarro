@@ -1,0 +1,156 @@
+{
+  "url": "https://mydukaan.io/the2935/products/benson-and-hedge-red-imported",
+  "product": {
+    "id": 47292006,
+    "uuid": "af9910df-28dd-4bbd-abf1-9c57fac934e4",
+    "slug": "benson-and-hedge-red-imported",
+    "name": "Benson And Hedge RED (Imported)",
+    "price": 3800,
+    "compare_at": 4000,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 58187985,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d2541c14-e8b7-494b-9c75-39b4804d0c02.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d506cef6-4334-4535-a092-1747b1187c97.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/316107e3-7fe9-4344-97bd-1479105b8127.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/95abfe4b-cee0-4832-9c09-c2296521f1a4.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/443c41d0-30d8-4564-b669-3200af7bf412.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6a6b0453-4e36-404f-9bdd-5dce9e9e2427.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/5dbc21f8-2ef0-4932-ad80-c1f39216ad84.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/f933fb7c-af6f-4c38-b25c-450642c802a8.jpg"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58187985,
+        "uuid": "5a3c8cb6-5ecc-46c8-9349-1ff8e936d123",
+        "code": "",
+        "price": 3800,
+        "compare_at": 4000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387479,
+        "uuid": "db564ebe-ea25-41f5-96b8-c2ff8fba842d",
+        "code": "",
+        "price": 1900,
+        "compare_at": 2000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/b17ca8bf-f9c0-4a5a-803c-7c9a9f69dbbd.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:57:02.842566Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

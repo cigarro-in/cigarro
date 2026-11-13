@@ -1,0 +1,152 @@
+{
+  "url": "https://mydukaan.io/the2935/products/davidoff-white-1mg-slim",
+  "product": {
+    "id": 43545471,
+    "uuid": "745600c0-8029-440a-bc43-6431071aad22",
+    "slug": "davidoff-white-1mg-slim",
+    "name": "Davidoff White 1MG SLIM",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 11,
+    "default_sku": 52094887,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/3193e131-982b-416a-a420-2e26a76f4c6b.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/da3f1214-7810-4c4c-9d8a-5ef8c7b4725c.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/445630da-a89d-494c-a53e-ef384f0bede3.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/90c9d789-a8f4-4d80-9101-0a39b42a48b1.jpg"
+    ],
+    "videos": [],
+    "description": "<p><br><img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Logo_Davidoff.svg/200px-Logo_Davidoff.svg.png\" width=\"200\" height=\"90\" loading=\"lazy\" decoding=\"async\"><br><br><br>You probably hear about Davidoff a lot, but who is he, and who owns the company? <a href=\"https://cigarcountry.com/brand/davidoff-cigars/\" rel=\"nofollow noopener\" target=\"_blank\">Davidoff</a> is a Swiss premium brand of cigars, cigarettes, and smoker’s adornments. Imperial Brands claimed the Davidoff cigarette brand after buying it in 2006. The non-cigarette part of the Davidoff tobacco brand is possessed by Oettinger Davidoff AG, which is situated in Basel, Switzerland.<br>David off white packet contains 20 cigarette</p>\n<ul>\n<li>\n<div>\n<div>\n<h5>Tar/Nicotine</h5>\n<p>Tar 1mg / Nic. 0.10mg</p>\n</div>\n</div>\n</li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "size",
+        "values": [
+          "Carton",
+          "Half Carton (5 Packets)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 52094887,
+        "uuid": "0ca861ca-ded0-4a00-ad0f-5cebd77339a6",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Carton"
+        }
+      },
+      {
+        "id": 52094888,
+        "uuid": "4ae81f8b-2c97-4325-b831-e82a73e5a490",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Half Carton (5 Packets)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-06T16:56:58.895643Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

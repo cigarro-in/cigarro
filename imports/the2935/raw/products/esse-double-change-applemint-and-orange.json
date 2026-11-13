@@ -1,0 +1,152 @@
+{
+  "url": "https://mydukaan.io/the2935/products/esse-double-change-applemint-and-orange",
+  "product": {
+    "id": 47686288,
+    "uuid": "10f65d6c-9ba7-4326-b1dc-907af8b1dc1c",
+    "slug": "esse-double-change-applemint-and-orange",
+    "name": "Esse Double Change Orange and Applemint",
+    "price": 1125,
+    "compare_at": 1245,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 62386828,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/19f17bb4-6b73-4c29-bb62-a4bdb878fbdd.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6745c0a3-e6cd-4c27-ab1a-2718a201030c.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/a6ca4ca7-5450-415c-bfca-c34881b60bd5.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/eef767a8-d18c-4951-b6e1-e4e14d349e3f.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/74236865-6d38-4ea8-a722-937ed6254f11.jpg"
+    ],
+    "videos": [],
+    "description": "<h4><span>ESSE DOUBLE CHANGE </span></h4>\n<h3>Applemint and Orange</h3>\n<p>Changing of flavors from rich to fresh upon breaking the capsules</p>\n<h3><br>Esse double change cigratte comes with 2 switches inside filter contains two different flavours Applemint and Orange</h3>\n<ul>\n<li>\n<div>\n<div>\n<h5>Length</h5>\n<p>100mm</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Tar/Nicotine</h5>\n<p>Tar 4.0mg / Nic. 0.40mg</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Launch Date</h5>\n<p>2013.06.10</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Price</h5>\n<p>Undefined</p>\n</div>\n</div>\n</li>\n<li>\n<div>\n<div>\n<h5>Feature</h5>\n<p>초슬림 캡슐 담배</p>\n</div>\n</div>\n</li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "HALF CARTON (FIVE PACKETS)",
+          "CARTON (TEN PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62386828,
+        "uuid": "e1549bf9-b9b5-40e2-9b4d-99c9de5f1c2a",
+        "code": "",
+        "price": 1125,
+        "compare_at": 1245,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/19f17bb4-6b73-4c29-bb62-a4bdb878fbdd.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/19f17bb4-6b73-4c29-bb62-a4bdb878fbdd.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      },
+      {
+        "id": 62386829,
+        "uuid": "6ef2104e-234d-430e-bd8b-8b452293b58a",
+        "code": "",
+        "price": 2250,
+        "compare_at": 2490,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/74236865-6d38-4ea8-a722-937ed6254f11.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/74236865-6d38-4ea8-a722-937ed6254f11.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (TEN PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T12:52:54.567884Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

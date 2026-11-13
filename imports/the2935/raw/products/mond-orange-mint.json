@@ -1,0 +1,147 @@
+{
+  "url": "https://mydukaan.io/the2935/products/mond-orange-mint",
+  "product": {
+    "id": 34195110,
+    "uuid": "d83d1df6-b2dd-4e85-bb6c-023da5daac00",
+    "slug": "mond-orange-mint",
+    "name": "Mond Orange Mint",
+    "price": 1900,
+    "compare_at": 2000,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 43170068,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/images/fa84c792-889a-4e45-957c-0f2e9de14bc6.jpg",
+      "https://dms.mydukaan.io/original/jpeg/images/83a960c7-06e7-459c-a240-0891f6ae2b97.jpg",
+      "https://dms.mydukaan.io/original/jpeg/images/8150a2a0-8f0e-4bf0-a8a7-bbc74d685659.jpg",
+      "https://dms.mydukaan.io/original/jpeg/images/c244f462-0efb-4ff9-8b4e-3a83958470c7.jpg"
+    ],
+    "videos": [],
+    "description": "<p>Mond Orange mint flavour slim cigarette packet contains 20 pcs</p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 43170068,
+        "uuid": "dcc0a8e0-3863-4401-923b-1555ca27bdbc",
+        "code": "",
+        "price": 1900,
+        "compare_at": 2000,
+        "image": "https://api.mydukaan.io/static/images/category-def.jpg",
+        "all_images": [],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387781,
+        "uuid": "54ee2dab-7fc5-4dea-a73c-9dbbf4ac2f15",
+        "code": "",
+        "price": 950,
+        "compare_at": 1000,
+        "image": "https://api.mydukaan.io/static/images/category-def.jpg",
+        "all_images": [],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T16:16:51.044425Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

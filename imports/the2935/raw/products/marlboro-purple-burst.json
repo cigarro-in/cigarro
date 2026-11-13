@@ -1,0 +1,137 @@
+{
+  "url": "https://mydukaan.io/the2935/products/marlboro-purple-burst",
+  "product": {
+    "id": 48025500,
+    "uuid": "674c324a-5b5d-449d-9d8f-37f796c5dd77",
+    "slug": "marlboro-purple-burst",
+    "name": "MARLBORO PURPLE BURST",
+    "price": 3300,
+    "compare_at": 3990,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 60068833,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/8cafb8f0-eb76-4ffe-b47c-6124ee7c78a2.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/8cb71991-e26e-4d38-8d90-80a15f42c28a.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/c56a772d-759e-47ff-a4ff-3858611e99df.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/2b4b1ec5-fb5a-459e-b35b-3a9cd43a1ec0.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/d3749162-6c14-43fb-87f4-dfdcfff8e481.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/ef596cd0-7494-42a3-89b6-bbb9d83753de.webp"
+    ],
+    "videos": [],
+    "description": "<h5>Marlboro PURPLE BURST<br><br>&#34;Indulge in the exquisite Marlboro Purple Burst Cigarettes, featuring a unique blend that delivers a refreshing smoking experience. Each cigarette is crafted with precision, boasting cool, large rolls and enhanced with two squeeze beads for a burst of flavor. Infused with the delightful essence of Blueberry and Menthol, these cigarettes offer a cool and refreshing sensation with every inhale. Enjoy a smooth smoking experience that is gentle on the throat, making Marlboro Purple Burst a favorite choice for those seeking a flavorful and satisfying smoke.&#34;<br><br></h5>\n<ul>\n<li><span>Product Type: </span>Cigarettes<br><br></li>\n<li><span>Stick count: </span>20 Per Packet<br><br></li>\n<li>Packet count: 10 Per Carton</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "MARLBORO",
+      "slug": "marlboro"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 60068833,
+        "uuid": "105c2e09-765f-49bf-8e78-a921f4f2cfaf",
+        "code": "",
+        "price": 3300,
+        "compare_at": 3990,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/8cafb8f0-eb76-4ffe-b47c-6124ee7c78a2.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/8cafb8f0-eb76-4ffe-b47c-6124ee7c78a2.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-09T08:09:03.602997Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

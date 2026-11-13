@@ -1,0 +1,137 @@
+{
+  "url": "https://mydukaan.io/the2935/products/classic-connect",
+  "product": {
+    "id": 43256810,
+    "uuid": "0d219d67-cd17-43d1-9ad7-65315595e572",
+    "slug": "classic-connect",
+    "name": "Classic Connect",
+    "price": 3900,
+    "compare_at": 0,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 62417440,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/74cb5a12-3264-497a-a101-2d66bd9b37eb.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/c968df40-bfc0-472d-9023-4c4ed4e8284c.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/4f889dc8-fa89-4bbb-9734-3f26ba1eb60d.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/23306dd1-471a-4177-8c1f-614a7709985a.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6c0d9d3e-e031-4383-8bd4-185a8ed54cbf.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/a7c7160f-0628-492b-b9fc-ad0ba0538eed.jpg"
+    ],
+    "videos": [],
+    "description": "<h1><strong>Rare Blue Leaf tobaccos with a hint of freshness for low smell</strong></h1>\n<p> </p>\n<p> </p>\n<p> </p>\n<p><strong>CIG. LENGTH: 97MM</strong></p>\n<p><strong>20 CIGARETTES</strong></p>\n<p><strong>NOT FOR SALE TO MINORS</strong></p>\n<p><strong>MFD. BY ITC LTD.</strong></p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON (10 PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62417440,
+        "uuid": "9e06b09c-81e8-4605-8711-84a8fac63f10",
+        "code": "",
+        "price": 3900,
+        "compare_at": 0,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/74cb5a12-3264-497a-a101-2d66bd9b37eb.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/74cb5a12-3264-497a-a101-2d66bd9b37eb.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (10 PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-04-06T20:51:35.417878Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

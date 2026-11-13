@@ -1,0 +1,167 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/marlboro",
+  "h1": "MARLBORO",
+  "title": "Premium Quality Marlboro Cigarettes Online",
+  "canonical": "https://mydukaan.io/the2935/collections/marlboro",
+  "metaDescription": "Shop the best selection of Marlboro cigarettes. Enjoy the rich, bold flavor of a world-renowned brand. Fast shipping and great prices guaranteed!",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/84757150-c02a-44a1-9201-d563167eaa3b.png",
+  "introHtml": "<div>\n<div>\n<div>\n<div>\n<div>\n<div>Marlboro is one of the best-known trademarks among all consumer products, and has been the world&#39;s number-one international selling cigarette brand since 1972.</div>\n</div>\n<div>\n<div> </div>\n</div>\n</div>\n</div>\n</div>\n</div>\n<div>\n<div>\n<div>\n<div>\n<div>\n<div> </div>\n</div>\n</div>\n</div>\n</div>\n</div>",
+  "childSlugs": [],
+  "countText": 8,
+  "productSlugs": [
+    "marlboro-purple-burst",
+    "marlboro-double-burst",
+    "marlboro-fuse-beyond",
+    "marlboro-red-imported",
+    "marlboro-light-imported",
+    "marlboro-advance",
+    "marlboro-red",
+    "marlboro-lights"
+  ],
+  "productsRaw": [
+    {
+      "id": 48025500,
+      "uuid": "674c324a-5b5d-449d-9d8f-37f796c5dd77",
+      "slug": "marlboro-purple-burst",
+      "name": "MARLBORO PURPLE BURST",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/8cafb8f0-eb76-4ffe-b47c-6124ee7c78a2.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/8cb71991-e26e-4d38-8d90-80a15f42c28a.webp"
+      ],
+      "price": 3300,
+      "compare_at": 3990,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60068833,
+      "sku_count": 1
+    },
+    {
+      "id": 47292052,
+      "uuid": "f0a594a8-8132-4888-b8b6-8f85e692df66",
+      "slug": "marlboro-double-burst",
+      "name": "Marlboro Double Burst",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/e199a240-b693-47f1-917f-fad340b28440.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/dc342657-4da6-4e58-b2e8-b7714dd39345.jpg"
+      ],
+      "price": 3300,
+      "compare_at": 3400,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58188235,
+      "sku_count": 2
+    },
+    {
+      "id": 43256854,
+      "uuid": "c6a6964a-b321-450c-bad2-145ea107838d",
+      "slug": "marlboro-fuse-beyond",
+      "name": "Marlboro Fuse Beyond",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/c2d07543-a219-46d7-be41-ded11a5904bc.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/c55b7965-6752-4b4f-8335-096cdafaf184.png"
+      ],
+      "price": 4800,
+      "compare_at": 0,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 51195889,
+      "sku_count": 1
+    },
+    {
+      "id": 2837949,
+      "uuid": "1fe9cb01-9846-447b-8a30-3f74c3c6e5e2",
+      "slug": "marlboro-red-imported",
+      "name": "Marlboro Red IMPORTED",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d04167c1-6ea7-4f0e-b333-ffe57bf661f5.png",
+        "https://dms.mydukaan.io/original/jpeg/media/eb6da0fd-54b4-448a-bd04-fffcd66d03be.png"
+      ],
+      "price": 3300,
+      "compare_at": 3500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 5,
+      "default_sku": 43170275,
+      "sku_count": 2
+    },
+    {
+      "id": 2837911,
+      "uuid": "e698f56b-cb19-4dd3-b4df-b377bfe2c5f2",
+      "slug": "marlboro-light-imported",
+      "name": "Marlboro Light IMPORTED",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b77fe1a4-75dd-4bf7-b7e3-613f7fc13d01.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/3c34fee1-ef57-4d05-9643-3c0fd2be823e.webp"
+      ],
+      "price": 3300,
+      "compare_at": 3500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 5,
+      "default_sku": 43170213,
+      "sku_count": 2
+    },
+    {
+      "id": 2602891,
+      "uuid": "7f6b1215-d717-424f-9059-9424c250a9bb",
+      "slug": "marlboro-advance",
+      "name": "Marlboro Advance",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d5c3e182-25c5-4968-a8a2-8d1ded98ccb3.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/b606478b-de32-4945-8ec3-15134803c67c.webp"
+      ],
+      "price": 4800,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62417430,
+      "sku_count": 2
+    },
+    {
+      "id": 2602823,
+      "uuid": "93529396-8185-4771-aa0d-7f47d37ee03c",
+      "slug": "marlboro-red",
+      "name": "Marlboro Red (Indian)",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/a668f93d-c490-4cdb-9011-0e17690f7c11.jpeg",
+        "https://dms.mydukaan.io/original/jpeg/644186/a5f58abf-83e1-46a3-ba0e-14da2f16102b.png"
+      ],
+      "price": 4800,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 62417436,
+      "sku_count": 2
+    },
+    {
+      "id": 2602713,
+      "uuid": "7491fafd-971b-43cb-8070-790229548c23",
+      "slug": "marlboro-lights",
+      "name": "Marlboro Lights(Indian)",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/c578d91f-62c2-47ae-810e-aef3a208adf9.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/11a1f0f7-b1a9-4495-a8b1-b9f6999308df.webp"
+      ],
+      "price": 4800,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62417433,
+      "sku_count": 2
+    }
+  ]
+}

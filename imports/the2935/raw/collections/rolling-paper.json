@@ -1,0 +1,94 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/rolling-paper",
+  "h1": "Rolling Paper & Accesories",
+  "title": "Cool Rolling Paper & Accessories | Best Prices",
+  "canonical": "https://mydukaan.io/the2935/collections/rolling-paper",
+  "metaDescription": "Explore our wide range of high-quality Cool Rolling Paper & Accessories. Perfect for your smoking needs. Enjoy smooth and easy rolling with our products.",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/254ce0a0-e0ec-4391-849a-4cf1adc01780.png",
+  "introHtml": "<h3>Welcome to smokeshop.co.in - Your One-Stop Destination for Premium Rolling Papers and Accessories!</h3>\n<p>At smokeshop.co.in, we take pride in offering a curated selection of the finest rolling papers and accessories from leading brands in the industry. Dive into a world of superior craftsmanship and quality, as we bring you a collection that includes renowned brands such as OCB, RAW, Lit, Bongchie, and more.</p>\n<h4>Discover the Art of Rolling:</h4>\n<p>Embark on a journey of exquisite craftsmanship with our premium selection of rolling papers. From ultra-thin and slow-burning options to unbleached and organic choices, we cater to every preference and style. Elevate your smoking experience with the precision and perfection that these top brands offer.</p>\n<h4>Elevate Your Smoking Experience:</h4>\n<p>Our collection goes beyond just rolling papers – explore a range of filters, tips, and other accessories designed to complement your smoking ritual. Enhance the flavor, improve the burn, and customize your smoking experience with our carefully curated lineup of accessories.</p>\n<h4>Why Choose Us?</h4>\n<ul>\n<li><strong>Top Brands:</strong> We bring you the best of the best, ensuring unmatched quality and authenticity.</li>\n<li><strong>Variety:</strong> Explore a diverse range of options to suit your individual preferences and rolling style.</li>\n<li><strong>Quality Assurance:</strong> Each product is meticulously selected to uphold the highest standards of excellence.</li>\n<li><strong>Expertise:</strong> Count on us for guidance, recommendations, and a seamless shopping experience.</li>\n</ul>\n<h4>Shop Now:</h4>\n<p>Indulge in the luxury of top-tier rolling papers and accessories at smokeshop.co.in. Elevate your smoking experience with precision, quality, and style. Shop now and discover the art of rolling like never before!</p>\n<p><em>Enhance Your Smoking Ritual with our Premium Rolling Papers and Accessories - Shop Now at <a href=\"https://smokeshop.co.in/\" rel=\"nofollow noopener\" target=\"_blank\">smokeshop.co.in</a></em></p>",
+  "childSlugs": [
+    "lit",
+    "ocb",
+    "smoking"
+  ],
+  "countText": 4,
+  "productSlugs": [
+    "smoking-slim-long-filters-packet-with-120-tips-white",
+    "raw-rolling-paper",
+    "ocb-brown-rolling-paper-2",
+    "ocb-rolling-papers"
+  ],
+  "productsRaw": [
+    {
+      "id": 47934111,
+      "uuid": "69cc7e14-3285-4d88-8623-3e9a7b5eb159",
+      "slug": "smoking-slim-long-filters-packet-with-120-tips-white",
+      "name": "Smoking Slim Long Filters Packet with 120 Tips (White)",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/240ec0c2-b1d3-447b-9481-20b5371be088.jpg"
+      ],
+      "price": 99,
+      "compare_at": 199,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60897611,
+      "sku_count": 2
+    },
+    {
+      "id": 36576005,
+      "uuid": "7d73de83-2fe1-4d6f-aa14-c370fefaf0a6",
+      "slug": "raw-rolling-paper",
+      "name": "Raw Rolling Paper",
+      "images": [
+        "https://dms.mydukaan.io/original/webp/projecteagle/images/6524ba17-0219-41c8-aa92-af0556f7a635.jpg",
+        "https://dms.mydukaan.io/original/webp/projecteagle/images/77a7bebd-c63f-4d61-84b8-7a8308fe222f.jpg"
+      ],
+      "price": 199,
+      "compare_at": 249,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 31003714,
+      "sku_count": 1
+    },
+    {
+      "id": 2603777,
+      "uuid": "a448bd28-ce48-4d38-bf4e-2d17a828ca55",
+      "slug": "ocb-brown-rolling-paper-2",
+      "name": "OCB Slim UNBLEACHED",
+      "images": [
+        "https://dms.mydukaan.io/original/webp/media/31eda59d-4cd6-4ecd-94e2-c0815419f7d9.jpeg",
+        "https://dms.mydukaan.io/original/jpeg/644186/77710352-a281-4d44-9d2b-3461e771f2eb.png"
+      ],
+      "price": 75,
+      "compare_at": 100,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58406326,
+      "sku_count": 2
+    },
+    {
+      "id": 2603685,
+      "uuid": "f0364c9b-2156-4825-b546-9acc00e7fb56",
+      "slug": "ocb-rolling-papers",
+      "name": "OCB Slim Premium",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/155ec979-83f9-4b08-8b79-c8e760e79033.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/af4379ae-db29-47be-a9e0-c712dac65bd4.jpg"
+      ],
+      "price": 75,
+      "compare_at": 100,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 58406317,
+      "sku_count": 2
+    }
+  ]
+}

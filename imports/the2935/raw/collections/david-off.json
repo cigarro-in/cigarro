@@ -1,0 +1,110 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/david-off",
+  "h1": "DAVID OFF",
+  "title": "Explore the Range of Davidoff Cigarette - At smokeshop.co.in",
+  "canonical": "https://mydukaan.io/the2935/collections/david-off",
+  "metaDescription": "Explore the epitome of sophistication with Davidoff cigarettes, a brand renowned for its exceptionally mild flavor and refined smoking experience.",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/0a759227-6728-4113-a7fe-8b0561013106.svg",
+  "introHtml": "<h3>Indulge in Luxury with Davidoff Cigarettes</h3>\n<p>Welcome to smokeshop.co.in, your premium destination for exquisite smoking experiences. Explore the epitome of sophistication with Davidoff cigarettes, a brand renowned for its exceptionally mild flavor and refined smoking experience.</p>\n<p>Crafted from an exclusive tobacco blend of the finest varieties, Davidoff cigarettes set the standard for quality and luxury. Each pack embodies the essence of elegance, offering smokers a truly aromatic taste that transcends the ordinary.</p>\n<h4>Key Features of Davidoff Cigarettes:</h4>\n<ul>\n<li><strong>Exceptional Mildness</strong>: Enjoy a smooth and gentle smoking experience that is a hallmark of Davidoff cigarettes.</li>\n<li><strong>Aromatic Excellence</strong>: Delight your senses with the rich, distinctive aroma that lingers with each puff.</li>\n<li><strong>Quality Standards</strong>: Made with precision and care, Davidoff cigarettes meet the highest quality standards, ensuring a consistent and satisfying smoke every time.</li>\n</ul>\n<h4>Elevate Your Smoking Ritual:</h4>\n<p>Rediscover the joy of smoking with Davidoff cigarettes, where indulgence meets excellence. Whether you&#39;re seeking a moment of relaxation or a touch of luxury, Davidoff brings you a smoking experience that is unparalleled.</p>\n<h4>Shop Davidoff Cigarettes:</h4>\n<p>Experience the allure of Davidoff cigarettes and elevate your smoking ritual to new heights. Immerse yourself in luxury and sophistication with every puff of Davidoff. Shop now and savor the essence of refinement.</p>\n<p><em>Explore the World of Luxury Smoking with Davidoff Cigarettes - Available at <a href=\"https://smokeshop.co.in/\" rel=\"nofollow noopener\" target=\"_blank\">smokeshop.co.in</a></em></p>",
+  "childSlugs": [],
+  "countText": 5,
+  "productSlugs": [
+    "davidoff-white-superslim-1mg",
+    "davidoff-gold-8mg-slim",
+    "davidoff-gold-8mg",
+    "davidoff-white-1mg-slim",
+    "davidoff-white"
+  ],
+  "productsRaw": [
+    {
+      "id": 47606930,
+      "uuid": "64629715-506d-4c62-baca-0f784dee5414",
+      "slug": "davidoff-white-superslim-1mg",
+      "name": "Davidoff White SUPERSLIM 1MG",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/55e588ac-9c8f-4e1b-8524-1524538fceec.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/0c4615d6-9c69-4e0d-8ab2-7e48077eb2eb.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 3,
+      "default_sku": 58826138,
+      "sku_count": 2
+    },
+    {
+      "id": 43545477,
+      "uuid": "d4a9e1a7-8963-44a8-902d-fed15f96d40c",
+      "slug": "davidoff-gold-8mg-slim",
+      "name": "Davidoff GOLD 7MG SLIM",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b6a68de1-c5bf-4a3a-915d-7f97dbbe5087.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/04883567-4cc7-4685-9110-a5c64f5256aa.png"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 52094907,
+      "sku_count": 2
+    },
+    {
+      "id": 43545474,
+      "uuid": "bda2476f-9b82-466a-bd32-abda82a1630a",
+      "slug": "davidoff-gold-8mg",
+      "name": "Davidoff GOLD 7MG KING SIZE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/7c06cbbd-48cf-4343-bf46-acfb719c451f.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/10b5b241-7895-4869-95bb-0090fb9ff9eb.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 4,
+      "default_sku": 52094901,
+      "sku_count": 2
+    },
+    {
+      "id": 43545471,
+      "uuid": "745600c0-8029-440a-bc43-6431071aad22",
+      "slug": "davidoff-white-1mg-slim",
+      "name": "Davidoff White 1MG SLIM",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/3193e131-982b-416a-a420-2e26a76f4c6b.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/152f85ed-a9fe-42a2-b087-3adf8870be4f.jpg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 11,
+      "default_sku": 52094887,
+      "sku_count": 2
+    },
+    {
+      "id": 36576092,
+      "uuid": "4ca12401-5d0b-4d6b-9bbc-95175283473f",
+      "slug": "davidoff-white",
+      "name": "Davidoff White 1MG KING SIZE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/ba034d88-497b-4671-a1f8-eb70c0ee3e69.webp",
+        "https://dms.mydukaan.io/original/jpeg/829276/13a0cfb6-7f09-4d49-85a3-7650de86956d/1650306971146-cbf17675-3dbc-41af-96a2-bd1cf46b4e9c.jpeg"
+      ],
+      "price": 3850,
+      "compare_at": 4500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.9,
+      "reviews": 10,
+      "default_sku": 52195486,
+      "sku_count": 2
+    }
+  ]
+}

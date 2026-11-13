@@ -1,0 +1,152 @@
+{
+  "url": "https://mydukaan.io/the2935/products/mond-strawberry",
+  "product": {
+    "id": 47348765,
+    "uuid": "af137602-40ed-44e5-bba9-418c986d9725",
+    "slug": "mond-strawberry",
+    "name": "Mond Strawberry",
+    "price": 1900,
+    "compare_at": 2000,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 4,
+    "default_sku": 58337425,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/fbd909c5-51dc-4ebf-ac1b-cb875b4ce27d.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/c6224bef-82bf-452b-b796-9dda410e7206.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6fadc759-be42-4302-9795-36fdfa75570a.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/fab55d8a-f504-4a8d-bf5a-d0bf5c7b5b39.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li><strong>TAR: 5MG<br></strong></li>\n<li><strong>NICOTINE: 0.4MG<br><br></strong></li>\n<li><strong>BLEND: AMERICAN<br><br></strong></li>\n<li><strong>FLAVOUR: STRAWBERRY<br><br></strong></li>\n<li><strong>CIGARETTE TYPE: SUPERSLIM<br><br></strong></li>\n<li><strong>LENGTH: 99MM<br><br></strong></li>\n<li><strong>FILTER: MONOACETATE<br><br></strong></li>\n<li><strong>PACKET CONTAINS: 20 CIGRATTES<br><br></strong></li>\n<li><strong>CARTON CONTAINS: 10 PACKETS </strong></li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58337425,
+        "uuid": "81416b3b-ec93-4182-bd26-cbd22eb0888d",
+        "code": "",
+        "price": 1900,
+        "compare_at": 2000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/fab55d8a-f504-4a8d-bf5a-d0bf5c7b5b39.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/fab55d8a-f504-4a8d-bf5a-d0bf5c7b5b39.jpg",
+          "https://dms.mydukaan.io/original/jpeg/media/6fadc759-be42-4302-9795-36fdfa75570a.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387450,
+        "uuid": "7f96ad46-6160-44c7-8d9d-5868f7373218",
+        "code": "",
+        "price": 950,
+        "compare_at": 1000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/fbd909c5-51dc-4ebf-ac1b-cb875b4ce27d.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/fbd909c5-51dc-4ebf-ac1b-cb875b4ce27d.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:30:49.859688Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

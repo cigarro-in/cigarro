@@ -1,0 +1,223 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/esse",
+  "h1": "ESSE",
+  "title": "ESSE: Premium Quality Products for Your Needs",
+  "canonical": "https://mydukaan.io/the2935/collections/esse",
+  "metaDescription": "Discover the wide range of ESSE products. Shop now for great deals!",
+  "ogImage": "https://dms.mydukaan.io/original/webp/media/f33de8a7-85d7-4d1c-af39-b20770736b72.jpg",
+  "introHtml": "<p><img src=\"https://dms.mydukaan.io/original/webp/media/3aac7735-f259-4a5d-94c1-5a6d6180f414.jpeg\" alt=\"\" width=\"175\" height=\"131\" loading=\"lazy\" decoding=\"async\"></p>\n<p>Welcome to THE SMOKE SHOP, your premier destination for ESSE cigarettes manufactured by Korea Tomorrow &amp; Global. We take pride in offering you the finest quality cigarettes from one of the leading manufacturers in the tobacco industry.</p>\n<p>ESSE cigarettes are crafted with precision and care. Our range includes various flavors and strengths, ensuring that you find the perfect cigarette to suit your taste. Each ESSE cigarette is made using premium tobacco leaves sourced from around the world, combined with state-of-the-art manufacturing techniques to deliver a smooth and satisfying smoking experience.</p>\n<p>Korea Tomorrow &amp; Global is renowned for its commitment to producing high-quality tobacco products that are enjoyed by smokers worldwide. We are honored to bring you the best that the brand has to offer, and we believe that once you try ESSE cigarettes, you&#39;ll appreciate their superior taste and quality.</p>\n<p>At THE SMOKE SHOP, we are dedicated to providing you with a convenient and secure shopping experience, ensuring prompt delivery and exceptional customer service. Our team is here to assist you with any questions or inquiries you may have, making sure you have a seamless experience from browsing to checkout.</p>\n<p>Whether you&#39;re a seasoned smoker or exploring new flavors, we invite you to discover the distinctive taste and premium quality of ESSE cigarettes from Korea Tomorrow &amp; Global. Begin your smoking journey with THE SMOKE SHOP today and elevate your smoking experience with ESSE.</p>",
+  "childSlugs": [],
+  "countText": 11,
+  "productSlugs": [
+    "pine-superslims",
+    "esse-double-change-applemint-and-orange",
+    "pine-double-change-applemint-wine",
+    "esse-change-4mg-1",
+    "pine-double-change",
+    "esse-double-change",
+    "esse-black",
+    "esse-menthol",
+    "esse-change",
+    "esse-gold",
+    "esse-light-2"
+  ],
+  "productsRaw": [
+    {
+      "id": 47686498,
+      "uuid": "b27636d7-17a8-467b-bdee-f877b3e7ca5c",
+      "slug": "pine-superslims",
+      "name": "PINE SUPERSLIMS",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/05faf74b-e636-4f94-9718-a0541c9563e6.webp"
+      ],
+      "price": 2750,
+      "compare_at": 2990,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 62386924,
+      "sku_count": 2
+    },
+    {
+      "id": 47686288,
+      "uuid": "10f65d6c-9ba7-4326-b1dc-907af8b1dc1c",
+      "slug": "esse-double-change-applemint-and-orange",
+      "name": "Esse Double Change Orange and Applemint",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/19f17bb4-6b73-4c29-bb62-a4bdb878fbdd.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/6745c0a3-e6cd-4c27-ab1a-2718a201030c.jpg"
+      ],
+      "price": 1125,
+      "compare_at": 1245,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62386828,
+      "sku_count": 2
+    },
+    {
+      "id": 47686277,
+      "uuid": "07824f51-b519-4481-89f2-f6aa81d79461",
+      "slug": "pine-double-change-applemint-wine",
+      "name": "Pine Double change APPLEMINT & WINE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/1144ae36-379d-420d-bf8c-c99633796aae.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/37fc0029-cfb2-4271-853c-063620925e38.webp"
+      ],
+      "price": 1125,
+      "compare_at": 1245,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 62386952,
+      "sku_count": 2
+    },
+    {
+      "id": 47523044,
+      "uuid": "1194b78e-cdaf-48a5-bcd2-77f591cba65a",
+      "slug": "esse-change-4mg-1",
+      "name": "Esse Change 4mg",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/784f3559-db36-4a69-88a5-14aa622a9806.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/7c7fd152-4b63-443d-b6fb-88b866b954d8.jpeg"
+      ],
+      "price": 2250,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58658364,
+      "sku_count": 2
+    },
+    {
+      "id": 43496464,
+      "uuid": "a2f4733a-80be-4a31-807c-17ed08d11e14",
+      "slug": "pine-double-change",
+      "name": "Pine Double change ORANGE & APPLEMINT",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/2ce7e4ff-007d-46c3-9cab-d9631f16669f.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/8939da17-17c7-47de-9234-fdd0af7dd7f0.jpg"
+      ],
+      "price": 1125,
+      "compare_at": 1225,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 62387486,
+      "sku_count": 2
+    },
+    {
+      "id": 36576103,
+      "uuid": "b9cc3e18-74bc-46dd-a519-a7ee2d675b59",
+      "slug": "esse-double-change",
+      "name": "Esse Double Change Applemint and Wine",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d9b79883-2e20-451b-9202-0b5f4b651858.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/75aebf9f-13da-45f9-9c3c-5c8c9abae8af.jpg"
+      ],
+      "price": 1200,
+      "compare_at": 1245,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 3,
+      "default_sku": 62387638,
+      "sku_count": 2
+    },
+    {
+      "id": 34345941,
+      "uuid": "7800589b-1987-445f-8843-d74611e4efaf",
+      "slug": "esse-black",
+      "name": "Esse Golden Leaf",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/41a1579f-2b8d-4293-98ce-f8bd062319ea.webp"
+      ],
+      "price": 2250,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.444444444444445,
+      "reviews": 9,
+      "default_sku": 43168741,
+      "sku_count": 2
+    },
+    {
+      "id": 34195105,
+      "uuid": "a45466a6-4880-4898-b6b5-3019cf1d2bbd",
+      "slug": "esse-menthol",
+      "name": "Esse Menthol",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/264b5db9-13db-4f51-86a7-59239afffb70.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/93ba56a6-b253-4ea5-b2e5-aff00aad7ed8.jpg"
+      ],
+      "price": 2450,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.666666666666667,
+      "reviews": 6,
+      "default_sku": 43169453,
+      "sku_count": 2
+    },
+    {
+      "id": 34195099,
+      "uuid": "318b251d-0dbf-409a-9fb3-a4ee5f9a0476",
+      "slug": "esse-change",
+      "name": "Esse Change DUBAI IMPORTED",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d4391fbb-82aa-483e-9742-c18b0c38aa8c.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/6461818a-5c92-42c5-8b3d-172021c1a344.webp"
+      ],
+      "price": 2450,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.714285714285714,
+      "reviews": 7,
+      "default_sku": 52305989,
+      "sku_count": 2
+    },
+    {
+      "id": 2601714,
+      "uuid": "950c655b-59cc-4bb7-bd73-bc5000a8e0c5",
+      "slug": "esse-gold",
+      "name": "Esse Gold",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/8e18cb4a-8289-4493-8fbf-1058b877602b.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/ab69be9d-2baa-4c16-b02a-3322fa3d24a0.webp"
+      ],
+      "price": 2400,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 4.923076923076923,
+      "reviews": 13,
+      "default_sku": 58826231,
+      "sku_count": 2
+    },
+    {
+      "id": 2601344,
+      "uuid": "f0083cb4-fdbe-49af-9c6f-576951337174",
+      "slug": "esse-light-2",
+      "name": "Esse Light",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/584f8215-7f79-47d0-b552-8fd258c11cd0.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/35a1243e-03b0-4238-ace2-0b394a2029c3.webp"
+      ],
+      "price": 2250,
+      "compare_at": 2490,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 20,
+      "default_sku": 43168623,
+      "sku_count": 2
+    }
+  ]
+}

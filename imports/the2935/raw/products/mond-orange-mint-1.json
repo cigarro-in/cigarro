@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/mond-orange-mint-1",
+  "product": {
+    "id": 47348777,
+    "uuid": "db2253b4-8a0a-4ead-ad37-229895c839f0",
+    "slug": "mond-orange-mint-1",
+    "name": "Mond ORANGE MINT",
+    "price": 950,
+    "compare_at": 1000,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 62387458,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/5bd22956-f43e-44f2-b39d-13c42a7ed63e.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li><strong>TAR: 5MG<br></strong></li>\n<li><strong>NICOTINE: 0.4MG<br><br></strong></li>\n<li><strong>BLEND: AMERICAN<br><br></strong></li>\n<li><strong>FLAVOUR: ORANGE MINT<br><br></strong></li>\n<li><strong>CIGARETTE TYPE: SUPERSLIM<br><br></strong></li>\n<li><strong>LENGTH: 99MM<br><br></strong></li>\n<li><strong>FILTER: MONOACETATE<br><br></strong></li>\n<li><strong>PACKET CONTAINS: 20 CIGRATTES<br><br></strong></li>\n<li><strong>CARTON CONTAINS: 10 PACKETS </strong></li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "HALF CARTON (FIVE PACKETS)",
+          "CARTON"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62387458,
+        "uuid": "62acee76-ba7d-4b0a-9765-63d0fbb1c35f",
+        "code": "",
+        "price": 950,
+        "compare_at": 1000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      },
+      {
+        "id": 62387459,
+        "uuid": "1c64a917-7ab3-4d24-a80c-22f460db5b26",
+        "code": "",
+        "price": 1900,
+        "compare_at": 2000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:33:52.349515Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

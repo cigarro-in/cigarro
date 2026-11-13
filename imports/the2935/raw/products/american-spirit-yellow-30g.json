@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/american-spirit-yellow-30g",
+  "product": {
+    "id": 47661078,
+    "uuid": "79a6626d-8839-407f-a0d3-d123ce604685",
+    "slug": "american-spirit-yellow-30g",
+    "name": "American Spirit Yellow - 30g",
+    "price": 900,
+    "compare_at": 999,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 58921959,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/afb7889a-a07e-48fb-9c79-6fe0f7947dea.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/5e55bdee-5104-4f7d-a21d-112ed3a770db.webp"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li><strong>Pack</strong> - 30g</li>\n<li><strong>Origin</strong>- USA</li>\n<li>100% Original</li>\n<li>One of the highly popular</li>\n<li>No additives &amp; preservatives</li>\n<li>Nice packing</li>\n</ul>\n<p><br>American Spirit is a brand of roll-your-own (RYO) cigarette tobacco produced by the Santa Fe Natural Tobacco Company. It is marketed as an organic and additive-free brand of tobacco, which is grown in the United States and made from 100% natural tobacco. American Spirit RYO cigarette tobacco is available in different blends, such as full-bodied, medium, and mild, each made of different types of tobacco like Burley, Virginia, and Dark-Fired Kentucky. The full-bodied blend is known for its robust and smoky flavor, the medium blend for its balanced flavor, and the mild blend for its smooth and light flavor. The American Spirit brand is promoted as a natural and additive-free alternative to traditional cigarette tobacco, with the company emphasizing the use of organic and additive-free tobacco.</p>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Tobbaco",
+      "slug": "tobbaco"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "PACKET",
+          "BOX (CONTAINS EIGHT PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58921959,
+        "uuid": "7f21245b-c998-49db-bfce-c56d0d1fb303",
+        "code": "",
+        "price": 900,
+        "compare_at": 999,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/afb7889a-a07e-48fb-9c79-6fe0f7947dea.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/afb7889a-a07e-48fb-9c79-6fe0f7947dea.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "PACKET"
+        }
+      },
+      {
+        "id": 62387426,
+        "uuid": "aa3e3675-52be-494f-bbde-4f306c36beb3",
+        "code": "",
+        "price": 7200,
+        "compare_at": 7992,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/5e55bdee-5104-4f7d-a21d-112ed3a770db.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/5e55bdee-5104-4f7d-a21d-112ed3a770db.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "BOX (CONTAINS EIGHT PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:18:12.353761Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

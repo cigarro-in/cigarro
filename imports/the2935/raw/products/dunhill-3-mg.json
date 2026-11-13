@@ -1,0 +1,159 @@
+{
+  "url": "https://mydukaan.io/the2935/products/dunhill-3-mg",
+  "product": {
+    "id": 38684109,
+    "uuid": "791c8197-c72b-4a59-b441-bd8888ca1b81",
+    "slug": "dunhill-3-mg",
+    "name": "Dunhill GREY 3MG",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 43169796,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/fafcb9d3-8754-4b13-9222-2a986ad3c1e9.webp",
+      "https://dms.mydukaan.io/original/jpeg/upload_file_service/d68410f1-ef12-4dd6-b1e5-1049d9c7cb3c/1665693879322-jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/2095e8be-778b-453e-99a3-557247dd7c77.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d3f14eb5-dbf8-4206-974b-a58bb4c46612.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/b6e0b342-116c-4740-a2c7-198d62d845f1.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/c8e2b9ec-5f75-4822-a15d-e82f9d190fe0.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d9a9b62b-e5ca-45e5-9853-811f48dd1629.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/8547596f-0c43-4a4b-98b0-78ca8ae276bb.jpg",
+      "https://dms.mydukaan.io/original/jpeg/upload_file_service/fa9106f5-9ae6-418e-9f69-3631a1c34817/1665693939903-jpeg",
+      "https://dms.mydukaan.io/original/jpeg/upload_file_service/b863c81e-8013-49b0-86db-59d112a7ce10/1665693939915-jpeg",
+      "https://dms.mydukaan.io/original/jpeg/upload_file_service/7c893b55-beb9-4898-a51e-b9d4228e7e64/1665693939915-jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/0af2b06e-7b44-4084-941f-217046d5b381.jpg"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "Carton",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 43169796,
+        "uuid": "21a0ab74-2a37-4721-92ca-fe0a18ab9005",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/d3f14eb5-dbf8-4206-974b-a58bb4c46612.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/d3f14eb5-dbf8-4206-974b-a58bb4c46612.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "Carton"
+        }
+      },
+      {
+        "id": 62387581,
+        "uuid": "5a5689e2-48b1-464b-a37d-78d858d64eaf",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/fafcb9d3-8754-4b13-9222-2a986ad3c1e9.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/fafcb9d3-8754-4b13-9222-2a986ad3c1e9.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T14:51:11.070886Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

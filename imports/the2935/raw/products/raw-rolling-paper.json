@@ -1,0 +1,124 @@
+{
+  "url": "https://mydukaan.io/the2935/products/raw-rolling-paper",
+  "product": {
+    "id": 36576005,
+    "uuid": "7d73de83-2fe1-4d6f-aa14-c370fefaf0a6",
+    "slug": "raw-rolling-paper",
+    "name": "Raw Rolling Paper",
+    "price": 199,
+    "compare_at": 249,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 31003714,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/webp/projecteagle/images/6524ba17-0219-41c8-aa92-af0556f7a635.jpg",
+      "https://dms.mydukaan.io/original/webp/projecteagle/images/77a7bebd-c63f-4d61-84b8-7a8308fe222f.jpg",
+      "https://dms.mydukaan.io/original/webp/projecteagle/images/a7bbed8f-7565-4f89-bbe8-edc44f383c5d.jpg",
+      "https://dms.mydukaan.io/original/webp/projecteagle/images/8d9cd05d-c748-4b2a-b6a8-ff85c6c9c371.jpg"
+    ],
+    "videos": [],
+    "description": "Raw rolling papers, Best quality in rolling papers above mentioned price is for one booklet",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Rolling Paper & Accesories",
+      "slug": "rolling-paper"
+    },
+    "options": [],
+    "skus": [
+      {
+        "id": 31003714,
+        "uuid": "8f321a33-5b8e-4eb9-8ae7-e5b7b4ee71fe",
+        "code": "",
+        "price": 199,
+        "compare_at": 249,
+        "image": "https://dms.mydukaan.io/original/webp/projecteagle/images/6524ba17-0219-41c8-aa92-af0556f7a635.jpg",
+        "all_images": [],
+        "in_stock": true,
+        "options": {}
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2024-08-02T08:59:35.396544Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "url": "https://mydukaan.io/the2935/products/dunhill-international",
+  "product": {
+    "id": 47567110,
+    "uuid": "d25f895e-ce4f-4566-9dc8-8af486e91afb",
+    "slug": "dunhill-international",
+    "name": "Dunhill International",
+    "price": 4400,
+    "compare_at": 4990,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 58748345,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/31a75b36-188a-4bdf-a4cf-4b879475f8da.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/a181b208-1477-4f1a-b022-2790a7693691.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/49684220-69cb-44cb-bba5-9a7769a23fff.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d3a8671a-28c5-4a00-ba88-fcd731f5eb3d.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/88dfe672-e09d-4443-8f03-94fec26084a3.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6c996ac1-36c1-4068-84b6-f3ef544f80df.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/0067386a-8e8b-402b-86b8-b6dee51b1192.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/dd894097-8961-41d2-a23a-e5c6fc88ec55.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/63509638-e7d6-4d03-8659-9ebdf84ab276.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/47d08708-3568-403d-a5ab-8016bb449cb4.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6a29a1d8-0d9b-42a8-9b5d-734cab3b3857.jpg"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>SIZE : KING SIZE<br><br></li>\n<li>STICK LENGTH : 84MM<br><br><br></li>\n<li>TAR : 10MG<br><br></li>\n<li>NICOTINE : 1MG<br><br>\n<h1>Dunhill cigarettes are produced by Bristish American Tobacco.</h1>\n<strong>1 Packet contains 20 cigarettes sticks (Pack of 20).</strong><br><strong>1 Carton contains 10 packets of 20 cigarettes sticks. Total 200 cigarettes sticks (Box of 200).<br></strong><strong><br><br></strong>\n<p>Dunhill International cigarettes are a premium offering from the esteemed Dunhill brand, known for their exceptional quality and rich heritage.</p>\n<p>Blend: Dunhill International cigarettes feature a meticulously crafted blend of high-quality tobaccos, providing a full-bodied and smooth smoking experience.</p>\n</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "DUNHILL",
+      "slug": "dunhill"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58748345,
+        "uuid": "dc987389-5f82-4d40-b254-a46529604c9b",
+        "code": "",
+        "price": 4400,
+        "compare_at": 4990,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/dd894097-8961-41d2-a23a-e5c6fc88ec55.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/dd894097-8961-41d2-a23a-e5c6fc88ec55.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-08T03:54:05.602263Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

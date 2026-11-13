@@ -1,0 +1,152 @@
+{
+  "url": "https://mydukaan.io/the2935/products/pine-superslims",
+  "product": {
+    "id": 47686498,
+    "uuid": "b27636d7-17a8-467b-bdee-f877b3e7ca5c",
+    "slug": "pine-superslims",
+    "name": "PINE SUPERSLIMS",
+    "price": 2750,
+    "compare_at": 2990,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 1,
+    "default_sku": 62386924,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/05faf74b-e636-4f94-9718-a0541c9563e6.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/992614fd-a146-4616-9d95-84a96cb2371d.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/036798b0-89a0-428a-ba71-7afacc287591.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/7e6b6b41-eced-4797-bacc-f502c5e36c01.webp"
+    ],
+    "videos": [],
+    "description": "<div><span>Brand Family: </span>Pine (KT&amp;G)</div>\n<div><span>Product Type: </span>Cigarettes<br><span>Stick count (IN PACKET) : </span>20<br><span>Stick count (IN CARTON) : </span>200<br><br>MADE IN KOREA.</div>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "ESSE",
+      "slug": "esse"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON (TEN PACKETS)",
+          "HALF CARTON (FIVE PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 62386924,
+        "uuid": "b16361e4-b984-4c2b-bba6-8bbbd65fae5b",
+        "code": "",
+        "price": 2750,
+        "compare_at": 2990,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON (TEN PACKETS)"
+        }
+      },
+      {
+        "id": 62386925,
+        "uuid": "d039597f-d38c-4b81-9ccf-9e1011aaa6f9",
+        "code": "",
+        "price": 1375,
+        "compare_at": 1495,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/796af4a8-a685-48c6-98ce-6b3306036af3.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (FIVE PACKETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-11-13T05:11:00.842317Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

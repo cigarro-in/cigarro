@@ -1,0 +1,164 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/mond",
+  "h1": "mond",
+  "title": "mond | The Smoke Shop",
+  "canonical": "https://mydukaan.io/the2935/collections/mond",
+  "metaDescription": "This is the taste of Europe. Mond brand offers wide range of flavours to meet your preferences.",
+  "ogImage": "https://dms.mydukaan.io/original/jpeg/media/4836c750-8099-47d9-a7dd-0c1832140a30.jpeg",
+  "introHtml": "<h2><strong>This is the taste of Europe. Mond brand offers wide range of flavours to meet your preferences.</strong></h2>",
+  "childSlugs": [],
+  "countText": 8,
+  "productSlugs": [
+    "mond-green-apple",
+    "mond-watermelon",
+    "mond-orange-mint-1",
+    "mond-grapes",
+    "mond-strawberry",
+    "mond-gum-mint",
+    "milano-variance",
+    "mond-variance"
+  ],
+  "productsRaw": [
+    {
+      "id": 48094874,
+      "uuid": "c8aa212a-29d0-4ca4-b0ae-12d8a7f7c9f6",
+      "slug": "mond-green-apple",
+      "name": "MOND GREEN APPLE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/037210fe-d669-40b8-8d67-e9609a9069b8.webp"
+      ],
+      "price": 1900,
+      "compare_at": 1990,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 60221517,
+      "sku_count": 1
+    },
+    {
+      "id": 47683460,
+      "uuid": "13e4b472-9dcf-4362-8307-6ee891429dbd",
+      "slug": "mond-watermelon",
+      "name": "Mond WATERMELON",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/f8b129a6-dbca-4709-b926-1a3e3d54f72e.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/1424b08f-9cc3-44cd-a2ba-c777481af142.webp"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 58975930,
+      "sku_count": 2
+    },
+    {
+      "id": 47348777,
+      "uuid": "db2253b4-8a0a-4ead-ad37-229895c839f0",
+      "slug": "mond-orange-mint-1",
+      "name": "Mond ORANGE MINT",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/d024cf44-ff92-481c-8e26-70f38182c8e1.jpg",
+        "https://dms.mydukaan.io/original/jpeg/media/5bd22956-f43e-44f2-b39d-13c42a7ed63e.jpg"
+      ],
+      "price": 950,
+      "compare_at": 1000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 1,
+      "default_sku": 62387458,
+      "sku_count": 2
+    },
+    {
+      "id": 47348770,
+      "uuid": "a5274834-5cec-4703-9fa0-8c3fdbafd571",
+      "slug": "mond-grapes",
+      "name": "Mond GRAPES",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/16ab874e-c9de-44a1-a162-8832cb80478f.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/758e4510-3720-4bc5-967d-1e789186090f.jpg"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 62387453,
+      "sku_count": 2
+    },
+    {
+      "id": 47348765,
+      "uuid": "af137602-40ed-44e5-bba9-418c986d9725",
+      "slug": "mond-strawberry",
+      "name": "Mond Strawberry",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/fbd909c5-51dc-4ebf-ac1b-cb875b4ce27d.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/c6224bef-82bf-452b-b796-9dda410e7206.jpg"
+      ],
+      "price": 1900,
+      "compare_at": 2000,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 4,
+      "default_sku": 58337425,
+      "sku_count": 2
+    },
+    {
+      "id": 34195102,
+      "uuid": "5b3e8b1c-b351-41bb-b5d5-1f91e6ee2f20",
+      "slug": "mond-gum-mint",
+      "name": "Mond Gum Mint",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b22f1f2b-3172-4735-8697-b4595a8e2a31.webp"
+      ],
+      "price": 2000,
+      "compare_at": 0,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 2,
+      "default_sku": 43170103,
+      "sku_count": 2
+    },
+    {
+      "id": 34195093,
+      "uuid": "2132550b-f851-4a73-ae1b-fff0b909affb",
+      "slug": "milano-variance",
+      "name": "Milano LONDON 1MG cigarette",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/7279b9e1-27a1-40d6-9b97-572c5653a087.jpg"
+      ],
+      "price": 3300,
+      "compare_at": 3500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60897669,
+      "sku_count": 2
+    },
+    {
+      "id": 2838057,
+      "uuid": "8cab9583-0640-4a86-95b8-7b15fdeb009d",
+      "slug": "mond-variance",
+      "name": "Mond Variance",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/5b7975f8-b7be-4a93-be74-43ec85115a5c.webp",
+        "https://dms.mydukaan.io/original/jpeg/media/8b8c9cd3-f226-4510-8996-789235ee4dd7.jpg"
+      ],
+      "price": 2250,
+      "compare_at": 2500,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 5,
+      "reviews": 6,
+      "default_sku": 58188253,
+      "sku_count": 2
+    }
+  ]
+}

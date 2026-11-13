@@ -1,0 +1,159 @@
+{
+  "url": "https://mydukaan.io/the2935/products/davidoff-white-superslim-1mg",
+  "product": {
+    "id": 47606930,
+    "uuid": "64629715-506d-4c62-baca-0f784dee5414",
+    "slug": "davidoff-white-superslim-1mg",
+    "name": "Davidoff White SUPERSLIM 1MG",
+    "price": 3850,
+    "compare_at": 4500,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 3,
+    "default_sku": 58826138,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/55e588ac-9c8f-4e1b-8524-1524538fceec.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/0c4615d6-9c69-4e0d-8ab2-7e48077eb2eb.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/057cfe35-5bcc-4d80-ab3e-3e3bc8879858.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/c55c0526-9ef7-4e8f-8f86-e792c8df5562.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/1c8d3e1d-f634-4011-b7ee-e9f772b317ca.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/6d7cc323-adb2-4707-a9dd-e5db7303fa09.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/0f7748df-e4ed-4581-8084-23b6e02c23d7.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/b9185632-f6d2-4cd8-843e-4b2b33b9d7a3.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/38ba1a79-56f1-4135-a753-8a120e89fb93.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/061b9e5a-1434-4f9b-b0b1-219da591dae9.jpg"
+    ],
+    "videos": [],
+    "description": "<p> </p>\n<ul>\n<li>Size: SuperSlims<br><br></li>\n<li>Length: 100 mm<br><br><br></li>\n<li>\n<p>Tar: 1 mg<br><br></p>\n</li>\n<li>\n<p>Nicotine: 0.1 mg<br><br><br><br></p>\n</li>\n<li><strong>ONE Pack contains TWENTY cigarettes (Pack of 20).<br><br></strong></li>\n<li><strong>ONE Carton contains TEN packs of TWENTY cigarettes. Total TWO HUNDRED cigarettes (Box of 200).<br><br><br><br></strong>\n<h5>Davidoff White SuperSlims is a premium cigarette variant from the Davidoff brand, renowned for its exceptionally mild flavor and refined smoking experience. The high-quality Davidoff brand cigarettes are made from an exclusive tobacco blend of the finest tobacco varieties with high quality standards.<br>Davidoff filter cigarettes give smokers an aromatic taste.</h5>\n<p>Davidoff cigarettes are produced by Davidoff &amp; Cie SA. Switzerland</p>\n</li>\n</ul>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "size",
+        "values": [
+          "Carton",
+          "Half Carton (5 Packets)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58826138,
+        "uuid": "169874e9-39ba-4a37-8cae-0e3722d89cca",
+        "code": "",
+        "price": 3850,
+        "compare_at": 4500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/1c8d3e1d-f634-4011-b7ee-e9f772b317ca.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/1c8d3e1d-f634-4011-b7ee-e9f772b317ca.jpg",
+          "https://dms.mydukaan.io/original/jpeg/media/6d7cc323-adb2-4707-a9dd-e5db7303fa09.jpg",
+          "https://dms.mydukaan.io/original/jpeg/media/0f7748df-e4ed-4581-8084-23b6e02c23d7.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Carton"
+        }
+      },
+      {
+        "id": 58826139,
+        "uuid": "aa00e3e7-1bbc-49e6-9360-0310928f4c48",
+        "code": "",
+        "price": 1925,
+        "compare_at": 2250,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/b9185632-f6d2-4cd8-843e-4b2b33b9d7a3.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/b9185632-f6d2-4cd8-843e-4b2b33b9d7a3.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "size": "Half Carton (5 Packets)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T13:20:22.574857Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

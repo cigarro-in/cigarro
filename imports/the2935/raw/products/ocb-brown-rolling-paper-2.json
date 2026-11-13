@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/ocb-brown-rolling-paper-2",
+  "product": {
+    "id": 2603777,
+    "uuid": "a448bd28-ce48-4d38-bf4e-2d17a828ca55",
+    "slug": "ocb-brown-rolling-paper-2",
+    "name": "OCB Slim UNBLEACHED",
+    "price": 75,
+    "compare_at": 100,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 58406326,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/webp/media/31eda59d-4cd6-4ecd-94e2-c0815419f7d9.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/644186/77710352-a281-4d44-9d2b-3461e771f2eb.png"
+    ],
+    "videos": [],
+    "description": "<ul>\n<li>BRAND: OCB</li>\n<li>GROUP: LONG ROLLING SHEETS</li>\n<li>One booklet contains 32 sheets.</li>\n<li>Dimensions: 109x44 mm.</li>\n<li>Made of linen paper. Natural arabic gum glue.</li>\n<li>Slow-burning, thin, transparent rolling paper with a watermark.</li>\n<li>BROWN packaging with a hologram of the highest quality.</li>\n<li>Unbleached, with a natural brown color.</li>\n</ul>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Rolling Paper & Accesories",
+      "slug": "rolling-paper"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "SINGLE BOOKLET",
+          "BOX  (50 BOOKLETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58406326,
+        "uuid": "90cb3c59-2f32-48b4-a1fd-b2130ec6868c",
+        "code": "",
+        "price": 75,
+        "compare_at": 100,
+        "image": "https://dms.mydukaan.io/original/webp/media/31eda59d-4cd6-4ecd-94e2-c0815419f7d9.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/webp/media/31eda59d-4cd6-4ecd-94e2-c0815419f7d9.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "SINGLE BOOKLET"
+        }
+      },
+      {
+        "id": 58406327,
+        "uuid": "bdca2087-692a-453d-863b-bef91b909b24",
+        "code": "",
+        "price": 3750,
+        "compare_at": 5000,
+        "image": "https://dms.mydukaan.io/original/jpeg/644186/77710352-a281-4d44-9d2b-3461e771f2eb.png",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/644186/77710352-a281-4d44-9d2b-3461e771f2eb.png"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "BOX  (50 BOOKLETS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2024-12-21T17:19:42.700518Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

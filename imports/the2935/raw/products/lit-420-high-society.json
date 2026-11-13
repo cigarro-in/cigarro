@@ -1,0 +1,123 @@
+{
+  "url": "https://mydukaan.io/the2935/products/lit-420-high-society",
+  "product": {
+    "id": 47934115,
+    "uuid": "6ee438b3-3dc9-4f74-a9d0-e512981a51d8",
+    "slug": "lit-420-high-society",
+    "name": "LIT 420 HIGH SOCIETY",
+    "price": 199,
+    "compare_at": 222,
+    "price_varies": false,
+    "in_stock": true,
+    "rating": 0,
+    "reviews": 0,
+    "default_sku": 59746763,
+    "sku_count": 1,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/6381ab08-d61c-46c9-9440-b01a77be37fa.webp"
+    ],
+    "videos": [],
+    "description": "<div>For the Pros of #LitFam the 420 HIGH SOCIETY is essential for the high-functional stoner on the go! · Not only does it keep your papers and tips together but comes with a detachable rolling base! · Rolling papers with a hexagonal watermark and low GSM to ensure even burning · Vegan and processed without chalk or dyes · Made with rice resin delivering the true taste of smoke</div>\n<div> </div>\n<div> </div>\n<div>\n<div>\n<div>\n<div>\n<div> </div>\n<div>\n<p> </p>\n</div>\n</div>\n</div>\n</div>\n</div>",
+    "unit": "piece",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "LIT",
+      "slug": "lit"
+    },
+    "options": [],
+    "skus": [
+      {
+        "id": 59746763,
+        "uuid": "6c379bfa-1bc8-41db-bee9-5372e3e8c573",
+        "code": "",
+        "price": 199,
+        "compare_at": 222,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/6381ab08-d61c-46c9-9440-b01a77be37fa.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/6381ab08-d61c-46c9-9440-b01a77be37fa.webp"
+        ],
+        "in_stock": true,
+        "options": {}
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2025-06-15T16:41:42.583114Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

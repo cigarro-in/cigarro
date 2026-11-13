@@ -1,0 +1,149 @@
+{
+  "url": "https://mydukaan.io/the2935/products/gudang-garam",
+  "product": {
+    "id": 36576094,
+    "uuid": "cd9ca3cd-33ac-4214-abf1-8e93d0769fbb",
+    "slug": "gudang-garam",
+    "name": "Gudang Garam",
+    "price": 4500,
+    "compare_at": 5000,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 12,
+    "default_sku": 45611002,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/40779f43-03cc-4d20-ad09-2bb17e876296.webp",
+      "https://dms.mydukaan.io/original/jpeg/media/6fb2830a-3acc-41a9-95cb-a9509da032fd.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/e470ee50-863e-4cca-93d0-a1af1ce9835e.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/91aa6e8e-abb4-4dcd-81d9-c833116e14b6.jpg"
+    ],
+    "videos": [],
+    "description": "$2a",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Cigarette",
+      "slug": "cigarette"
+    },
+    "options": [
+      {
+        "name": "QUANTITY",
+        "values": [
+          "CARTON(20 PACKS)",
+          "HALF CARTON (10 PACKS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 45611002,
+        "uuid": "deee5aa1-00a1-4c48-8427-8df66223fb62",
+        "code": "",
+        "price": 4500,
+        "compare_at": 5000,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/40779f43-03cc-4d20-ad09-2bb17e876296.webp",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/40779f43-03cc-4d20-ad09-2bb17e876296.webp"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "CARTON(20 PACKS)"
+        }
+      },
+      {
+        "id": 62387641,
+        "uuid": "a2a1e114-b1af-4db3-972f-bba7194fe843",
+        "code": "",
+        "price": 2250,
+        "compare_at": 2500,
+        "image": "https://api.mydukaan.io/static/images/category-def.jpg",
+        "all_images": [],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "HALF CARTON (10 PACKS)"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-04-20T09:39:42.862675Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "url": "https://mydukaan.io/the2935/collections/smoking",
+  "h1": "smoking",
+  "title": "smoking | The Smoke Shop",
+  "canonical": "https://mydukaan.io/the2935/collections/smoking",
+  "metaDescription": null,
+  "ogImage": "https://dms.mydukaan.io/original/jpeg/media/6c140ebd-586a-4678-baac-6462f4235f20.png",
+  "introHtml": null,
+  "childSlugs": [],
+  "countText": 3,
+  "productSlugs": [
+    "smoking-master-regular",
+    "smoking-brown-king-size",
+    "smoking-slim-long-filters-packet-with-120-tips-white"
+  ],
+  "productsRaw": [
+    {
+      "id": 48025334,
+      "uuid": "1d9f79ff-9979-4825-a25e-e11456fd4b5e",
+      "slug": "smoking-master-regular",
+      "name": "SMOKING MASTER REGULAR",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/c9a10d0b-4c36-4582-ae90-49db043972fc.png"
+      ],
+      "price": 89,
+      "compare_at": 199,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60068484,
+      "sku_count": 1
+    },
+    {
+      "id": 48025328,
+      "uuid": "b6f256d7-01d7-428d-9de1-2a2584798338",
+      "slug": "smoking-brown-king-size",
+      "name": "SMOKING BROWN KING SIZE",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/b84cd100-2cfd-4a8a-a4e1-74b926240fb5.png"
+      ],
+      "price": 99,
+      "compare_at": 199,
+      "price_varies": false,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60068473,
+      "sku_count": 1
+    },
+    {
+      "id": 47934111,
+      "uuid": "69cc7e14-3285-4d88-8623-3e9a7b5eb159",
+      "slug": "smoking-slim-long-filters-packet-with-120-tips-white",
+      "name": "Smoking Slim Long Filters Packet with 120 Tips (White)",
+      "images": [
+        "https://dms.mydukaan.io/original/jpeg/media/240ec0c2-b1d3-447b-9481-20b5371be088.jpg"
+      ],
+      "price": 99,
+      "compare_at": 199,
+      "price_varies": true,
+      "in_stock": true,
+      "rating": 0,
+      "reviews": 0,
+      "default_sku": 60897611,
+      "sku_count": 2
+    }
+  ]
+}

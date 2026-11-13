@@ -1,0 +1,162 @@
+{
+  "url": "https://mydukaan.io/the2935/products/golden-virginia",
+  "product": {
+    "id": 36576009,
+    "uuid": "3621af42-21f2-4002-b158-305616749f72",
+    "slug": "golden-virginia",
+    "name": "Golden Virginia THE ORIGINAL",
+    "price": 1100,
+    "compare_at": 1150,
+    "price_varies": true,
+    "in_stock": true,
+    "rating": 5,
+    "reviews": 4,
+    "default_sku": 58740808,
+    "sku_count": 2,
+    "images": [
+      "https://dms.mydukaan.io/original/jpeg/media/af91f574-dd58-46d9-890a-21015fff4c77.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/1b29e152-5c09-4ac1-aceb-371ca8a6a9ce.jpeg",
+      "https://dms.mydukaan.io/original/jpeg/media/55e175cf-966b-400a-9540-9a92d4ce96c4.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/d917fe4b-262c-4f82-baf7-687e31308571.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/eb8e6c8c-2248-47a2-916c-4a40b9a1e215.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/9969cb29-27b1-4a81-9238-4eb51cbcabd3.jpg",
+      "https://dms.mydukaan.io/original/jpeg/media/582eea8e-f4c7-45d3-acf7-df3b9365e4ba.jpg"
+    ],
+    "videos": [],
+    "description": "<h2>Manufactured in the EU by Imperial Tobacco Limited.<br>Golden Virginia Smoking Tobbaco mostly used for filling PIPES AND HOOKKAH CHILLUM<br>WEIGHT 50G</h2>",
+    "unit": "packet",
+    "base_qty": 1,
+    "gtin": "",
+    "collection": {
+      "name": "Tobbaco",
+      "slug": "tobbaco"
+    },
+    "options": [
+      {
+        "name": "Weight",
+        "values": [
+          "50G"
+        ]
+      },
+      {
+        "name": "QUANTITY",
+        "values": [
+          "PACKET",
+          "BOX (PACK OF 10 PACKETS)"
+        ]
+      }
+    ],
+    "skus": [
+      {
+        "id": 58740808,
+        "uuid": "76b0669c-6410-434f-83be-03c88b362289",
+        "code": "",
+        "price": 1100,
+        "compare_at": 1150,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/1b29e152-5c09-4ac1-aceb-371ca8a6a9ce.jpeg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/1b29e152-5c09-4ac1-aceb-371ca8a6a9ce.jpeg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "PACKET",
+          "Weight": "50G"
+        }
+      },
+      {
+        "id": 58740810,
+        "uuid": "74d71758-b241-447a-a8fb-723f9f68b518",
+        "code": "",
+        "price": 10499,
+        "compare_at": 11500,
+        "image": "https://dms.mydukaan.io/original/jpeg/media/55e175cf-966b-400a-9540-9a92d4ce96c4.jpg",
+        "all_images": [
+          "https://dms.mydukaan.io/original/jpeg/media/55e175cf-966b-400a-9540-9a92d4ce96c4.jpg"
+        ],
+        "in_stock": true,
+        "options": {
+          "QUANTITY": "BOX (PACK OF 10 PACKETS)",
+          "Weight": "50G"
+        }
+      }
+    ],
+    "oversell": true,
+    "updated_at": "2026-03-27T14:58:52.889701Z"
+  },
+  "store": {
+    "id": 58451243,
+    "uuid": "32a00608-f489-4569-b984-035640ce527e",
+    "name": "The Smoke Shop",
+    "slug": "the2935",
+    "domain": "",
+    "logo": "https://dms.mydukaan.io/original/webp/media/bda20477-f64b-41ea-b0fe-85737577b1df.webp",
+    "logo_only": false,
+    "active": true,
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "decimals": 2,
+      "locale": "en-IN"
+    },
+    "phone": "",
+    "email": "",
+    "whatsapp": true,
+    "address": "Western Avenue, Lane No.13B, Sainik farms, 183A, Block H, Neb Sarai, Sainik Farm, New Delhi, Delhi 110062, India",
+    "min_order_value": 0,
+    "delivery_happens_with_in": "3-5 days",
+    "seo": {
+      "title": "Buy Cigarettes Online in India | Branded, Imported, Fast Delivery",
+      "description": "Shop branded and imported cigarettes online in India. Fast, discreet delivery. 100% original tobacco, cigars, rolling papers & more.",
+      "image": "https://dms.mydukaan.io/original/webp/media/6a34355f-3f37-4868-a194-cafdb0f9293e.png"
+    },
+    "hours": {
+      "is_online": true,
+      "store_opens_at": null,
+      "go_online_manually": false,
+      "timings": [
+        {
+          "day": "sunday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "monday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "tuesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "wednesday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "thursday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "friday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        },
+        {
+          "day": "saturday",
+          "online": true,
+          "from_time": "00:00:00",
+          "to_time": "00:00:00"
+        }
+      ]
+    }
+  }
+}
