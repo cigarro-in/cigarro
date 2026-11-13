@@ -9,7 +9,11 @@
 import { requiredConvexUrl, getOrgSlug } from './env.js';
 
 const CACHE_TTL_SECONDS = 60;
+// Last successful lookup per host, kept for outages so a store host keeps its own org.
+const LAST_GOOD_TTL_SECONDS = 86400;
 const LOOKUP_TIMEOUT_MS = 4000;
+// The only hosts that may fall back to the env default org when Convex is down.
+const LEGACY_HOSTS = new Set(['cigarro.in', 'www.cigarro.in']);
 // Store name used only when Convex cannot tell us. Matches the storefront brand.
 const FALLBACK_STORE_NAME = 'Cigarro';
 
@@ -105,12 +109,16 @@ export async function resolveRequestOrg(request, env) {
   try {
     resolved = await lookupHost(env, host);
   } catch (error) {
-    console.error('Org resolution unavailable, using default org:', error instanceof Error ? error.message : error);
-    return fallbackOrg(request, env);
+    console.error('Org resolution unavailable:', error instanceof Error ? error.message : error);
+    // Legacy and preview/local hosts keep the default org. A store host never
+    // gets another store: its last good org, or 503 (never cached as an org).
+    if (LEGACY_HOSTS.has(host) || isDevHost(host)) return fallbackOrg(request, env);
+    return (await readLastGood(host)) ?? { unavailable: true };
   }
 
   const org = resolved ? mapResolved(resolved, host) : null;
   await writeCache(host, org);
+  if (org) await writeLastGood(host, org);
   return org === null && isDevHost(host) ? fallbackOrg(request, env) : org;
 }
 
@@ -199,6 +207,38 @@ async function readCache(host) {
   }
 }
 
+function lastGoodRequest(host) {
+  return new Request(`https://${host}/__org_last_good`);
+}
+
+async function readLastGood(host) {
+  try {
+    const cache = globalThis.caches?.default;
+    if (!cache) return null;
+    const hit = await cache.match(lastGoodRequest(host));
+    if (!hit) return null;
+    const data = await hit.json();
+    return data.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLastGood(host, value) {
+  try {
+    const cache = globalThis.caches?.default;
+    if (!cache) return;
+    await cache.put(lastGoodRequest(host), new Response(JSON.stringify({ value }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${LAST_GOOD_TTL_SECONDS}`,
+      },
+    }));
+  } catch {
+    // Optimisation only.
+  }
+}
+
 async function writeCache(host, value) {
   try {
     const cache = globalThis.caches?.default;
@@ -252,7 +292,8 @@ export async function resolveSiteName(env, org) {
   }
 
   try {
-    if (cache) {
+    // A fallback org (legacy host, Convex down) must not write its data to the cache.
+    if (cache && !org.fallback) {
       await cache.put(key, new Response(JSON.stringify({ value: siteName }), {
         headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}` },
       }));

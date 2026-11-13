@@ -258,6 +258,8 @@ export async function ssrRender(context) {
 // from the stored time, not from the cache's own TTL).
 async function storePage(context, cache, key, page) {
   if (page.status !== 200) return;
+  // A fallback org (legacy host, Convex down) is never stored.
+  if (context.data?.org?.fallback) return;
   const entry = new Response(page.body, {
     status: 200,
     headers: {
