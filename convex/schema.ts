@@ -1026,6 +1026,8 @@ export default defineSchema({
     usage_limit: v.optional(v.number()),
     usage_count: v.number(),
     is_active: v.boolean(),
+    // Customer-specific: user ids allowed to use it. Empty or absent = everyone.
+    allowed_user_ids: v.optional(v.array(v.string())),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   })

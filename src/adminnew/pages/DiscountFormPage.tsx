@@ -1,522 +1,470 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, Percent, Tag, Calendar, RefreshCw, Trash2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Switch } from '../../components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { useQuery, useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
+import { IndianRupee, Percent, Receipt, RefreshCw } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { formatINR } from '../../utils/currency';
-import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
-import { PageHeader } from '../components/shared/PageHeader';
+import type { Id } from '../../../convex/_generated/dataModel';
+import { useOrg } from '../../lib/convex/useOrg';
+import { cn } from '../../components/ui/utils';
+import {
+  Banner,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Label,
+  Page,
+  PageLayout,
+  Skeleton,
+  Switch,
+  useButtonFeedback,
+} from '../ui';
+import {
+  EMPTY_DRAFT,
+  KIND_OPTIONS,
+  dayToMs,
+  draftToSummaryInput,
+  rowToDraft,
+  summarizeDiscount,
+  validateDraft,
+  type DiscountDraft,
+  type DiscountKind,
+  type DiscountRow,
+} from '../features/discounts/discountRules';
+import { CollapsibleSection } from '../features/discounts/CollapsibleSection';
+import { PickMany } from '../features/discounts/PickMany';
+import { discountError } from '../features/discounts/discountErrors';
 
-interface Discount {
-  id: string;
-  name: string;
-  code: string | null;
-  description: string | null;
-  type: 'percentage' | 'fixed_amount' | 'cart_value';
-  value: number;
-  min_cart_value: number | null;
-  max_discount_amount: number | null;
-  applicable_to: 'all' | 'products' | 'combos' | 'variants';
-  product_ids: string[] | null;
-  combo_ids: string[] | null;
-  variant_ids: string[] | null;
-  start_date: string | null;
-  end_date: string | null;
-  usage_limit: number | null;
-  usage_count: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+const KIND_ICON: Record<DiscountKind, typeof Percent> = {
+  percentage: Percent,
+  fixed_amount: IndianRupee,
+  cart_value: Receipt,
+};
 
-interface DiscountFormData {
-  name: string;
-  code: string;
-  description: string;
-  type: 'percentage' | 'fixed_amount' | 'cart_value';
-  value: number;
-  min_cart_value: number;
-  max_discount_amount: number;
-  applicable_to: 'all' | 'products' | 'combos' | 'variants';
-  start_date: string;
-  end_date: string;
-  usage_limit: number;
-  is_active: boolean;
-}
+const num = (s: string) => {
+  const n = parseFloat(s);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
 
 export function DiscountFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = !!id;
-
-  const [saving, setSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const isEdit = !!id;
+  const org = useOrg();
+  const orgSlug = org?.slug;
+  const orgId = org?._id;
 
   const row = useQuery(
     api.discounts.getDiscountForEdit,
-    isEditMode ? { id: id as any, orgSlug: ORG_SLUG } : 'skip'
-  );
+    isEdit && orgSlug ? { orgSlug, id: id as Id<'discounts'> } : 'skip',
+  ) as DiscountRow | null | undefined;
+  const customers = useQuery(api.adminStats.listCustomersForAdmin, orgId ? { orgId } : 'skip');
+  const products = useQuery(api.adminCatalog.listProductsForAdmin, orgSlug ? { orgSlug } : 'skip');
+
   const saveDiscount = useMutation(api.discounts.saveDiscount);
   const removeDiscount = useMutation(api.discounts.deleteDiscount);
-  const populatedRef = useRef(false);
+  const saveFb = useButtonFeedback();
 
-  const [formData, setFormData] = useState<DiscountFormData>({
-    name: '',
-    code: '',
-    description: '',
-    type: 'percentage',
-    value: 0,
-    min_cart_value: 0,
-    max_discount_amount: 0,
-    applicable_to: 'all',
-    start_date: '',
-    end_date: '',
-    usage_limit: 0,
-    is_active: true
-  });
+  const [draft, setDraft] = useState<DiscountDraft>(EMPTY_DRAFT);
+  const [hydrated, setHydrated] = useState(!isEdit);
+  const [attempted, setAttempted] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
-    if (isEditMode && row && !populatedRef.current) {
-      populatedRef.current = true;
-      const toDate = (ms?: number | null) =>
-        ms ? new Date(ms).toISOString().split('T')[0] : '';
-      setFormData({
-        name: row.name || '',
-        code: row.code || '',
-        description: row.description || '',
-        type: (row.type as DiscountFormData['type']) || 'percentage',
-        value: row.value || 0,
-        min_cart_value: row.min_cart_value || 0,
-        max_discount_amount: row.max_discount_amount || 0,
-        applicable_to: (row.applicable_to as DiscountFormData['applicable_to']) || 'all',
-        start_date: toDate(row.start_date),
-        end_date: toDate(row.end_date),
-        usage_limit: row.usage_limit || 0,
-        is_active: row.is_active !== false
-      });
+    if (!hydrated && row) {
+      setDraft(rowToDraft(row));
+      setHydrated(true);
     }
-  }, [isEditMode, row]);
+  }, [hydrated, row]);
 
-  useEffect(() => {
-    setIsDirty(true);
-  }, [formData]);
+  const set = (patch: Partial<DiscountDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  useEffect(() => {
-    setIsDirty(false);
-  }, []);
+  const errors = useMemo(() => validateDraft(draft), [draft]);
+  const preview = useMemo(
+    () => (parseFloat(draft.value) > 0 ? summarizeDiscount(draftToSummaryInput(draft)) : null),
+    [draft],
+  );
+
+  const productItems = useMemo(
+    () =>
+      (products ?? [])
+        .filter((p) => p.isActive)
+        .map((p) => ({ id: p.supabaseId, label: p.name })),
+    [products],
+  );
+  const customerItems = useMemo(
+    () =>
+      (customers ?? []).map((c) => ({
+        id: c.id,
+        label: c.name,
+        sub: c.phone || undefined,
+      })),
+    [customers],
+  );
 
   const generateCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setFormData(prev => ({ ...prev, code }));
+    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    set({ code });
   };
 
-  const handleChange = (updates: Partial<DiscountFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
+  const onSave = () => {
+    setAttempted(true);
+    if (errors.length > 0 || !orgSlug) return;
+    // A cleared optional field is sent as 0 on edit: a Convex patch cannot
+    // remove a field, and the backend treats 0 as "not set".
+    const clear = (n: number | undefined) => n ?? (isEdit ? 0 : undefined);
+    const isPct = draft.kind === 'percentage';
+    const uses = num(draft.usageLimit);
+    const payload = {
+      name: draft.name.trim(),
+      code: draft.code.trim() || undefined,
+      description: draft.description.trim(),
+      type: draft.kind,
+      value: parseFloat(draft.value),
+      min_cart_value: clear(num(draft.minOrder)),
+      max_discount_amount: clear(isPct ? num(draft.maxDiscount) : undefined),
+      applicable_to: draft.appliesTo,
+      product_ids: draft.appliesTo === 'products' ? draft.productIds : [],
+      start_date: clear(dayToMs(draft.startDate, 'start')),
+      end_date: clear(dayToMs(draft.endDate, 'end')),
+      usage_limit: clear(uses ? Math.floor(uses) : undefined),
+      is_active: draft.isActive,
+      allowed_user_ids: draft.customerIds,
+    };
+    void saveFb.run(async () => {
+      if (isEdit) await saveDiscount({ orgSlug, id: id as Id<'discounts'>, ...payload });
+      else await saveDiscount({ orgSlug, ...payload });
+      setTimeout(() => navigate('/discounts'), 600);
+    });
   };
 
-  const handleSubmit = async () => {
-    setSaveAttempted(true);
-    if (!formData.name.trim()) {
-      setOpError('Discount name is required');
-      return;
-    }
-
-    if (formData.type !== 'cart_value' && formData.value <= 0) {
-      setOpError('Discount value must be greater than 0');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const toMs = (day: string) => (day ? new Date(day + 'T00:00:00').getTime() : undefined);
-      const payload = {
-        name: formData.name.trim(),
-        code: formData.code.trim() || undefined,
-        description: formData.description.trim() || undefined,
-        type: formData.type,
-        value: formData.value,
-        min_cart_value: formData.min_cart_value || undefined,
-        max_discount_amount: formData.max_discount_amount || undefined,
-        applicable_to: formData.applicable_to,
-        start_date: toMs(formData.start_date),
-        end_date: toMs(formData.end_date),
-        usage_limit: formData.usage_limit || undefined,
-        is_active: formData.is_active
-      };
-
-      if (isEditMode) {
-        await saveDiscount({ id: id as any, ...payload, orgSlug: ORG_SLUG });
-        setOpOk('Discount updated successfully');
-      } else {
-        await saveDiscount({ ...payload, orgSlug: ORG_SLUG });
-        setOpOk('Discount created successfully');
-      }
-
-      navigate('/discounts');
-    } catch (error: any) {
-      console.error('Error saving discount:', error);
-      setOpError(
-        error?.data?.code === 'CODE_TAKEN'
-          ? 'That coupon code is already in use'
-          : error?.data?.code === 'NOT_DISCOUNT_ADMIN'
-            ? 'Admin access required'
-            : error.message || 'Failed to save discount'
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this discount?')) return;
-    setSaving(true);
-    try {
-      await removeDiscount({ id: id as any, orgSlug: ORG_SLUG });
-      setOpOk('Discount deleted successfully');
-      navigate('/discounts');
-    } catch (error: any) {
-      console.error('Error deleting discount:', error);
-      setOpError(
-        error?.data?.code === 'NOT_DISCOUNT_ADMIN'
-          ? 'Admin access required'
-          : 'Failed to delete discount'
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const formatDiscountValue = () => {
-    switch (formData.type) {
-      case 'percentage':
-        return `${formData.value}%`;
-      case 'fixed_amount':
-        return formatINR(formData.value);
-      case 'cart_value':
-        return `Cart value: ${formatINR(formData.value)}`;
-      default:
-        return formatINR(formData.value);
-    }
-  };
-
-  if (isEditMode && row === undefined) {
+  if (isEdit && row === undefined) {
     return (
-      <div className="flex items-center justify-center min-h-100">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <Page title="Edit discount" backTo="/discounts">
+        <Card>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        </Card>
+      </Page>
     );
   }
 
-  if (isEditMode && row === null) {
+  if (isEdit && row === null) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-100 gap-4">
-        <p className="text-muted-foreground">Discount not found. It may have been deleted.</p>
-        <Button variant="outline" onClick={() => navigate('/discounts')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Discounts
-        </Button>
-      </div>
+      <Page title="Discount not found" backTo="/discounts">
+        <Card>
+          <EmptyState
+            title="This discount no longer exists"
+            description="It may have been deleted."
+            action={<Button onClick={() => navigate('/discounts')}>Back to discounts</Button>}
+          />
+        </Card>
+      </Page>
     );
   }
+
+  const isPct = draft.kind === 'percentage';
+  const isBig = draft.kind === 'cart_value';
+  const valueLabel = isPct ? 'How much off (%)' : 'Amount off (₹)';
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <PageHeader
-        title={formData.name || 'Untitled Discount'}
-        description={isEditMode ? 'Edit discount' : 'Create new discount'}
-        backUrl="/discounts"
-      >
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/discounts')}
-        >
-          Cancel
-        </Button>
-        {isEditMode && (
-          <Button 
-            variant="destructive" 
-            onClick={handleDelete}
-            disabled={saving}
-            className="bg-destructive hover:bg-destructive text-white"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <Button 
-          onClick={handleSubmit} 
-          disabled={saving || !isDirty}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              {isEditMode ? 'Update' : 'Create'} Discount
-            </>
-          )}
-        </Button>
-      </PageHeader>
+    <Page
+      title={isEdit ? draft.name || 'Edit discount' : 'New discount'}
+      backTo="/discounts"
+      primaryAction={{
+        label: isEdit ? 'Save changes' : 'Create discount',
+        onClick: onSave,
+        state: saveFb.state,
+      }}
+      secondaryActions={isEdit ? [{ label: 'Delete', critical: true, onClick: () => setConfirmDelete(true) }] : []}
+    >
+      <ErrorBanner error={saveFb.error} />
+      {attempted && errors.length > 0 && (
+        <Banner tone="critical" title="Fix these before saving">
+          <ul className="list-disc pl-4">
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </Banner>
+      )}
 
-      <div className="max-w-400 mx-auto px-4 sm:px-6">
-        <InlineStatus status={opStatus} />
-      </div>
-
-      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        
-        {/* LEFT COLUMN */}
-        <div className="space-y-6">
-          {/* Basic Information */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Discount Details</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              
-              {/* Name */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">
-                  Name <Req />
-                </Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => handleChange({ name: e.target.value })}
-                  placeholder="e.g. Summer Sale"
-                  className="bg-background border-border focus:ring-primary text-lg py-6"
-                  aria-invalid={saveAttempted && isBlank(formData.name)}
-                />
-                <ReqError show={saveAttempted && isBlank(formData.name)} />
+      <PageLayout
+        main={
+          <>
+            <Card title="What kind of discount is it?">
+              <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Discount type">
+                {KIND_OPTIONS.map((o) => {
+                  const Icon = KIND_ICON[o.kind];
+                  const active = draft.kind === o.kind;
+                  return (
+                    <button
+                      key={o.kind}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => set({ kind: o.kind })}
+                      className={cn(
+                        'flex min-h-[120px] flex-col items-start gap-2 rounded-[var(--admin-radius)] border p-4 text-left transition-colors',
+                        active
+                          ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)] ring-1 ring-[var(--admin-primary)]'
+                          : 'border-[var(--admin-border-strong)] hover:bg-[var(--admin-surface-hover)]',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'flex size-9 items-center justify-center rounded-full',
+                          active ? 'bg-[var(--admin-primary)] text-[var(--admin-text-on-primary)]' : 'bg-[var(--admin-neutral-soft)] text-[var(--admin-text-muted)]',
+                        )}
+                      >
+                        <Icon className="size-4" aria-hidden />
+                      </span>
+                      <span className="text-[15px] font-semibold text-[var(--admin-text)]">{o.title}</span>
+                      <span className="text-sm text-[var(--admin-text-muted)]">{o.example}</span>
+                    </button>
+                  );
+                })}
               </div>
+            </Card>
 
-              {/* Code */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Discount Code</Label>
-                <div className="flex space-x-2">
+            <Card title="The basics">
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="disc-name">Name customers will see</Label>
                   <Input
-                    value={formData.code}
-                    onChange={(e) => handleChange({ code: e.target.value.toUpperCase() })}
-                    placeholder="SUMMER2024"
-                    className="bg-background border-border focus:ring-primary font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={generateCode}
-                    className="border-border hover:bg-background"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => handleChange({ description: e.target.value })}
-                  placeholder="Describe the discount..."
-                  rows={3}
-                  className="bg-background border-border focus:ring-primary"
-                />
-              </div>
-
-              {/* Type and Value */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-foreground font-medium">Discount Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value: 'percentage' | 'fixed_amount' | 'cart_value') => 
-                      handleChange({ type: value, value: 0 })
-                    }
-                  >
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="fixed_amount">Fixed Amount</SelectItem>
-                      <SelectItem value="cart_value">Cart Value</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-foreground font-medium">
-                    {formData.type === 'percentage' ? 'Percentage (%)' :
-                     formData.type === 'fixed_amount' ? 'Amount (₹)' :
-                     'Cart Value (₹)'}
-                    {formData.type !== 'cart_value' ? <Req /> : null}
-                  </Label>
-                  <Input
-                    type="number"
-                    value={formData.value}
-                    onChange={(e) => handleChange({ value: parseFloat(e.target.value) || 0 })}
-                    placeholder={formData.type === 'percentage' ? '10' : '100'}
-                    className="bg-background border-border focus:ring-primary"
-                    aria-invalid={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}
-                  />
-                  <ReqError show={saveAttempted && formData.type !== 'cart_value' && !(formData.value > 0)}>
-                    Discount value must be greater than 0
-                  </ReqError>
-                </div>
-              </div>
-
-              {/* Applicability */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Applies To</Label>
-                <Select
-                  value={formData.applicable_to}
-                  onValueChange={(value: 'all' | 'products' | 'combos' | 'variants') => 
-                    handleChange({ applicable_to: value })
-                  }
-                >
-                  <SelectTrigger className="bg-background border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Products</SelectItem>
-                    <SelectItem value="products">Specific Products</SelectItem>
-                    <SelectItem value="combos">Combos</SelectItem>
-                    <SelectItem value="variants">Specific Variants</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Conditions */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-foreground font-medium">Minimum Cart Value</Label>
-                  <Input
-                    type="number"
-                    value={formData.min_cart_value}
-                    onChange={(e) => handleChange({ min_cart_value: parseFloat(e.target.value) || 0 })}
-                    placeholder="0"
-                    className="bg-background border-border focus:ring-primary"
+                    id="disc-name"
+                    value={draft.name}
+                    onChange={(e) => set({ name: e.target.value })}
+                    placeholder="e.g. Diwali sale"
                   />
                 </div>
-                {formData.type === 'percentage' && (
-                  <div className="space-y-2">
-                    <Label className="text-foreground font-medium">Maximum Discount Amount</Label>
+
+                <div className={cn('grid gap-4', isBig ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="disc-value">{valueLabel}</Label>
                     <Input
-                      type="number"
-                      value={formData.max_discount_amount}
-                      onChange={(e) => handleChange({ max_discount_amount: parseFloat(e.target.value) || 0 })}
-                      placeholder="0"
-                      className="bg-background border-border focus:ring-primary"
+                      id="disc-value"
+                      inputMode="decimal"
+                      value={draft.value}
+                      onChange={(e) => set({ value: e.target.value.replace(/[^0-9.]/g, '') })}
+                      placeholder={isPct ? 'e.g. 10' : 'e.g. 100'}
+                    />
+                  </div>
+                  {isBig && (
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="disc-min">Only when the bill is over (₹)</Label>
+                      <Input
+                        id="disc-min"
+                        inputMode="decimal"
+                        value={draft.minOrder}
+                        onChange={(e) => set({ minOrder: e.target.value.replace(/[^0-9.]/g, '') })}
+                        placeholder="e.g. 999"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="disc-code">Code (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="disc-code"
+                      value={draft.code}
+                      onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/\s/g, '') })}
+                      placeholder="e.g. DIWALI10"
+                      className="font-mono"
+                    />
+                    <Button variant="secondary" icon={<RefreshCw />} onClick={generateCode} aria-label="Generate a code">
+                      Generate
+                    </Button>
+                  </div>
+                  <p className="text-xs text-[var(--admin-text-muted)]">
+                    Customers type this at checkout. Leave it empty if no code is needed.
+                  </p>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="disc-desc">Note for your team (optional)</Label>
+                  <Input
+                    id="disc-desc"
+                    value={draft.description}
+                    onChange={(e) => set({ description: e.target.value })}
+                    placeholder="Why this discount exists"
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card padding="none" title="More options">
+              <CollapsibleSection
+                title="Limits"
+                hint={[
+                  !isBig && draft.minOrder ? `Over ${draft.minOrder}` : null,
+                  isPct && draft.maxDiscount ? `Saving up to ₹${draft.maxDiscount}` : null,
+                  draft.usageLimit ? `${draft.usageLimit} uses` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || 'Minimum order, maximum saving, number of uses'}
+                defaultOpen={(!isBig && !!draft.minOrder) || (isPct && !!draft.maxDiscount) || !!draft.usageLimit}
+              >
+                {!isBig && (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="disc-min2">Minimum order (₹)</Label>
+                    <Input
+                      id="disc-min2"
+                      inputMode="decimal"
+                      value={draft.minOrder}
+                      onChange={(e) => set({ minOrder: e.target.value.replace(/[^0-9.]/g, '') })}
+                      placeholder="Leave empty for no minimum"
                     />
                   </div>
                 )}
-              </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-foreground font-medium">Start Date</Label>
+                {isPct && (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="disc-cap">Most they can save (₹)</Label>
+                    <Input
+                      id="disc-cap"
+                      inputMode="decimal"
+                      value={draft.maxDiscount}
+                      onChange={(e) => set({ maxDiscount: e.target.value.replace(/[^0-9.]/g, '') })}
+                      placeholder="Leave empty for no cap"
+                    />
+                  </div>
+                )}
+                <div className="grid gap-1.5">
+                  <Label htmlFor="disc-uses">Total number of uses</Label>
                   <Input
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => handleChange({ start_date: e.target.value })}
-                    className="bg-background border-border focus:ring-primary"
+                    id="disc-uses"
+                    inputMode="numeric"
+                    value={draft.usageLimit}
+                    onChange={(e) => set({ usageLimit: e.target.value.replace(/[^0-9]/g, '') })}
+                    placeholder="Leave empty for unlimited"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-foreground font-medium">End Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => handleChange({ end_date: e.target.value })}
-                    className="bg-background border-border focus:ring-primary"
-                  />
-                </div>
-              </div>
+              </CollapsibleSection>
 
-              {/* Usage Limit */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Usage Limit</Label>
-                <Input
-                  type="number"
-                  value={formData.usage_limit}
-                  onChange={(e) => handleChange({ usage_limit: parseInt(e.target.value) || 0 })}
-                  placeholder="0 (unlimited)"
-                  className="bg-background border-border focus:ring-primary"
+              <CollapsibleSection
+                title="Dates"
+                hint={
+                  draft.startDate || draft.endDate
+                    ? `${draft.startDate || 'Now'} to ${draft.endDate || 'no end date'}`
+                    : 'Always on unless you set dates'
+                }
+                defaultOpen={!!draft.startDate || !!draft.endDate}
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="disc-start">Starts on</Label>
+                    <Input id="disc-start" type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="disc-end">Ends on (the whole day counts)</Label>
+                    <Input id="disc-end" type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} />
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Which products it applies to"
+                hint={draft.appliesTo === 'all' ? 'All products' : `Only ${draft.appliesTo === 'products' ? 'selected products' : draft.appliesTo}`}
+                defaultOpen={draft.appliesTo !== 'all'}
+              >
+                <div className="grid gap-1.5">
+                  <Label htmlFor="disc-applies">Applies to</Label>
+                  <select
+                    id="disc-applies"
+                    value={draft.appliesTo}
+                    onChange={(e) => set({ appliesTo: e.target.value as DiscountDraft['appliesTo'] })}
+                    className="h-9 rounded-[var(--admin-radius)] border border-[var(--admin-border-strong)] bg-[var(--admin-surface)] px-3 text-sm text-[var(--admin-text)] focus:border-[var(--admin-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-focus)]/20"
+                  >
+                    <option value="all">All products</option>
+                    <option value="products">Selected products</option>
+                    <option value="combos">Combos</option>
+                    <option value="variants">Specific variants</option>
+                  </select>
+                </div>
+                {draft.appliesTo === 'products' && (
+                  <PickMany
+                    items={productItems}
+                    value={draft.productIds}
+                    onChange={(productIds) => set({ productIds })}
+                    searchPlaceholder="Search products"
+                    emptyText="No active products yet."
+                    loading={products === undefined}
+                  />
+                )}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Only for selected customers"
+                hint={draft.customerIds.length ? `${draft.customerIds.length} selected` : 'Open to every customer'}
+                defaultOpen={draft.customerIds.length > 0}
+              >
+                <p className="text-sm text-[var(--admin-text-muted)]">
+                  Leave this empty for everyone. Add customers to make it a private offer for them.
+                </p>
+                <PickMany
+                  items={customerItems}
+                  value={draft.customerIds}
+                  onChange={(customerIds) => set({ customerIds })}
+                  searchPlaceholder="Search by name or phone"
+                  emptyText="No customers yet."
+                  loading={customers === undefined}
                 />
+              </CollapsibleSection>
+            </Card>
+          </>
+        }
+        aside={
+          <>
+            <Card title="How it works">
+              <div className="flex flex-col gap-2">
+                {preview ? (
+                  <p className="text-[17px] font-semibold leading-snug text-[var(--admin-text)]">{preview}</p>
+                ) : (
+                  <p className="text-sm text-[var(--admin-text-muted)]">Enter the amount to see how this discount works.</p>
+                )}
+                {draft.code && (
+                  <p className="text-sm text-[var(--admin-text-muted)]">
+                    Customers enter <span className="font-mono text-[var(--admin-text)]">{draft.code}</span>
+                  </p>
+                )}
               </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="space-y-6">
-          {/* Status */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Status</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="flex items-center justify-between">
+            </Card>
+            <Card>
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <Label>Active</Label>
-                  <p className="text-sm text-muted-foreground">Discount is available to customers</p>
+                  <p className="text-sm font-medium text-[var(--admin-text)]">Turned on</p>
+                  <p className="text-xs text-[var(--admin-text-muted)]">Off means no customer can use it.</p>
                 </div>
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => handleChange({ is_active: checked })}
-                />
+                <Switch checked={draft.isActive} onCheckedChange={(isActive) => set({ isActive })} aria-label="Turned on" />
               </div>
-            </AdminCardContent>
-          </AdminCard>
+            </Card>
+          </>
+        }
+      />
 
-          {/* Preview */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Preview</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="space-y-3">
-                <div className="p-4 border border-border/30 rounded-lg">
-                  <div className="font-medium text-foreground mb-2">
-                    {formData.name || 'Discount Name'}
-                  </div>
-                  {formData.code && (
-                    <div className="text-sm font-mono text-muted-foreground mb-2">
-                      Code: {formData.code}
-                    </div>
-                  )}
-                  <div className="text-lg font-bold text-primary">
-                    {formatDiscountValue()}
-                  </div>
-                  {formData.description && (
-                    <div className="text-sm text-muted-foreground mt-2">
-                      {formData.description}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-      </div>
-    </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this discount?"
+        description="Customers will no longer be able to use it. This cannot be undone."
+        confirmLabel="Delete discount"
+        critical
+        onConfirm={async () => {
+          try {
+            await removeDiscount({ orgSlug: orgSlug!, id: id as Id<'discounts'> });
+          } catch (err) {
+            throw discountError(err);
+          }
+          navigate('/discounts');
+        }}
+      />
+    </Page>
   );
 }

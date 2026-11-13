@@ -27,6 +27,19 @@ async function findDiscountByCode(ctx: any, org: any, code: string) {
   return rows.find((d: any) => (d.code ?? "").toUpperCase() === want) ?? null;
 }
 
+// Customer-specific discounts: an empty/absent allowed_user_ids list means
+// everyone. Shoppers never see the list itself (publicShape strips it).
+const isRestricted = (d: { allowed_user_ids?: string[] }) =>
+  (d.allowed_user_ids?.length ?? 0) > 0;
+
+async function callerCanUse(ctx: any, d: any): Promise<boolean> {
+  if (!isRestricted(d)) return true;
+  const identity = await ctx.auth.getUserIdentity();
+  return !!identity && d.allowed_user_ids.includes(identity.subject);
+}
+
+const publicShape = (d: any) => ({ ...d, allowed_user_ids: undefined });
+
 // Admin list: ALL of this org's discounts, newest first.
 export const listDiscountsForAdmin = query({
   args: { orgSlug: v.string() },
@@ -45,12 +58,15 @@ export const listActiveDiscounts = query({
     const org = await resolveOrg(ctx, args.orgSlug);
     const now = Date.now();
     const rows = await collectInOrg(ctx, "discounts", org);
-    return rows.filter(
+    const live = rows.filter(
       (d) =>
         d.is_active &&
-        (d.start_date == null || d.start_date <= now) &&
-        (d.end_date == null || d.end_date >= now),
+        (!d.start_date || d.start_date <= now) &&
+        (!d.end_date || d.end_date >= now),
     );
+    const visible = [];
+    for (const d of live) if (await callerCanUse(ctx, d)) visible.push(publicShape(d));
+    return visible;
   },
 });
 
@@ -63,7 +79,10 @@ export const getDiscountByCode = query({
     const org = await resolveOrg(ctx, orgSlug);
     const want = code.trim().toUpperCase();
     if (!want) return null;
-    return await findDiscountByCode(ctx, org, want);
+    const row = await findDiscountByCode(ctx, org, want);
+    // A customer-only code looks invalid to everyone else.
+    if (!row || !(await callerCanUse(ctx, row))) return null;
+    return publicShape(row);
   },
 });
 
@@ -93,6 +112,7 @@ const discountFields = {
   end_date: v.optional(v.number()),
   usage_limit: v.optional(v.number()),
   is_active: v.boolean(),
+  allowed_user_ids: v.optional(v.array(v.string())),
 };
 
 export const saveDiscount = mutation({

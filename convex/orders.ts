@@ -81,6 +81,7 @@ async function resolveDiscount(
   items: Doc<"orders">["items"],
   cartTotalPaise: number,
   allowExhausted = false,
+  userId?: string,
 ): Promise<{ amountPaise: number; label?: string; id?: Id<"discounts"> }> {
   if (!discountId) return { amountPaise: 0 };
   const discount = await ctx.db.get(discountId);
@@ -89,15 +90,21 @@ async function resolveDiscount(
     !discount ||
     !inOrg(discount as any, org) ||
     !discount.is_active ||
-    (discount.start_date != null && discount.start_date > now) ||
-    (discount.end_date != null && discount.end_date < now) ||
-    (!allowExhausted && discount.usage_limit != null && (discount.usage_count ?? 0) >= discount.usage_limit)
+    // 0 means "not set": the admin form clears a field by sending 0, because a
+    // Convex patch cannot remove a field.
+    (!!discount.start_date && discount.start_date > now) ||
+    (!!discount.end_date && discount.end_date < now) ||
+    (!allowExhausted && !!discount.usage_limit && (discount.usage_count ?? 0) >= discount.usage_limit)
   ) {
     throw new ConvexError({ code: "INVALID_DISCOUNT" });
   }
+  // Customer-specific discount: only the listed customers may use it.
+  const allowed = discount.allowed_user_ids ?? [];
+  if (allowed.length > 0 && (!userId || !allowed.includes(userId)))
+    throw new ConvexError({ code: "DISCOUNT_NOT_FOR_CUSTOMER" });
 
   const cartTotalRupees = cartTotalPaise / 100;
-  if (discount.min_cart_value != null && cartTotalRupees < discount.min_cart_value)
+  if ((discount.min_cart_value ?? 0) > 0 && cartTotalRupees < discount.min_cart_value!)
     throw new ConvexError({ code: "DISCOUNT_NOT_APPLICABLE" });
 
   const matches = (ids: string[] | undefined, value: string | undefined) =>
@@ -115,8 +122,8 @@ async function resolveDiscount(
   else throw new ConvexError({ code: "INVALID_DISCOUNT" });
   if (!Number.isFinite(amountRupees) || amountRupees < 0)
     throw new ConvexError({ code: "INVALID_DISCOUNT" });
-  if (discount.max_discount_amount != null)
-    amountRupees = Math.min(amountRupees, discount.max_discount_amount);
+  if ((discount.max_discount_amount ?? 0) > 0)
+    amountRupees = Math.min(amountRupees, discount.max_discount_amount!);
   const amountPaise = Math.max(0, Math.min(Math.round(amountRupees * 100), cartTotalPaise));
   return { amountPaise, label: discount.name, id: discountId };
 }
@@ -508,6 +515,7 @@ export const createOrder = mutation({
           orderItems,
           cartTotal,
           !!retrySource?.discountId,
+          userId,
         )
       : { amountPaise: 0 };
     // Legacy callers that send only a client-computed amount must not receive

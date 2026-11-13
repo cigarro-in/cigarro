@@ -1,22 +1,32 @@
-import { useState } from 'react';
-import { Check, Trash2, Star, Plus } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Textarea } from '../../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { useQuery, useMutation } from 'convex/react';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { Eye, EyeOff, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { DataTable } from '../components/shared/DataTable';
-import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
-import { Req, ReqError } from '../components/shared/requiredFields';
-import { PageHeader } from '../components/shared/PageHeader';
+import type { Id } from '../../../convex/_generated/dataModel';
+import { useOrg } from '../../lib/convex/useOrg';
+import {
+  Badge,
+  BulkActionBar,
+  Button,
+  Card,
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  ErrorBanner,
+  FilterBar,
+  FilterSelect,
+  Menu,
+  Page,
+  useButtonFeedback,
+  useRowSelection,
+  type Column,
+} from '../ui';
+import { Stars } from '../features/reviews/Stars';
+import { AddReviewDialog } from '../features/reviews/AddReviewDialog';
+import { discountError } from '../features/discounts/discountErrors';
 
 interface ReviewRow {
-  id: string;
-  _id: string;
+  _id: Id<'productReviews'>;
   productSupabaseId: string;
   productName: string;
   userName: string;
@@ -27,199 +37,212 @@ interface ReviewRow {
   createdAt: number;
 }
 
+const DATE = (ms: number) => new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
 export function ReviewsPage() {
-  const [filter, setFilter] = useState<'pending' | 'approved' | 'all'>('pending');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const org = useOrg();
+  const orgSlug = org?.slug;
+
+  const [status, setStatus] = useState<'all' | 'published' | 'hidden'>('all');
+  const [ratingFilter, setRatingFilter] = useState<'all' | '5' | '4' | '3' | '2' | '1'>('all');
+  const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+  const sel = useRowSelection();
+  const showFb = useButtonFeedback();
+  const hideFb = useButtonFeedback();
+  const delFb = useButtonFeedback();
 
   const rows = useQuery(
     api.reviews.listReviewsForAdmin,
-    filter === 'all' ? { orgSlug: ORG_SLUG } : { approved: filter === 'approved', orgSlug: ORG_SLUG }
-  );
+    orgSlug ? { orgSlug, approved: status === 'all' ? undefined : status === 'published' } : 'skip',
+  ) as ReviewRow[] | undefined;
+  const products = useQuery(api.adminCatalog.listProductsForAdmin, orgSlug ? { orgSlug } : 'skip');
   const setApproved = useMutation(api.reviews.setReviewApproved);
   const removeReview = useMutation(api.reviews.deleteReview);
-  const addReview = useMutation(api.reviews.createReview);
-  const loading = rows === undefined;
 
-  const products = useQuery(api.adminCatalog.listProductsForAdmin, { orgSlug: ORG_SLUG });
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ productId: '', rating: 5, userName: '', title: '', comment: '' });
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+  const filtered = useMemo(() => {
+    if (!rows) return undefined;
+    const needle = query.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (ratingFilter !== 'all' && r.rating !== Number(ratingFilter)) return false;
+      if (!needle) return true;
+      return `${r.productName} ${r.userName} ${r.title ?? ''} ${r.comment ?? ''}`.toLowerCase().includes(needle);
+    });
+  }, [rows, query, ratingFilter]);
 
-  const submit = () =>
-    act(async () => {
-      setSaveAttempted(true);
-      if (!form.productId) throw new Error('Pick a product');
-      await addReview({
-        orgSlug: ORG_SLUG,
-        productSupabaseId: form.productId,
-        rating: form.rating,
-        userName: form.userName || undefined,
-        title: form.title || undefined,
-        comment: form.comment || undefined,
-      });
-      setForm({ productId: '', rating: 5, userName: '', title: '', comment: '' });
-      setSaveAttempted(false);
-      setShowForm(false);
-    }, 'Review added', 'Failed to add review');
-
-  const act = async (fn: () => Promise<unknown>, ok: string, fail: string) => {
-    try {
-      await fn();
-      setOpOk(ok);
-      setSelected([]);
-    } catch (error: any) {
-      setOpError(
-        error?.data?.code === 'NOT_REVIEWS_ADMIN' ? 'Admin access required' : fail
-      );
-    }
-  };
-
-  const bulkActions = [
-    {
-      label: 'Approve Selected',
-      icon: Check,
-      onClick: (ids: string[]) =>
-        act(
-          () => Promise.all(ids.map((id) => setApproved({ id: id as any, isApproved: true, orgSlug: ORG_SLUG }))).then(() => {}),
-          `${ids.length} reviews approved`,
-          'Failed to approve'
-        )
-    },
-    {
-      label: 'Delete Selected',
-      icon: Trash2,
-      variant: 'destructive' as const,
-      onClick: (ids: string[]) => {
-        if (!confirm(`Delete ${ids.length} reviews?`)) return Promise.resolve();
-        return act(
-          () => Promise.all(ids.map((id) => removeReview({ id: id as any, orgSlug: ORG_SLUG }))).then(() => {}),
-          `${ids.length} reviews deleted`,
-          'Failed to delete'
-        );
+  const setPublished = (ids: string[], isApproved: boolean, fb: typeof showFb) =>
+    fb.run(async () => {
+      for (const id of ids) {
+        await setApproved({ orgSlug: orgSlug!, id: id as Id<'productReviews'>, isApproved });
       }
-    }
-  ];
+      setTimeout(() => sel.clear(), 1200);
+    });
 
-  const columns = [
+  const columns: Column<ReviewRow>[] = [
     {
-      key: 'productName',
-      label: 'Product',
-      render: (_: any, r: ReviewRow) => (
-        <div>
-          <div className="font-medium text-foreground">{r.productName}</div>
-          <div className="text-xs text-muted-foreground">
-            {r.userName} · {new Date(r.createdAt).toLocaleDateString()}
+      id: 'product',
+      header: 'Product',
+      cell: (r) => (
+        <div className="min-w-[160px]">
+          <div className="font-medium text-[var(--admin-text)]">{r.productName}</div>
+          <div className="text-xs text-[var(--admin-text-muted)]">
+            {r.userName} · {DATE(r.createdAt)}
           </div>
         </div>
-      )
+      ),
     },
     {
-      key: 'rating',
-      label: 'Rating',
-      render: (rating: number) => (
-        <span className="inline-flex items-center gap-1">
-          <Star className="w-4 h-4 fill-sunflower text-sunflower" />
-          {rating}
-        </span>
-      )
+      id: 'rating',
+      header: 'Rating',
+      cell: (r) => <Stars value={r.rating} />,
     },
     {
-      key: 'comment',
-      label: 'Review',
-      render: (_: any, r: ReviewRow) => (
+      id: 'review',
+      header: 'Review',
+      cell: (r) => (
         <div className="max-w-md">
-          {r.title && <div className="font-medium text-sm">{r.title}</div>}
-          <div className="text-sm text-muted-foreground line-clamp-3">{r.comment || '—'}</div>
+          {r.title && <div className="text-sm font-medium text-[var(--admin-text)]">{r.title}</div>}
+          <div className="line-clamp-2 text-sm text-[var(--admin-text-muted)]">{r.comment || 'No written review'}</div>
         </div>
-      )
+      ),
     },
     {
-      key: 'isApproved',
-      label: 'Status',
-      render: (approved: boolean) => (
-        <Badge className={approved ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}>
-          {approved ? 'Approved' : 'Pending'}
-        </Badge>
-      )
-    }
+      id: 'status',
+      header: 'Status',
+      cell: (r) =>
+        r.isApproved ? (
+          <Badge tone="success" dot>Shown on site</Badge>
+        ) : (
+          <Badge tone="neutral" dot>Hidden</Badge>
+        ),
+    },
+    {
+      id: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      align: 'right',
+      width: 'w-12',
+      cell: (r) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Menu
+            trigger={
+              <Button variant="plain" size="icon" className="size-8" aria-label={`Actions for review of ${r.productName}`}>
+                <MoreHorizontal aria-hidden />
+              </Button>
+            }
+            items={[
+              r.isApproved
+                ? { label: 'Hide from site', icon: <EyeOff />, onSelect: () => void setPublished([r._id], false, hideFb) }
+                : { label: 'Show on site', icon: <Eye />, onSelect: () => void setPublished([r._id], true, showFb) },
+              { label: 'Delete', icon: <Trash2 />, tone: 'critical', onSelect: () => setConfirmIds([r._id]) },
+            ]}
+          />
+        </div>
+      ),
+    },
   ];
 
-  return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Reviews"
-        description="Moderate customer reviews"
-        search={{ value: searchTerm, onChange: setSearchTerm, placeholder: 'Search reviews...' }}
-      >
-        <div className="flex gap-2">
-          <BulkActionsMenu selectedIds={selected} actions={bulkActions} />
-          {(['pending', 'approved', 'all'] as const).map((f) => (
-            <Button
-              key={f}
-              variant={filter === f ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter(f)}
-              className="capitalize"
-            >
-              {f}
-            </Button>
-          ))}
-        </div>
-      </PageHeader>
+  const loading = rows === undefined;
+  const hasAny = (rows?.length ?? 0) > 0;
+  const error = showFb.error ?? hideFb.error ?? delFb.error;
+  const productOptions = useMemo(
+    () => (products ?? []).filter((p) => p.isActive).map((p) => ({ supabaseId: p.supabaseId, name: p.name })),
+    [products],
+  );
 
-      <div className="p-6 max-w-400 mx-auto space-y-6">
-        <InlineStatus status={opStatus} />
-        <div>
-          <Button size="sm" onClick={() => { setSaveAttempted(false); setShowForm((s) => !s); }}>
-            <Plus className="w-4 h-4 mr-1" /> Add review
-          </Button>
-          {showForm && (
-            <div className="mt-3 max-w-xl space-y-3 rounded-lg border border-border/30 bg-card p-4">
-              <div>
-                <p className="text-xs font-medium mb-1">Product <Req /></p>
-                <Select value={form.productId} onValueChange={(v) => set({ productId: v })}>
-                  <SelectTrigger aria-invalid={saveAttempted && !form.productId}>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {((products || []) as any[]).filter((p) => p.isActive).map((p) => (
-                      <SelectItem key={p.supabaseId} value={p.supabaseId}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ReqError show={saveAttempted && !form.productId}>
-                  Pick a product for this review
-                </ReqError>
-              </div>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} type="button" onClick={() => set({ rating: n })} aria-label={`${n} stars`}>
-                    <Star className={`w-6 h-6 ${n <= form.rating ? 'fill-sunflower text-sunflower' : 'text-border'}`} />
-                  </button>
-                ))}
-              </div>
-              <label className="grid gap-1 text-xs font-medium">Reviewer name <Input aria-label="Reviewer name" placeholder="Cigarro Team" value={form.userName} onChange={(e) => set({ userName: e.target.value })} /></label>
-              <label className="grid gap-1 text-xs font-medium">Title <Input aria-label="Review title" placeholder="Optional" value={form.title} onChange={(e) => set({ title: e.target.value })} /></label>
-              <label className="grid gap-1 text-xs font-medium">Review <Textarea aria-label="Review comment" placeholder="Optional" value={form.comment} onChange={(e) => set({ comment: e.target.value })} /></label>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={submit}>Save review</Button>
-                <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              </div>
-            </div>
-          )}
-        </div>
-        <DataTable
-          data={(rows || []).map((row: Omit<ReviewRow, 'id'>) => ({ ...row, id: row._id }))}
+  return (
+    <Page
+      title="Reviews"
+      primaryAction={{ label: 'Add review', icon: <Plus />, onClick: () => setAdding(true), disabled: !orgSlug }}
+    >
+      {error && <ErrorBanner error={error} />}
+      <Card padding="none">
+        <FilterBar search={{ value: query, onChange: setQuery, placeholder: 'Search product, name or words' }}>
+          <FilterSelect
+            label="Rating"
+            value={ratingFilter}
+            onChange={setRatingFilter}
+            options={[
+              { value: 'all', label: 'Any' },
+              { value: '5', label: '5 stars' },
+              { value: '4', label: '4 stars' },
+              { value: '3', label: '3 stars' },
+              { value: '2', label: '2 stars' },
+              { value: '1', label: '1 star' },
+            ]}
+          />
+          <FilterSelect
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'published', label: 'Shown on site' },
+              { value: 'hidden', label: 'Hidden' },
+            ]}
+          />
+        </FilterBar>
+        <DataTable<ReviewRow>
           columns={columns}
+          rows={filtered}
           loading={loading}
-          selectedItems={selected}
-          onSelectionChange={setSelected}
-          searchTerm={searchTerm}
+          getRowId={(r) => r._id}
+          selection={sel}
+          empty={
+            hasAny ? (
+              <EmptyState title="No reviews match these filters" />
+            ) : (
+              <EmptyState
+                title="No reviews yet"
+                description="Customer reviews appear here once they are submitted."
+              />
+            )
+          }
         />
-      </div>
-    </div>
+      </Card>
+
+      <BulkActionBar
+        count={sel.count}
+        onClear={sel.clear}
+        noun="selected"
+        actions={
+          <>
+            <Button size="sm" icon={<Eye />} state={showFb.state} onClick={() => void setPublished(sel.ids, true, showFb)}>
+              Show on site
+            </Button>
+            <Button size="sm" icon={<EyeOff />} state={hideFb.state} onClick={() => void setPublished(sel.ids, false, hideFb)}>
+              Hide
+            </Button>
+            <Button size="sm" variant="critical" icon={<Trash2 />} onClick={() => setConfirmIds(sel.ids)}>
+              Delete
+            </Button>
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmIds !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmIds(null);
+        }}
+        title={`Delete ${confirmIds?.length ?? 0} ${confirmIds?.length === 1 ? 'review' : 'reviews'}?`}
+        description="Deleted reviews cannot be recovered. The product rating is updated."
+        confirmLabel="Delete"
+        critical
+        onConfirm={async () => {
+          const ids = confirmIds ?? [];
+          try {
+            for (const id of ids) await removeReview({ orgSlug: orgSlug!, id: id as Id<'productReviews'> });
+            sel.clear();
+          } catch (err) {
+            throw discountError(err);
+          }
+        }}
+      />
+
+      {orgSlug && (
+        <AddReviewDialog open={adding} onOpenChange={setAdding} orgSlug={orgSlug} products={productOptions} />
+      )}
+    </Page>
   );
 }
