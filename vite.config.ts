@@ -21,7 +21,10 @@ export default defineConfig({
       ],
       manifest: false, // Use manifest.json from public folder
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // No index.html in the precache. Workbox's directoryIndex maps a
+        // navigation to "/" onto a precached index.html, which has no
+        // edge-injected window.__ORG__, so the client fell back to another store.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}'],
         // Don't cache images in precache (too large)
         globIgnores: ['**/assets/images/**'],
         cleanupOutdatedCaches: true,

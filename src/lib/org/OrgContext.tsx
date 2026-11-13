@@ -8,6 +8,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import { LEGACY_ORG_SLUG } from './legacyOrg';
+import { isLocalDevHost } from './ensureStoreIdentity';
 
 export interface OrgInfo {
   slug: string;
@@ -43,11 +44,14 @@ export function getClientOrgInfo(): OrgInfo {
     adminPathStore = STORE_SLUG_RE.test(first) && !ADMIN_RESERVED_SEGMENTS.has(first) ? first : null;
   }
 
+  // The edge-injected store is the only source. On a non-local host the entry
+  // (ensureStoreIdentity) has already resolved window.__ORG__ by hostname, so
+  // this never guesses a store there. The env/legacy default is localhost only.
+  const isLocal = !!loc && isLocalDevHost(loc.hostname);
   const slug =
     adminPathStore ||
     org?.slug ||
-    import.meta.env?.VITE_ORG_SLUG ||
-    LEGACY_ORG_SLUG;
+    (isLocal ? import.meta.env?.VITE_ORG_SLUG || LEGACY_ORG_SLUG : '');
 
   const primaryHost = org?.primaryHost || (loc ? loc.host : '');
 
