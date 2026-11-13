@@ -4,6 +4,7 @@
 // compression. The edge endpoint stores bytes as-is (it can't convert).
 
 import { getAccessToken } from '../auth/session';
+import { ORG_SLUG } from '../convex/org';
 
 const MAX_DIM = 1600;
 const WEBP_QUALITY = 0.82;
@@ -11,6 +12,11 @@ const WEBP_QUALITY = 0.82;
 async function sessionToken(): Promise<string | null> {
   // Own JWT (auth cutover complete).
   return getAccessToken();
+}
+
+/** Admin API calls on admin.<root> carry no store in the path; name the store so the edge checks the right org. */
+function storeAuthHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, 'X-Store': ORG_SLUG };
 }
 
 /** Decode any image → (square-crop) → resize → WebP blob (metadata-free by redraw). */
@@ -95,7 +101,7 @@ export async function uploadImageToR2(
   form.append('alt', opts.alt || humanizeAlt(opts.slug || fallbackName));
   const res = await fetch('/api/images/upload', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: storeAuthHeaders(token),
     body: form,
   });
   const body = await res.json().catch(() => ({}));
@@ -121,7 +127,7 @@ export async function uploadRawToR2(
   if (opts.folder) form.append('folder', opts.folder);
   const res = await fetch('/api/images/upload', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: storeAuthHeaders(token),
     body: form,
   });
   const body = await res.json().catch(() => ({}));
@@ -191,7 +197,7 @@ export async function listR2Images(prefix = 'asset_images/', cursor?: string): P
   const qs = new URLSearchParams({ prefix });
   if (cursor) qs.set('cursor', cursor);
   const res = await fetch(`/api/images/upload?${qs.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: storeAuthHeaders(token),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Library unavailable');
@@ -204,7 +210,7 @@ export async function deleteR2Image(key: string): Promise<void> {
   if (!token) throw new Error('Not signed in');
   const res = await fetch(`/api/images/upload?key=${encodeURIComponent(key)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: storeAuthHeaders(token),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.success) throw new Error(body.error || 'Delete failed');

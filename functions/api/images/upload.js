@@ -21,6 +21,7 @@ const LIB_PREFIX = 'asset_images/';
 // Unprefixed legacy keys under LIB_PREFIX belong to this org only.
 const LEGACY_LIBRARY_ORG = LEGACY_ORG_SLUG;
 const MAX_BYTES = 10 * 1024 * 1024;
+const STORE_HEADER_RE = /^[a-z0-9-]{1,50}$/;
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -29,9 +30,21 @@ function json(payload, status = 200) {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Store',
     },
   });
+}
+
+// The store this request acts for. On the admin host the API path carries no
+// store (/api/images/upload), so the edge default store would be used and the
+// admin check would run against the wrong org. The admin client names the store
+// in X-Store instead. Only honoured on the admin host; requireAdmin still checks
+// membership in that named store, so a header cannot grant access to another store.
+function requestedStoreSlug(request, context) {
+  const org = getRequestOrg(context);
+  const named = (request.headers.get('X-Store') || '').trim().toLowerCase();
+  if (org.admin && STORE_HEADER_RE.test(named)) return named;
+  return String(org.slug);
 }
 
 async function requireAdmin(request, env, orgSlug) {
@@ -93,12 +106,12 @@ export async function onRequest(context) {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return json({}, 200);
 
-  const gate = await requireAdmin(request, env, getRequestOrg(context).slug);
+  const orgSlug = requestedStoreSlug(request, context);
+  const gate = await requireAdmin(request, env, orgSlug);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
   const bucket = env.R2_ASSETS;
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
-  const orgSlug = String(getRequestOrg(context).slug);
   if (!/^[a-z0-9-]{1,50}$/.test(orgSlug)) return json({ error: 'Invalid org configuration' }, 500);
   const tenantPrefix = `${LIB_PREFIX}orgs/${orgSlug}/`;
 
