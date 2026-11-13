@@ -2,14 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useConvex } from 'convex/react';
 import { makeFunctionReference } from 'convex/server';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { PageHeader } from '../components/shared/PageHeader';
 import { adminPath } from '../lib/paths';
+import { Badge, Banner, Button, Card, Page, Skeleton, type BadgeTone } from '../ui';
+import { normalizeSeoPath, seoFixPath, SEO_HOW_TO } from './SeoChecks';
 
 type Severity = 'high' | 'medium' | 'low';
 
@@ -44,129 +41,116 @@ interface SeoHealth {
   checks: SeoCheck[];
 }
 
-const getSeoHealthRef = makeFunctionReference<'query', { orgSlug: string }, SeoHealth>(
-  'seoHealth:getSeoHealth',
-);
+const getSeoHealthRef = makeFunctionReference<'query', { orgSlug: string }, SeoHealth>('seoHealth:getSeoHealth');
 
 const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  high: 'High',
-  medium: 'Medium',
-  low: 'Low',
-};
+const SEVERITY_TONE: Record<Severity, BadgeTone> = { high: 'critical', medium: 'warning', low: 'neutral' };
+const SEVERITY_LABEL: Record<Severity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+const ITEMS_PREVIEW = 5;
 
 function scoreTone(score: number) {
-  if (score >= 85) return { text: 'text-emerald-600', stroke: 'stroke-emerald-500', label: 'Healthy' };
-  if (score >= 60) return { text: 'text-amber-600', stroke: 'stroke-amber-500', label: 'Needs work' };
-  return { text: 'text-red-600', stroke: 'stroke-red-500', label: 'At risk' };
+  if (score >= 85) return { text: 'text-success', stroke: 'stroke-success', label: 'Healthy', tone: 'success' as const };
+  if (score >= 60) return { text: 'text-warning', stroke: 'stroke-warning', label: 'Needs work', tone: 'warning' as const };
+  return { text: 'text-destructive', stroke: 'stroke-destructive', label: 'At risk', tone: 'critical' as const };
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreRing({ score, stroke, text }: { score: number; stroke: string; text: string }) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - Math.max(0, Math.min(100, score)) / 100);
-  const tone = scoreTone(score);
   return (
-    <div className="relative h-28 w-28 shrink-0">
-      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
-        <circle cx="50" cy="50" r={radius} fill="none" strokeWidth="10" className="stroke-muted" />
+    <div className="relative size-28 shrink-0">
+      <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden>
+        <circle cx="50" cy="50" r={radius} fill="none" strokeWidth="9" className="stroke-border" />
         <circle
           cx="50"
           cy="50"
           r={radius}
           fill="none"
-          strokeWidth="10"
+          strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className={tone.stroke}
+          className={stroke}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-3xl font-semibold tabular-nums ${tone.text}`}>{score}</span>
-        <span className="text-[11px] text-muted-foreground">of 100</span>
+        <span className={`text-3xl font-semibold tabular-nums ${text}`}>
+          {score}
+        </span>
+        <span className="text-xs text-muted-foreground">of 100</span>
       </div>
     </div>
   );
 }
 
-function CheckCard({
-  check,
-  open,
-  onToggle,
-}: {
-  check: SeoCheck;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const passing = check.affected === 0;
-  const panelId = `seo-check-${check.id}`;
-  return (
-    <Card className="gap-0 py-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex w-full items-start gap-3 rounded-xl p-4 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {passing ? (
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-        ) : (
-          <AlertTriangle
-            className={`mt-0.5 h-5 w-5 shrink-0 ${check.severity === 'high' ? 'text-red-600' : 'text-amber-600'}`}
-            aria-hidden="true"
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{check.label}</span>
-            <Badge variant="outline" className="text-[11px]">
-              {SEVERITY_LABEL[check.severity]}
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{check.description}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="text-sm font-semibold tabular-nums">
-            {check.affected} <span className="font-normal text-muted-foreground">/ {check.total}</span>
-          </span>
-          {open ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          )}
-        </div>
-      </button>
+/** One failing check: what is wrong, how to fix it, one Fix button, and the affected items. */
+function FailingCheck({ check }: { check: SeoCheck }) {
+  const [showAll, setShowAll] = useState(false);
+  const fixTo = seoFixPath(check.id, check.items[0]?.adminPath);
+  const visible = showAll ? check.items : check.items.slice(0, ITEMS_PREVIEW);
+  const hidden = check.items.length - visible.length;
 
-      {open && (
-        <div id={panelId} className="border-t px-4 py-3">
-          {check.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing to fix here.</p>
-          ) : (
-            <ul className="divide-y">
-              {check.items.map((item) => (
-                <li key={item.id + item.detail} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:gap-3">
-                  <Link
-                    to={adminPath(item.adminPath)}
-                    className="min-w-0 truncate font-medium text-primary underline-offset-2 hover:underline sm:max-w-[40%]"
-                  >
-                    {item.label}
-                  </Link>
-                  <span className="text-sm text-muted-foreground">{item.detail}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {check.truncated && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Showing the first {check.items.length} of {check.affected}.
+  return (
+    <li className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 gap-3">
+          <AlertTriangle
+            className={`mt-0.5 size-5 shrink-0 ${check.severity === 'high' ? 'text-destructive' : 'text-warning'}`}
+            aria-hidden
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">{check.label}</span>
+              <Badge tone={SEVERITY_TONE[check.severity]}>{SEVERITY_LABEL[check.severity]}</Badge>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {check.affected} of {check.total}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">{check.description}</p>
+            <p className="text-sm text-foreground">
+              <span className="font-medium">How to fix: </span>
+              {SEO_HOW_TO[check.id] ?? 'Open the affected pages and correct the listed fields.'}
             </p>
+          </div>
+        </div>
+        <Button asChild size="sm" variant="secondary" className="self-start">
+          <Link to={adminPath(fixTo)}>Fix</Link>
+        </Button>
+      </div>
+
+      {check.items.length > 0 && (
+        <div className="ml-8 flex flex-col">
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {visible.map((item) => (
+              <li key={item.id + item.detail} className="flex flex-col gap-0.5 px-3 py-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+                <Link
+                  to={adminPath(normalizeSeoPath(item.adminPath))}
+                  className="min-w-0 truncate font-medium text-primary hover:underline sm:max-w-xs"
+                >
+                  {item.label}
+                </Link>
+                <span className="min-w-0 text-muted-foreground">{item.detail}</span>
+              </li>
+            ))}
+          </ul>
+          {(hidden > 0 || check.truncated) && (
+            <div className="mt-2 flex items-center gap-2">
+              {hidden > 0 && (
+                <Button size="sm" variant="plain" onClick={() => setShowAll(true)}>
+                  Show all {check.items.length}
+                </Button>
+              )}
+              {check.truncated && (
+                <span className="text-xs text-muted-foreground">
+                  Showing the first {check.items.length} of {check.affected}.
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
-    </Card>
+    </li>
   );
 }
 
@@ -174,156 +158,142 @@ export function SeoHealthPage() {
   const convex = useConvex();
   const [data, setData] = useState<SeoHealth | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
-  const { status, setError, clear } = useInlineStatus();
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await convex.query(getSeoHealthRef, { orgSlug: ORG_SLUG });
       setData(res);
-      clear();
-    } catch (err: any) {
-      const code = err?.data?.code ?? 'UNKNOWN';
+      setError(null);
+    } catch (err: unknown) {
+      const code = (err as { data?: { code?: string } })?.data?.code ?? 'UNKNOWN';
       setError(`Could not load SEO health (${code}). Try again.`);
     } finally {
       setLoading(false);
     }
-  }, [convex, clear, setError]);
+  }, [convex]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const sortedChecks = useMemo(() => {
-    if (!data) return [];
-    return [...data.checks].sort((a, b) => {
-      const failing = Number(b.affected > 0) - Number(a.affected > 0);
-      if (failing !== 0) return failing;
-      const sev = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
-      if (sev !== 0) return sev;
-      return b.affected - a.affected;
-    });
-  }, [data]);
-
-  const totalIssues = useMemo(
-    () => (data ? data.checks.reduce((sum, c) => sum + c.affected, 0) : 0),
+  const failing = useMemo(
+    () =>
+      data
+        ? data.checks
+            .filter((c) => c.affected > 0)
+            .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.affected - a.affected)
+        : [],
     [data],
   );
-
-  const toggle = (id: string) => {
-    setOpenIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
+  const passing = useMemo(() => (data ? data.checks.filter((c) => c.affected === 0) : []), [data]);
+  const totalIssues = failing.reduce((sum, c) => sum + c.affected, 0);
   const tone = data ? scoreTone(data.score) : null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="SEO health"
-        description="Live checks on this store's products, categories, posts, redirects and domain"
-      >
-        <Button variant="outline" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
-          Refresh
-        </Button>
-      </PageHeader>
+    <Page
+      title="SEO health"
+      secondaryActions={[{ label: 'Refresh', onClick: () => void load(), loading }]}
+    >
+      {error && <Banner tone="critical">{error}</Banner>}
 
-      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
-        <InlineStatus status={status} />
+      {!data && loading && (
+        <Card>
+          <div className="flex flex-col gap-3" role="status" aria-label="Checking the catalog">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        </Card>
+      )}
 
-        {loading && !data && (
-          <p className="text-sm text-muted-foreground" role="status">
-            Checking the catalog...
-          </p>
-        )}
-
-        {data && tone && (
-          <>
-            <Card>
-              <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                <ScoreRing score={data.score} />
-                <div className="flex min-w-0 flex-1 flex-col gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-semibold">Overall score</h2>
-                      <Badge variant="outline" className={tone.text}>
-                        {tone.label}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {totalIssues === 0
-                        ? 'No issues found in the current checks.'
-                        : `${totalIssues} issue${totalIssues === 1 ? '' : 's'} across ${
-                            data.checks.filter((c) => c.affected > 0).length
-                          } checks. Open a check to see the items.`}
-                    </p>
+      {data && tone && (
+        <>
+          <Card>
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <ScoreRing score={data.score} stroke={tone.stroke} text={tone.text} />
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold text-foreground">SEO score</h2>
+                    <Badge tone={tone.tone}>{tone.label}</Badge>
                   </div>
-                  <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                    <div>
-                      <dt className="text-muted-foreground">Canonical host</dt>
-                      <dd className="font-medium break-all">
-                        {data.canonicalHost ?? 'No primary domain'}
-                        {data.primaryDomainStatus && data.primaryDomainStatus !== 'active' && (
-                          <span className="ml-1 text-red-600">({data.primaryDomainStatus})</span>
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Sitemap</dt>
-                      <dd className="font-medium">
-                        {data.sitemap.enabled ? `On at ${data.sitemap.path}` : 'Off'}
-                        <span className="text-muted-foreground"> · {data.sitemap.urls} URLs</span>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Scanned</dt>
-                      <dd className="font-medium">
-                        {data.counts.products} products · {data.counts.categories} categories · {data.counts.blogPosts}{' '}
-                        posts
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Redirects</dt>
-                      <dd className="font-medium">{data.counts.redirects}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Domains</dt>
-                      <dd className="font-medium">{data.counts.domains}</dd>
-                    </div>
-                  </dl>
+                  <p className="text-sm text-muted-foreground">
+                    {totalIssues === 0
+                      ? 'No issues in the current checks.'
+                      : `${totalIssues} ${totalIssues === 1 ? 'issue' : 'issues'} in ${failing.length} ${
+                          failing.length === 1 ? 'check' : 'checks'
+                        }. Fix them below, starting with the highest severity.`}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {sortedChecks.map((check) => (
-                <CheckCard
-                  key={check.id}
-                  check={check}
-                  open={openIds.has(check.id)}
-                  onToggle={() => toggle(check.id)}
-                />
-              ))}
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-muted-foreground">Canonical host</dt>
+                    <dd className="break-all font-medium">
+                      {data.canonicalHost ?? 'No primary domain'}
+                      {data.primaryDomainStatus && data.primaryDomainStatus !== 'active' && (
+                        <span className="ml-1 text-destructive">({data.primaryDomainStatus})</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Sitemap</dt>
+                    <dd className="font-medium">
+                      {data.sitemap.enabled ? `On at ${data.sitemap.path}` : 'Off'}
+                      <span className="text-muted-foreground"> · {data.sitemap.urls} URLs</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Scanned</dt>
+                    <dd className="font-medium">
+                      {data.counts.products} products · {data.counts.categories} categories · {data.counts.blogPosts} posts
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Redirects</dt>
+                    <dd className="font-medium">{data.counts.redirects}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Domains</dt>
+                    <dd className="font-medium">{data.counts.domains}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">What is not checked here</CardTitle>
-                <CardDescription>
-                  Static pages (about, contact, terms) are defined in code, not stored rows, so they are not
-                  scanned. Search Console data (rankings, indexing) is not read by this page.
-                </CardDescription>
-              </CardHeader>
+          {failing.length > 0 && (
+            <Card title={`Needs attention · ${failing.length}`} padding="none">
+              <ul className="divide-y divide-border">
+                {failing.map((check) => (
+                  <FailingCheck key={check.id} check={check} />
+                ))}
+              </ul>
             </Card>
-          </>
-        )}
-      </div>
-    </div>
+          )}
+
+          <Card title={`Passing · ${passing.length}`} padding="none">
+            {passing.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">No check passes yet.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {passing.map((check) => (
+                  <li key={check.id} className="flex items-center gap-3 px-4 py-3">
+                    <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">{check.label}</span>
+                    <span className="text-xs text-muted-foreground">Passing</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <p className="px-1 text-xs text-muted-foreground">
+            Static pages (about, contact, terms) are defined in code and are not scanned. Search Console data is not read here.
+          </p>
+        </>
+      )}
+    </Page>
   );
 }

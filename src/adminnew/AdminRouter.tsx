@@ -56,6 +56,12 @@ export const ADMIN_ROUTES = [
   { path: '/seo', element: SeoHealthPage, label: 'SEO health', section: 'seo' },
   { path: '/seo/redirects', element: RedirectsPage, label: 'Redirects', section: 'seo' },
   { path: '/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
+  // Settings sections: one page component, the section is read from the path.
+  { path: '/settings/store', element: SettingsPage, label: 'Store details', section: 'platform' },
+  { path: '/settings/checkout', element: SettingsPage, label: 'Checkout & shipping', section: 'platform' },
+  { path: '/settings/referral', element: SettingsPage, label: 'Refer & earn', section: 'platform' },
+  { path: '/settings/legal', element: SettingsPage, label: 'Legal & age gate', section: 'platform' },
+  { path: '/settings/advanced', element: SettingsPage, label: 'Advanced', section: 'platform' },
   { path: '/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },
   // Deep links into the Payments tabs (single page, tab picked from the path).
