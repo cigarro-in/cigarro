@@ -3,12 +3,11 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import Hero from './Hero';
 import { CategoriesScroller } from './CategoriesScroller';
 import { useHomepageData } from '../../hooks/useHomepageData';
-import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 // The page's only h1 (logos in the headers are not headings). Visually hidden:
 // the store tagline above the fold is decorative, the SEO title carries the topic.
-const HOME_TITLE = 'Cigarro | Cigarettes and Tobacco Products Online';
 
 // Eager, not React.lazy: the home page is server-rendered (P5-SSR). A lazy section
 // suspends during hydration, leaving its Suspense boundary dehydrated, and any
@@ -29,6 +28,8 @@ export function HomePage() {
   const { data, isLoading } = useHomepageData();
   const { settings: store } = useStoreSettings();
   const { primaryHost } = useOrgInfo();
+  const homeTitle = `${store.name} | Cigarettes and Tobacco Products Online`;
+  const homeDescription = `Browse cigarette brands, variants, pack options and related tobacco products online at ${store.name}. For adults of legal smoking age only.`;
   // Admin Homepage toggles; absent row = enabled (existing installs unaffected).
   const on = (name: string) => data?.sectionsEnabled?.[name] !== false;
 
@@ -51,15 +52,15 @@ export function HomePage() {
   return (
     <>
       <SEOHead
-        title={HOME_TITLE}
-        description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
+        title={homeTitle}
+        description={homeDescription}
         url="/"
         type="website"
         keywords={['cigarettes online', 'cigarette brands India', 'tobacco products India', 'rolling papers India']}
         image={data?.heroSlides?.[0]?.image_url}
         extraJsonLd={latestItemList ? [latestItemList] : undefined}
       />
-      <h1 className="sr-only">{HOME_TITLE}</h1>
+      <h1 className="sr-only">{homeTitle}</h1>
       {on('hero_section') && <Hero slides={data?.heroSlides} isLoading={isLoading} />}
 
       {/* Same sections on mobile + desktop (each section is responsive) */}

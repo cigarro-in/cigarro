@@ -198,3 +198,12 @@ export const importSiteSettingsRef = makeFunctionReference<
   { saToken: string; orgId: Id<'organizations'> } & SiteSettingsPatch,
   { updated: boolean }
 >('storeImport:importSiteSettings');
+export const importSeedRedirectsRef = makeFunctionReference<
+  'mutation',
+  {
+    saToken: string;
+    orgId: Id<'organizations'>;
+    rows: { from: string; to: string; status: 301 | 302 | 410 }[];
+  },
+  { imported: number; failed: number }
+>('redirects:importSeedRedirectsForOrg');

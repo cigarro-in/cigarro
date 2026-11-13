@@ -145,9 +145,13 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
       ? raw.referralRewardPaise
       : d.referralRewardPaise;
   const referral = resolveReferral(raw, paise);
+  // Brand fallbacks derive from the store's own name, never from the
+  // oldsmokeshop defaults in site.ts (a store without seo.titleTemplate must
+  // not get "| Cigarro").
+  const name = str(raw?.siteName, d.name);
   return {
-    name: str(raw?.siteName, d.name),
-    metaTitle: str(raw?.metaTitle, DEFAULT_META_TITLE),
+    name,
+    metaTitle: str(raw?.metaTitle, name || DEFAULT_META_TITLE),
     metaDescription: str(raw?.metaDescription, DEFAULT_META_DESCRIPTION),
     brand: {
       logoUrl: str(raw?.brand?.logoUrl),
@@ -180,7 +184,7 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
     referralRewardRupees: paiseToRupees(referral.refereeReward.type === 'fixed' ? referral.refereeReward.value : 0),
     referral,
     seo: {
-      titleTemplate: str(raw?.seo?.titleTemplate, d.seo.titleTemplate),
+      titleTemplate: str(raw?.seo?.titleTemplate, `%s | ${name}`),
       defaultDescription: str(raw?.seo?.defaultDescription, d.seo.defaultDescription),
       googleSiteVerification: str(raw?.seo?.googleSiteVerification),
       bingSiteVerification: str(raw?.seo?.bingSiteVerification),

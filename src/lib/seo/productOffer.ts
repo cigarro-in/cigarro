@@ -154,7 +154,12 @@ export function getCartonVariant<T extends {
 export function getProductSeoImages(
   variants: Array<{ images?: string[]; is_active?: boolean }> | undefined | null,
 ): string[] {
-  return getActiveVariants(variants).flatMap((v) => (v.images || []).filter(Boolean));
+  const all = getActiveVariants(variants).flatMap((v) => (v.images || []).filter(Boolean));
+  // Hero/banner art sometimes sits in a variant's image list (imported catalogs).
+  // Prefer the product's own photos as the share/JSON-LD image; keep a hero
+  // only when nothing else exists.
+  const own = all.filter((u) => !/\/hero_images\//.test(u));
+  return own.length > 0 ? own : all;
 }
 
 // Canonical URL for a product page. The stored canonical is trusted only when

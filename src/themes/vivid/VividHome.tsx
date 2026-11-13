@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useHomepageData } from '../../hooks/useHomepageData';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { VividHeroBanners } from './VividHeroBanners';
 import { VividCategorySidebar } from './VividCategorySidebar';
 import { VividCartPanel } from './VividCartPanel';
@@ -9,6 +10,7 @@ import { VividCategoryChips } from './VividCategoryChips';
 
 export function VividHome() {
   const { data, isLoading } = useHomepageData();
+  const { name: storeName } = useOrgInfo();
   const [activeSlug, setActiveSlug] = useState<string | undefined>();
 
   // Same admin sources as classic: collection-linked titles/products,
@@ -50,12 +52,11 @@ export function VividHome() {
 
   return (
     <>
-      <SEOHead
-        title="Cigarro | Cigarettes and Tobacco Products Online"
-        description="Browse cigarette brands, variants, pack options and related tobacco products online at Cigarro. For adults of legal smoking age only."
-        url="/"
-        type="website"
-      />
+      {/* Title and description come from the store's settings (SEOHead defaults). */}
+      <SEOHead url="/" type="website" />
+      <h1 className="sr-only">
+        {storeName ? `${storeName} | Cigarettes and tobacco products online` : 'Cigarettes and tobacco products online'}
+      </h1>
 
       {on('hero_section') && (
         <div className="max-w-[1280px] mx-auto px-4 pt-5">

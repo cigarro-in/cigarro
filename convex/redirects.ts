@@ -1,9 +1,12 @@
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireOrgAdminBySlug } from "./lib/org";
+import { requireSaWrite } from "./lib/auth";
+import { audit } from "./lib/audit";
+import { SMOKESHOP_SEED_REDIRECTS } from "./lib/smokeshopRedirects";
 import {
   normalizeFromPath,
   normalizePath,
@@ -432,6 +435,73 @@ export const bulkImport = mutation({
 
     const ok = results.filter((r) => r.ok).length;
     return { results, imported: ok, failed: results.length - ok };
+  },
+});
+
+// Idempotent seed for an import: upserts by fromPath (planRedirects patches an
+// existing row, inserts a new one). Used by the SA importer and by the
+// smokeshopRedirects-v1 migration. Live-page guard is off: these are old URLs.
+export async function applySeedRedirects(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  rows: { from: string; to: string; status: RedirectStatus }[],
+): Promise<{ imported: number; failed: { from: string; error: string }[] }> {
+  const incoming: Incoming[] = [];
+  const failed: { from: string; error: string }[] = [];
+  rows.forEach((row, idx) => {
+    const from = normalizeFromPath(row.from);
+    if (!from.ok) return void failed.push({ from: row.from, error: from.error });
+    const to = normalizeTarget(row.to, row.status);
+    if (!to.ok) return void failed.push({ from: row.from, error: to.error });
+    incoming.push({ idx, fromPath: from.path, toPath: to.toPath, status: row.status, source: "import" });
+  });
+  const planned = await planRedirects(ctx, orgId, incoming, { checkLive: false });
+  let imported = 0;
+  planned.forEach((r, i) => {
+    if (r.ok) imported++;
+    else failed.push({ from: incoming[i].fromPath, error: r.error });
+  });
+  return { imported, failed };
+}
+
+// One-off seed of the Dukaan redirects for the smokeshop store.
+// Run by migrations.ts (smokeshopRedirects-v1); safe to re-run.
+export const importSmokeshopRedirects = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", "smokeshop"))
+      .unique();
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND", orgSlug: "smokeshop" });
+    const res = await applySeedRedirects(ctx, org._id, SMOKESHOP_SEED_REDIRECTS);
+    return { imported: res.imported, failed: res.failed.length, failures: res.failed.slice(0, 10) };
+  },
+});
+
+// Dukaan importer step (super-admin): same seed, keyed by the store the SA picked.
+// Gated by requireSaWrite like the other storeImport mutations.
+export const importSeedRedirectsForOrg = mutation({
+  args: {
+    saToken: v.string(),
+    orgId: v.id("organizations"),
+    rows: v.array(v.object({ from: v.string(), to: v.string(), status: v.union(v.literal(301), v.literal(302), v.literal(410)) })),
+  },
+  handler: async (ctx, { saToken, orgId, rows }) => {
+    const sa = await requireSaWrite(ctx, saToken);
+    if (rows.length > MAX_IMPORT_ROWS)
+      throw new ConvexError({ code: "TOO_MANY_ROWS", max: MAX_IMPORT_ROWS });
+    const res = await applySeedRedirects(ctx, orgId, rows);
+    await audit(ctx, {
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
+      orgId,
+      action: "platform.import.redirects",
+      targetType: "organization",
+      targetId: orgId,
+      payload: { imported: res.imported, failed: res.failed.length },
+    });
+    return { imported: res.imported, failed: res.failed.length };
   },
 });
 

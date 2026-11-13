@@ -1,3 +1,4 @@
+import { truncateAtWord } from '../../lib/seo/text';
 import { Helmet } from 'react-helmet-async';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
@@ -138,9 +139,7 @@ export function SEOHead({
   const resolvedImage = image ?? DEFAULT_SHARE_IMAGE;
   const shareImage = omitImage ? undefined : (ogImage || resolvedImage);
   const twitterShareImage = omitImage ? undefined : (twitterImage || ogImage || resolvedImage);
-  const optimizedDescription = description.length > 160 
-    ? description.substring(0, 157) + '...'
-    : description;
+  const optimizedDescription = truncateAtWord(description, 160);
 
   const logoUrl = store.brand.logoUrl || SITE_LOGO_URL;
   const addr = store.business.address;

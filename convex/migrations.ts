@@ -35,6 +35,12 @@ const listRowsRef = makeFunctionReference<
   Record<string, never>,
   MigrationRow[]
 >("migrations:listRows");
+const importSmokeshopRedirectsRef = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  unknown
+>("redirects:importSmokeshopRedirects");
+
 const writeRowRef = makeFunctionReference<
   "mutation",
   { name: string; status: "done" | "failed"; result?: string; updatedAt: number },
@@ -181,6 +187,11 @@ const MIGRATIONS: Migration[] = [
     // Literal name: the exported const below is declared after this array.
     name: "cleanSmokeshopDescriptions-v1",
     run: async (ctx) => await runCleanSmokeshopDescriptions(ctx),
+  },
+  {
+    // Dukaan redirects (imports/the2935/redirects.csv) for smokeshop. Idempotent.
+    name: "smokeshopRedirects-v1",
+    run: async (ctx) => await ctx.runMutation(importSmokeshopRedirectsRef, {}),
   },
 ];
 

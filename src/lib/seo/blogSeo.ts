@@ -1,5 +1,6 @@
 // Head + JSON-LD model for a blog post (bot parity: functions/ssr-middleware.js
 // generateBlogHTML). Pure: runs identically on the server and in the browser.
+import { truncateAtWord } from './text';
 import { formatBlogDate } from '../blog/blogRender';
 
 export interface BlogPostSeoInput {
@@ -20,7 +21,7 @@ export function blogPostSeo(post: BlogPostSeoInput, siteName: string, primaryHos
   const canonical = `${site}/blog/${post.slug}`;
   const title = post.metaTitle || `${post.title} | ${siteName} Blog`;
   const description =
-    post.metaDescription || post.excerpt || (post.content ? post.content.replace(/<[^>]+>/g, '').substring(0, 160) : '');
+    post.metaDescription || post.excerpt || (post.content ? truncateAtWord(post.content.replace(/<[^>]+>/g, ''), 160) : '');
   const author = post.authorName || siteName;
   const published = post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined;
   const modified = post.updatedAt ? new Date(post.updatedAt).toISOString() : published;

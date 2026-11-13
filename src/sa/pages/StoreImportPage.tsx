@@ -11,6 +11,7 @@ import { useSa } from '../SuperGate';
 import { saErrorMessage } from '../session';
 import {
   importBlogPostsRef,
+  importSeedRedirectsRef,
   importCategoriesRef,
   importHeroSlidesRef,
   importProductsRef,
@@ -52,12 +53,15 @@ export function StoreImportPage() {
   const importHero = useMutation(importHeroSlidesRef);
   const importBlogs = useMutation(importBlogPostsRef);
   const importSettings = useMutation(importSiteSettingsRef);
+  const importRedirects = useMutation(importSeedRedirectsRef);
 
   const [normalized, setNormalized] = useState<DukaanNormalized | null>(null);
   const [imageMap, setImageMap] = useState<ImageMap>({});
   const [activeTheme, setActiveTheme] = useState('vivid');
   const [fileName, setFileName] = useState('');
   const [mapName, setMapName] = useState('');
+  const [redirectRows, setRedirectRows] = useState<{ from: string; to: string; status: 301 | 302 | 410 }[]>([]);
+  const [redirectName, setRedirectName] = useState('');
   const [results, setResults] = useState<StepResult[]>([]);
   const [running, setRunning] = useState(false);
   const status = useInlineStatus();
@@ -81,6 +85,25 @@ export function StoreImportPage() {
     } catch (err) {
       setNormalized(null);
       status.setError(err instanceof Error ? err.message : 'Could not read that file.');
+    }
+  };
+
+  // redirects.csv (from,to,status) from the Dukaan export. Plain CSV, no quoted fields.
+  const onPickRedirects = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const lines = (await file.text()).trim().split(String.fromCharCode(10)).slice(1);
+      const rows = lines
+        .filter((l) => l.trim() !== '')
+        .map((l) => {
+          const [from = '', to = '', status = '301'] = l.split(',');
+          const n = Number(status.trim());
+          return { from: from.trim(), to: to.trim(), status: (n === 302 || n === 410 ? n : 301) as 301 | 302 | 410 };
+        });
+      setRedirectRows(rows);
+      setRedirectName(file.name);
+    } catch {
+      status.setError('Could not read the redirects file.');
     }
   };
 
@@ -143,6 +166,18 @@ export function StoreImportPage() {
 
       const s = await importSettings({ saToken: token, orgId, ...plan.settings });
       push({ entity: 'Site settings', batches: 1, summary: s.updated ? 'updated' : 'created' });
+
+      if (redirectRows.length) {
+        let imported = 0;
+        let failed = 0;
+        const redirectBatches = batches(redirectRows, 200);
+        for (const b of redirectBatches) {
+          const r = await importRedirects({ saToken: token, orgId, rows: b });
+          imported += r.imported;
+          failed += r.failed;
+        }
+        push({ entity: 'Redirects', batches: redirectBatches.length, summary: `${imported} imported, ${failed} failed (re-run is safe)` });
+      }
       status.setOk(`Import finished for "${store.slug}".`);
     } catch (err) {
       status.setError(`Import stopped: ${saErrorMessage(err)}. Re-run after fixing; completed rows are updated in place.`);
@@ -179,6 +214,11 @@ export function StoreImportPage() {
           <Label htmlFor="import-map">Image map (image-map.json, optional)</Label>
           <Input id="import-map" type="file" accept="application/json,.json" onChange={(e) => void onPickMap(e.target.files?.[0])} />
           {mapName && <p className="text-xs text-muted-foreground">{mapName} · {Object.keys(imageMap).length} entries</p>}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="import-redirects">Redirects (redirects.csv, optional)</Label>
+          <Input id="import-redirects" type="file" accept=".csv,text/csv" onChange={(e) => void onPickRedirects(e.target.files?.[0])} />
+          {redirectName && <p className="text-xs text-muted-foreground">{redirectName} · {redirectRows.length} rows</p>}
         </div>
         <div className="grid gap-2 max-w-sm">
           <Label htmlFor="import-theme">Theme id to activate</Label>
