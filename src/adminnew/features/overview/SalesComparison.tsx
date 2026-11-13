@@ -2,6 +2,10 @@ import type { ReactNode } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { formatINR } from '../../../utils/currency';
 import { Card } from '../../ui';
+import { CountUp } from './CountUp';
+
+/** Rupees with two decimals while counting, the same format as the final value. */
+const money = (n: number) => formatINR(Math.round(n * 100) / 100);
 
 /** Percent change vs yesterday, or null when there is nothing to compare. */
 export function percentChange(today: number, yesterday: number): number | null {
@@ -51,16 +55,16 @@ export function SalesComparison({
       <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-4 sm:divide-y-0">
         <Cell
           label="Sales today"
-          value={formatINR(todayRevenue)}
+          value={<CountUp value={todayRevenue} format={money} />}
           sub={<Change today={todayRevenue} yesterday={yesterdayRevenue} />}
         />
-        <Cell label="Sales yesterday" value={formatINR(yesterdayRevenue)} sub="Paid orders" />
+        <Cell label="Sales yesterday" value={<CountUp value={yesterdayRevenue} format={money} />} sub="Paid orders" />
         <Cell
           label="Orders today"
-          value={todayOrders}
+          value={<CountUp value={todayOrders} />}
           sub={<Change today={todayOrders} yesterday={yesterdayOrders} />}
         />
-        <Cell label="Orders yesterday" value={yesterdayOrders} sub="All placed orders" />
+        <Cell label="Orders yesterday" value={<CountUp value={yesterdayOrders} />} sub="All placed orders" />
       </div>
     </Card>
   );

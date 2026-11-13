@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '../../components/ui/sidebar';
+import { SidebarMenu, SidebarMenuItem } from '../../components/ui/sidebar';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useAdminStores } from '../hooks/useAdminStores';
@@ -73,15 +73,20 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarMenuButton size="lg" aria-label="Store and account menu" className="h-16 gap-3 px-3 text-[15px]">
-                <StoreIcon name={storeName} iconUrl={iconUrl} />
-                <span className="grid min-w-0 flex-1 text-left leading-snug">
-                  <span className="truncate text-base font-semibold">{storeName}</span>
-                  <span className="truncate text-sm text-[var(--admin-text-muted)]">{adminLabel}</span>
-                </span>
-                <ChevronsUpDown className="ml-auto size-5 text-[var(--admin-text-muted)]" aria-hidden />
-              </SidebarMenuButton>
+            {/* A native button, not SidebarMenuButton: that component is not
+                forwardRef, so Radix never received the trigger ref. Without the
+                anchor, Radix keeps the menu at translate(0, -200%), off-screen,
+                and the click appears to do nothing. */}
+            <DropdownMenuTrigger
+              aria-label="Store and account menu"
+              className="flex h-16 w-full items-center gap-3 overflow-hidden rounded-md px-3 text-left text-[15px] outline-hidden ring-sidebar-ring transition-[background-color,transform] duration-150 hover:bg-sidebar-accent focus-visible:ring-2 active:scale-[0.99] data-[state=open]:bg-sidebar-accent motion-reduce:transition-none motion-reduce:active:scale-100"
+            >
+              <StoreIcon name={storeName} iconUrl={iconUrl} />
+              <span className="grid min-w-0 flex-1 text-left leading-snug">
+                <span className="truncate text-base font-semibold">{storeName}</span>
+                <span className="truncate text-sm text-[var(--admin-text-muted)]">{adminLabel}</span>
+              </span>
+              <ChevronsUpDown className="ml-auto size-5 shrink-0 text-[var(--admin-text-muted)]" aria-hidden />
             </DropdownMenuTrigger>
             <DropdownMenuContent side="bottom" align="start" className="w-[17rem] p-1">
               <div className="flex items-center gap-2.5 px-2 py-2">
@@ -106,7 +111,7 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 
-              {stores.length > 1 && (
+              {stores.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs font-medium text-[var(--admin-text-muted)]">Switch store</DropdownMenuLabel>

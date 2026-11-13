@@ -4,6 +4,7 @@ import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { cn } from '../../components/ui/utils';
 import { Button, type ButtonState } from './Button';
 import { Menu } from './Menu';
+import { GlobalSearch } from '../features/search/GlobalSearch';
 
 /** Declarative page action. A ReactNode is also accepted wherever a PageAction is. */
 export interface PageAction {
@@ -44,10 +45,11 @@ function ActionButton({ action, primary }: { action: PageAction; primary?: boole
 }
 
 /**
- * Standard admin page frame. One content width (1100px, centered) with the
- * same top padding on every page. Title only: no eyebrow, no subtitle.
- * The header is a floating island: rounded, bordered, sticky 12px from the
- * top (below the mobile bar on phones) with a soft backdrop blur.
+ * Standard admin page frame. Content fills the width to the right of the
+ * sidebar, with 16px gutters on phones and 24px from `sm` up (the same inset
+ * the floating sidebar uses). Title only: no eyebrow, no subtitle.
+ * The header is a compact floating island (52px): rounded, bordered, sticky
+ * 12px from the top (below the mobile bar on phones) with a soft backdrop blur.
  *
  *   <Page title="Orders" primaryAction={{ label: 'Create order', to: '/orders/new' }}>
  *     <Card>...</Card>
@@ -56,7 +58,9 @@ function ActionButton({ action, primary }: { action: PageAction; primary?: boole
  * - backTo: router-relative path for the back arrow (detail/form pages).
  * - titleMeta: inline badges next to the title (e.g. <StatusBadge order={o} />).
  * - secondaryActions: shown as buttons on desktop, folded into a "More" menu on phones.
- * - width="wide": only for dense tables that genuinely need more room.
+ * - width="form": long-form forms only (caps line length at 880px, centered).
+ *   Everything else is fluid. `width="wide"` is accepted as an alias of "fluid".
+ * - The global search (orders, products, customers; Cmd/Ctrl+K) sits in the island.
  */
 export function Page({
   title,
@@ -64,7 +68,7 @@ export function Page({
   titleMeta,
   primaryAction,
   secondaryActions,
-  width = 'default',
+  width = 'fluid',
   children,
   className,
 }: {
@@ -73,7 +77,7 @@ export function Page({
   titleMeta?: ReactNode;
   primaryAction?: PageAction | ReactNode;
   secondaryActions?: Array<PageAction | ReactNode>;
-  width?: 'default' | 'wide';
+  width?: 'fluid' | 'form' | 'wide';
   children?: ReactNode;
   className?: string;
 }) {
@@ -84,14 +88,14 @@ export function Page({
   return (
     <div
       className={cn(
-        'mx-auto w-full px-3 pb-24 pt-3 sm:px-4',
-        width === 'wide' ? 'max-w-[1400px]' : 'max-w-[1100px]',
+        'w-full px-4 pb-24 pt-3 sm:px-6',
+        width === 'form' ? 'mx-auto max-w-[880px]' : 'max-w-none',
         className,
       )}
     >
       {/* Island header: always the same floating panel (sticky, blurred), so
           nothing shifts when it starts sticking. 12px inset matches the sidebar. */}
-      <header className="sticky top-[60px] z-20 mb-3 flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-[var(--admin-border)] bg-[color-mix(in_srgb,var(--admin-surface)_86%,transparent)] px-3 py-2 shadow-[var(--admin-shadow-island)] backdrop-blur-md backdrop-saturate-150 md:top-3 sm:px-4">
+      <header className="sticky top-[60px] z-20 mb-3 flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-[var(--admin-border)] bg-[color-mix(in_srgb,var(--admin-surface)_90%,transparent)] px-3 py-2 shadow-[var(--admin-shadow-island)] backdrop-blur-md backdrop-saturate-150 md:top-3 sm:px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {backTo && (
             <Button asChild variant="plain" size="icon" className="-ml-2 size-8" aria-label="Back">
@@ -100,9 +104,10 @@ export function Page({
               </Link>
             </Button>
           )}
-          <h1 className="min-w-0 truncate text-xl font-semibold tracking-[-0.01em] text-[var(--admin-text)]">{title}</h1>
+          <h1 className="min-w-0 truncate text-[18px] font-semibold leading-7 tracking-[-0.01em] text-[var(--admin-text)]">{title}</h1>
           {titleMeta && <div className="flex shrink-0 items-center gap-1.5">{titleMeta}</div>}
         </div>
+        <GlobalSearch />
         {hasActions && (
           <div className="flex shrink-0 items-center gap-2">
             {secondary.length > 0 && (

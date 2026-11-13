@@ -414,3 +414,89 @@ export const getCustomerProfile = query({
     };
   },
 });
+
+// ---------- Admin global search (header box) ----------
+// One round trip for orders, products and customers in the caller's store.
+// Admin-only (requireOrgAdmin). Bounded like the dashboard: the newest 1000
+// orders, the store's catalog and its users, with at most SEARCH_LIMIT hits
+// per group. Five digits match the customer-facing order number exactly;
+// 4+ digits also match the customer phone; text matches names and titles.
+
+const SEARCH_LIMIT = 6;
+
+export const searchAdmin = query({
+  args: { orgId: v.id("organizations"), text: v.string() },
+  handler: async (ctx, { orgId, text }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const empty = { orders: [], products: [], customers: [] };
+    const term = text.trim().slice(0, 80);
+    if (!term) return empty;
+    const org = await ctx.db.get(orgId);
+    if (!org) return empty;
+
+    const needle = term.toLowerCase();
+    const digits = term.replace(/\D/g, "");
+    const orderNo = /^\d{5}$/.test(term) ? Number(term) : null;
+    const phoneMatches = (phone: string | undefined) =>
+      digits.length >= 4 && (phone ?? "").replace(/\D/g, "").includes(digits);
+
+    const recent = await ctx.db
+      .query("orders")
+      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .take(1000);
+    const orders: Array<{
+      id: string;
+      number: number | null;
+      customer: string;
+      paymentStatus: string;
+      shippingStatus: string | null;
+      total: number;
+      createdAt: number;
+    }> = [];
+    for (const o of recent) {
+      if (orders.length >= SEARCH_LIMIT) break;
+      const number = orderNumberOf(o) ?? null;
+      const name = o.address?.name ?? "";
+      const hit =
+        (orderNo !== null && number === orderNo) ||
+        (name !== "" && name.toLowerCase().includes(needle)) ||
+        phoneMatches(o.address?.phone);
+      if (!hit) continue;
+      orders.push({
+        id: o._id,
+        number,
+        customer: name || "Guest",
+        paymentStatus: o.status,
+        shippingStatus: o.shippingStatus ?? null,
+        total: rupees(o.finalAmountPaise),
+        createdAt: o.createdAt,
+      });
+    }
+
+    const products = (await collectInOrg(ctx, "catalogProducts", org))
+      .filter((p) => String(p.name ?? "").toLowerCase().includes(needle))
+      .slice(0, SEARCH_LIMIT)
+      .map((p) => ({ id: String(p.supabaseId), name: String(p.name), isActive: !!p.isActive }));
+
+    const scopedUsers = await ctx.db
+      .query("users")
+      .withIndex("by_org_phone", (q) => q.eq("orgId", orgId))
+      .collect();
+    const legacyUsers = isLegacyOrg(org)
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_org_phone", (q) => q.eq("orgId", undefined))
+          .collect()
+      : [];
+    const customers = [...scopedUsers, ...legacyUsers]
+      .filter(
+        (u) =>
+          (u.name ?? "").toLowerCase().includes(needle) || phoneMatches(u.phone),
+      )
+      .slice(0, SEARCH_LIMIT)
+      .map((u) => ({ id: u.userId, name: u.name ?? "", phone: u.phone ?? "" }));
+
+    return { orders, products, customers };
+  },
+});

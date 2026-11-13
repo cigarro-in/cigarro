@@ -4,8 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { useAuth } from '../../hooks/useAuth';
 import { formatINR } from '../../utils/currency';
 import { AttentionRow, type AttentionItem } from '../features/overview/AttentionRow';
+import { CountUp } from '../features/overview/CountUp';
+import { greetingTitle } from '../features/overview/greetings';
 import { SalesComparison } from '../features/overview/SalesComparison';
 import {
   Button,
@@ -40,7 +43,7 @@ interface RecentCustomer {
 }
 
 function StoreRow({ label, value, to }: { label: string; value: ReactNode; to?: string }) {
-  const cls = 'flex h-9 items-center justify-between gap-3 rounded-md px-2 text-sm';
+  const cls = 'flex h-9 items-center justify-between gap-3 rounded-md px-2 text-sm transition-[background-color,transform] duration-150 active:scale-[0.99] motion-reduce:transform-none';
   const content = (
     <>
       <span className="text-muted-foreground">{label}</span>
@@ -69,13 +72,6 @@ const CUSTOMER_COLUMNS: Column<RecentCustomer>[] = [
   { id: 'contact', header: 'Phone', cell: (c) => <span className="tabular-nums">{c.contact || '-'}</span> },
   { id: 'joined', header: 'Joined', align: 'right', cell: (c) => <span className="text-muted-foreground">{formatOrderDate(c.createdAt)}</span> },
 ];
-
-function greetingFor(date: Date): string {
-  const h = date.getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
 
 function OverviewSkeleton() {
   return (
@@ -142,8 +138,12 @@ export function DashboardPage() {
     createdAt: Number(customer.created_at),
   }));
 
-  const storeName = org?.name;
-  const title = `${greetingFor(new Date())}${storeName ? `, ${storeName}` : ''}`;
+  // Picked once per mount so the greeting does not change on every render.
+  const [greetedAt] = useState(() => new Date());
+  const { user } = useAuth();
+  // 'Customer' is the placeholder name for accounts without a name: no greeting name.
+  const adminName = user?.name && user.name !== 'Customer' ? user.name : null;
+  const title = greetingTitle(greetedAt, adminName);
 
   const attention: AttentionItem[] = data
     ? [
@@ -203,7 +203,13 @@ export function DashboardPage() {
                     getRowId={(o) => o.id}
                     onRowClick={(o) => navigate(`/orders/${o.id}`)}
                     rowLabel={(o) => `Open order ${o.number}`}
-                    empty={<EmptyState icon={<ShoppingCart />} title="No orders yet" />}
+                    empty={
+                      <EmptyState
+                        icon={<ShoppingCart />}
+                        title="No orders yet"
+                        description="Orders show up here as soon as customers check out. Share your store to get the first one."
+                      />
+                    }
                   />
                 ) : (
                   <DataTable
@@ -212,7 +218,13 @@ export function DashboardPage() {
                     getRowId={(c) => c.id}
                     onRowClick={(c) => navigate(`/customers/${c.id}`)}
                     rowLabel={(c) => `Open customer ${c.name}`}
-                    empty={<EmptyState icon={<Users />} title="No customers yet" />}
+                    empty={
+                      <EmptyState
+                        icon={<Users />}
+                        title="No new customers yet"
+                        description="People who create an account on your store appear here."
+                      />
+                    }
                   />
                 )}
                 <div className="flex justify-end border-t border-border px-2 py-1.5">
@@ -226,11 +238,19 @@ export function DashboardPage() {
             aside={
               <Card title="Store" actions={<span className="text-xs text-muted-foreground">{data.ordersCapped ? 'Latest 1,000 orders' : 'All time'}</span>}>
                 <div className="-mx-2 flex flex-col">
-                  <StoreRow label="Total sales" value={formatINR(data.totalRevenue)} />
-                  <StoreRow label="Total orders" value={data.totalOrders} />
-                  <StoreRow label="Shipped" value={data.shippedOrders} to="/orders?status=shipped" />
-                  <StoreRow label="Active products" value={`${data.activeProducts} / ${data.totalProducts}`} to="/products" />
-                  <StoreRow label="Customers" value={data.totalCustomers} to="/customers" />
+                  <StoreRow label="Total sales" value={<CountUp value={data.totalRevenue} format={(n) => formatINR(Math.round(n * 100) / 100)} />} />
+                  <StoreRow label="Total orders" value={<CountUp value={data.totalOrders} />} />
+                  <StoreRow label="Shipped" value={<CountUp value={data.shippedOrders} />} to="/orders?status=shipped" />
+                  <StoreRow
+                    label="Active products"
+                    value={
+                      <>
+                        <CountUp value={data.activeProducts} /> / <CountUp value={data.totalProducts} />
+                      </>
+                    }
+                    to="/products"
+                  />
+                  <StoreRow label="Customers" value={<CountUp value={data.totalCustomers} />} to="/customers" />
                 </div>
               </Card>
             }

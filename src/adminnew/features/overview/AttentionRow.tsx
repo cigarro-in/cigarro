@@ -1,6 +1,7 @@
 import { ArrowRight, CircleCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card } from '../../ui';
+import { CountUp } from './CountUp';
 
 export interface AttentionItem {
   key: string;
@@ -20,7 +21,7 @@ export function AttentionRow({ items }: { items: AttentionItem[] }) {
       {pending.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <CircleCheck className="size-4 text-primary" aria-hidden />
-          Nothing needs attention right now.
+          All clear. Nothing needs attention right now.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -28,11 +29,11 @@ export function AttentionRow({ items }: { items: AttentionItem[] }) {
             <Link
               key={item.key}
               to={item.to}
-              className="group flex items-center justify-between gap-3 rounded-md border border-border px-3.5 py-3 transition-colors hover:bg-muted"
+              className="group flex items-center justify-between gap-3 rounded-md border border-border px-3.5 py-3 transition-[background-color,transform] duration-150 hover:bg-muted active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-colors"
             >
               <span className="flex flex-col">
                 <span className="text-xl font-semibold tabular-nums text-foreground">
-                  {item.count}
+                  <CountUp value={item.count} />
                   {item.capped ? '+' : ''}
                 </span>
                 <span className="text-sm text-muted-foreground">{item.label}</span>

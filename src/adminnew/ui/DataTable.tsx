@@ -172,7 +172,7 @@ export function DataTable<T>({
                 onKeyDown={(e) => onKey(e, row)}
                 className={cn(
                   'h-12 border-b border-[var(--admin-border)] last:border-b-0',
-                  onRowClick && 'cursor-pointer hover:bg-[var(--admin-surface-hover)] focus-visible:bg-[var(--admin-surface-hover)] focus-visible:outline-none',
+                  onRowClick && 'cursor-pointer transition-colors duration-150 hover:bg-[var(--admin-surface-hover)] focus-visible:bg-[var(--admin-surface-hover)] focus-visible:outline-none motion-reduce:transition-none',
                   isSel && 'bg-[var(--admin-surface-selected)] hover:bg-[var(--admin-surface-selected)]',
                 )}
               >
