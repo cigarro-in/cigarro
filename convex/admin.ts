@@ -301,3 +301,22 @@ export const listRecentOrders = query({
       .take(limit ?? 50);
   },
 });
+
+// Find one order by its five-digit customer-facing number (admin search).
+// Legacy rows without orderNumber are not findable here; search them by
+// displayOrderId in the client list instead.
+export const findOrderByNumber = query({
+  args: {
+    orgId: v.id("organizations"),
+    orderNumber: v.number(),
+  },
+  handler: async (ctx, { orgId, orderNumber }) => {
+    await requireOrgAdmin(ctx, orgId);
+    return await ctx.db
+      .query("orders")
+      .withIndex("by_org_order_number", (q) =>
+        q.eq("orgId", orgId).eq("orderNumber", orderNumber),
+      )
+      .first();
+  },
+});

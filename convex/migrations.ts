@@ -17,6 +17,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import { RENAME_MIGRATION } from "./lib/legacyOrg";
+import { genOrderNumberCandidate, isValidOrderNumber } from "./lib/ids";
 
 const MAX_RUNS = 5;
 const MAX_RESULT_CHARS = 2048;
@@ -117,6 +118,51 @@ interface Migration {
   run: (ctx: ActionCtx) => Promise<unknown>;
 }
 
+// One-off: give every order that predates the five-digit orderNumber a unique
+// (per org) number. Orders created since then already have one (allocated in
+// createOrder). Skips rows that already carry a valid number, so re-running is
+// a no-op. Single transaction per run; fine at current store sizes.
+export const backfillOrderNumbers = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ orgs: number; assigned: number }> => {
+    const orgs = await ctx.db.query("organizations").collect();
+    let assigned = 0;
+    for (const org of orgs) {
+      const orders = await ctx.db
+        .query("orders")
+        .withIndex("by_org_user", (q) => q.eq("orgId", org._id))
+        .collect();
+      const used = new Set<number>();
+      for (const o of orders) {
+        if (isValidOrderNumber(o.orderNumber)) used.add(o.orderNumber);
+      }
+      for (const o of orders) {
+        if (isValidOrderNumber(o.orderNumber)) continue;
+        let candidate = genOrderNumberCandidate();
+        let tries = 0;
+        while (used.has(candidate)) {
+          if (++tries > 1000) {
+            throw new Error(`ORDER_NUMBER_EXHAUSTED for org ${org._id}`);
+          }
+          candidate = genOrderNumberCandidate();
+        }
+        used.add(candidate);
+        await ctx.db.patch(o._id, { orderNumber: candidate });
+        assigned++;
+      }
+    }
+    return { orgs: orgs.length, assigned };
+  },
+});
+
+const backfillOrderNumbersRef = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  unknown
+>("migrations:backfillOrderNumbers");
+
+export const BACKFILL_ORDER_NUMBERS_MIGRATION = "backfillOrderNumbers-v1";
+
 // Only migrations that may still be needed. Finished one-offs are removed from
 // this list together with their functions. Add new entries here and delete the
 // function once it has run.
@@ -124,6 +170,10 @@ const MIGRATIONS: Migration[] = [
   {
     name: RENAME_MIGRATION,
     run: async (ctx) => await ctx.runMutation(renameLegacyOrgRef, {}),
+  },
+  {
+    name: BACKFILL_ORDER_NUMBERS_MIGRATION,
+    run: async (ctx) => await ctx.runMutation(backfillOrderNumbersRef, {}),
   },
 ];
 

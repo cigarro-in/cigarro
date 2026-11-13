@@ -17,6 +17,7 @@ import { adminAbsoluteUrl } from '../lib/paths';
 import { convexUrl } from '../../lib/convex/client';
 import { paiseToRupees } from '../../lib/convex/money';
 import { formatINR } from '../../utils/currency';
+import { orderNumberOf } from '../../../convex/lib/ids';
 
 // The browser knows the .cloud URL; the OAuth callback lives on .site.
 const GMAIL_CALLBACK_URL =
@@ -235,7 +236,10 @@ function OverviewTab(props: {
                   onClick={() => props.onOpenOrder(o._id)}
                 >
                   <div>
-                    <p className="font-mono text-sm">#{o.displayOrderId}</p>
+                    <p className="font-mono text-sm font-semibold">#{orderNumberOf(o) ?? o.displayOrderId}</p>
+                    {orderNumberOf(o) !== undefined && (
+                      <p className="font-mono text-[11px] text-muted-foreground">{o.displayOrderId}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {o.address?.name || 'Wallet load'} • {new Date(o._creationTime).toLocaleString()}
                     </p>

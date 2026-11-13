@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { collectInOrg } from "./lib/org";
 import { isLegacyOrg } from "./lib/legacyOrg";
+import { orderNumberOf } from "./lib/ids";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -101,6 +102,7 @@ export const getDashboardStats = query({
     const recentOrders = orders.slice(0, 5).map((o) => ({
       id: o._id,
       display_order_id: o.displayOrderId,
+      order_number: orderNumberOf(o),
       shipping_name: o.address?.name ?? "Guest",
       total: rupees(o.finalAmountPaise),
       status: o.shippingStatus ?? o.status,
@@ -237,6 +239,7 @@ export const getCustomerForAdmin = query({
       orders: orders.slice(0, 10).map((o) => ({
         id: o._id,
         display_order_id: o.displayOrderId,
+        order_number: orderNumberOf(o),
         total: rupees(o.finalAmountPaise),
         status: o.shippingStatus ?? o.status,
         created_at: o.createdAt,

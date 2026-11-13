@@ -16,6 +16,7 @@ import { dropRedirectForLivePath, recordSlugChange } from "./redirects";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
 import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
+import { orderNumberOf } from "./lib/ids";
 
 // ---------- Wave 5: catalog + content authorship (Supabase -> Convex) ----------
 // Catalog/content tables are ORG-SCOPED. Every read/write takes orgSlug,
@@ -345,7 +346,7 @@ async function collectImageUsage(
     if (count)
       push({
         kind: "order",
-        label: (o as any).displayOrderId ?? String((o as any)._id),
+        label: orderNumberOf(o as any) ? `Order ${orderNumberOf(o as any)}` : ((o as any).displayOrderId ?? String((o as any)._id)),
         detail: "item snapshot",
         mutable: false,
       }, count);

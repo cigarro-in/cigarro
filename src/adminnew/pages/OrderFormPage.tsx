@@ -25,6 +25,7 @@ import { PageHeader } from '../components/shared/PageHeader';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { paiseToRupees } from '../../lib/convex/money';
+import { orderNumberOf } from '../../../convex/lib/ids';
 
 type PaymentStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'late_paid' | 'refunded' | 'voided';
 type ShippingStatus = 'awaiting' | 'processing' | 'shipped' | 'delivered' | 'returned';
@@ -176,8 +177,8 @@ export function OrderFormPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <PageHeader
-        title={`Order #${order.displayOrderId}`}
-        description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()}`}
+        title={`Order #${orderNumberOf(order) ?? order.displayOrderId}`}
+        description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()} · ${order.displayOrderId}`}
         backUrl="/orders"
       >
         <Badge variant="secondary">

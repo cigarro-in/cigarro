@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from 'convex/react';
+import { useCallback, useMemo } from 'react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
@@ -199,3 +199,36 @@ export function useMyOrders(options: UseMyOrdersOptions = {}): UseMyOrdersResult
     isAuthed: !!user,
   };
 }
+
+export interface RetryOrderResult {
+  orderId: string;
+  displayOrderId: string;
+  orderNumber?: number;
+  upiUrl: string | null;
+  status: string;
+  reused: boolean;
+}
+
+// Retry a payment on an expired or cancelled order (server creates a fresh
+// order linked via retryOfOrderId). Only the data layer talks to Convex; the
+// caller decides what to do with the result (redirect to UPI, navigate). Throws
+// the Convex error unchanged so the view can map error codes.
+export function useRetryOrder(): (orderId: string) => Promise<RetryOrderResult> {
+  const { slug: orgSlug } = useOrgInfo();
+  const retryMutation = useMutation(api.orders.retryOrder);
+  return useCallback(
+    async (orderId: string) => {
+      const result = await retryMutation({ orgSlug, oldOrderId: orderId as any });
+      return {
+        orderId: String(result.orderId),
+        displayOrderId: result.displayOrderId,
+        orderNumber: (result as { orderNumber?: number }).orderNumber,
+        upiUrl: result.upiUrl ?? null,
+        status: result.status,
+        reused: Boolean((result as { reused?: boolean }).reused),
+      };
+    },
+    [orgSlug, retryMutation],
+  );
+}
+

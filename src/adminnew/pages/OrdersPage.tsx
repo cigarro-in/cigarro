@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Phone } from 'lucide-react';
+import { Phone, Copy } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { formatINR } from '../../utils/currency';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
@@ -12,6 +12,7 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { paiseToRupees } from '../../lib/convex/money';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { orderNumberOf } from '../../../convex/lib/ids';
 
 interface OrderItem {
   id: string;
@@ -33,6 +34,8 @@ const mapStatusToDisplay = (paymentStatus: string, shippingStatus?: string): Ord
 
 interface Order {
   id: string;
+  // Five-digit customer-facing number. Undefined on legacy rows (pre-backfill).
+  order_number?: number;
   display_order_id: string;
   user_id: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'returned' | 'cancelled' | 'expired' | 'refunded' | 'voided' | 'late_paid' | 'paid';
@@ -64,20 +67,30 @@ export function OrdersPage() {
     api.admin.listRecentOrders,
     org ? { orgId: org._id, limit: 100 } : 'skip',
   );
+  const [searchTerm, setSearchTerm] = useState('');
+  // Five-digit search: look the order up directly so it is found even when it
+  // is older than the 100 most recent rows loaded above.
+  const numericSearch = /^#?\d{5}$/.test(searchTerm.trim())
+    ? Number(searchTerm.trim().replace('#', ''))
+    : undefined;
+  const foundByNumber = useQuery(
+    api.admin.findOrderByNumber,
+    org && numericSearch !== undefined ? { orgId: org._id, orderNumber: numericSearch } : 'skip',
+  );
   const markPaid = useMutation(api.admin.markPaid);
   const voidOrder = useMutation(api.admin.voidOrder);
 
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? 'all');
-  const [searchTerm, setSearchTerm] = useState('');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const loading = convexOrders === undefined;
 
   const orders: Order[] = useMemo(() => {
     if (!convexOrders) return [];
-    return convexOrders.map((o: any): Order => ({
+    const toRow = (o: any): Order => ({
       id: o._id,
+      order_number: orderNumberOf(o),
       display_order_id: o.displayOrderId,
       user_id: o.userId,
       status: mapStatusToDisplay(o.status, o.shippingStatus),
@@ -105,8 +118,14 @@ export function OrdersPage() {
         product_name: it.name,
         variant_name: it.variantId,
       })),
-    }));
-  }, [convexOrders]);
+    });
+    const rows = convexOrders.map(toRow);
+    // Prepend a number-search hit that is not already in the recent list.
+    if (foundByNumber && !rows.some((r) => r.id === foundByNumber._id)) {
+      rows.unshift(toRow(foundByNumber));
+    }
+    return rows;
+  }, [convexOrders, foundByNumber]);
 
   const visibleOrders = useMemo(
     () => statusFilter === 'all' ? orders : orders.filter((order) =>
@@ -153,12 +172,10 @@ export function OrdersPage() {
 
   const columns = [
     {
-      key: 'display_order_id',
-      label: 'Order ID',
-      render: (displayId: string) => (
-        <div className="font-mono text-sm font-medium text-foreground">
-          #{displayId}
-        </div>
+      key: 'order_number',
+      label: 'Order',
+      render: (_value: number | undefined, order: Order) => (
+        <OrderNumberCell order={order} />
       )
     },
     {
@@ -271,7 +288,7 @@ export function OrdersPage() {
         <InlineStatus status={opStatus} />
         <DataTable
           data={visibleOrders}
-          searchText={(order) => [order.display_order_id, order.shipping_name, order.shipping_phone, order.status, order.payment_status, ...(order.order_items ?? []).map((item) => `${item.product_name} ${item.variant_name ?? ''}`)].join(' ')}
+          searchText={(order) => [order.order_number !== undefined ? String(order.order_number) : '', order.display_order_id, order.shipping_name, order.shipping_phone, order.status, order.payment_status, ...(order.order_items ?? []).map((item) => `${item.product_name} ${item.variant_name ?? ''}`)].join(' ')}
           columns={columns}
           loading={loading}
           selectedItems={selectedOrders}
@@ -280,6 +297,33 @@ export function OrdersPage() {
           searchTerm={searchTerm}
         />
       </div>
+    </div>
+  );
+}
+
+// Five-digit number is the primary label everywhere in admin. The internal
+// display id (ORD-...) stays as small copyable secondary text. Legacy rows
+// with no number fall back to the display id as the primary label.
+function OrderNumberCell({ order }: { order: Order }) {
+  const primary = order.order_number !== undefined ? `#${order.order_number}` : `#${order.display_order_id}`;
+  const copy = (value: string) => {
+    void navigator.clipboard?.writeText(value).catch(() => undefined);
+  };
+  return (
+    <div className="space-y-0.5">
+      <div className="font-mono text-sm font-semibold text-foreground">{primary}</div>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          copy(order.display_order_id);
+        }}
+        className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+        title="Copy internal order id"
+      >
+        {order.display_order_id}
+        <Copy className="h-3 w-3" aria-hidden="true" />
+      </button>
     </div>
   );
 }

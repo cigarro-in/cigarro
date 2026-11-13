@@ -35,6 +35,7 @@ import { switchAdminStore } from '../lib/adminAuth';
 
 interface RecentOrder {
   id: string;
+  orderNumber?: number;
   displayOrderId: string;
   customer: string;
   total: number;
@@ -181,6 +182,7 @@ export function DashboardPage() {
 
   const recentOrders: RecentOrder[] = (data?.recentOrders ?? []).map((order) => ({
     id: String(order.id),
+    orderNumber: order.order_number,
     displayOrderId: order.display_order_id,
     customer: order.shipping_name,
     total: order.total,
@@ -299,11 +301,11 @@ export function DashboardPage() {
                                   role="link"
                                   tabIndex={0}
                                   className="cursor-pointer"
-                                  aria-label={`Open order ${order.displayOrderId}`}
+                                  aria-label={`Open order ${order.orderNumber ?? order.displayOrderId}`}
                                   onClick={openOrder}
                                   onKeyDown={(event) => activateRow(event, openOrder)}
                                 >
-                                  <TableCell className="font-medium">#{order.displayOrderId}</TableCell>
+                                  <TableCell className="font-medium">#{order.orderNumber ?? order.displayOrderId}</TableCell>
                                   <TableCell>{order.customer || 'Guest'}</TableCell>
                                   <TableCell>
                                     <Badge variant={statusBadgeVariant(order.status)}>

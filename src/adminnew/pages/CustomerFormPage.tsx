@@ -27,6 +27,7 @@ interface Customer {
 
 interface CustomerOrder {
   id: string;
+  order_number?: number;
   display_order_id: string;
   total: number;
   status: string;
@@ -66,6 +67,7 @@ export function CustomerFormPage() {
     : null;
   const orders: CustomerOrder[] = (data?.orders || []).map((o: any) => ({
     id: String(o.id),
+    order_number: o.order_number,
     display_order_id: o.display_order_id,
     total: o.total,
     status: o.status,
@@ -166,8 +168,11 @@ export function CustomerFormPage() {
                   <button key={order.id} type="button" onClick={() => navigate(`/orders/${order.id}`)} className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div>
                       <div className="font-medium text-foreground">
-                        #{order.display_order_id}
+                        #{order.order_number ?? order.display_order_id}
                       </div>
+                      {order.order_number !== undefined && (
+                        <div className="font-mono text-[11px] text-muted-foreground">{order.display_order_id}</div>
+                      )}
                       <div className="text-sm text-muted-foreground">
                         {new Date(order.created_at).toLocaleDateString()} • {order.items_count} items
                       </div>
