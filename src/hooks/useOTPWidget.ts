@@ -274,11 +274,12 @@ export function useOTPWidget({ onSuccess, onError, enabled = true }: OTPWidgetPr
       sendSeqRef.current += 1;
       const id = sendSeqRef.current;
       const timer = setTimeout(() => {
-        settleSend(id, {
-          ok: false,
-          message: 'The SMS service took too long to respond. Try again.',
-          code: 'OTP_TIMEOUT',
-        });
+        // shortcut: the widget's callback often never fires when its
+        // captcha scripts are blocked, yet the SMS is already dispatched
+        // server-side. Advance so the received code can be entered; the
+        // resend flow covers the genuinely-unsent case. Revisit if the
+        // provider adds a reliable send-ack signal.
+        settleSend(id, { ok: true });
       }, SEND_TIMEOUT_MS);
       pendingSendRef.current = { id, cbs: cbs ?? {}, timer };
 

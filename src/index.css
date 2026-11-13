@@ -882,12 +882,10 @@ html {
 }
 
 /* ponytail: MSG91 injects an invisible-captcha badge (recaptcha/hcaptcha) that
-   floats bottom-right over product cards. Keep it in DOM for OTP, push it
-   behind everything so it never shows. Remove only if OTP provider changes. */
-.grecaptcha-badge,
-iframe[src*="recaptcha"],
-iframe[src*="hcaptcha"],
-h-captcha {
+   floats bottom-right over product cards. Hide ONLY the badge — the visible
+   challenge iframes must stay renderable, otherwise a triggered challenge
+   shows as a blank white box that blocks login. Remove only if OTP provider changes. */
+.grecaptcha-badge {
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
