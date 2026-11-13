@@ -159,3 +159,42 @@ export const removeDomainRef = makeFunctionReference<
   { saToken: string; domainId: Id<'orgDomains'> },
   Id<'orgDomains'>
 >('domains:removeDomain');
+
+// ---- Catalog import (convex/storeImport.ts). Batches are sent one at a time by StoreImportPage.
+import type {
+  BlogItem,
+  CategoryItem,
+  HeroSlideItem,
+  ProductItem,
+  SiteSettingsPatch,
+} from '../lib/storeImport/dukaan';
+
+export const importCategoriesRef = makeFunctionReference<
+  'mutation',
+  { saToken: string; orgId: Id<'organizations'>; items: CategoryItem[] },
+  { created: number; updated: number }
+>('storeImport:importCategories');
+export const importProductsRef = makeFunctionReference<
+  'mutation',
+  { saToken: string; orgId: Id<'organizations'>; items: ProductItem[] },
+  {
+    products: { created: number; updated: number };
+    variants: { created: number; updated: number };
+    links: number;
+  }
+>('storeImport:importProducts');
+export const importHeroSlidesRef = makeFunctionReference<
+  'mutation',
+  { saToken: string; orgId: Id<'organizations'>; items: HeroSlideItem[] },
+  { replaced: number; created: number }
+>('storeImport:importHeroSlides');
+export const importBlogPostsRef = makeFunctionReference<
+  'mutation',
+  { saToken: string; orgId: Id<'organizations'>; items: BlogItem[] },
+  { created: number; updated: number }
+>('storeImport:importBlogPosts');
+export const importSiteSettingsRef = makeFunctionReference<
+  'mutation',
+  { saToken: string; orgId: Id<'organizations'> } & SiteSettingsPatch,
+  { updated: boolean }
+>('storeImport:importSiteSettings');

@@ -9,6 +9,7 @@ import { StoresPage } from './pages/StoresPage';
 import { StoreDetailPage } from './pages/StoreDetailPage';
 import { PlatformConfigPage } from './pages/PlatformConfigPage';
 import { DomainsPage } from './pages/DomainsPage';
+import { StoreImportPage } from './pages/StoreImportPage';
 
 // Citadel super-admin app, mounted for admin.<root>/sa/*. No store is injected
 // (window.__ORG__ is null) and the page is never indexed.
@@ -34,6 +35,7 @@ export function SaApp() {
               <Route path="/sa" element={<Navigate to="/sa/stores" replace />} />
               <Route path="/sa/stores" element={<ErrorBoundary variant="inline"><StoresPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId" element={<ErrorBoundary variant="inline"><StoreDetailPage /></ErrorBoundary>} />
+              <Route path="/sa/stores/:orgId/import" element={<ErrorBoundary variant="inline"><StoreImportPage /></ErrorBoundary>} />
               <Route path="/sa/domains" element={<ErrorBoundary variant="inline"><DomainsPage /></ErrorBoundary>} />
               <Route path="/sa/platform" element={<ErrorBoundary variant="inline"><PlatformConfigPage /></ErrorBoundary>} />
             </Route>

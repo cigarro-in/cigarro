@@ -104,7 +104,10 @@ export function StoreDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/sa/stores" className="text-sm underline">Back to stores</Link>
+      <div className="flex gap-4 text-sm">
+        <Link to="/sa/stores" className="underline">Back to stores</Link>
+        <Link to={`/sa/stores/${orgId}/import`} className="underline">Import catalog (Dukaan)</Link>
+      </div>
       <h1 className="text-xl font-bold">
         {store?.name ?? 'Store'} <span className="font-mono text-sm text-muted-foreground">{store?.slug}</span>
       </h1>
