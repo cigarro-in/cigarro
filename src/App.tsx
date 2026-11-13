@@ -293,7 +293,7 @@ function AppContent({ helmetContext }: AppContentProps) {
 {isUserPage ? (
         ThemeLayout ? (
           <Suspense fallback={<LoadingSpinner />}>
-            <ThemeLayout storeName={store.name} logoUrl={store.brand.logoUrl} legalName={store.business.legalName || store.name}>
+            <ThemeLayout storeName={store.name} logoUrl={store.brand.logoUrl} brandColor={store.brand.brandColor} legalName={store.business.legalName || store.name}>
               <PageTransition>
                 <Suspense fallback={<LoadingSpinner />}>
                   <AppRoutes isAdminRoute={false} location={location} />

@@ -9,9 +9,26 @@ interface Props {
   storeName: string;
   logoUrl: string;
   legalName: string;
+  brandColor?: string;
 }
 
-export function VividShell({ children, storeName, logoUrl, legalName }: Props) {
+// Settings default for brand.brandColor (src/config/site.ts). A store that keeps
+// the default keeps vivid's own blue; any other valid color becomes the brand.
+const DEFAULT_SETTINGS_BRAND = '#8b4513';
+
+/** Scoped token overrides for a store's brand color. Pure: safe during SSR render. */
+export function vividBrandStyle(brandColor: string | undefined): Record<string, string> | undefined {
+  const c = (brandColor ?? '').trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(c) || c === DEFAULT_SETTINGS_BRAND) return undefined;
+  return {
+    '--vv-brand': c,
+    '--vv-brand-hover': c,
+    '--vv-brand-active': c,
+    '--vv-brand-soft': `color-mix(in srgb, ${c} 10%, #ffffff)`,
+  };
+}
+
+export function VividShell({ children, storeName, logoUrl, legalName, brandColor }: Props) {
   const { totalItems } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -31,7 +48,7 @@ export function VividShell({ children, storeName, logoUrl, legalName }: Props) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-background)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-background)', ...vividBrandStyle(brandColor) }}>
       <header className="sticky top-0 z-40 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
         <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
