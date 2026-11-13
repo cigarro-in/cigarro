@@ -8,7 +8,8 @@
          age gate overlay never flashes. Must stay before any stylesheet. -->
     <script>
       try {
-        if (localStorage.getItem('ageVerified') === 'true') document.documentElement.dataset.ageok = '1';
+        var ageOk = localStorage.getItem('ageVerified') === 'true' || /(?:^|;\s*)ageVerified=true(?:;|$)/.test(document.cookie);
+        if (ageOk) document.documentElement.dataset.ageok = '1';
       } catch (e) {
         // Storage blocked: the overlay renders and the app behaves as before.
       }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Check, Loader2, Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
 import { useCatalogProduct } from '../../hooks/data/useCatalog';
 import { useCart } from '../../hooks/useCart';
 import { useWishlist } from '../../hooks/useWishlist';
@@ -12,9 +11,11 @@ import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { productBreadcrumbs, productSeoProps } from '../../lib/seo/productSeo';
+import { sanitizeBlogBody } from '../../lib/blog/blogRender';
 import { getDefaultVariant, getVariantKey, resolveProductCanonical } from '../../lib/seo/productOffer';
 import { ProductReviews } from '../../components/products/ProductReviews';
 import type { ProductVariant } from '../../types/product';
+import { useActionFeedback } from './useActionFeedback';
 
 interface Details {
   id: string;
@@ -45,9 +46,9 @@ export default function VividProduct() {
   // Product + variants from the Convex catalog (preload-aware: same data on the
   // server render and the first client render). Derived, not effect-synced.
   const { product: catalogProduct, loading: catalogLoading } = useCatalogProduct(slug);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk, clear: clearOpStatus } = useInlineStatus({
-    okAutoDismissMs: 3000,
-  });
+  // Button-level feedback only (no notices): the Add button shows pending/done/error.
+  const addFeedback = useActionFeedback();
+  const wishFeedback = useActionFeedback();
 
   const data = catalogProduct && (catalogProduct as any).is_active !== false ? (catalogProduct as any) : null;
   const product = useMemo<Details | null>(
@@ -123,17 +124,17 @@ export default function VividProduct() {
   const images = selected?.images?.length ? selected.images : variants[0]?.images || [];
   const price = selected?.price || 0;
 
-  const handleAdd = async () => {
-    try {
-      if (selected) {
-        await addVariantToCart(product as any, selected, qty);
-      } else {
-        await addToCart(product as any, qty);
-      }
-      setOpOk(`${product.name} added to cart`);
-    } catch {
-      setOpError('Could not add to cart');
-    }
+  const handleAdd = () => {
+    if (addFeedback.busy) return;
+    void addFeedback.run(
+      () => (selected ? addVariantToCart(product as any, selected, qty) : addToCart(product as any, qty)),
+      'Could not add to cart',
+    );
+  };
+
+  const handleWishlist = () => {
+    if (wishFeedback.busy) return;
+    void wishFeedback.run(() => toggleWishlist(product.id), 'Could not update wishlist');
   };
 
   return (
@@ -224,12 +225,11 @@ export default function VividProduct() {
             </div>
           )}
 
-          <div className="mb-3"><InlineStatus status={opStatus} onDismiss={clearOpStatus} /></div>
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3 mb-1">
             <div className="inline-flex items-center bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full overflow-hidden">
               <button
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="w-10 h-10 grid place-items-center text-[var(--color-foreground)]"
+                className="w-11 h-11 grid place-items-center text-[var(--color-foreground)]"
                 aria-label="Decrease"
               >
                 <Minus className="w-4 h-4" />
@@ -237,7 +237,7 @@ export default function VividProduct() {
               <span className="w-8 text-center text-[var(--color-foreground)] font-semibold">{qty}</span>
               <button
                 onClick={() => setQty((q) => q + 1)}
-                className="w-10 h-10 grid place-items-center text-[var(--color-foreground)]"
+                className="w-11 h-11 grid place-items-center text-[var(--color-foreground)]"
                 aria-label="Increase"
               >
                 <Plus className="w-4 h-4" />
@@ -245,31 +245,54 @@ export default function VividProduct() {
             </div>
 
             <button
+              type="button"
               onClick={handleAdd}
-              disabled={isLoading}
-              className="flex-1 vv-btn-primary inline-flex items-center justify-center gap-2 h-11"
+              disabled={isLoading || addFeedback.busy}
+              aria-live="polite"
+              data-state={addFeedback.state}
+              className={`flex-1 vv-btn-primary inline-flex items-center justify-center gap-2 h-11 ${
+                addFeedback.state === 'done' ? '!bg-[var(--vv-success)] !border-[var(--vv-success)]' : ''
+              } ${addFeedback.state === 'error' ? '!bg-[var(--vv-danger)] !border-[var(--vv-danger)]' : ''}`}
             >
-              <ShoppingCart className="w-4 h-4" />
-              Add to Cart
+              {addFeedback.state === 'pending' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {addFeedback.state === 'done' && <Check className="w-4 h-4" strokeWidth={3} />}
+              {(addFeedback.state === 'idle' || addFeedback.state === 'error') && <ShoppingCart className="w-4 h-4" />}
+              {addFeedback.state === 'pending'
+                ? 'Adding...'
+                : addFeedback.state === 'done'
+                  ? 'Added to cart'
+                  : addFeedback.state === 'error'
+                    ? 'Try again'
+                    : 'Add to Cart'}
             </button>
 
             <button
-              onClick={() => toggleWishlist(product.id)}
-              className="w-11 h-11 rounded-full border border-[var(--color-border)] flex items-center justify-center text-[var(--color-foreground)] hover:border-[var(--color-primary)]"
-              aria-label="Wishlist"
+              type="button"
+              onClick={handleWishlist}
+              disabled={wishFeedback.busy}
+              aria-pressed={isWishlisted(product.id)}
+              className="w-11 h-11 shrink-0 rounded-full border border-[var(--color-border)] flex items-center justify-center text-[var(--color-foreground)] hover:border-[var(--color-primary)] disabled:opacity-60"
+              aria-label={isWishlisted(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
             >
               <Heart className={`w-4 h-4 ${isWishlisted(product.id) ? 'fill-[var(--color-primary)] text-[var(--color-primary)]' : ''}`} />
             </button>
           </div>
+          {(addFeedback.error || wishFeedback.error) && (
+            <p role="alert" className="mb-4 text-sm text-[var(--vv-danger)]">
+              {addFeedback.error || wishFeedback.error}
+            </p>
+          )}
 
           {product.description && (
             <div className="mt-8">
               <h3 className="text-sm uppercase tracking-wider text-[var(--color-muted-foreground)] font-semibold mb-2">
                 Description
               </h3>
-              <p className="text-[var(--color-foreground)] text-sm leading-relaxed whitespace-pre-line">
-                {product.description}
-              </p>
+              {/* Descriptions are HTML (cleaned on import) or legacy plain text; sanitizeBlogBody keeps only the allowlist. */}
+              <div
+                className={`text-[var(--color-foreground)] text-sm leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_li]:mb-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_strong]:font-semibold [&_a]:underline ${/<[a-z][\s\S]*>/i.test(product.description) ? '' : 'whitespace-pre-line'}`}
+                dangerouslySetInnerHTML={{ __html: sanitizeBlogBody(product.description) }}
+              />
             </div>
           )}
         </div>

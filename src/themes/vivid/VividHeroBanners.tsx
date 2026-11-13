@@ -32,7 +32,7 @@ export function VividHeroBanners({ slides = [], isLoading }: Props) {
         >
           <img src={s.mobile_image_url || s.image_url} alt={s.title} className="w-full h-full object-cover" />
           {(s.title || s.button_text) && (
-            <span className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/70 to-transparent text-white">
+            <span className="absolute inset-x-0 bottom-0 p-3 bg-black/60 text-white">
               {s.suptitle && <span className="block text-[11px] uppercase tracking-wider opacity-80">{s.suptitle}</span>}
               {s.title && <span className="block font-serif text-lg leading-tight">{s.title}</span>}
               {s.button_text && <span className="mt-1 inline-block text-xs font-medium uppercase tracking-wide underline underline-offset-4">{s.button_text}</span>}

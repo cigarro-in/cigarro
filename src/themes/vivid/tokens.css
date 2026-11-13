@@ -209,7 +209,7 @@
 
 /* Buttons */
 [data-theme="vivid"] .vv-btn {
-  --h: 40px;
+  --h: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -232,7 +232,7 @@
 [data-theme="vivid"] .vv-btn:active { transform: scale(0.98); }
 [data-theme="vivid"] .vv-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-[data-theme="vivid"] .vv-btn--sm { --h: 32px; padding: 0 var(--vv-space-3); font-size: var(--vv-text-xs); }
+[data-theme="vivid"] .vv-btn--sm { --h: 44px; padding: 0 var(--vv-space-3); font-size: var(--vv-text-xs); }
 [data-theme="vivid"] .vv-btn--lg { --h: 48px; padding: 0 var(--vv-space-6); font-size: var(--vv-text-base); }
 
 [data-theme="vivid"] .vv-btn-primary {
@@ -243,7 +243,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--vv-space-2);
-  height: 40px;
+  height: 44px;
   padding: 0 var(--vv-space-4);
   border-radius: var(--vv-radius-md);
   font-weight: 600;
@@ -282,20 +282,76 @@
   color: var(--vv-brand);
   border: 1px solid var(--vv-brand);
   border-radius: var(--vv-radius-sm);
-  padding: 5px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: var(--vv-tracking-wide);
   text-transform: uppercase;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  white-space: nowrap;
   transition: background-color var(--vv-duration-1) var(--vv-ease), color var(--vv-duration-1) var(--vv-ease);
 }
 [data-theme="vivid"] .vv-btn-add:hover {
   background: var(--vv-brand);
   color: var(--vv-brand-on);
+}
+[data-theme="vivid"] .vv-btn-add:disabled { cursor: progress; opacity: 0.8; }
+[data-theme="vivid"] .vv-btn-add--done {
+  background: var(--vv-success);
+  border-color: var(--vv-success);
+  color: #ffffff;
+}
+[data-theme="vivid"] .vv-btn-add--done:hover {
+  background: var(--vv-success);
+  color: #ffffff;
+}
+[data-theme="vivid"] .vv-btn-add--error {
+  background: var(--vv-danger-soft);
+  border-color: var(--vv-danger);
+  color: var(--vv-danger);
+}
+[data-theme="vivid"] .vv-btn-add--error:hover {
+  background: var(--vv-danger);
+  color: #ffffff;
+}
+
+/* Header icon buttons: 44px tap target */
+[data-theme="vivid"] .vv-icon-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vv-radius-md);
+  color: var(--vv-fg);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color var(--vv-duration-1) var(--vv-ease);
+}
+[data-theme="vivid"] .vv-icon-btn:hover { background: var(--vv-bg-inset); }
+[data-theme="vivid"] .vv-icon-btn[aria-expanded="true"] { background: var(--vv-bg-inset); }
+
+/* Cart count bump: re-keyed on every change of the count */
+[data-theme="vivid"] .vv-bump { animation: vv-bump 320ms var(--vv-ease-spring); }
+@keyframes vv-bump {
+  0% { transform: scale(0.5); }
+  100% { transform: scale(1); }
+}
+
+/* Inline error under a control (no popups) */
+[data-theme="vivid"] .vv-inline-error {
+  font-size: var(--vv-text-xs);
+  line-height: var(--vv-leading-snug);
+  color: var(--vv-danger);
 }
 
 /* Inputs */
@@ -497,14 +553,13 @@
 
 /* Skeleton */
 [data-theme="vivid"] .vv-skeleton {
-  background: linear-gradient(90deg, var(--vv-bg-inset) 0%, color-mix(in oklab, var(--vv-bg-inset) 60%, #fff) 50%, var(--vv-bg-inset) 100%);
-  background-size: 200% 100%;
-  animation: vv-shimmer 1.4s ease infinite;
+  background: var(--vv-bg-inset);
+  animation: vv-pulse 1.4s ease-in-out infinite;
   border-radius: var(--vv-radius-sm);
 }
-@keyframes vv-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes vv-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 /* Divider */

@@ -1,8 +1,13 @@
-import type { ReactNode } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, User, Grid3X3, Home, Package } from 'lucide-react';
+import { useCallback, useState, type ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Grid3X3, Home, Package, User } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth, useAuthDialog } from '../../hooks/useAuth';
+import { VividMobileHeader } from './VividMobileHeader';
+import { VividDesktopHeader } from './VividDesktopHeader';
+import { VividSearchBar } from './VividSearchBar';
+import { VividNavDrawer } from './VividNavDrawer';
+import { VividCartDrawer } from './VividCartDrawer';
 
 interface Props {
   children: ReactNode;
@@ -31,9 +36,16 @@ export function vividBrandStyle(brandColor: string | undefined): Record<string, 
 export function VividShell({ children, storeName, logoUrl, legalName, brandColor }: Props) {
   const { totalItems } = useCart();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { requestAuth } = useAuthDialog();
+  const [navOpen, setNavOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const closeNav = useCallback(() => setNavOpen(false), []);
+  const closeCart = useCallback(() => setCartOpen(false), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const toggleSearch = useCallback(() => setSearchOpen((open) => !open), []);
 
   const hideBottomNav =
     location.pathname.startsWith('/checkout') ||
@@ -41,64 +53,28 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
     location.pathname.startsWith('/desktop-checkout') ||
     location.pathname.startsWith('/transaction');
 
-  const onSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = new FormData(e.currentTarget).get('q')?.toString().trim();
-    if (q) navigate(`/products?search=${encodeURIComponent(q)}`);
+  const headerProps = {
+    storeName,
+    logoUrl,
+    cartCount: totalItems,
+    navOpen,
+    searchOpen,
+    onMenu: () => setNavOpen(true),
+    onSearch: toggleSearch,
+    onCart: () => setCartOpen(true),
   };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-background)', ...vividBrandStyle(brandColor) }}>
-      <header className="sticky top-0 z-40 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-        <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-4">
-          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
-            {logoUrl ? (
-                <img src={logoUrl} alt={storeName} width={36} height={36} className="h-9 w-9 object-contain" />
-              ) : (
-                <>
-                  <span className="w-9 h-9 rounded-full bg-[var(--color-foreground)] text-[var(--color-surface)] grid place-items-center text-sm font-black">
-                    {storeName.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="hidden sm:inline font-bold text-[var(--color-foreground)] tracking-tight">
-                    {storeName}
-                  </span>
-                </>
-              )}
-          </Link>
+      {/* Mobile and desktop headers are separate layouts, switched by CSS (md:). */}
+      <div className="sticky top-0 z-40">
+        <VividMobileHeader {...headerProps} />
+        <VividDesktopHeader {...headerProps} />
+        <VividSearchBar open={searchOpen} onClose={closeSearch} />
+      </div>
 
-          <form onSubmit={onSearchSubmit} className="flex-1 max-w-xl mx-auto">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-muted)]" />
-              <input
-                name="q"
-                placeholder="Search for products..."
-                className="w-full bg-[var(--color-surface-2)] border border-transparent rounded-lg pl-10 pr-4 h-10 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-muted)] focus:outline-none focus:bg-[var(--color-surface)] focus:border-[var(--color-primary)]"
-              />
-            </div>
-          </form>
-
-          <nav className="flex items-center gap-2 flex-shrink-0">
-            <HeaderLink to="/categories" icon={<Grid3X3 className="w-4 h-4" />} label="Categories" />
-            <HeaderLink
-              to="/cart"
-              icon={<ShoppingCart className="w-4 h-4" />}
-              label="Cart"
-              badge={totalItems}
-            />
-            {user ? (
-              <HeaderLink to="/profile" icon={<User className="w-4 h-4" />} label="Account" />
-            ) : (
-              <button
-                onClick={() => requestAuth()}
-                className="relative px-3 py-2 rounded-lg text-sm text-[var(--color-foreground)] hover:bg-[var(--color-surface-2)] flex items-center gap-2"
-              >
-                <User className="w-4 h-4" />
-                <span className="hidden md:inline">Sign in</span>
-              </button>
-            )}
-          </nav>
-        </div>
-      </header>
+      <VividNavDrawer open={navOpen} onClose={closeNav} storeName={storeName} logoUrl={logoUrl} />
+      <VividCartDrawer open={cartOpen} onClose={closeCart} />
 
       <main className={`flex-1 ${hideBottomNav ? '' : 'pb-20 md:pb-0'}`}>{children}</main>
 
@@ -168,39 +144,13 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
 function BottomButton({ onClick, icon, label }: { onClick: () => void; icon: ReactNode; label: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="flex flex-col items-center justify-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)]"
+      className="min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)]"
     >
       {icon}
       {label}
     </button>
-  );
-}
-
-function HeaderLink({
-  to,
-  icon,
-  label,
-  badge,
-}: {
-  to: string;
-  icon: ReactNode;
-  label: string;
-  badge?: number;
-}) {
-  return (
-    <Link
-      to={to}
-      className="relative px-3 py-2 rounded-lg text-sm text-[var(--color-foreground)] hover:bg-[var(--color-surface-2)] flex items-center gap-2"
-    >
-      {icon}
-      <span className="hidden md:inline">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[var(--color-primary)] text-white text-[10px] font-bold grid place-items-center">
-          {badge}
-        </span>
-      )}
-    </Link>
   );
 }
 
@@ -235,7 +185,7 @@ function BottomLink({
   return (
     <Link
       to={to}
-      className={`flex flex-col items-center justify-center gap-0.5 text-[10px] ${
+      className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] ${
         active ? 'text-[var(--color-primary)]' : 'text-[var(--color-muted-foreground)]'
       }`}
     >

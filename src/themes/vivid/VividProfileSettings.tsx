@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Loader2 } from 'lucide-react';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Check, Save, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { useActionFeedback } from './useActionFeedback';
 
 export function VividProfileSettings() {
   const { user } = useAuth();
@@ -12,8 +12,8 @@ export function VividProfileSettings() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [saving, setSaving] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const save = useActionFeedback();
+  const saving = save.busy;
 
   useEffect(() => {
     if (!user) {
@@ -24,20 +24,12 @@ export function VividProfileSettings() {
     setEmail(user.email || '');
   }, [user, navigate]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    setSaving(true);
-    try {
-      // Display name lives in Convex (Phase 1 spine) via useMyProfile. Email is read-only here (contact
-      // support to change), mirroring the classic settings page.
-      await updateDisplayName(name || undefined);
-      setOpOk('Profile updated');
-    } catch (err) {
-      setOpError(err instanceof Error ? err.message : 'Failed to update');
-    } finally {
-      setSaving(false);
-    }
+    if (!user || saving) return;
+    // Display name lives in Convex (Phase 1 spine) via useMyProfile. Email is read-only here (contact
+    // support to change), mirroring the classic settings page.
+    void save.run(() => updateDisplayName(name || undefined), 'Could not save. Try again.');
   };
 
   return (
@@ -51,7 +43,6 @@ export function VividProfileSettings() {
         </header>
 
         <form onSubmit={handleSave} className="vv-surface p-5 space-y-5">
-          <InlineStatus status={opStatus} />
           <div>
             <label className="vv-label">Name</label>
             <input
@@ -91,10 +82,22 @@ export function VividProfileSettings() {
             </p>
           </div>
 
-          <button type="submit" disabled={saving} className="vv-btn-primary w-full">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save changes
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              aria-live="polite"
+              className={`vv-btn-primary w-full ${save.state === 'done' ? '!bg-[var(--vv-success)] !border-[var(--vv-success)]' : ''} ${save.state === 'error' ? '!bg-[var(--vv-danger)] !border-[var(--vv-danger)]' : ''}`}
+            >
+              {save.state === 'pending' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {save.state === 'done' && <Check className="w-4 h-4" strokeWidth={3} />}
+              {(save.state === 'idle' || save.state === 'error') && <Save className="w-4 h-4" />}
+              {save.state === 'pending' ? 'Saving...' : save.state === 'done' ? 'Saved' : save.state === 'error' ? 'Try again' : 'Save changes'}
+            </button>
+            {save.error && (
+              <p role="alert" className="text-sm text-[var(--vv-danger)] text-center">{save.error}</p>
+            )}
+          </div>
         </form>
       </div>
     </>

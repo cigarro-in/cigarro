@@ -10,6 +10,21 @@ interface Props {
   siteName?: string;
 }
 
+// Same key the index.html inline script reads before first paint (data-ageok).
+const AGE_KEY = 'ageVerified';
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+/** Remember the confirmation for a year: localStorage plus a long-lived cookie. Never throws. */
+function rememberAgeVerified(): void {
+  writeStoredPreference(AGE_KEY, 'true');
+  try {
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${AGE_KEY}=true; Max-Age=${ONE_YEAR_SECONDS}; Path=/; SameSite=Lax${secure}`;
+  } catch {
+    // Cookies blocked: localStorage (above) still remembers the visitor.
+  }
+}
+
 export function VividAgeVerification({
   onVerify,
   ageGate = DEFAULT_AGE_GATE,
@@ -18,8 +33,9 @@ export function VividAgeVerification({
   const [confirming, setConfirming] = useState(false);
 
   const handleYes = () => {
+    if (confirming) return;
     setConfirming(true);
-    writeStoredPreference('ageVerified', 'true');
+    rememberAgeVerified();
     setTimeout(onVerify, 200);
   };
 
@@ -33,8 +49,8 @@ export function VividAgeVerification({
       style={{ background: '#0f0f12' }}
     >
       <div className="w-full max-w-md rounded-2xl overflow-hidden bg-white shadow-2xl">
-        <div className="h-1 w-full bg-gradient-to-r from-[#2563eb] via-[#1d4ed8] to-[#ff4b34]" />
-        <div className="p-7 text-center">
+        <div className="h-1 w-full bg-[#2563eb]" />
+        <div className="p-6 sm:p-7 text-center">
           <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#eff6ff] text-[#2563eb] grid place-items-center">
             <Cigarette className="w-6 h-6" />
           </div>
@@ -53,17 +69,19 @@ export function VividAgeVerification({
             per Indian law. By continuing you confirm you meet this requirement.
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
+              type="button"
               onClick={handleNo}
-              className="h-11 rounded-[10px] border border-[#e7e8ec] text-[#0f0f12] font-semibold text-sm hover:bg-[#f1f2f4] transition"
+              className="min-h-[44px] rounded-[10px] border border-[#e7e8ec] text-[#0f0f12] font-semibold text-sm hover:bg-[#f1f2f4] transition"
             >
               I'm under {ageGate.minAge}
             </button>
             <button
+              type="button"
               onClick={handleYes}
               disabled={confirming}
-              className="h-11 rounded-[10px] bg-[#2563eb] text-white font-semibold text-sm hover:bg-[#1d4ed8] active:scale-[0.98] transition-all"
+              className="min-h-[44px] rounded-[10px] bg-[#2563eb] text-white font-semibold text-sm hover:bg-[#1d4ed8] active:scale-[0.98] transition-all disabled:opacity-70"
             >
               Yes, I am {ageGate.minAge}+
             </button>
@@ -71,7 +89,7 @@ export function VividAgeVerification({
 
           <div className="mt-6 pt-5 border-t border-[#e7e8ec] flex items-center justify-center gap-2 text-[11px] text-[#8a8b95]">
             <ShieldCheck className="w-3.5 h-3.5" />
-            Your answer is stored locally only
+            Your answer is remembered on this device for a year
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-[#8a8b95]">
             Continuing confirms you are {ageGate.minAge}+ and accept our use of cookies.{' '}

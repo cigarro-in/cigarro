@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Pencil, Trash2, Check } from 'lucide-react';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Plus, MapPin, Pencil, Trash2, Check, Loader2 } from 'lucide-react';
+import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyAddresses } from '../../hooks/data/useMyAddresses';
 import { SEOHead } from '../../components/seo/SEOHead';
@@ -20,7 +20,8 @@ export function VividAddresses() {
   } = useMyAddresses();
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Address | null>(null);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const { status: opStatus, setError: setOpError, clear: clearOpStatus } = useInlineStatus();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -38,6 +39,7 @@ export function VividAddresses() {
 
   async function save(data: Address) {
     if (!user) return;
+    clearOpStatus();
     try {
       await storeSaveAddress({
         id: data.id,
@@ -55,22 +57,24 @@ export function VividAddresses() {
       setOpError('Failed to save');
       return;
     }
-    setOpOk(data.id ? 'Address updated' : 'Address added');
     await reloadStore();
     setView('list');
     setEditing(null);
   }
 
   async function remove(id?: string) {
-    if (!id || !user) return;
+    if (!id || !user || deletingId) return;
     if (!confirm('Delete this address?')) return;
+    clearOpStatus();
+    setDeletingId(id);
     try {
       await storeDeleteAddress(id);
     } catch {
-      setOpError('Failed to delete');
+      setOpError('Could not delete this address. Try again.');
       return;
+    } finally {
+      setDeletingId(null);
     }
-    setOpOk('Address deleted');
     reloadStore();
   }
 
@@ -160,17 +164,19 @@ export function VividAddresses() {
                         setEditing(a);
                         setView('form');
                       }}
-                      className="w-8 h-8 rounded-md text-[var(--vv-fg-muted)] hover:bg-[var(--vv-bg-inset)] grid place-items-center"
+                      className="w-11 h-11 rounded-md text-[var(--vv-fg-muted)] hover:bg-[var(--vv-bg-inset)] grid place-items-center"
                       aria-label="Edit"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => remove(a.id)}
-                      className="w-8 h-8 rounded-md text-[var(--vv-fg-muted)] hover:bg-[var(--vv-danger-soft)] hover:text-[var(--vv-danger)] grid place-items-center"
+                      disabled={deletingId !== null}
+                      className="w-11 h-11 rounded-md text-[var(--vv-fg-muted)] hover:bg-[var(--vv-danger-soft)] hover:text-[var(--vv-danger)] grid place-items-center disabled:opacity-50"
                       aria-label="Delete"
+                      aria-busy={deletingId === a.id}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deletingId === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>

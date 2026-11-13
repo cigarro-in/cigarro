@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Check, Loader2, Plus } from 'lucide-react';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { useCart } from '../../hooks/useCart';
 import type { HomepageProduct } from '../../types/home';
+import { useActionFeedback } from './useActionFeedback';
 
 interface Props {
   product: HomepageProduct;
@@ -15,9 +15,7 @@ const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export function VividProductCard({ product, listName = 'products' }: Props) {
   const { addToCart } = useCart();
-  const { status: opStatus, setError: setOpError, setOk: setOpOk, clear: clearOpStatus } = useInlineStatus({
-    okAutoDismissMs: 3000,
-  });
+  const add = useActionFeedback();
 
   const defaultVariant =
     product.product_variants?.find((v) => v.is_default) ||
@@ -31,24 +29,22 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
       ? Math.round(((comparePrice - price) / comparePrice) * 100)
       : 0;
 
-  const handleAdd = async (e: React.MouseEvent) => {
+  const handleAdd = (e: React.MouseEvent) => {
+    // The whole card is a link: the add button must not navigate.
     e.preventDefault();
     e.stopPropagation();
-    try {
-      await addToCart(product as any, 1, defaultVariant?.id);
-      setOpOk(`${product.name} added`);
-    } catch {
-      setOpError('Could not add to cart');
-    }
+    if (add.busy) return;
+    void add.run(() => addToCart(product as any, 1, defaultVariant?.id), 'Could not add');
   };
 
+  const label =
+    add.state === 'pending' ? 'Adding' : add.state === 'done' ? 'Added' : add.state === 'error' ? 'Retry' : 'Add';
+
   return (
-    <>
-      <InlineStatus status={opStatus} onDismiss={clearOpStatus} />
     <Link
       to={`/product/${product.slug}`}
       onClick={() => trackSelectItem(product, listName)}
-      className="vv-card flex items-center gap-4 p-3"
+      className="vv-card flex items-center gap-3 sm:gap-4 p-3"
     >
       <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-[var(--color-surface-2)] flex-shrink-0">
         <img
@@ -64,7 +60,7 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
         <h3 className="text-[var(--color-foreground)] font-semibold text-sm leading-snug line-clamp-2">
           {product.name}
         </h3>
-        <div className="mt-1.5 flex items-baseline gap-2">
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
           <span className="text-[var(--color-foreground)] font-bold text-[15px]">
             ₹{formatPrice(price)}
           </span>
@@ -76,11 +72,26 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
         </div>
       </div>
 
-      <button onClick={handleAdd} className="vv-btn-add flex-shrink-0">
-        Add
-        <Plus className="w-3 h-3" strokeWidth={2.5} />
-      </button>
+      <div className="flex flex-col items-end gap-1 flex-shrink-0 max-w-[104px]">
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={add.busy}
+          aria-live="polite"
+          data-state={add.state}
+          className={`vv-btn-add ${add.state === 'done' ? 'vv-btn-add--done' : ''} ${add.state === 'error' ? 'vv-btn-add--error' : ''}`}
+        >
+          {add.state === 'pending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {add.state === 'done' && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+          {(add.state === 'idle' || add.state === 'error') && <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />}
+          {label}
+        </button>
+        {add.error && (
+          <span role="alert" className="text-[11px] leading-tight text-[var(--vv-danger)] text-right">
+            {add.error}
+          </span>
+        )}
+      </div>
     </Link>
-    </>
   );
 }

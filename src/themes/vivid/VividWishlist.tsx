@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Trash2 } from 'lucide-react';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Check, Heart, Loader2, Trash2 } from 'lucide-react';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { VividProductCard } from './VividProductCard';
 import type { HomepageProduct } from '../../types/home';
+import { useActionFeedback } from './useActionFeedback';
 
 export function VividWishlist() {
   const { wishlistItems, clearWishlist } = useWishlist();
@@ -14,7 +14,7 @@ export function VividWishlist() {
   const [loading, setLoading] = useState(true);
   // Wave 3: wishlist rows from the Convex catalog (same shapes).
   const { products: catalogProducts, loading: catalogLoading } = useFullCatalog();
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const clearFeedback = useActionFeedback();
 
   useEffect(() => {
     if (catalogLoading) return;
@@ -41,14 +41,9 @@ export function VividWishlist() {
     setLoading(false);
   }, [wishlistItems, catalogProducts, catalogLoading]);
 
-  const handleClear = async () => {
-    if (!confirm('Clear your entire wishlist?')) return;
-    try {
-      await clearWishlist();
-      setOpOk('Wishlist cleared');
-    } catch {
-      setOpError('Failed to clear wishlist');
-    }
+  const handleClear = () => {
+    if (clearFeedback.busy || !confirm('Clear your entire wishlist?')) return;
+    void clearFeedback.run(() => clearWishlist(), 'Could not clear wishlist');
   };
 
   return (
@@ -66,14 +61,31 @@ export function VividWishlist() {
             </p>
           </div>
           {products.length > 0 && (
-            <button onClick={handleClear} className="vv-btn vv-btn-outline vv-btn--sm text-[var(--vv-danger)]">
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Clear all</span>
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={clearFeedback.busy}
+                aria-live="polite"
+                className={`vv-btn vv-btn-outline text-[var(--vv-danger)] ${clearFeedback.state === 'done' ? '!text-[var(--vv-success)]' : ''}`}
+              >
+                {clearFeedback.state === 'pending' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : clearFeedback.state === 'done' ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>
+                  {clearFeedback.state === 'pending' ? 'Clearing...' : clearFeedback.state === 'done' ? 'Cleared' : clearFeedback.state === 'error' ? 'Try again' : 'Clear all'}
+                </span>
+              </button>
+              {clearFeedback.error && (
+                <span role="alert" className="text-xs text-[var(--vv-danger)]">{clearFeedback.error}</span>
+              )}
+            </div>
           )}
         </header>
-
-        <InlineStatus status={opStatus} />
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
