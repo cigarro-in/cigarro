@@ -18,6 +18,7 @@ import {
   Settings,
   ShoppingCart,
   ArrowRightLeft,
+  Gauge,
   Star,
   Tags,
   Users,
@@ -105,7 +106,10 @@ export const ADMIN_NAVIGATION: NavSection[] = [
   },
   {
     label: 'SEO',
-    items: [{ label: 'Redirects', path: '/seo/redirects', icon: ArrowRightLeft }],
+    items: [
+      { label: 'SEO health', path: '/seo', icon: Gauge },
+      { label: 'Redirects', path: '/seo/redirects', icon: ArrowRightLeft },
+    ],
   },
 ];
 

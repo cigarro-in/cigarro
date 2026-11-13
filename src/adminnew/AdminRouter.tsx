@@ -29,6 +29,7 @@ import {
   InvoicesPage,
   InvoiceFormPage,
   RedirectsPage,
+  SeoHealthPage,
 } from './pages';
 
 /**
@@ -52,6 +53,7 @@ export const ADMIN_ROUTES = [
   { path: '/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
   { path: '/reviews', element: ReviewsPage, label: 'Reviews', section: 'platform' },
   { path: '/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
+  { path: '/seo', element: SeoHealthPage, label: 'SEO health', section: 'seo' },
   { path: '/seo/redirects', element: RedirectsPage, label: 'Redirects', section: 'seo' },
   { path: '/settings', element: SettingsPage, label: 'Settings', section: 'platform' },
   { path: '/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },

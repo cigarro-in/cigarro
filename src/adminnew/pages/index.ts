@@ -21,6 +21,7 @@ export { InventoryPage } from './InventoryPage';
 export { InvoicesPage } from './InvoicesPage';
 export { MarketingPage } from './MarketingPage';
 export { RedirectsPage } from './RedirectsPage';
+export { SeoHealthPage } from './SeoHealthPage';
 
 // Form pages
 export { ProductFormPage } from './ProductFormPage';
