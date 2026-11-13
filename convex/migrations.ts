@@ -1,39 +1,32 @@
-// One-time data migrations, run automatically by the "run pending migrations"
-// cron (convex/crons.ts) every 10 minutes. Each migration is recorded in the
-// `migrations` table; a migration marked "done" is never run again. A failing
-// migration is retried on later ticks, up to MAX_RUNS attempts.
+// One-time data migrations. Each migration is recorded in the `migrations`
+// table; a migration marked "done" is never run again. A failing migration is
+// retried on later runs, up to MAX_RUNS attempts.
 //
-// Internal only. Inspect progress from the super-admin Platform Config page
-// (platform:listMigrations).
+// Runs only when explicitly triggered, never on a cron:
+//   - dev:   npx convex run migrations:runPending
+//   - prod:  super-admin "Run pending migrations" button on the Platform Config
+//            page (platform:runPendingMigrations, requires a write window).
+// Inspect progress via platform:listMigrations.
 
 import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
-import { internal } from "./_generated/api";
 import {
   internalAction,
   internalMutation,
   internalQuery,
   type ActionCtx,
 } from "./_generated/server";
-import { LEGACY_ORG_SLUG, RENAME_MIGRATION } from "./lib/legacyOrg";
+import { RENAME_MIGRATION } from "./lib/legacyOrg";
 
 const MAX_RUNS = 5;
 const MAX_RESULT_CHARS = 2048;
 
 // Modules absent from the generated api.d.ts until codegen runs; referenced by path.
-const seedDomainsRef = makeFunctionReference<"mutation", Record<string, never>, unknown>(
-  "domains:seedLegacyDomains",
-);
 const renameLegacyOrgRef = makeFunctionReference<
   "mutation",
   Record<string, never>,
   unknown
 >("organizations:renameLegacyOrgSlug");
-const cleanupCanonicalUrlsRef = makeFunctionReference<
-  "mutation",
-  { orgSlug: string; dryRun: boolean },
-  unknown
->("maintenance:cleanupCanonicalUrls");
 const listRowsRef = makeFunctionReference<
   "query",
   Record<string, never>,
@@ -124,52 +117,13 @@ interface Migration {
   run: (ctx: ActionCtx) => Promise<unknown>;
 }
 
-// Order matters: later migrations may depend on earlier ones. The slug rename
-// goes first so every later step (and every org-slug lookup) sees the final slug.
+// Only migrations that may still be needed. Finished one-offs are removed from
+// this list together with their functions. Add new entries here and delete the
+// function once it has run.
 const MIGRATIONS: Migration[] = [
   {
     name: RENAME_MIGRATION,
     run: async (ctx) => await ctx.runMutation(renameLegacyOrgRef, {}),
-  },
-  {
-    name: "backfillUserOrgs-v1",
-    run: async (ctx) => {
-      let cursor: string | null = null;
-      let patched = 0;
-      let pages = 0;
-      for (;;) {
-        const page: {
-          patched: number;
-          isDone: boolean;
-          continueCursor: string;
-        } = await ctx.runMutation(internal.userState.backfillUserOrgs, {
-          orgSlug: LEGACY_ORG_SLUG,
-          cursor,
-        });
-        patched += page.patched;
-        pages += 1;
-        if (page.isDone) break;
-        cursor = page.continueCursor;
-      }
-      return { patched, pages };
-    },
-  },
-  {
-    name: "migrateLegacyGmail-v1",
-    // Fails (and is retried) if GMAIL_TOKEN_KEY is not set.
-    run: async (ctx) => await ctx.runAction(internal.gmail.migrateLegacyGmail, {}),
-  },
-  {
-    name: "seedSmokeshopDomains-v1",
-    run: async (ctx) => await ctx.runMutation(seedDomainsRef, {}),
-  },
-  {
-    name: "cleanupCanonicalUrls-v1",
-    run: async (ctx) =>
-      await ctx.runMutation(cleanupCanonicalUrlsRef, {
-        orgSlug: LEGACY_ORG_SLUG,
-        dryRun: false,
-      }),
   },
 ];
 

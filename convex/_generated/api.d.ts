@@ -37,7 +37,6 @@ import type * as lib_pollSchedule from "../lib/pollSchedule.js";
 import type * as lib_upi from "../lib/upi.js";
 import type * as marketing from "../marketing.js";
 import type * as orders from "../orders.js";
-import type * as orgBackfill from "../orgBackfill.js";
 import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
 import type * as referrals from "../referrals.js";
@@ -81,7 +80,6 @@ declare const fullApi: ApiFromModules<{
   "lib/upi": typeof lib_upi;
   marketing: typeof marketing;
   orders: typeof orders;
-  orgBackfill: typeof orgBackfill;
   organizations: typeof organizations;
   payments: typeof payments;
   referrals: typeof referrals;

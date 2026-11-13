@@ -13,7 +13,7 @@ import {
   query,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Phase 1: user state (cart, wishlist, profiles, addresses) ----------
 // Identity: identity.subject (Supabase sub today; stable string carried
@@ -195,38 +195,6 @@ export const resolvePhoneIdentity = internalMutation({
 function legacyUserRow(rows: Doc<"users">[]) {
   return rows.find((r) => r.orgId === undefined) ?? null;
 }
-
-// One-time, resumable backfill: stamps orgId = the legacy org on every users row
-// that predates per-store accounts. Paginates the undefined-orgId partition of
-// by_org_phone with a cursor; patched rows leave that partition, and the cursor
-// never revisits them, so repeat calls converge. Run it until isDone is true.
-//   npx convex run userState:backfillUserOrgs '{"orgSlug":"oldsmokeshop"}'
-//   npx convex run userState:backfillUserOrgs '{"orgSlug":"oldsmokeshop","cursor":"<continueCursor>"}'
-export const backfillUserOrgs = internalMutation({
-  args: {
-    orgSlug: v.string(),
-    cursor: v.optional(v.union(v.string(), v.null())),
-    batchSize: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    if (args.orgSlug !== LEGACY_ORG_SLUG)
-      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_LEGACY_ORG" });
-    const org = await resolveOrg(ctx, args.orgSlug);
-    const numItems = Math.max(1, Math.min(args.batchSize ?? 200, 500));
-    const page = await ctx.db
-      .query("users")
-      .withIndex("by_org_phone", (q) => q.eq("orgId", undefined))
-      .paginate({ cursor: args.cursor ?? null, numItems });
-    for (const row of page.page) {
-      await ctx.db.patch(row._id, { orgId: org._id });
-    }
-    return {
-      patched: page.page.length,
-      isDone: page.isDone,
-      continueCursor: page.continueCursor,
-    };
-  },
-});
 
 export const upsertUser = mutation({
   args: {

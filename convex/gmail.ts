@@ -14,7 +14,7 @@ import {
   requireOrgAdmin,
   safeReturnTo,
 } from "./lib/auth";
-import { decryptSecret, encryptSecret } from "./lib/crypto";
+import { decryptSecret } from "./lib/crypto";
 import { mergeSenders } from "./appConfig";
 import {
   buildOrderPollOffsets,
@@ -629,68 +629,6 @@ export const notePollResult = internalMutation({
       if (conn.status !== "needs_reconnect") patch.lastError = undefined;
     }
     await ctx.db.patch(conn._id, patch);
-  },
-});
-
-// One-time migration from the legacy single-slot appConfig token. Encrypts the
-// token (appConfig.gmailRefreshToken, or env GMAIL_REFRESH_TOKEN if that is
-// unset) into gmailConnections for appConfig.gmailOrgId, then clears the
-// plaintext appConfig field. Idempotent: an existing org row is not overwritten.
-export const migrateLegacyGmail = internalAction({
-  args: {},
-  handler: async (ctx): Promise<any> => {
-    const legacy: any = await ctx.runQuery(internal.gmail.getLegacyGmail, {});
-    const refreshToken =
-      legacy?.refreshToken ?? process.env.GMAIL_REFRESH_TOKEN ?? null;
-    if (!refreshToken) return { migrated: false, reason: "no legacy token" };
-    if (!legacy?.orgId)
-      return { migrated: false, reason: "appConfig.gmailOrgId not set" };
-    const refreshTokenEnc = await encryptSecret(refreshToken);
-    return await ctx.runMutation(internal.gmail.finishLegacyMigration, {
-      orgId: legacy.orgId,
-      refreshTokenEnc,
-      accountEmail: legacy.accountEmail ?? "",
-    });
-  },
-});
-
-export const getLegacyGmail = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const cfg = await getConfig(ctx);
-    return {
-      refreshToken: cfg?.gmailRefreshToken ?? null,
-      orgId: cfg?.gmailOrgId ?? null,
-      accountEmail: cfg?.gmailAccountEmail ?? null,
-    };
-  },
-});
-
-export const finishLegacyMigration = internalMutation({
-  args: {
-    orgId: v.id("organizations"),
-    refreshTokenEnc: v.string(),
-    accountEmail: v.string(),
-  },
-  handler: async (ctx, { orgId, refreshTokenEnc, accountEmail }) => {
-    const now = Date.now();
-    const existing = await getConnection(ctx, orgId);
-    if (!existing) {
-      await ctx.db.insert("gmailConnections", {
-        orgId,
-        accountEmail,
-        refreshTokenEnc,
-        status: "active",
-        connectedBy: "legacy-migration",
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-    const cfg = await getConfig(ctx);
-    if (cfg?.gmailRefreshToken) {
-      await ctx.db.patch(cfg._id, { gmailRefreshToken: undefined, updatedAt: now });
-    }
-    return { migrated: !existing };
   },
 });
 

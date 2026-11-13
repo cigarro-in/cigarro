@@ -434,15 +434,15 @@ export default defineSchema({
     key: v.string(),
     bankSenders: v.optional(v.array(v.string())), // e.g. ["@hdfcbank.bank.in", "@icicibank.com"]
     // Gmail: DORMANT legacy single-slot fields. Connections are per store now
-    // (gmailConnections). gmailRefreshToken is cleared by
-    // gmail.migrateLegacyGmail; the other gmail* fields are kept (optional)
+    // (gmailConnections). gmailRefreshToken is no longer read (its one-time
+    // migration was removed); the other gmail* fields are kept (optional)
     // so old rows validate. Platform bank-sender allowlist (bankSenders) stays live.
     gmailPollEnabled: v.optional(v.boolean()),
     gmailQuery: v.optional(v.string()),
     gmailOrgId: v.optional(v.id("organizations")),
     gmailLastPollAt: v.optional(v.number()),
     gmailLastError: v.optional(v.string()),
-    // Legacy plaintext refresh token. Cleared by migrateLegacyGmail.
+    // Legacy plaintext refresh token. No longer read; kept so old rows validate.
     gmailRefreshToken: v.optional(v.string()),
     gmailAccountEmail: v.optional(v.string()),
     // Pending OAuth handshake (single-use, 10-min expiry).
@@ -621,8 +621,8 @@ export default defineSchema({
     // Stable identity, shared across auth providers. Unique per (store, phone):
     // the same phone shopping two stores gets two rows with two userIds.
     userId: v.string(),
-    // Owning store. Optional only until backfillUserOrgs has run; legacy rows
-    // without it belong to the legacy org.
+    // Owning store. Optional: legacy rows created before per-store accounts
+    // have no orgId and belong to the legacy org.
     orgId: v.optional(v.id("organizations")),
     phone: v.optional(v.string()), // E.164, e.g. +919876543210
     name: v.optional(v.string()),

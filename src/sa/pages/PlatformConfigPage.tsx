@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
 import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
 import { api } from '../../../convex/_generated/api';
 import { useSa } from '../SuperGate';
 import { saErrorMessage } from '../session';
-import { listMigrationsRef } from '../refs';
+import { listMigrationsRef, runPendingMigrationsRef } from '../refs';
 
 // Moved from the store admin Payments page (Platform Config card). Platform-wide
 // bank-alert senders shared by every store.
@@ -15,7 +15,10 @@ export function PlatformConfigPage() {
   const appConfig = useQuery(api.appConfig.get, { saToken: token });
   const setAppConfig = useMutation(api.appConfig.set);
   const migrations = useQuery(listMigrationsRef, { saToken: token });
+  const runPendingMigrations = useAction(runPendingMigrationsRef);
   const status = useInlineStatus();
+  const migrationStatus = useInlineStatus();
+  const [running, setRunning] = useState(false);
   const [csv, setCsv] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -41,6 +44,23 @@ export function PlatformConfigPage() {
       status.setError(saErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onRunMigrations = async () => {
+    setRunning(true);
+    migrationStatus.clear();
+    try {
+      const summary = await runPendingMigrations({ saToken: token });
+      const entries = Object.entries(summary);
+      const text = entries.length === 0
+        ? 'No migrations pending.'
+        : entries.map(([name, result]) => `${name}: ${result}`).join('; ');
+      migrationStatus.setOk(text);
+    } catch (err) {
+      migrationStatus.setError(saErrorMessage(err));
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -81,8 +101,14 @@ export function PlatformConfigPage() {
       <div className="rounded-xl border p-4 space-y-3">
         <p className="text-sm font-semibold">One-time migrations</p>
         <p className="text-xs text-muted-foreground">
-          Run automatically every 10 minutes until done. Failed rows retry up to 5 runs.
+          Runs only when you press the button. Done rows are never re-run. Failed rows retry up to 5 runs.
         </p>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => void onRunMigrations()} disabled={!writeOpen || running}>
+            {running ? 'Running...' : 'Run pending migrations'}
+          </Button>
+        </div>
+        <InlineStatus status={migrationStatus.status} />
         {migrations === undefined ? (
           <p className="text-sm text-muted-foreground">Loading...</p>
         ) : migrations.length === 0 ? (

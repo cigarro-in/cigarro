@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { makeFunctionReference } from "convex/server";
+import { action, internalMutation, mutation, query } from "./_generated/server";
 import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { normalizePhoneE164 } from "./lib/phone";
@@ -44,6 +45,43 @@ export const listMigrations = query({
         updatedAt: r.updatedAt,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+// Manual trigger for the migration runner (convex/migrations.ts). Only the
+// internal runner is referenced by path (generated api.d.ts omits this module).
+const runPendingRef = makeFunctionReference<
+  "action",
+  Record<string, never>,
+  Record<string, string>
+>("migrations:runPending");
+const authorizeMigrationRunRef = makeFunctionReference<
+  "mutation",
+  { saToken: string },
+  null
+>("platform:authorizeMigrationRun");
+
+// Write-gated and audited check, run before the action starts the runner.
+export const authorizeMigrationRun = internalMutation({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    const sa = await requireSaWrite(ctx, saToken);
+    await audit(ctx, {
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
+      action: "platform.migrations.run",
+      targetType: "migrations",
+      targetId: "pending",
+    });
+    return null;
+  },
+});
+
+export const runPendingMigrations = action({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }): Promise<Record<string, string>> => {
+    await ctx.runMutation(authorizeMigrationRunRef, { saToken });
+    return await ctx.runAction(runPendingRef, {});
   },
 });
 

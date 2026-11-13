@@ -42,6 +42,11 @@ export const listMigrationsRef = makeFunctionReference<
   { saToken: string },
   MigrationRow[]
 >('platform:listMigrations');
+export const runPendingMigrationsRef = makeFunctionReference<
+  'action',
+  { saToken: string },
+  Record<string, string>
+>('platform:runPendingMigrations');
 
 export const listStoresRef = makeFunctionReference<'query', { saToken: string }, StoreRow[]>(
   'platform:listStores',
