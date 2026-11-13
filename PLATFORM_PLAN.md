@@ -31,6 +31,13 @@ Status: updated 2026-11-13. Keep this file short; move detail into code comments
 6. Remove the bot-only renderer `functions/ssr-middleware.js` once every route is in `SSR_ROUTES`.
 7. Cache purge on admin edits.
 8. Environment consolidation (drop the `VITE_ORG_SLUG` fallback).
+9. Order id migration: backend uses the Convex `_id` for everything (links, payment matching, references); the frontend shows only the 5-digit order number. Retire the `ORD-YYMMDD-xxxxx` id (`convex/lib/ids.ts`) with a migration and redirects for old customer order links.
+10. Store modules: a super-admin page that turns modules (invoices, inventory, marketing, ...) on or off per store, enforced in the backend and the admin nav. Invoices stay hidden until then.
+11. Customer-specific discounts (if not shipped in the admin revamp).
+12. Referral reward expiry is stored but not enforced.
+13. Soft-404s: unknown storefront paths render the home page for browsers (bots get a real 404).
+14. Bank SMS relay: an Android app (or an existing SMS-forwarder app) that relays bank credit SMS to the store's bank inbox, as a fallback when the Gmail route is unreliable. Research existing apps first.
+15. Platform fees: prepaid wallet vs postpaid billing, shown in the payments statement (`kind: 'fee'` is already reserved).
 
 SEO open items (canonical mismatches on three product slugs, etc.) are tracked in `SEO_CURRENT_STATE.md`.
 
