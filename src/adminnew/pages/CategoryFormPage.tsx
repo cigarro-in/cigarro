@@ -1,382 +1,311 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, FolderTree, Trash2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { Switch } from '../../components/ui/switch';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
-import { ProductSelector } from '../components/shared/ProductSelector';
-import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
-import { PageHeader } from '../components/shared/PageHeader';
-import { useQuery, useMutation } from 'convex/react';
+import { FolderTree } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
+import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { ProductMembers, useCatalogProducts } from '../features/catalog/ProductMembers';
+import {
+  CatalogThumb,
+  DisclosureCard,
+  Field,
+  SaveBar,
+  catalogError,
+  useFormBaseline,
+} from '../features/catalog/catalogShared';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Label,
+  Page,
+  PageLayout,
+  Skeleton,
+  SkeletonText,
+  Switch,
+  Textarea,
+  useButtonFeedback,
+} from '../ui';
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  image: string | null;
-  is_active: boolean;
-  created_at: string;
-  meta_title?: string;
-  meta_description?: string;
-}
+const LIST = '/categories';
 
-interface CategoryFormData {
+interface CategoryForm {
   name: string;
   slug: string;
   description: string;
-  image: string[];
-  meta_title: string;
-  meta_description: string;
+  image: string | null;
+  isActive: boolean;
+  seoTitle: string;
+  seoDescription: string;
+  productIds: string[];
 }
 
 export function CategoryFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = !!id;
+  const isEdit = !!id;
 
-  const [loading, setLoading] = useState(isEditMode);
-  const [saving, setSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-
-  const [formData, setFormData] = useState<CategoryFormData>({
-    name: '',
-    slug: '',
-    description: '',
-    image: [],
-    meta_title: '',
-    meta_description: ''
-  });
-
-  const categoryRows = useQuery(api.adminCatalog.listCategoriesForAdmin, { orgSlug: ORG_SLUG });
+  const rows = useQuery(api.adminCatalog.listCategoriesForAdmin, { orgSlug: ORG_SLUG });
   const createCategory = useMutation(api.adminCatalog.createCategory);
   const updateCategory = useMutation(api.adminCatalog.updateCategory);
   const removeCategory = useMutation(api.adminCatalog.deleteCategory);
   const linkProducts = useMutation(api.adminCatalog.setCategoryProducts);
-  const populatedRef = useRef(false);
+  const setActive = useMutation(api.adminCatalog.setCategoriesActive);
+  const products = useCatalogProducts();
+
+  const source: any = isEdit ? rows?.find((c: any) => c.supabaseId === id) : undefined;
+  const notFound = isEdit && rows !== undefined && !source;
+  const ready = rows !== undefined && !notFound;
+
+  const [form, setForm] = useState<CategoryForm | null>(null);
+  const [slugTouched, setSlugTouched] = useState(isEdit);
+  const [attempted, setAttempted] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const save = useButtonFeedback();
+  const { base, dirty, rebaseline } = useFormBaseline(form);
 
   useEffect(() => {
-    if (isEditMode) setIsSlugManuallyEdited(true);
-  }, [id]);
-
-  // Populate once from the Convex admin list (carries linked product ids).
-  useEffect(() => {
-    if (!isEditMode || !categoryRows || populatedRef.current) return;
-    populatedRef.current = true;
-    const data: any = categoryRows.find((c: any) => c.supabaseId === id);
-    if (!data) {
-      setOpError('Category not found');
-      navigate('/categories');
-      return;
+    if (!ready || form) return;
+    if (source) {
+      setForm({
+        name: source.name || '',
+        slug: source.slug || '',
+        description: source.description || '',
+        image: source.image || null,
+        isActive: source.isActive !== false,
+        seoTitle: source.metaTitle || '',
+        seoDescription: source.metaDescription || '',
+        productIds: source.productSupabaseIds || [],
+      });
+    } else {
+      setForm({
+        name: '',
+        slug: '',
+        description: '',
+        image: null,
+        isActive: true,
+        seoTitle: '',
+        seoDescription: '',
+        productIds: [],
+      });
     }
-    setFormData({
-      name: data.name || '',
-      slug: data.slug || '',
-      description: data.description || '',
-      image: data.image ? [data.image] : [],
-      meta_title: data.metaTitle || '',
-      meta_description: data.metaDescription || ''
-    });
-    setSelectedProductIds(data.productSupabaseIds || []);
-    setLoading(false);
-  }, [categoryRows]);
+  }, [ready, form, source]);
 
-  useEffect(() => {
-    setIsDirty(true);
-  }, [formData]);
+  const patch = (p: Partial<CategoryForm>) => setForm((f) => (f ? { ...f, ...p } : f));
 
-  useEffect(() => {
-    setIsDirty(false);
-  }, []);
-
-  const handleNameChange = (name: string) => {
-    setFormData(prev => ({ ...prev, name }));
-    // Auto-generate slug only if not manually edited
-    if (!isSlugManuallyEdited) {
-      setFormData(prev => ({ ...prev, slug: generateSlug(name) }));
-    }
+  const onName = (name: string) => patch({ name, ...(slugTouched ? {} : { slug: generateSlug(name) }) });
+  const onSlug = (value: string) => {
+    setSlugTouched(true);
+    patch({ slug: generateSlug(value) });
   };
 
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsSlugManuallyEdited(true);
-    setFormData(prev => ({ ...prev, slug: generateSlug(e.target.value) }));
-  };
-
-  const handleChange = (updates: Partial<CategoryFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  };
-
-  const handleSubmit = async () => {
-    setSaveAttempted(true);
-    if (!formData.name.trim()) {
-      setOpError('Category name is required');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const args = {
-        name: formData.name.trim(),
-        slug: formData.slug.trim(),
-        description: formData.description.trim() || undefined,
-        image: formData.image[0] || undefined,
-        metaTitle: formData.meta_title.trim() || formData.name.trim(),
-        metaDescription: formData.meta_description.trim() || undefined,
-      };
-
+  const onSave = async () => {
+    if (!form) return;
+    setAttempted(true);
+    if (!form.name.trim() || !form.slug.trim()) return;
+    const submitted = form;
+    const args = {
+      name: submitted.name.trim(),
+      slug: submitted.slug.trim(),
+      description: submitted.description.trim() || undefined,
+      image: submitted.image || undefined,
+      metaTitle: submitted.seoTitle.trim() || submitted.name.trim(),
+      metaDescription: submitted.seoDescription.trim() || undefined,
+    };
+    const result = await save.run(async () => {
       let categoryId = id;
-      if (isEditMode) {
+      if (isEdit) {
         await updateCategory({ supabaseId: id!, patch: args, orgSlug: ORG_SLUG });
-        setOpOk('Category updated successfully');
       } else {
-        const { supabaseId } = await createCategory({ ...args, orgSlug: ORG_SLUG });
-        categoryId = supabaseId;
-        setOpOk('Category created successfully');
+        const created = await createCategory({ ...args, orgSlug: ORG_SLUG });
+        categoryId = created.supabaseId;
       }
-
-      // Replace product links (same replace-set semantics as before).
-      await linkProducts({ supabaseId: categoryId!, productSupabaseIds: selectedProductIds, orgSlug: ORG_SLUG });
-
-      navigate('/categories');
-    } catch (error: any) {
-      console.error('Error saving category:', error);
-      const code = error?.data?.code;
-      setOpError(
-        code === 'SLUG_TAKEN'
-          ? 'Slug is taken by another category'
-          : code === 'NOT_CATALOG_ADMIN'
-            ? 'Admin access required'
-            : error.message || 'Failed to save category'
-      );
-    } finally {
-      setSaving(false);
-    }
+      // Replace-set semantics: the picker list is the full membership.
+      await linkProducts({ supabaseId: categoryId!, productSupabaseIds: submitted.productIds, orgSlug: ORG_SLUG });
+      // Visibility lives on the category row but is not part of categoryV, so it is set separately.
+      const wasActive = source ? source.isActive !== false : true;
+      if (submitted.isActive !== wasActive) {
+        await setActive({ supabaseIds: [categoryId!], isActive: submitted.isActive, orgSlug: ORG_SLUG });
+      }
+      return categoryId;
+    });
+    if (!result) return;
+    if (isEdit) rebaseline(submitted);
+    else window.setTimeout(() => navigate(LIST), 700);
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
-    setSaving(true);
+  const onDelete = async () => {
     try {
       await removeCategory({ supabaseId: id!, orgSlug: ORG_SLUG });
-      setOpOk('Category deleted successfully');
-      navigate('/categories');
-    } catch (error: any) {
-      console.error('Error deleting category:', error);
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete category');
-    } finally {
-      setSaving(false);
+    } catch (err) {
+      throw new Error(catalogError(err, 'Could not delete this category.').message);
     }
+    navigate(LIST);
   };
 
-  if (loading) {
+  if (notFound) {
     return (
-      <div className="flex items-center justify-center min-h-100">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <Page title="Not found" backTo={LIST}>
+        <Card>
+          <EmptyState
+            title="This category no longer exists"
+            action={<Button onClick={() => navigate(LIST)}>Back to categories</Button>}
+          />
+        </Card>
+      </Page>
     );
   }
 
+  if (!form) {
+    return (
+      <Page title={<Skeleton className="h-6 w-48" />} backTo={LIST}>
+        <PageLayout main={<Card><SkeletonText lines={4} /></Card>} aside={<Card><SkeletonText lines={2} /></Card>} />
+      </Page>
+    );
+  }
+
+  const titleText = form.name.trim() || (isEdit ? 'Untitled category' : 'New category');
+  const nameMissing = attempted && !form.name.trim();
+  const slugMissing = attempted && !form.slug.trim();
+
   return (
-    <div className="min-h-screen bg-background pb-16">
-      {/* Header */}
-      <PageHeader
-        title={formData.name || 'Untitled Category'}
-        description={isEditMode ? 'Edit category' : 'Create new category'}
-        backUrl="/categories"
+    <>
+      <Page
+        title={titleText}
+        backTo={LIST}
+        secondaryActions={isEdit ? [{ label: 'Delete', critical: true, onClick: () => setDeleteOpen(true) }] : undefined}
       >
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/categories')}
-        >
-          Cancel
-        </Button>
-        {isEditMode && (
-          <Button 
-            variant="destructive" 
-            onClick={handleDelete}
-            disabled={saving}
-            className="bg-destructive hover:bg-destructive text-white"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <Button 
-          onClick={handleSubmit} 
-          disabled={saving || !isDirty}
-        >
-          {saving ? (
+        {save.error && <ErrorBanner error={save.error} />}
+        <PageLayout
+          main={
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              {isEditMode ? 'Update' : 'Create'} Category
-            </>
-          )}
-        </Button>
-      </PageHeader>
-
-      <div className="max-w-400 mx-auto px-6">
-        <InlineStatus status={opStatus} />
-      </div>
-
-      <div className="max-w-400 mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* LEFT COLUMN */}
-        <div className="flex flex-col gap-4">
-          {/* Basic Information */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Category Identity</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="space-y-1">
-                <Label>Name <Req /></Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g. Premium Cigarettes"
-                  aria-invalid={saveAttempted && isBlank(formData.name)}
-                />
-                <ReqError show={saveAttempted && isBlank(formData.name)} />
-              </div>
-
-              <div className={`flex items-center gap-1 text-sm text-muted-foreground bg-background px-3 py-2 rounded border border-border/30${saveAttempted && isBlank(formData.slug) ? ' border-destructive' : ''}`}>
-                <span>store.cigarro.in/categories/</span>
-                <input
-                  value={formData.slug}
-                  onChange={handleSlugChange}
-                  className="bg-transparent border-none focus:outline-none text-foreground font-medium flex-1"
-                  placeholder="category-slug"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => handleChange({ description: e.target.value })}
-                  placeholder="Describe the category..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Category Image</Label>
-                <SingleImagePicker
-                  value={formData.image[0] || null}
-                  onChange={(url) => handleChange({ image: url ? [url] : [] })}
-                  searchHint={formData.name ? `${formData.name} category` : undefined}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Products */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Products</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <ProductSelector
-                selectedProductIds={selectedProductIds}
-                onSelectionChange={setSelectedProductIds}
-              />
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* SEO */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>SEO Settings</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="space-y-1">
-                <Label htmlFor="meta_title">Meta Title</Label>
-                <Input
-                  id="meta_title"
-                  value={formData.meta_title}
-                  onChange={(e) => handleChange({ meta_title: e.target.value })}
-                  placeholder="SEO title (defaults to category name)"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="meta_description">Meta Description</Label>
-                <Textarea
-                  id="meta_description"
-                  value={formData.meta_description}
-                  onChange={(e) => handleChange({ meta_description: e.target.value })}
-                  placeholder="SEO description"
-                  rows={2}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="flex flex-col gap-4">
-          {/* Status */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle className="text-xs uppercase tracking-wider">Status</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <p className="text-sm text-muted-foreground">
-                Categories are always visible once created.
-              </p>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Preview */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle className="text-xs uppercase tracking-wider">Preview</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md overflow-hidden bg-background flex-shrink-0">
-                  {formData.image[0] ? (
-                    <img
-                      src={formData.image[0]}
-                      alt="Category"
-                      className="w-full h-full object-cover"
+              <Card title="Details">
+                <div className="flex flex-col gap-4">
+                  <Field label="Name" htmlFor="category-name" required error={nameMissing ? 'Enter a category name.' : undefined}>
+                    <Input
+                      id="category-name"
+                      value={form.name}
+                      onChange={(e) => onName(e.target.value)}
+                      placeholder="e.g. Premium Cigarettes"
+                      aria-invalid={nameMissing}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <FolderTree className="h-5 w-5 text-foreground/40" />
+                  </Field>
+                  <Field label="Description" htmlFor="category-description">
+                    <Textarea
+                      id="category-description"
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => patch({ description: e.target.value })}
+                      placeholder="Describe the category"
+                    />
+                  </Field>
+                  <Field label="Image">
+                    <SingleImagePicker
+                      value={form.image}
+                      onChange={(url) => patch({ image: url || null })}
+                      searchHint={form.name ? `${form.name} category` : undefined}
+                    />
+                  </Field>
+                </div>
+              </Card>
+
+              <Card
+                title="Products"
+                actions={<span className="text-xs text-[var(--admin-text-muted)]">{form.productIds.length} in this category</span>}
+              >
+                <ProductMembers
+                  selectedIds={form.productIds}
+                  products={products}
+                  onChange={(productIds) => patch({ productIds })}
+                />
+              </Card>
+
+              <DisclosureCard title="Slug and SEO" summary={`/categories/${form.slug || '…'}`} forceOpen={slugMissing}>
+                <Field label="URL slug" htmlFor="category-slug" required error={slugMissing ? 'Slug is required.' : undefined} hint="Created from the name. Edit to override.">
+                  <Input
+                    id="category-slug"
+                    value={form.slug}
+                    onChange={(e) => onSlug(e.target.value)}
+                    placeholder="category-slug"
+                    aria-invalid={slugMissing}
+                  />
+                </Field>
+                <Field label="Meta title" htmlFor="category-meta-title" hint="Defaults to the category name.">
+                  <Input
+                    id="category-meta-title"
+                    value={form.seoTitle}
+                    onChange={(e) => patch({ seoTitle: e.target.value })}
+                  />
+                </Field>
+                <Field label="Meta description" htmlFor="category-meta-description">
+                  <Textarea
+                    id="category-meta-description"
+                    rows={2}
+                    value={form.seoDescription}
+                    onChange={(e) => patch({ seoDescription: e.target.value })}
+                  />
+                </Field>
+              </DisclosureCard>
+            </>
+          }
+          aside={
+            <>
+              <Card title="Visibility">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label htmlFor="category-active">Active</Label>
+                    <p className="text-xs text-[var(--admin-text-muted)]">Shown to customers on the store.</p>
+                  </div>
+                  <Switch
+                    id="category-active"
+                    checked={form.isActive}
+                    onCheckedChange={(isActive) => patch({ isActive })}
+                  />
+                </div>
+              </Card>
+
+              <Card title="Preview">
+                <div className="flex items-center gap-3">
+                  <CatalogThumb src={form.image} icon={<FolderTree />} alt="" className="size-12" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-[var(--admin-text)]">{titleText}</div>
+                    <div className="line-clamp-2 text-xs text-[var(--admin-text-muted)]">
+                      {form.description || 'No description yet'}
                     </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {formData.name || 'Category Name'}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {formData.description || 'Category description'}
                   </div>
                 </div>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-      </div>
-    </div>
+              </Card>
+            </>
+          }
+        />
+      </Page>
+
+      <SaveBar
+        visible={dirty || save.state !== 'idle'}
+        state={save.state}
+        onSave={() => void onSave()}
+        onDiscard={() => {
+          if (base) setForm(base);
+          setAttempted(false);
+        }}
+      />
+
+      {isEdit && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          critical
+          title="Delete this category?"
+          description="Products are not deleted. This cannot be undone."
+          confirmLabel="Delete category"
+          onConfirm={onDelete}
+        />
+      )}
+    </>
   );
 }

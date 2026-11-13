@@ -1,420 +1,323 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, LayoutGrid, Trash2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { Switch } from '../../components/ui/switch';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
-import { ProductSelector } from '../components/shared/ProductSelector';
-import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
-import { PageHeader } from '../components/shared/PageHeader';
-import { useQuery, useMutation } from 'convex/react';
+import { LayoutGrid } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { generateSlug } from '../../types/product';
+import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { ProductMembers, useCatalogProducts } from '../features/catalog/ProductMembers';
+import {
+  CatalogThumb,
+  DisclosureCard,
+  Field,
+  SaveBar,
+  catalogError,
+  useFormBaseline,
+} from '../features/catalog/catalogShared';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Label,
+  Page,
+  PageLayout,
+  SkeletonText,
+  Switch,
+  Textarea,
+  Skeleton,
+  useButtonFeedback,
+} from '../ui';
 
-interface Collection {
-  id: string;
-  title: string;
-  slug: string;
-  description?: string;
-  image_url?: string;
-  is_active: boolean;
-  display_order: number;
-  meta_title?: string;
-  meta_description?: string;
-}
+const LIST = '/collections';
 
-interface CollectionFormData {
+interface CollectionForm {
   title: string;
   slug: string;
   description: string;
-  image_url: string[];
-  is_active: boolean;
-  display_order: number;
-  meta_title: string;
-  meta_description: string;
+  image: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  seoTitle: string;
+  seoDescription: string;
+  productIds: string[];
 }
 
 export function CollectionFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = !!id;
+  const isEdit = !!id;
 
-  const [loading, setLoading] = useState(isEditMode);
-  const [saving, setSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-
-  const [formData, setFormData] = useState<CollectionFormData>({
-    title: '',
-    slug: '',
-    description: '',
-    image_url: [],
-    is_active: true,
-    display_order: 1,
-    meta_title: '',
-    meta_description: ''
-  });
-
-  const collectionRows = useQuery(api.adminCatalog.listCollectionsForAdmin, { orgSlug: ORG_SLUG });
+  const rows = useQuery(api.adminCatalog.listCollectionsForAdmin, { orgSlug: ORG_SLUG });
   const saveCollection = useMutation(api.adminCatalog.saveCollection);
   const removeCollection = useMutation(api.adminCatalog.deleteCollection);
-  const populatedRef = useRef(false);
+  const products = useCatalogProducts();
 
+  const source: any = isEdit ? rows?.find((c: any) => c.supabaseId === id) : undefined;
+  const notFound = isEdit && rows !== undefined && !source;
+  const ready = rows !== undefined && !notFound;
+
+  const [form, setForm] = useState<CollectionForm | null>(null);
+  const [slugTouched, setSlugTouched] = useState(isEdit);
+  const [attempted, setAttempted] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const save = useButtonFeedback();
+  const { base, dirty, rebaseline } = useFormBaseline(form);
+
+  // Seed the form once: from the saved row when editing, defaults when creating
+  // (display order = next after the highest existing one).
   useEffect(() => {
-    if (isEditMode) {
-      setIsSlugManuallyEdited(true);
-    } else if (collectionRows) {
-      // Next display order = max sortOrder + 1 (was a created_at query).
-      const max = Math.max(0, ...collectionRows.map((c: any) => c.sortOrder ?? 0));
-      setFormData((prev) => ({ ...prev, display_order: max + 1 }));
-    }
-  }, [id, collectionRows]);
-
-  // Populate once from the Convex admin list (carries linked product ids).
-  useEffect(() => {
-    if (!isEditMode || !collectionRows || populatedRef.current) return;
-    populatedRef.current = true;
-    const data: any = collectionRows.find((c: any) => c.supabaseId === id);
-    if (!data) {
-      setOpError('Collection not found');
-      navigate('/collections');
-      return;
-    }
-    setFormData({
-      title: data.title || '',
-      slug: data.slug || '',
-      description: data.description || '',
-      image_url: data.imageUrl ? [data.imageUrl] : [],
-      is_active: data.isActive !== false,
-      display_order: data.sortOrder || 1,
-      meta_title: data.seoTitle || '',
-      meta_description: data.seoDescription || ''
-    });
-    setSelectedProductIds(data.productSupabaseIds || []);
-    setLoading(false);
-  }, [collectionRows]);
-
-  useEffect(() => {
-    setIsDirty(true);
-  }, [formData]);
-
-  useEffect(() => {
-    setIsDirty(false);
-  }, []);
-
-  const handleTitleChange = (title: string) => {
-    setFormData(prev => ({ ...prev, title }));
-    // Auto-generate slug only if not manually edited
-    if (!isSlugManuallyEdited) {
-      setFormData(prev => ({ ...prev, slug: generateSlug(title) }));
-    }
-  };
-
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsSlugManuallyEdited(true);
-    setFormData(prev => ({ ...prev, slug: generateSlug(e.target.value) }));
-  };
-
-  const handleChange = (updates: Partial<CollectionFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  };
-
-  const handleSubmit = async () => {
-    setSaveAttempted(true);
-    if (!formData.title.trim()) {
-      setOpError('Collection title is required');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      // Joins ride inside saveCollection — one mutation, no separate writes.
-      await saveCollection({
-        orgSlug: ORG_SLUG,
-        supabaseId: isEditMode ? id : undefined,
-        collection: {
-          title: formData.title.trim(),
-          slug: formData.slug.trim(),
-          description: formData.description.trim() || undefined,
-          imageUrl: formData.image_url[0] || undefined,
-          isActive: formData.is_active,
-          sortOrder: formData.display_order,
-          seoTitle: formData.meta_title.trim() || formData.title.trim(),
-          seoDescription: formData.meta_description.trim() || undefined,
-        },
-        productSupabaseIds: selectedProductIds,
+    if (!ready || form) return;
+    if (source) {
+      setForm({
+        title: source.title || '',
+        slug: source.slug || '',
+        description: source.description || '',
+        image: source.imageUrl || null,
+        isActive: source.isActive !== false,
+        sortOrder: source.sortOrder || 1,
+        seoTitle: source.seoTitle || '',
+        seoDescription: source.seoDescription || '',
+        productIds: source.productSupabaseIds || [],
       });
-      setOpOk(isEditMode ? 'Collection updated successfully' : 'Collection created successfully');
-
-      navigate('/collections');
-    } catch (error: any) {
-      console.error('Error saving collection:', error);
-      const code = error?.data?.code;
-      setOpError(
-        code === 'SLUG_TAKEN'
-          ? 'Slug is taken by another collection'
-          : code === 'NOT_CATALOG_ADMIN'
-            ? 'Admin access required'
-            : error.message || 'Failed to save collection'
-      );
-    } finally {
-      setSaving(false);
+    } else {
+      const next = Math.max(0, ...(rows ?? []).map((c: any) => c.sortOrder ?? 0)) + 1;
+      setForm({
+        title: '',
+        slug: '',
+        description: '',
+        image: null,
+        isActive: true,
+        sortOrder: next,
+        seoTitle: '',
+        seoDescription: '',
+        productIds: [],
+      });
     }
+  }, [ready, form, source, rows]);
+
+  const patch = (p: Partial<CollectionForm>) => setForm((f) => (f ? { ...f, ...p } : f));
+
+  const onTitle = (title: string) => patch({ title, ...(slugTouched ? {} : { slug: generateSlug(title) }) });
+  const onSlug = (value: string) => {
+    setSlugTouched(true);
+    patch({ slug: generateSlug(value) });
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this collection?')) return;
-    setSaving(true);
+  const onSave = async () => {
+    if (!form) return;
+    setAttempted(true);
+    if (!form.title.trim() || !form.slug.trim()) return;
+    const submitted = form;
+    const result = await save.run(() =>
+      saveCollection({
+        orgSlug: ORG_SLUG,
+        supabaseId: id,
+        collection: {
+          title: submitted.title.trim(),
+          slug: submitted.slug.trim(),
+          description: submitted.description.trim() || undefined,
+          imageUrl: submitted.image || undefined,
+          isActive: submitted.isActive,
+          sortOrder: submitted.sortOrder,
+          seoTitle: submitted.seoTitle.trim() || submitted.title.trim(),
+          seoDescription: submitted.seoDescription.trim() || undefined,
+        },
+        productSupabaseIds: submitted.productIds,
+      }),
+    );
+    if (!result) return;
+    if (isEdit) rebaseline(submitted);
+    else window.setTimeout(() => navigate(LIST), 700);
+  };
+
+  const onDelete = async () => {
     try {
       await removeCollection({ supabaseId: id!, orgSlug: ORG_SLUG });
-      setOpOk('Collection deleted successfully');
-      navigate('/collections');
-    } catch (error: any) {
-      console.error('Error deleting collection:', error);
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete collection');
-    } finally {
-      setSaving(false);
+    } catch (err) {
+      throw new Error(catalogError(err, 'Could not delete this collection.').message);
     }
+    navigate(LIST);
   };
 
-  if (loading) {
+  if (notFound) {
     return (
-      <div className="flex items-center justify-center min-h-100">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <Page title="Not found" backTo={LIST}>
+        <Card>
+          <EmptyState
+            title="This collection no longer exists"
+            action={<Button onClick={() => navigate(LIST)}>Back to collections</Button>}
+          />
+        </Card>
+      </Page>
     );
   }
 
+  if (!form) {
+    return (
+      <Page title={<Skeleton className="h-6 w-48" />} backTo={LIST}>
+        <PageLayout main={<Card><SkeletonText lines={4} /></Card>} aside={<Card><SkeletonText lines={2} /></Card>} />
+      </Page>
+    );
+  }
+
+  const titleText = form.title.trim() || (isEdit ? 'Untitled collection' : 'New collection');
+  const titleMissing = attempted && !form.title.trim();
+  const slugMissing = attempted && !form.slug.trim();
+
   return (
-    <div className="min-h-screen bg-background pb-16">
-      {/* Header */}
-      <PageHeader
-        title={formData.title || 'Untitled Collection'}
-        description={isEditMode ? 'Edit collection' : 'Create new collection'}
-        backUrl="/collections"
+    <>
+      <Page
+        title={titleText}
+        backTo={LIST}
+        secondaryActions={isEdit ? [{ label: 'Delete', critical: true, onClick: () => setDeleteOpen(true) }] : undefined}
       >
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/collections')}
-        >
-          Cancel
-        </Button>
-        {isEditMode && (
-          <Button 
-            variant="destructive" 
-            onClick={handleDelete}
-            disabled={saving}
-            className="bg-destructive hover:bg-destructive text-white"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <Button 
-          onClick={handleSubmit} 
-          disabled={saving || !isDirty}
-        >
-          {saving ? (
+        {save.error && <ErrorBanner error={save.error} />}
+        <PageLayout
+          main={
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              {isEditMode ? 'Update' : 'Create'} Collection
-            </>
-          )}
-        </Button>
-      </PageHeader>
-
-      <div className="max-w-400 mx-auto px-6">
-        <InlineStatus status={opStatus} />
-      </div>
-
-      <div className="max-w-400 mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* LEFT COLUMN */}
-        <div className="flex flex-col gap-4">
-          {/* Basic Information */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Collection Identity</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              
-              {/* Title */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">
-                  Title <Req />
-                </Label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="e.g. Premium Selection"
-                  className="bg-background border-border focus:ring-ring text-lg py-6"
-                  aria-invalid={saveAttempted && isBlank(formData.title)}
-                />
-                <ReqError show={saveAttempted && isBlank(formData.title)} />
-              </div>
-
-              {/* Slug */}
-              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 items-center text-sm text-muted-foreground bg-background/50 p-3 rounded-md border border-border/30${saveAttempted && isBlank(formData.slug) ? ' border-destructive' : ''}`}>
-                <span className="font-medium">store.cigarro.in/collections/</span>
-                <input
-                  value={formData.slug}
-                  onChange={handleSlugChange}
-                  className="bg-transparent border-none focus:outline-none text-foreground font-medium w-full"
-                  placeholder="collection-slug"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => handleChange({ description: e.target.value })}
-                  placeholder="Describe the collection..."
-                  rows={4}
-                  className="bg-background border-border focus:ring-ring"
-                />
-              </div>
-
-              {/* Image */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Collection Image</Label>
-                <SingleImagePicker
-                  value={formData.image_url[0] || null}
-                  onChange={(url) => handleChange({ image_url: url ? [url] : [] })}
-                  searchHint={formData.title ? `${formData.title} collection` : undefined}
-                />
-              </div>
-
-              {/* Display Order */}
-              <div className="space-y-2">
-                <Label className="text-foreground font-medium">Display Order</Label>
-                <Input
-                  type="number"
-                  value={formData.display_order}
-                  onChange={(e) => handleChange({ display_order: parseInt(e.target.value) || 1 })}
-                  placeholder="1"
-                  className="bg-background border-border focus:ring-ring"
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Products */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Products</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <ProductSelector
-                selectedProductIds={selectedProductIds}
-                onSelectionChange={setSelectedProductIds}
-              />
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Status & SEO */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>SEO Settings</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="space-y-2">
-                <Label htmlFor="meta_title">Meta Title</Label>
-                <Input
-                  id="meta_title"
-                  value={formData.meta_title}
-                  onChange={(e) => handleChange({ meta_title: e.target.value })}
-                  placeholder="SEO title (defaults to collection title)"
-                  className="bg-background border-border"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="meta_description">Meta Description</Label>
-                <Textarea
-                  id="meta_description"
-                  value={formData.meta_description}
-                  onChange={(e) => handleChange({ meta_description: e.target.value })}
-                  placeholder="SEO description"
-                  rows={3}
-                  className="bg-background border-border"
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="flex flex-col gap-4">
-          {/* Status */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Status</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Active</Label>
-                  <p className="text-sm text-muted-foreground">Collection is visible to customers</p>
+              <Card title="Details">
+                <div className="flex flex-col gap-4">
+                  <Field
+                    label="Name"
+                    htmlFor="collection-name"
+                    required
+                    error={titleMissing ? 'Enter a collection name.' : undefined}
+                  >
+                    <Input
+                      id="collection-name"
+                      value={form.title}
+                      onChange={(e) => onTitle(e.target.value)}
+                      placeholder="e.g. Premium Selection"
+                      aria-invalid={titleMissing}
+                    />
+                  </Field>
+                  <Field label="Description" htmlFor="collection-description">
+                    <Textarea
+                      id="collection-description"
+                      rows={4}
+                      value={form.description}
+                      onChange={(e) => patch({ description: e.target.value })}
+                      placeholder="Describe the collection"
+                    />
+                  </Field>
+                  <Field label="Image">
+                    <SingleImagePicker
+                      value={form.image}
+                      onChange={(url) => patch({ image: url || null })}
+                      searchHint={form.title ? `${form.title} collection` : undefined}
+                    />
+                  </Field>
                 </div>
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => handleChange({ is_active: checked })}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
+              </Card>
 
-          {/* Preview */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Preview</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted">
-                    {formData.image_url[0] ? (
-                      <img
-                        src={formData.image_url[0]}
-                        alt="Collection"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <LayoutGrid className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
+              <Card
+                title="Products"
+                actions={<span className="text-xs text-[var(--admin-text-muted)]">{form.productIds.length} in this collection</span>}
+              >
+                <ProductMembers
+                  selectedIds={form.productIds}
+                  products={products}
+                  onChange={(productIds) => patch({ productIds })}
+                />
+              </Card>
+
+              <DisclosureCard
+                title="Slug, order and SEO"
+                summary={`/collections/${form.slug || '…'}`}
+                forceOpen={slugMissing}
+              >
+                <Field label="URL slug" htmlFor="collection-slug" required error={slugMissing ? 'Slug is required.' : undefined} hint="Created from the name. Edit to override.">
+                  <Input
+                    id="collection-slug"
+                    value={form.slug}
+                    onChange={(e) => onSlug(e.target.value)}
+                    placeholder="collection-slug"
+                    aria-invalid={slugMissing}
+                  />
+                </Field>
+                <Field label="Display order" htmlFor="collection-order" hint="Lower numbers show first.">
+                  <Input
+                    id="collection-order"
+                    type="number"
+                    value={form.sortOrder}
+                    onChange={(e) => patch({ sortOrder: parseInt(e.target.value) || 1 })}
+                  />
+                </Field>
+                <Field label="Meta title" htmlFor="collection-meta-title" hint="Defaults to the collection name.">
+                  <Input
+                    id="collection-meta-title"
+                    value={form.seoTitle}
+                    onChange={(e) => patch({ seoTitle: e.target.value })}
+                  />
+                </Field>
+                <Field label="Meta description" htmlFor="collection-meta-description">
+                  <Textarea
+                    id="collection-meta-description"
+                    rows={3}
+                    value={form.seoDescription}
+                    onChange={(e) => patch({ seoDescription: e.target.value })}
+                  />
+                </Field>
+              </DisclosureCard>
+            </>
+          }
+          aside={
+            <>
+              <Card title="Visibility">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label htmlFor="collection-active">Active</Label>
+                    <p className="text-xs text-[var(--admin-text-muted)]">Shown to customers on the store.</p>
                   </div>
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {formData.title || 'Collection Title'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {formData.description || 'Collection description'}
+                  <Switch
+                    id="collection-active"
+                    checked={form.isActive}
+                    onCheckedChange={(isActive) => patch({ isActive })}
+                  />
+                </div>
+              </Card>
+
+              <Card title="Preview">
+                <div className="flex items-center gap-3">
+                  <CatalogThumb src={form.image} icon={<LayoutGrid />} alt="" className="size-12" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-[var(--admin-text)]">{titleText}</div>
+                    <div className="line-clamp-2 text-xs text-[var(--admin-text-muted)]">
+                      {form.description || 'No description yet'}
                     </div>
                   </div>
                 </div>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-      </div>
-    </div>
+              </Card>
+            </>
+          }
+        />
+      </Page>
+
+      <SaveBar
+        visible={dirty || save.state !== 'idle'}
+        state={save.state}
+        onSave={() => void onSave()}
+        onDiscard={() => {
+          if (base) setForm(base);
+          setAttempted(false);
+        }}
+      />
+
+      {isEdit && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          critical
+          title="Delete this collection?"
+          description="Products are not deleted. This cannot be undone."
+          confirmLabel="Delete collection"
+          onConfirm={onDelete}
+        />
+      )}
+    </>
   );
 }

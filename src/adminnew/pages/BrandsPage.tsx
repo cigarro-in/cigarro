@@ -1,187 +1,40 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Trash2, Building2, Plus } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import { useQuery, useMutation } from 'convex/react';
+import { useMemo } from 'react';
+import { Building2, Plus } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { DataTable } from '../components/shared/DataTable';
-import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
-import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-import { PageHeader } from '../components/shared/PageHeader';
-
-interface Brand {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  product_count?: number;
-}
+import { CatalogListView, type CatalogListRow } from '../features/catalog/CatalogListView';
 
 export function BrandsPage() {
-  const navigate = useNavigate();
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-
   const rows = useQuery(api.adminCatalog.listBrandsForAdmin, { orgSlug: ORG_SLUG });
   const removeBrand = useMutation(api.adminCatalog.deleteBrand);
   const setActive = useMutation(api.adminCatalog.setBrandsActive);
 
-  // Boundary: Convex camelCase → table shape (ids stay supabaseIds).
-  const brands: Brand[] = (rows || []).map((b: any) => ({
-    id: b.supabaseId,
-    name: b.name,
-    slug: b.slug,
-    description: b.description ?? null,
-    logo_url: b.logoUrl ?? null,
-    is_active: b.isActive,
-    created_at: b.createdAt ? new Date(b.createdAt).toISOString() : '',
-    product_count: b.product_count,
-  }));
-  const loading = rows === undefined;
-
-  const handleAddBrand = () => {
-    navigate('/brands/new');
-  };
-
-  const handleEditBrand = (brand: Brand) => {
-    navigate(`/brands/${brand.id}`);
-  };
-
-  const handleBulkDelete = async (brandIds: string[]) => {
-    if (!confirm(`Delete ${brandIds.length} brands?`)) return;
-    try {
-      for (const supabaseId of brandIds) {
-        await removeBrand({ supabaseId, orgSlug: ORG_SLUG });
-      }
-      setOpOk(`${brandIds.length} brands deleted`);
-      setSelectedBrands([]);
-    } catch (error: any) {
-      setOpError(
-        error?.data?.code === 'BRAND_IN_USE'
-          ? 'A brand with products cannot be deleted'
-          : error?.data?.code === 'NOT_CATALOG_ADMIN'
-            ? 'Admin access required'
-            : 'Failed to delete brands'
-      );
-    }
-  };
-
-  const handleBulkStatusChange = async (brandIds: string[], isActive: boolean) => {
-    try {
-      await setActive({ supabaseIds: brandIds, isActive, orgSlug: ORG_SLUG });
-      setOpOk(`${brandIds.length} brands ${isActive ? 'activated' : 'deactivated'}`);
-      setSelectedBrands([]);
-    } catch (error: any) {
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update status');
-    }
-  };
-
-  const columns = [
-    {
-      key: 'logo_url',
-      label: 'Logo',
-      render: (_: any, brand: Brand) => (
-        <div className="size-10 overflow-hidden rounded-md bg-muted">
-          {brand.logo_url ? (
-            <ImageWithFallback
-              src={brand.logo_url}
-              alt="Brand"
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center">
-              <Building2 className="size-4 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'name',
-      label: 'Brand Name',
-      render: (name: string, brand: Brand) => (
-        <div>
-          <div className="font-medium">{name}</div>
-          <div className="text-xs text-muted-foreground">{brand.slug}</div>
-        </div>
-      )
-    },
-    {
-      key: 'product_count',
-      label: 'Products',
-      render: (count: number) => (
-        <Badge variant="secondary">
-          {count}
-        </Badge>
-      )
-    },
-    {
-      key: 'is_active',
-      label: 'Status',
-      render: (isActive: boolean) => (
-        <Badge variant={isActive ? 'default' : 'secondary'}>
-          {isActive ? 'Active' : 'Inactive'}
-        </Badge>
-      )
-    },
-  ];
-
-  const bulkActions = [
-    {
-      label: 'Activate Selected',
-      icon: Eye,
-      onClick: (brandIds: string[]) => handleBulkStatusChange(brandIds, true)
-    },
-    {
-      label: 'Deactivate Selected',
-      icon: EyeOff,
-      onClick: (brandIds: string[]) => handleBulkStatusChange(brandIds, false)
-    },
-    {
-      label: 'Delete Selected',
-      icon: Trash2,
-      onClick: handleBulkDelete,
-      variant: 'destructive' as const
-    }
-  ];
+  const list = useMemo<CatalogListRow[] | undefined>(
+    () =>
+      rows?.map((b: any) => ({
+        id: b.supabaseId,
+        name: b.name,
+        slug: b.slug,
+        image: b.logoUrl ?? null,
+        productCount: b.product_count ?? 0,
+        isActive: b.isActive !== false,
+      })),
+    [rows],
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader 
-        title="Brands" 
-        description="Manage your product brands"
-        search={{
-          value: searchTerm,
-          onChange: setSearchTerm,
-          placeholder: "Search brands..."
-        }}
-      >
-        <BulkActionsMenu selectedIds={selectedBrands} actions={bulkActions} />
-        <Button onClick={handleAddBrand}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Brand
-        </Button>
-      </PageHeader>
-
-      <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
-        <InlineStatus status={opStatus} />
-        <DataTable
-          data={brands}
-          columns={columns}
-          loading={loading}
-          selectedItems={selectedBrands}
-          onSelectionChange={setSelectedBrands}
-          onRowClick={handleEditBrand}
-          searchTerm={searchTerm}
-        />
-      </div>
-    </div>
+    <CatalogListView<CatalogListRow>
+      noun="brand"
+      plural="brands"
+      title="Brands"
+      icon={<Building2 />}
+      rows={list}
+      openPath={(id) => `/brands/${id}`}
+      newAction={{ label: 'Add brand', to: '/brands/new', icon: <Plus /> }}
+      searchPlaceholder="Search brands"
+      onRemove={(id) => removeBrand({ supabaseId: id, orgSlug: ORG_SLUG })}
+      onSetActive={(ids, isActive) => setActive({ supabaseIds: ids, isActive, orgSlug: ORG_SLUG })}
+    />
   );
 }
