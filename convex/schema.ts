@@ -163,6 +163,10 @@ export default defineSchema({
     // kept optional so existing org rows still validate. Do not reuse.
     gasWebhookUrl: v.optional(v.string()),
     gasWebhookSecret: v.optional(v.string()),
+
+    // Bank/UPI alert senders whose emails count as payment confirmations.
+    // Empty or absent = no filter. See convex/lib/bankSenders.ts.
+    allowedBankSenders: v.optional(v.array(v.string())),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
@@ -283,6 +287,9 @@ export default defineSchema({
     extraCreditsPaise: v.optional(v.number()), // sum of duplicate/over-payments credited beyond this order
     lastWakeAt: v.optional(v.number()),      // throttle for customer wake/refresh polls
     pollGeneration: v.optional(v.number()), // epoch for scheduled inbox checks; wake bumps it so stale chains exit
+    // Set when an admin refunds a paid order: where the money went back.
+    // Absent on legacy refunds (destination unknown).
+    refundDestination: v.optional(v.union(v.literal("wallet"), v.literal("bank"))),
     // Inventory is reserved while payment is pending, committed when paid,
     // and released when an unpaid order terminates. Optional for legacy rows.
     inventoryState: v.optional(v.union(
@@ -298,7 +305,10 @@ export default defineSchema({
     .index("by_org_order_number", ["orgId", "orderNumber"])
     .index("by_retry_of", ["retryOfOrderId"])
     .index("by_org_status", ["orgId", "status", "createdAt"])
-    .index("by_org_user_idem", ["orgId", "userId", "idempotencyKey"]),
+    .index("by_org_user_idem", ["orgId", "userId", "idempotencyKey"])
+    // Payment statement: email-matched credits by paid time, refunds by refund time.
+    .index("by_org_method_paid", ["orgId", "verificationMethod", "paidAt"])
+    .index("by_org_status_terminal", ["orgId", "status", "terminalAt"]),
 
   paymentSlots: defineTable({
     orgId: v.id("organizations"),

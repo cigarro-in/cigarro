@@ -26,8 +26,8 @@ import {
 // org's admin connects its own bank-alert inbox via OAuth; the refresh token
 // is AES-GCM encrypted at rest (convex/lib/crypto.ts, key GMAIL_TOKEN_KEY).
 // There is no permanent cron: every check is order-triggered (creation
-// backoff, customer wake/refresh, post-expiry reconciliation) or a manual
-// admin "Check inbox now". An org with no active connection skips Gmail; the
+// backoff, customer wake/refresh, post-expiry reconciliation). There is no
+// admin-callable trigger. An org with no active connection skips Gmail; the
 // forwarding path (POST /receiveBankEmail + bankInboxes) still works.
 // Platform-wide secrets stay in Convex env:
 //   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_TOKEN_KEY
@@ -325,10 +325,14 @@ export const pollInbox = internalAction({
     }
     const accessToken = token.accessToken;
 
-    const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, {});
+    const cfg: any = await ctx.runQuery(internal.gmail.getPollConfigInternal, { orgId });
+    // A store's own sender allowlist replaces the platform defaults in the
+    // search; ingestBankEmail still enforces it on every message.
+    const senders: string[] =
+      cfg?.orgSenders?.length > 0 ? cfg.orgSenders : (cfg?.senders ?? []);
     const q = cfg?.query?.trim()
       ? cfg.query.trim()
-      : buildPollQuery(cfg?.senders ?? []);
+      : buildPollQuery(senders);
     const maxResults = String(Math.min(maxMessages ?? 20, 50));
     let processed = 0;
     let matched = 0;
@@ -395,23 +399,6 @@ export const pollInbox = internalAction({
       parseFailures,
       failed: messageFailures,
     };
-  },
-});
-
-// Manual trigger from Payment Settings ("Check inbox now"). Same path as the
-// order-triggered checks, but always runs (no pending-work skip).
-export const triggerPoll = action({
-  args: {
-    maxMessages: v.optional(v.number()),
-    orgId: v.id("organizations"),
-  },
-  handler: async (ctx, args): Promise<any> => {
-    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, { orgId: args.orgId });
-    return await ctx.runAction(internal.gmail.pollInbox, {
-      orgId: args.orgId,
-      maxMessages: args.maxMessages ?? 20,
-      reason: "manual",
-    });
   },
 });
 
@@ -680,15 +667,18 @@ export const hasReconcilableOrders = internalQuery({
   },
 });
 
-// Platform-wide poll settings only (search query override, sender allowlist).
-// Per-store credentials are read from gmailConnections, never here.
+// Poll settings: platform-wide search query override and default senders, plus
+// the store's own sender allowlist when orgId is given. Per-store credentials
+// are read from gmailConnections, never here.
 export const getPollConfigInternal = internalQuery({
-  args: {},
-  handler: async (ctx) => {
+  args: { orgId: v.optional(v.id("organizations")) },
+  handler: async (ctx, { orgId }) => {
     const cfg = await getConfig(ctx);
+    const org = orgId ? await ctx.db.get(orgId) : null;
     return {
       query: cfg?.gmailQuery ?? null,
       senders: mergeSenders(cfg?.bankSenders),
+      orgSenders: org?.allowedBankSenders ?? [],
     };
   },
 });

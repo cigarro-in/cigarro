@@ -80,6 +80,7 @@ export const refundOrder = mutation({
     await ctx.db.patch(orderId, {
       status: "refunded",
       terminalAt: Date.now(),
+      refundDestination: toWallet ? "wallet" : "bank",
     });
     if (restock) await returnOrderInventory(ctx, order, `admin:${identity.subject}`);
 

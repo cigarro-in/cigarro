@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { SYSTEM_TEMPLATES } from "./lib/email";
 
@@ -232,6 +233,18 @@ export const deleteInbox = mutation({
   },
 });
 
+// Primary UPI ID = the active paymentVpas row with the lowest priority (checkout
+// reads the same row via by_org_active). Mirror it into organizations.upiVpa so
+// the legacy single field never disagrees with the primary. Leaves the field
+// alone when no VPA is active.
+async function syncPrimaryVpa(ctx: MutationCtx, orgId: Id<"organizations">) {
+  const primary = await ctx.db
+    .query("paymentVpas")
+    .withIndex("by_org_active", (q) => q.eq("orgId", orgId).eq("active", true))
+    .first();
+  if (primary) await ctx.db.patch(orgId, { upiVpa: primary.vpa });
+}
+
 export const listVpas = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
@@ -263,9 +276,10 @@ export const upsertVpa = mutation({
         active: args.active,
         priority: args.priority,
       });
+      await syncPrimaryVpa(ctx, args.orgId);
       return args.vpaId;
     }
-    return await ctx.db.insert("paymentVpas", {
+    const id = await ctx.db.insert("paymentVpas", {
       orgId: args.orgId,
       vpa: args.vpa,
       label: args.label,
@@ -273,6 +287,8 @@ export const upsertVpa = mutation({
       priority: args.priority,
       createdAt: Date.now(),
     });
+    await syncPrimaryVpa(ctx, args.orgId);
+    return id;
   },
 });
 
@@ -284,5 +300,6 @@ export const deleteVpa = mutation({
     if (!row || row.orgId !== orgId)
       throw new ConvexError({ code: "NOT_FOUND" });
     await ctx.db.delete(vpaId);
+    await syncPrimaryVpa(ctx, orgId);
   },
 });

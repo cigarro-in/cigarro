@@ -1,7 +1,10 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
-import { MutationCtx, internalMutation } from "./_generated/server";
+import { MutationCtx, internalMutation, query } from "./_generated/server";
+import { requireOrgAdmin } from "./lib/auth";
+import { isBankSenderAllowed, senderAddress } from "./lib/bankSenders";
 import { parseWithTemplates, parseBankEmail } from "./lib/email";
 import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
@@ -134,6 +137,25 @@ export const ingestBankEmail = internalMutation({
       args.htmlBody ||
       args.rawBody ||
       "";
+
+    // 3a) Store sender allowlist: a non-empty list ignores every other sender.
+    //     Stored as ignored (not dropped) so the message-id dedupe still holds.
+    const storeOrg = await ctx.db.get(orgId);
+    if (!isBankSenderAllowed(args.from, storeOrg?.allowedBankSenders)) {
+      const ignoredId = await ctx.db.insert("bankEmails", {
+        orgId,
+        gmailMessageId: args.messageId,
+        receivedAt: Date.now(),
+        amountPaise: 0,
+        senderEmail: args.from,
+        toAlias: toLower || undefined,
+        subject: args.subject,
+        rawBody: body,
+        status: "ignored",
+        adminNote: "sender not in store allowlist",
+      });
+      return { ignored: true, reason: "sender_not_allowed", emailId: ignoredId };
+    }
 
     // 4) Pick templates and attempt extraction
     const orgTemplates = await ctx.db
@@ -463,3 +485,242 @@ async function markOrderPaid(
     matchedOrderId: order._id,
   });
 }
+
+// ---------- Admin: payment statement + matched emails ----------
+
+type StatementKind = "order_credit" | "refund" | "fee";
+
+interface StatementEntry {
+  kind: StatementKind;
+  key: string; // `${kind}:${id}`, stable and unique
+  at: number;
+  amountPaise: number;
+  orderId: Id<"orders">;
+  orderNumber: number | null;
+  displayOrderId: string;
+  status: string;
+  senderEmail: string | null; // bank sender address for credits
+  destination: "wallet" | "bank" | null; // refunds only; null = legacy/unknown
+}
+
+interface StatementCursor {
+  at: number; // upper bound (inclusive) for the next page
+  ids: string[]; // keys already returned at exactly `at`
+}
+
+const NO_UPPER = Number.MAX_SAFE_INTEGER;
+
+function decodeStatementCursor(raw: string): StatementCursor {
+  try {
+    const c = JSON.parse(raw);
+    if (
+      typeof c?.at !== "number" ||
+      !Array.isArray(c?.ids) ||
+      !c.ids.every((x: unknown) => typeof x === "string")
+    )
+      throw new Error("bad shape");
+    return c as StatementCursor;
+  } catch {
+    throw new ConvexError({ code: "INVALID_CURSOR" });
+  }
+}
+
+/**
+ * Store money statement, newest first.
+ * - order_credit: orders credited by a bank email (verificationMethod "email"),
+ *   at = paidAt, amountPaise = finalAmountPaise (late-paid orders included).
+ * - refund: admin-refunded orders, at = terminalAt. destination says whether the
+ *   money went back to the wallet or out of the bank (null = legacy refund).
+ * - fee: reserved for platform fees; none are produced yet.
+ *
+ * `cursor` is opaque (returned as nextCursor). Totals cover the whole
+ * from/to range, not just the page. refundedPaise counts bank-side refunds
+ * (destination "bank" or unknown); wallet refunds are reported separately.
+ */
+export const listStatement = query({
+  args: {
+    orgId: v.id("organizations"),
+    from: v.optional(v.number()),
+    to: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+    limit: v.number(),
+  },
+  handler: async (ctx, { orgId, from, to, cursor, limit }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const pageSize = Math.min(Math.max(Math.floor(limit), 1), 100);
+    const lower = from ?? 0;
+    const upperRange = to ?? NO_UPPER;
+
+    let upper = upperRange;
+    let skip = new Set<string>();
+    if (cursor) {
+      const c = decodeStatementCursor(cursor);
+      upper = Math.min(upper, c.at);
+      skip = new Set(c.ids);
+    }
+
+    const take = pageSize + 1 + skip.size;
+    const credits = await ctx.db
+      .query("orders")
+      .withIndex("by_org_method_paid", (q) =>
+        q
+          .eq("orgId", orgId)
+          .eq("verificationMethod", "email")
+          .gte("paidAt", lower)
+          .lte("paidAt", upper),
+      )
+      .order("desc")
+      .take(take);
+    const refunds = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status_terminal", (q) =>
+        q
+          .eq("orgId", orgId)
+          .eq("status", "refunded")
+          .gte("terminalAt", lower)
+          .lte("terminalAt", upper),
+      )
+      .order("desc")
+      .take(take);
+
+    const creditEntries: StatementEntry[] = [];
+    for (const o of credits) {
+      if (o.paidAt === undefined) continue;
+      const email = o.bankEmailId ? await ctx.db.get(o.bankEmailId) : null;
+      creditEntries.push({
+        kind: "order_credit",
+        key: `order_credit:${o._id}`,
+        at: o.paidAt,
+        amountPaise: o.finalAmountPaise,
+        orderId: o._id,
+        orderNumber: o.orderNumber ?? null,
+        displayOrderId: o.displayOrderId,
+        status: o.status,
+        senderEmail: email ? senderAddress(email.senderEmail) : null,
+        destination: null,
+      });
+    }
+    const refundEntries: StatementEntry[] = [];
+    for (const o of refunds) {
+      if (o.terminalAt === undefined) continue;
+      refundEntries.push({
+        kind: "refund",
+        key: `refund:${o._id}`,
+        at: o.terminalAt,
+        amountPaise: o.finalAmountPaise,
+        orderId: o._id,
+        orderNumber: o.orderNumber ?? null,
+        displayOrderId: o.displayOrderId,
+        status: o.status,
+        senderEmail: null,
+        destination: o.refundDestination ?? null,
+      });
+    }
+
+    const merged = [...creditEntries, ...refundEntries]
+      .filter((e) => !skip.has(e.key))
+      .sort((a, b) => b.at - a.at || (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+
+    const entries = merged.slice(0, pageSize);
+    const hasMore = merged.length > pageSize;
+
+    let nextCursor: string | null = null;
+    if (hasMore && entries.length > 0) {
+      const lastAt = entries[entries.length - 1].at;
+      const ids = new Set<string>(
+        entries.filter((e) => e.at === lastAt).map((e) => e.key),
+      );
+      // Same-millisecond keys already returned on earlier pages must survive
+      // into the next cursor, or the next query would return them again.
+      if (cursor && lastAt === upper) {
+        for (const id of skip) ids.add(id);
+      }
+      nextCursor = JSON.stringify({ at: lastAt, ids: [...ids] } satisfies StatementCursor);
+    }
+
+    // Range totals (independent of the page).
+    const rangeCredits = await ctx.db
+      .query("orders")
+      .withIndex("by_org_method_paid", (q) =>
+        q
+          .eq("orgId", orgId)
+          .eq("verificationMethod", "email")
+          .gte("paidAt", lower)
+          .lte("paidAt", upperRange),
+      )
+      .collect();
+    const rangeRefunds = await ctx.db
+      .query("orders")
+      .withIndex("by_org_status_terminal", (q) =>
+        q
+          .eq("orgId", orgId)
+          .eq("status", "refunded")
+          .gte("terminalAt", lower)
+          .lte("terminalAt", upperRange),
+      )
+      .collect();
+    let creditedPaise = 0;
+    for (const o of rangeCredits) creditedPaise += o.finalAmountPaise;
+    let refundedPaise = 0; // bank-side refunds
+    let walletRefundedPaise = 0;
+    for (const o of rangeRefunds) {
+      if (o.refundDestination === "wallet") walletRefundedPaise += o.finalAmountPaise;
+      else refundedPaise += o.finalAmountPaise;
+    }
+
+    return {
+      entries,
+      nextCursor,
+      isDone: !hasMore,
+      totals: {
+        creditedPaise,
+        refundedPaise,
+        walletRefundedPaise,
+        feePaise: 0,
+        netPaise: creditedPaise - refundedPaise,
+      },
+    };
+  },
+});
+
+/**
+ * Bank emails that matched an order, newest first, with the linked order number.
+ */
+export const listMatchedEmails = query({
+  args: {
+    orgId: v.id("organizations"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, { orgId, paginationOpts }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const page = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_org_status", (q) =>
+        q.eq("orgId", orgId).eq("status", "matched"),
+      )
+      .order("desc")
+      .paginate(paginationOpts);
+    const rows = await Promise.all(
+      page.page.map(async (e) => {
+        const order = e.matchedOrderId ? await ctx.db.get(e.matchedOrderId) : null;
+        return {
+          _id: e._id,
+          receivedAt: e.receivedAt,
+          amountPaise: e.amountPaise,
+          senderEmail: senderAddress(e.senderEmail),
+          subject: e.subject ?? null,
+          upiRef: e.upiRef ?? null,
+          payerVpa: e.payerVpa ?? null,
+          orderId: order?._id ?? null,
+          orderNumber: order?.orderNumber ?? null,
+          displayOrderId: order?.displayOrderId ?? null,
+        };
+      }),
+    );
+    return {
+      page: rows,
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
+  },
+});

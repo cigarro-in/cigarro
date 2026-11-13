@@ -5,6 +5,7 @@ import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { LEGACY_ORG_SLUG, PRE_RENAME_LEGACY_SLUG } from "./lib/legacyOrg";
 import { role } from "./schema";
 import { adminStoresForPhone } from "./lib/adminStores";
+import { MAX_BANK_SENDERS, normalizeBankSenders } from "./lib/bankSenders";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
 const DEFAULT_QUARANTINE_MS = 20 * 60 * 1000; // 20 min — grace for late UPI arrivals
@@ -168,6 +169,33 @@ export const updateSettings = mutation({
       patch.slotsPerBase = args.slotsPerBase;
     }
     await ctx.db.patch(args.orgId, patch);
+  },
+});
+
+// Bank/UPI alert senders for this store (see convex/lib/bankSenders.ts).
+// Empty list = no sender filter.
+export const getAllowedBankSenders = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const org = await ctx.db.get(orgId);
+    return { senders: org?.allowedBankSenders ?? [] };
+  },
+});
+
+export const updateAllowedBankSenders = mutation({
+  args: {
+    orgId: v.id("organizations"),
+    senders: v.array(v.string()),
+  },
+  handler: async (ctx, { orgId, senders }) => {
+    await requireOrgAdmin(ctx, orgId);
+    if (senders.length > MAX_BANK_SENDERS)
+      throw new ConvexError({ code: "TOO_MANY_SENDERS" });
+    const normalized = normalizeBankSenders(senders);
+    if (normalized === null) throw new ConvexError({ code: "INVALID_SENDER" });
+    await ctx.db.patch(orgId, { allowedBankSenders: normalized });
+    return { senders: normalized };
   },
 });
 

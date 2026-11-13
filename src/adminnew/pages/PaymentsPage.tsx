@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, XCircle } from 'lucide-react';
 import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -53,11 +53,6 @@ export function PaymentsPage() {
     }
   }, []);
 
-  const checkInbox = useAction(api.gmail.triggerPoll);
-  const [checking, setChecking] = useState(false);
-  // Last inbox-check outcome, rendered inline next to the button (replaces
-  // the old success/info toasts — the page, not a popup, reports results).
-  const [checkNote, setCheckNote] = useState<string | null>(null);
   const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   const recentOrders = useQuery(
@@ -85,30 +80,6 @@ export function PaymentsPage() {
   const pendingCount = recentOrders?.filter((o: any) => o.status === 'pending').length ?? 0;
   const unmatchedCount = unmatched?.length ?? 0;
 
-  const handleCheckInbox = async () => {
-    setChecking(true);
-    setCheckNote(null);
-    try {
-      if (!org) { setOpError("No store selected"); return; }
-      const r: any = await checkInbox({ maxMessages: 20, orgId: org._id });
-      if (r?.error) {
-        setOpError(`Inbox check failed: ${r.error}`);
-      } else if (r?.skipped) {
-        setCheckNote(`Skipped: ${r.skipped}`);
-      } else if ((r?.fetched ?? 0) === 0) {
-        setCheckNote('Inbox check complete — no new bank emails.');
-      } else {
-        setCheckNote(
-          `Checked — ${r.fetched} email${r.fetched === 1 ? '' : 's'}${r.matched ? `, ${r.matched} matched` : ''}${r.duplicates ? `, ${r.duplicates} duplicate` : ''}${r.parseFailures ? `, ${r.parseFailures} unreadable` : ''}`,
-        );
-      }
-    } catch (e: any) {
-      setOpError(e?.data?.code || e?.message || 'Inbox check failed');
-    } finally {
-      setChecking(false);
-    }
-  };
-
   const tabs: Array<{ id: Tab; label: string; badge?: number | string; urgent?: boolean }> = [
     { id: 'overview', label: 'Overview', badge: pendingCount > 0 ? `${pendingCount} pending` : undefined },
     { id: 'unmatched', label: 'Unmatched', badge: unmatchedCount > 0 ? unmatchedCount : undefined, urgent: unmatchedCount > 0 },
@@ -117,25 +88,7 @@ export function PaymentsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title="Payments" description="UPI payment operations">
-        <div className="flex items-center gap-2">
-          {checkNote && (
-            <span className="text-xs text-muted-foreground max-w-80 truncate" title={checkNote}>
-              {checkNote}
-            </span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCheckInbox}
-            disabled={checking}
-            title="Poll Gmail now for new bank-alert emails"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-            {checking ? 'Checking...' : 'Check inbox now'}
-          </Button>
-        </div>
-      </PageHeader>
+      <PageHeader title="Payments" description="UPI payment operations" />
       <div className="mx-auto flex max-w-400 flex-col gap-4 px-4 py-4 sm:px-6">
         <InlineStatus status={opStatus} />
         <div className="flex gap-1 overflow-x-auto border-b border-border">
@@ -170,7 +123,7 @@ export function PaymentsPage() {
         )}
         {tab === 'unmatched' && <UnmatchedTab emails={unmatched} />}
         {tab === 'settings' && (
-          <SettingsTab org={org} settings={settings} gmailStatus={gmailStatus} setCheckNoteParent={setCheckNote} />
+          <SettingsTab org={org} settings={settings} gmailStatus={gmailStatus} />
         )}
       </div>
     </div>
@@ -203,7 +156,7 @@ function OverviewTab(props: {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : recentEmails.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No emails ingested yet. Click <b>Check inbox now</b> after a bank transaction.
+              No emails ingested yet. Bank alerts appear here automatically after a bank transaction.
             </p>
           ) : (
             <div className="divide-y">
@@ -349,10 +302,9 @@ function BankEmailRow({ email }: { email: any }) {
 
 // ---------- Settings ----------
 
-function SettingsTab(props: { org: any; settings: any; gmailStatus: any; setCheckNoteParent?: (s: string | null) => void }) {
-  const { org, settings, gmailStatus, setCheckNoteParent } = props;
+function SettingsTab(props: { org: any; settings: any; gmailStatus: any }) {
+  const { org, settings, gmailStatus } = props;
   const update = useMutation(api.organizations.updateSettings);
-  const triggerGmailPoll = useAction(api.gmail.triggerPoll);
 
   const [upiVpa, setUpiVpa] = useState('');
   const [walletEnabled, setWalletEnabled] = useState(true);
@@ -415,23 +367,6 @@ function SettingsTab(props: { org: any; settings: any; gmailStatus: any; setChec
     }
   };
 
-  const handleCheckInbox = async () => {
-    try {
-      if (!org) { setSettingsError("No store selected"); return; }
-      const r: any = await triggerGmailPoll({ maxMessages: 20, orgId: org._id });
-      if (r?.error) setSettingsError(r.error);
-      else setCheckNoteParent?.(
-        r?.skipped
-          ? `Skipped: ${r.skipped}`
-          : `Checked ${r?.fetched ?? 0} email(s)` +
-            (r?.matched ? `, ${r.matched} matched` : ', none matched a pending order') +
-            (r?.parseFailures ? `, ${r.parseFailures} unreadable` : ''),
-      );
-    } catch (e: any) {
-      setSettingsError(e?.data?.message || e?.message || 'Check failed');
-    }
-  };
-
   if (settings === undefined) return <p>Loading...</p>;
 
   return (
@@ -441,7 +376,6 @@ function SettingsTab(props: { org: any; settings: any; gmailStatus: any; setChec
         status={gmailStatus}
         orgId={org?._id}
         callbackUrl={GMAIL_CALLBACK_URL}
-        onCheckInbox={handleCheckInbox}
       />
 
       <AdminCard>
@@ -565,7 +499,6 @@ function GmailConnectionCard(props: {
   status: any;
   orgId: any;
   callbackUrl: string;
-  onCheckInbox: () => void;
 }) {
   const s = props.status;
   const [connecting, setConnecting] = useState(false);
@@ -724,10 +657,6 @@ function GmailConnectionCard(props: {
               {disconnecting ? 'Disconnecting…' : 'Disconnect'}
             </Button>
           )}
-          <span className="flex-1" />
-          <Button size="sm" variant="outline" onClick={props.onCheckInbox} disabled={connState !== 'active'}>
-            <RefreshCw className="w-4 h-4 mr-2" /> Check inbox now
-          </Button>
         </div>
       </AdminCardContent>
     </AdminCard>

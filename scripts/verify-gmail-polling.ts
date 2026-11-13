@@ -77,7 +77,7 @@ check("order-scoped terminal guard present", gmail.includes("order_terminal"));
 check("no-pending guard present", gmail.includes("no_pending_orders"));
 check("reconcile reason supported", gmail.includes('"reconcile"'));
 check("wake restarts backoff bounded to remaining timeout", gmail.includes("buildOrderPollOffsets") && gmail.includes("remaining"));
-check("manual check preserved", gmail.includes("triggerPoll"));
+check("admin manual trigger removed", !gmail.includes("triggerPoll"));
 
 const orders = read("convex/orders.ts");
 check("createOrder uses backoff builder", orders.includes("buildOrderPollOffsets"));
