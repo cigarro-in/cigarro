@@ -1,7 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
-import { requireIdentity, requireOrgAdmin } from "./lib/auth";
+import { internalMutation, internalQuery, mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { Doc, Id } from "./_generated/dataModel";
+import { requireIdentity, requireMember, requireOrgAdmin } from "./lib/auth";
+import { inOrg } from "./lib/org";
 import { LEGACY_ORG_SLUG, PRE_RENAME_LEGACY_SLUG } from "./lib/legacyOrg";
 import { role } from "./schema";
 import { adminStoresForPhone } from "./lib/adminStores";
@@ -305,5 +306,77 @@ export const renameLegacyOrgSlug = internalMutation({
     if (!legacy) return { renamed: false, reason: "no-legacy-org" };
     await ctx.db.patch(legacy._id, { slug: LEGACY_ORG_SLUG });
     return { renamed: true, orgId: legacy._id };
+  },
+});
+
+// ---------- Admin: store address and the signed-in admin's own profile ----------
+
+// The store's own public address: the primary domain when it is live, else the
+// platform-managed <slug>.<root> row. Null until one is active. Hostnames are
+// public routing data (resolveByHost serves them to anyone), so this query needs
+// no sign-in and never returns the admin host.
+export const storeHostname = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const org = await ctx.db.get(orgId);
+    if (!org || !org.active) return null;
+    const rows = await ctx.db
+      .query("orgDomains")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const primary = rows.find((r) => r.kind === "primary" && r.status === "active");
+    const managed = rows.find((r) => r.managed === true && r.status === "active");
+    const hostname = primary?.hostname ?? managed?.hostname ?? null;
+    return hostname ? { hostname, url: `https://${hostname}` } : null;
+  },
+});
+
+// The admin's row for this store. users is per store (orgId), so the subject
+// alone can match another store's row; inOrg keeps this store's row only.
+async function myUserRow(
+  ctx: QueryCtx | MutationCtx,
+  org: Doc<"organizations">,
+  subject: string,
+) {
+  const rows = await ctx.db
+    .query("users")
+    .withIndex("by_user", (q) => q.eq("userId", subject))
+    .collect();
+  return rows.find((r) => inOrg(r, org)) ?? null;
+}
+
+// Own profile in this store: name, masked-ready phone and store role. Member
+// only; the subject is taken from the token, never from an argument.
+export const myStoreProfile = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const { identity, membership } = await requireMember(ctx, orgId);
+    const org = await ctx.db.get(orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+    const row = await myUserRow(ctx, org, identity.subject);
+    return {
+      name: row?.name ?? null,
+      phone: row?.phone ?? null,
+      role: membership.role,
+    };
+  },
+});
+
+// Renames the signed-in admin's own row in this store. Auth-checked to self:
+// the row is chosen by the token subject, so no one can rename another user.
+export const updateMyName = mutation({
+  args: { orgId: v.id("organizations"), name: v.string() },
+  handler: async (ctx, { orgId, name }) => {
+    const { identity } = await requireMember(ctx, orgId);
+    const org = await ctx.db.get(orgId);
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
+    const clean = name.replace(/\s+/g, " ").trim();
+    if (clean.length < 1 || clean.length > 60) {
+      throw new ConvexError({ code: "INVALID_NAME" });
+    }
+    const row = await myUserRow(ctx, org, identity.subject);
+    if (!row) throw new ConvexError({ code: "NO_USER_ROW" });
+    await ctx.db.patch(row._id, { name: clean, updatedAt: Date.now() });
+    return { name: clean };
   },
 });
