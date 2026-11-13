@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { Check, Smartphone, RefreshCw, Wallet, X, Clock, Download } from 'lucide-react';
+import { Check, Smartphone, RefreshCw, Wallet, X, Clock } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { UpiPayControls } from '../../components/payment/UpiAppPicker';
+import { QrShareButton } from '../../components/payment/QrShareButton';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
 import { api } from '../../../convex/_generated/api';
@@ -229,16 +231,6 @@ export function TransactionProcessingPage() {
   // Download reuses the already-generated QR data URL — same pixels, same
   // server-generated UPI URL. Never regenerate with different params.
   const qrFilename = `${orgSlug}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
-  const qrDownloadSupported =
-    typeof document !== 'undefined' && 'download' in document.createElement('a');
-  // Explicit UPI app choices: same params, app-specific scheme so the OS
-  // opens the chosen app directly.
-  const upiQuery = order.upiUrl?.split('?')[1] ?? '';
-  const upiAppLinks = [
-    { label: 'GPay', url: `tez://upi/pay?${upiQuery}` },
-    { label: 'PhonePe', url: `phonepe://pay?${upiQuery}` },
-    { label: 'Paytm', url: `paytmmp://pay?${upiQuery}` },
-  ];
   const refreshExhausted = refreshCount >= MAX_MANUAL_REFRESH;
   // Fall back to the 10-min server default so the countdown never NaNs when
   // the org row hasn't loaded or predates the slotTimeoutMs field.
@@ -440,28 +432,7 @@ export function TransactionProcessingPage() {
         </motion.div>
 
         <div className="space-y-3">
-          {order.upiUrl && (
-            <>
-              <p className="text-xs text-coyote font-medium">Choose how to pay</p>
-              <div className="grid grid-cols-2 gap-2">
-                {upiAppLinks.map((app) => (
-                  <button
-                    key={app.label}
-                    onClick={() => (window.location.href = app.url)}
-                    className="h-11 rounded-xl border border-coyote/30 bg-white/60 text-sm font-bold text-dark hover:border-canyon hover:text-canyon transition-colors"
-                  >
-                    {app.label}
-                  </button>
-                ))}
-                <button
-                  onClick={() => (window.location.href = order.upiUrl as string)}
-                  className="h-11 rounded-xl border border-coyote/30 bg-white/60 text-sm font-bold text-dark hover:border-canyon hover:text-canyon transition-colors"
-                >
-                  Other UPI app
-                </button>
-              </div>
-            </>
-          )}
+          {order.upiUrl && <UpiPayControls upiUrl={order.upiUrl} orgSlug={orgSlug} />}
 
           {qrCode && (
             <div>
@@ -469,21 +440,16 @@ export function TransactionProcessingPage() {
                 <img src={qrCode} alt={`UPI QR for order ${orderLabel}`} className="w-36 h-36 mix-blend-multiply" />
                 <p className="text-[11px] text-coyote mt-1.5 font-mono">Scan with any UPI app</p>
               </div>
-              <div className="mt-2">
-                {qrDownloadSupported ? (
-                  <a
-                    href={qrCode}
-                    download={qrFilename}
-                    aria-label={`Download UPI QR for order ${orderLabel}`}
-                    className="inline-flex items-center gap-1.5 text-sm font-bold text-canyon hover:underline focus-visible:outline-2 focus-visible:outline-canyon rounded"
-                  >
-                    <Download className="w-4 h-4" aria-hidden="true" />
-                    Download QR
-                  </a>
-                ) : (
-                  <p className="text-xs text-coyote">Downloads aren’t supported here — long-press or screenshot the QR to save it.</p>
-                )}
-              </div>
+              {order.upiUrl && (
+                <div className="mt-2">
+                  <QrShareButton
+                    qrDataUrl={qrCode}
+                    filename={qrFilename}
+                    upiUrl={order.upiUrl}
+                    title={`Pay order ${orderLabel}`}
+                  />
+                </div>
+              )}
             </div>
           )}
 
