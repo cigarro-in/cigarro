@@ -1,4 +1,5 @@
 import { LEGACY_ORG_SLUG } from '../../lib/legacyOrg.js';
+import { getRequestOrg } from '../../lib/org.js';
 import { requiredConvexUrl } from '../../lib/env.js';
 /**
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).

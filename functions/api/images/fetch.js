@@ -1,4 +1,5 @@
 import { requiredConvexUrl } from '../../lib/env.js';
+import { getRequestOrg } from '../../lib/org.js';
 /**
  * Remote-image byte proxy for admin web-search imports.
  *
