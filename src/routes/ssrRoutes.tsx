@@ -13,6 +13,8 @@ import { HomePage } from '../pages/home/HomePage';
 import { VividHome } from '../themes/vivid/VividHome';
 import ProductPage from '../pages/products/ProductPage';
 import VividProduct from '../themes/vivid/VividProduct';
+import { MinimalHome } from '../themes/minimal/MinimalHome';
+import MinimalProduct from '../themes/minimal/MinimalProduct';
 import NotFoundPage from '../pages/NotFoundPage';
 import { useCatalogProduct } from '../hooks/data/useCatalog';
 import { useSetRenderStatus } from '../lib/ssr/renderStatus';
@@ -39,6 +41,7 @@ import {
 const EAGER_HOME: Record<string, ComponentType> = {
   classic: HomePage,
   vivid: VividHome,
+  minimal: MinimalHome,
 };
 
 // Eager product component per theme. A theme without an entry is not served
@@ -46,6 +49,7 @@ const EAGER_HOME: Record<string, ComponentType> = {
 const EAGER_PRODUCT: Record<string, ComponentType> = {
   classic: ProductPage,
   vivid: VividProduct,
+  minimal: MinimalProduct,
 };
 
 function SsrHome() {

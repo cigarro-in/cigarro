@@ -1,8 +1,9 @@
 import type { ThemeManifest } from './types';
 import { classicTheme } from './classic';
 import { vividTheme } from './vivid';
+import { minimalTheme } from './minimal';
 
-export const themes: ThemeManifest[] = [classicTheme, vividTheme];
+export const themes: ThemeManifest[] = [classicTheme, vividTheme, minimalTheme];
 
 export const DEFAULT_THEME_ID = classicTheme.id;
 
