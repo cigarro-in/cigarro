@@ -1,33 +1,31 @@
+import type { ReactNode } from 'react';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '../../components/ui/sidebar';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
-import { ReactNode } from 'react';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '../../components/ui/sidebar';
+import { useOrg } from '../../lib/convex/useOrg';
 import { AdminSidebar } from './AdminSidebar';
-
-interface AdminShellProps {
-  children: ReactNode;
-}
+import { GmailBanner } from './GmailBanner';
+import { StoreIcon } from './AdminStoreMenu';
 
 /**
- * Admin Shell - Main layout wrapper
- * Provides consistent sidebar and header across all admin pages
- * Shell stays mounted during navigation to prevent flickering
+ * Admin shell: persistent sidebar (drawer on phones), a slim mobile top bar,
+ * the Gmail connection banner, and the routed page. The shell stays mounted
+ * across navigation so route changes never flash the frame.
  */
-export function AdminShell({ children }: AdminShellProps) {
+export function AdminShell({ children }: { children: ReactNode }) {
   const { settings: store } = useStoreSettings();
+  const org = useOrg();
+  const name = org?.name || store.name;
   return (
     <SidebarProvider data-admin-shell>
       <AdminSidebar />
-      <SidebarInset className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background px-3 md:hidden">
-          <SidebarTrigger />
-          <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">C</span>
-            <span className="text-sm font-semibold">{store.name}</span>
-          </div>
+      <SidebarInset className="flex min-h-svh min-w-0 flex-col bg-[var(--admin-bg)]">
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-[var(--admin-border)] bg-[var(--admin-surface)] px-2 md:hidden">
+          <SidebarTrigger className="size-9" aria-label="Open navigation" />
+          <StoreIcon name={name} iconUrl={store.brand.faviconUrl || store.brand.logoUrl || undefined} size="sm" />
+          <span className="min-w-0 truncate text-sm font-semibold">{name}</span>
         </header>
-        <main className="flex-1">
-          {children}
-        </main>
+        <GmailBanner />
+        <main className="min-w-0 flex-1">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

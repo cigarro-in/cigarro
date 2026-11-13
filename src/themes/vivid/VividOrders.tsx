@@ -124,7 +124,7 @@ function OrderCard({ order }: { order: NormalizedOrder }) {
 
   const meta = badgeFor(order);
   const Icon = meta.icon;
-  const numberLabel = order.orderNumber !== undefined ? `#${order.orderNumber}` : `#${order.displayOrderId}`;
+  const numberLabel = order.orderNumber !== undefined ? String(order.orderNumber) : order.displayOrderId;
   const showsDisplayId = order.orderNumber !== undefined;
   const canContinue = order.paymentStatus === 'pending';
   const canRetry = RETRYABLE.has(order.paymentStatus);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { PhoneAuthDialog } from '../components/auth/PhoneAuthDialog';
 import { AuthError } from '../hooks/useAuth';
 import { listStoredSessionSlugs, storeSessionForStore } from '../lib/auth/session';
+import { AdminLogin } from './AdminLogin';
 
 /**
  * admin.<root>/ with no store in the path. Phone-only sign-in: the OTP is
@@ -12,14 +12,13 @@ import { listStoredSessionSlugs, storeSessionForStore } from '../lib/auth/sessio
 export function StorePicker() {
   // A valid session already on this origin: go straight to that store.
   const [resumeSlug] = useState<string | null>(() => listStoredSessionSlugs()[0] ?? null);
-  const [loginOpen, setLoginOpen] = useState(false);
 
   useEffect(() => {
     if (resumeSlug) window.location.replace(`/${resumeSlug}/`);
   }, [resumeSlug]);
 
-  // Runs after the MSG91 OTP is verified in PhoneAuthDialog. Errors thrown here
-  // (for example NO_ADMIN_ACCESS) show inline in the dialog.
+  // Runs after the MSG91 OTP is verified. Errors thrown here (for example
+  // NO_ADMIN_ACCESS) show inline on the login card.
   const verifyAdminPhone = async ({ phone, token, countryCode }: { phone: string; token: string; countryCode: string }) => {
     let res: Response;
     try {
@@ -39,29 +38,15 @@ export function StorePicker() {
     }
     storeSessionForStore(data.store, data.cigarro_token, data.user_id, data.phone || phone);
     window.location.assign(`/${data.store}/`);
-    return { isNewUser: false };
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-creme px-4">
-      {resumeSlug ? (
-        <p className="text-sm text-muted-foreground">Opening your store...</p>
-      ) : (
-        <div className="w-full max-w-sm space-y-4 text-center">
-          <p className="font-bold text-lg">Cigarro Admin</p>
-          <p className="text-sm text-muted-foreground">
-            Sign in with your admin phone number. Your stores open after sign-in.
-          </p>
-          <button
-            type="button"
-            onClick={() => setLoginOpen(true)}
-            className="h-11 w-full rounded-xl bg-canyon text-creme font-semibold text-base"
-          >
-            Sign in with phone
-          </button>
-        </div>
-      )}
-      <PhoneAuthDialog open={loginOpen} onOpenChange={setLoginOpen} onVerified={verifyAdminPhone} />
-    </div>
-  );
+  if (resumeSlug) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--admin-bg)] px-4">
+        <p className="text-sm text-[var(--admin-text-muted)]">Opening your store...</p>
+      </div>
+    );
+  }
+
+  return <AdminLogin onVerified={verifyAdminPhone} />;
 }

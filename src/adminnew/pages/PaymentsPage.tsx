@@ -189,7 +189,7 @@ function OverviewTab(props: {
                   onClick={() => props.onOpenOrder(o._id)}
                 >
                   <div>
-                    <p className="font-mono text-sm font-semibold">#{orderNumberOf(o) ?? o.displayOrderId}</p>
+                    <p className="font-mono text-sm font-semibold">{orderNumberOf(o) ?? o.displayOrderId}</p>
                     {orderNumberOf(o) !== undefined && (
                       <p className="font-mono text-[11px] text-muted-foreground">{o.displayOrderId}</p>
                     )}

@@ -1,26 +1,15 @@
-import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import type { LucideIcon } from 'lucide-react';
 import {
-  Boxes,
-  Building2,
-  ChevronUp,
   CreditCard,
   FileText,
-  FolderOpen,
-  Home,
   Image as ImageIcon,
   LayoutDashboard,
-  LogOut,
-  Megaphone,
   Package,
   Percent,
-  ReceiptIndianRupee,
+  Search,
   Settings,
   ShoppingCart,
-  ArrowRightLeft,
-  Gauge,
   Star,
-  Tags,
   Users,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -30,189 +19,154 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from '../../components/ui/sidebar';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import { useAuth } from '../../hooks/useAuth';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrg } from '../../lib/convex/useOrg';
 import { AdminStoreMenu } from './AdminStoreMenu';
-import { signOutOfAdmin } from '../lib/adminAuth';
 
-interface NavItem {
+export interface NavChild {
+  label: string;
+  path: string;
+}
+
+export interface NavItem {
   label: string;
   path: string;
   icon: LucideIcon;
+  /** Shown under the item while any of its paths is active. */
+  children?: NavChild[];
 }
 
-interface NavSection {
-  label?: string;
+export interface NavSection {
+  /** 'main' renders in the scrolling list; 'bottom' sits above the footer edge. */
+  placement: 'main' | 'bottom';
   items: NavItem[];
 }
 
+/**
+ * Sidebar navigation. Paths are router-relative (basename is /<store>).
+ * Hidden from nav but still routed (see ADMIN_ROUTES): Invoices, Inventory,
+ * Marketing, Homepage, Redirects.
+ */
 export const ADMIN_NAVIGATION: NavSection[] = [
   {
-    items: [{ label: 'Overview', path: '/', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Sales',
+    placement: 'main',
     items: [
+      { label: 'Overview', path: '/', icon: LayoutDashboard },
       { label: 'Orders', path: '/orders', icon: ShoppingCart },
+      {
+        label: 'Products',
+        path: '/products',
+        icon: Package,
+        children: [
+          { label: 'Collections', path: '/collections' },
+          { label: 'Categories', path: '/categories' },
+          { label: 'Brands', path: '/brands' },
+        ],
+      },
       { label: 'Customers', path: '/customers', icon: Users },
-      { label: 'Payments', path: '/payments', icon: CreditCard },
-      { label: 'Invoices', path: '/invoices', icon: ReceiptIndianRupee },
-    ],
-  },
-  {
-    label: 'Catalog',
-    items: [
-      { label: 'Products', path: '/products', icon: Package },
-      { label: 'Inventory', path: '/inventory', icon: Boxes },
-      { label: 'Collections', path: '/collections', icon: FolderOpen },
-      { label: 'Categories', path: '/categories', icon: Tags },
-      { label: 'Brands', path: '/brands', icon: Building2 },
-    ],
-  },
-  {
-    label: 'Growth',
-    items: [
-      { label: 'Marketing', path: '/marketing', icon: Megaphone },
       { label: 'Discounts', path: '/discounts', icon: Percent },
-    ],
-  },
-  {
-    label: 'Storefront',
-    items: [
-      { label: 'Homepage', path: '/homepage', icon: Home },
       { label: 'Reviews', path: '/reviews', icon: Star },
-      { label: 'Blogs', path: '/blogs', icon: FileText },
+      { label: 'Content', path: '/blogs', icon: FileText, children: [{ label: 'Blogs', path: '/blogs' }] },
+      { label: 'SEO', path: '/seo', icon: Search },
       { label: 'Assets', path: '/assets', icon: ImageIcon },
     ],
   },
   {
-    label: 'SEO',
+    placement: 'bottom',
     items: [
-      { label: 'SEO health', path: '/seo', icon: Gauge },
-      { label: 'Redirects', path: '/seo/redirects', icon: ArrowRightLeft },
+      { label: 'Payments', path: '/payments', icon: CreditCard },
+      { label: 'Settings', path: '/settings', icon: Settings },
     ],
   },
 ];
 
-function getInitial(value?: string | null) {
-  return value?.trim().charAt(0).toUpperCase() || 'C';
+function matches(pathname: string, path: string) {
+  if (path === '/') return pathname === '/';
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+function NavList({ items, pathname, onNavigate }: { items: NavItem[]; pathname: string; onNavigate: () => void }) {
+  return (
+    <SidebarMenu className="gap-0.5">
+      {items.map((item) => {
+        const childPaths = item.children?.map((c) => c.path) ?? [];
+        const ownActive = matches(pathname, item.path);
+        const childActive = childPaths.some((p) => p !== item.path && matches(pathname, p));
+        const groupActive = ownActive || childActive;
+        // Only show sub items when there is more than the item itself.
+        const subItems = item.children?.filter((c) => c.path !== item.path) ?? [];
+        return (
+          <SidebarMenuItem key={item.path}>
+            <SidebarMenuButton
+              asChild
+              isActive={ownActive && !childActive}
+              tooltip={item.label}
+              className="h-8 font-medium data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-semibold"
+            >
+              <NavLink to={item.path} end={item.path === '/'} onClick={onNavigate}>
+                <item.icon aria-hidden />
+                <span>{item.label}</span>
+              </NavLink>
+            </SidebarMenuButton>
+            {groupActive && subItems.length > 0 && (
+              <SidebarMenuSub className="mr-0 border-l-0 pr-0">
+                {subItems.map((child) => (
+                  <SidebarMenuSubItem key={child.path}>
+                    <SidebarMenuSubButton
+                      asChild
+                      isActive={matches(pathname, child.path)}
+                      className="data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-medium"
+                    >
+                      <NavLink to={child.path} onClick={onNavigate}>
+                        {child.label}
+                      </NavLink>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            )}
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
 }
 
 export function AdminSidebar() {
   const { settings: store } = useStoreSettings();
-  const location = useLocation();
+  const { pathname } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
-  const { user } = useAuth();
   const org = useOrg();
-
-  const isActive = (path: string) =>
-    path === '/'
-      ? location.pathname === path
-      : location.pathname.startsWith(path);
-
-  const closeMobileSidebar = () => {
+  const close = () => {
     if (isMobile) setOpenMobile(false);
   };
+  const main = ADMIN_NAVIGATION.filter((s) => s.placement === 'main').flatMap((s) => s.items);
+  const bottom = ADMIN_NAVIGATION.filter((s) => s.placement === 'bottom').flatMap((s) => s.items);
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <AdminStoreMenu storeName={org?.name || store.name} />
+    <Sidebar collapsible="icon" variant="floating" className="p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1.5rem+2px)]">
+      <SidebarHeader className="p-2">
+        <AdminStoreMenu storeName={org?.name || store.name} iconUrl={store.brand.faviconUrl || store.brand.logoUrl || undefined} />
       </SidebarHeader>
-
       <SidebarContent>
-        {ADMIN_NAVIGATION.map((section, sectionIndex) => (
-          <SidebarGroup key={section.label || 'overview'} className={sectionIndex === 0 ? 'pb-0' : undefined}>
-            {section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {section.items.map((item) => (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.path)}
-                      tooltip={item.label}
-                    >
-                      <NavLink to={item.path} end={item.path === '/'} onClick={closeMobileSidebar}>
-                        <item.icon aria-hidden />
-                        <span>{item.label}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        <SidebarGroup className="pt-1">
+          <SidebarGroupContent>
+            <NavList items={main} pathname={pathname} onNavigate={close} />
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive('/settings')}
-              tooltip="Settings"
-            >
-              <NavLink to="/settings" onClick={closeMobileSidebar}>
-                <Settings aria-hidden />
-                <span>Settings</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <SidebarSeparator />
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" tooltip="Account">
-                  <Avatar className="size-8 rounded-md">
-                    <AvatarFallback className="rounded-md">
-                      {getInitial(user?.name || user?.email || user?.phone)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="grid min-w-0 flex-1 text-left leading-tight">
-                    <span className="truncate font-medium">{user?.name || 'Admin'}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user?.phone || user?.email || 'Account'}
-                    </span>
-                  </span>
-                  <ChevronUp className="ml-auto" aria-hidden />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-56">
-                <DropdownMenuLabel>Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onSelect={() => signOutOfAdmin()}>
-                    <LogOut aria-hidden />
-                    Sign out
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarFooter className="p-2">
+        <NavList items={bottom} pathname={pathname} onNavigate={close} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

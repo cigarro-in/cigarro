@@ -380,7 +380,7 @@ export function OrdersPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0 pr-3">
                         <h3 className="font-mono tracking-tight text-base md:text-lg text-foreground font-bold mb-1">
-                          Order #{order.orderNumber ?? order.displayOrderId}
+                          Order {order.orderNumber ?? order.displayOrderId}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{new Date(order.createdAt).toLocaleDateString('en-IN', {

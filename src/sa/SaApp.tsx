@@ -10,6 +10,7 @@ import { StoreDetailPage } from './pages/StoreDetailPage';
 import { PlatformConfigPage } from './pages/PlatformConfigPage';
 import { DomainsPage } from './pages/DomainsPage';
 import { StoreImportPage } from './pages/StoreImportPage';
+import { AdminRoot } from '../adminnew/AdminRoot';
 
 // Citadel super-admin app, mounted for admin.<root>/sa/*. No store is injected
 // (window.__ORG__ is null) and the page is never indexed.
@@ -26,6 +27,7 @@ export function SaApp() {
   }, []);
 
   return (
+    <AdminRoot>
     <ErrorBoundary>
       <ConvexProvider client={convex}>
         <BrowserRouter>
@@ -44,5 +46,6 @@ export function SaApp() {
         </BrowserRouter>
       </ConvexProvider>
     </ErrorBoundary>
+    </AdminRoot>
   );
 }

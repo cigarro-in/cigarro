@@ -168,7 +168,7 @@ export function CustomerFormPage() {
                   <button key={order.id} type="button" onClick={() => navigate(`/orders/${order.id}`)} className="flex w-full items-center justify-between rounded-lg border border-border p-4 text-left transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <div>
                       <div className="font-medium text-foreground">
-                        #{order.order_number ?? order.display_order_id}
+                        {order.order_number ?? order.display_order_id}
                       </div>
                       {order.order_number !== undefined && (
                         <div className="font-mono text-[11px] text-muted-foreground">{order.display_order_id}</div>

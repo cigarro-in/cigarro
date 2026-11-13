@@ -1,45 +1,32 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ArrowRight, ShoppingCart, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
-import { useOrgInfo } from '../../lib/org/OrgContext';
-import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
 import {
+  Button,
   Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../../components/ui/card';
-import { Empty, EmptyHeader, EmptyTitle } from '../../components/ui/empty';
-import { Skeleton } from '../../components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
-import { PageHeader } from '../components/shared/PageHeader';
-import { useAdminStores } from '../hooks/useAdminStores';
-import { switchAdminStore } from '../lib/adminAuth';
+  DataTable,
+  EmptyState,
+  Page,
+  PageLayout,
+  Skeleton,
+  StatusBadge,
+  Tabs,
+  formatOrderDate,
+  formatOrderNumber,
+  type Column,
+} from '../ui';
 
 interface RecentOrder {
   id: string;
-  orderNumber?: number;
-  displayOrderId: string;
+  number: string;
   customer: string;
   total: number;
-  status: string;
+  paymentStatus: string;
+  shippingStatus: string | null;
   createdAt: number;
 }
 
@@ -50,143 +37,105 @@ interface RecentCustomer {
   createdAt: number;
 }
 
-function statusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (['paid', 'late_paid', 'delivered'].includes(status)) return 'default';
-  if (['pending', 'awaiting', 'processing', 'shipped'].includes(status)) return 'secondary';
-  if (['cancelled', 'refunded', 'voided'].includes(status)) return 'destructive';
-  return 'outline';
-}
-
-function statusLabel(status: string) {
-  return status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function initial(value: string) {
-  return value.trim().charAt(0).toUpperCase() || 'U';
-}
-
-function activateRow(event: KeyboardEvent<HTMLTableRowElement>, action: () => void) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    action();
-  }
-}
-
-function SummaryMetric({
-  label,
-  value,
-  onClick,
-}: {
-  label: string;
-  value: ReactNode;
-  onClick?: () => void;
-}) {
-  const content = (
+function Metric({ label, value, to }: { label: string; value: ReactNode; to?: string }) {
+  const body = (
     <>
-      <span className="text-xs font-normal text-muted-foreground">{label}</span>
-      <span className="text-xl font-semibold tabular-nums sm:text-2xl">{value}</span>
+      <span className="text-[13px] text-[var(--admin-text-muted)]">{label}</span>
+      <span className="text-xl font-semibold tabular-nums text-[var(--admin-text)]">{value}</span>
     </>
   );
+  const cls = 'flex flex-col gap-1 p-4';
+  return to ? (
+    <Link to={to} className={`${cls} transition-colors hover:bg-[var(--admin-surface-hover)]`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
 
-  if (!onClick) {
-    return <div className="flex flex-col items-start gap-1 p-4 sm:p-5">{content}</div>;
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      className="h-auto w-full flex-col items-start gap-1 rounded-none p-4 text-left sm:p-5"
-      onClick={onClick}
-    >
+function StoreRow({ label, value, to }: { label: string; value: ReactNode; to?: string }) {
+  const cls = 'flex h-9 items-center justify-between gap-3 rounded-[var(--admin-radius-sm)] px-2 text-sm';
+  const content = (
+    <>
+      <span className="text-[var(--admin-text-muted)]">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
+    </>
+  );
+  return to ? (
+    <Link to={to} className={`${cls} hover:bg-[var(--admin-surface-hover)]`}>
       {content}
-    </Button>
+    </Link>
+  ) : (
+    <div className={cls}>{content}</div>
   );
 }
 
-function StoreMetric({ label, value, onClick }: { label: string; value: ReactNode; onClick?: () => void }) {
-  if (!onClick) {
-    return (
-      <div className="flex h-9 items-center justify-between px-4 text-sm">
-        <span>{label}</span>
-        <span className="tabular-nums">{value}</span>
-      </div>
-    );
-  }
+const ORDER_COLUMNS: Column<RecentOrder>[] = [
+  { id: 'number', header: 'Order', cell: (o) => <span className="font-medium tabular-nums">{o.number}</span> },
+  { id: 'date', header: 'Date', hideBelow: 'sm', cell: (o) => <span className="text-[var(--admin-text-muted)]">{formatOrderDate(o.createdAt)}</span> },
+  { id: 'customer', header: 'Customer', hideBelow: 'md', cell: (o) => o.customer || 'Guest' },
+  { id: 'status', header: 'Status', cell: (o) => <StatusBadge order={{ status: o.paymentStatus, shippingStatus: o.shippingStatus }} /> },
+  { id: 'total', header: 'Total', align: 'right', cell: (o) => <span className="tabular-nums">{formatINR(o.total)}</span> },
+];
 
-  return (
-    <Button variant="ghost" className="justify-between" onClick={onClick}>
-      <span>{label}</span>
-      <span className="tabular-nums">{value}</span>
-    </Button>
-  );
-}
+const CUSTOMER_COLUMNS: Column<RecentCustomer>[] = [
+  { id: 'name', header: 'Customer', cell: (c) => <span className="font-medium">{c.name || 'Unknown'}</span> },
+  { id: 'contact', header: 'Phone', cell: (c) => <span className="tabular-nums">{c.contact || '-'}</span> },
+  { id: 'joined', header: 'Joined', align: 'right', cell: (c) => <span className="text-[var(--admin-text-muted)]">{formatOrderDate(c.createdAt)}</span> },
+];
 
-function DashboardSkeleton() {
+function OverviewSkeleton() {
   return (
-    <div className="flex flex-col gap-4" aria-label="Loading dashboard">
-      <Card className="gap-0 py-0">
-        <CardContent className="grid grid-cols-2 p-0 sm:grid-cols-4">
-          {[0, 1, 2, 3].map((item) => (
-            <div key={item} className="flex flex-col gap-2 p-5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-7 w-24" />
+    <>
+      <Card padding="none">
+        <div className="grid grid-cols-2 divide-x divide-y divide-[var(--admin-border)] sm:grid-cols-4 sm:divide-y-0">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col gap-2 p-4">
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-6 w-24" />
             </div>
           ))}
-        </CardContent>
+        </div>
       </Card>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <Skeleton className="h-5 w-24" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-10 w-full" />)}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-20" />
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-8 w-full" />)}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <PageLayout
+        main={
+          <Card padding="none" title="Recent">
+            <div className="flex flex-col gap-3 p-4">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          </Card>
+        }
+        aside={
+          <Card title="Store">
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-5 w-full" />
+              ))}
+            </div>
+          </Card>
+        }
+      />
+    </>
   );
 }
 
+/** Overview. Reference implementation of the admin UI primitives (see ../ui/README.md). */
 export function DashboardPage() {
   const navigate = useNavigate();
   const org = useOrg();
-  const data = useQuery(
-    api.adminStats.getDashboardStats,
-    org ? { orgId: org._id } : 'skip',
-  );
-  const { stores } = useAdminStores();
-  const currentSlug = useOrgInfo().slug;
-  const storeSwitch = useInlineStatus();
-  const [switching, setSwitching] = useState(false);
-
-  const handleSwitchStore = async (targetSlug: string) => {
-    storeSwitch.clear();
-    setSwitching(true);
-    try {
-      // Navigates to the target store on success.
-      await switchAdminStore(targetSlug);
-    } catch (error) {
-      storeSwitch.setError(error instanceof Error ? error.message : 'Could not switch store.');
-      setSwitching(false);
-    }
-  };
+  const data = useQuery(api.adminStats.getDashboardStats, org ? { orgId: org._id } : 'skip');
+  const [view, setView] = useState<'orders' | 'customers'>('orders');
 
   const recentOrders: RecentOrder[] = (data?.recentOrders ?? []).map((order) => ({
     id: String(order.id),
-    orderNumber: order.order_number,
-    displayOrderId: order.display_order_id,
+    number: formatOrderNumber(order.order_number, order.display_order_id),
     customer: order.shipping_name,
     total: order.total,
-    status: order.status,
+    paymentStatus: order.payment_status,
+    shippingStatus: order.shipping_status,
     createdAt: Number(order.created_at),
   }));
 
@@ -198,228 +147,73 @@ export function DashboardPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader title="Overview" />
-
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 pb-6 sm:px-6">
-        {stores.length > 1 && (
-          <Card className="gap-0 py-0">
-            <CardHeader className="p-4 sm:p-5">
-              <CardTitle>Your stores</CardTitle>
-              <CardDescription>Switching uses this admin session. No new code is needed.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-px p-0">
-              {stores.map((store) => {
-                const isCurrent = store.slug === currentSlug;
-                return (
-                  <Button
-                    key={store.slug}
-                    variant="ghost"
-                    className="h-auto justify-between rounded-none p-4 text-left sm:px-5"
-                    disabled={isCurrent || switching}
-                    onClick={() => void handleSwitchStore(store.slug)}
-                  >
-                    <span className="truncate font-semibold">{store.name}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {isCurrent ? 'Current' : 'Open'}
-                    </span>
-                  </Button>
-                );
-              })}
-            </CardContent>
-            {storeSwitch.status.kind && (
-              <div className="p-4 pt-0 sm:px-5">
-                <InlineStatus status={storeSwitch.status} />
-              </div>
-            )}
-          </Card>
-        )}
-        {data === undefined ? (
-          <DashboardSkeleton />
-        ) : (
-          <>
-            <Card className="gap-0 py-0">
-              <CardContent className="grid grid-cols-2 divide-x divide-y p-0 sm:grid-cols-4 sm:divide-y-0">
-                <SummaryMetric
-                  label="Sales today"
-                  value={formatINR(data?.todayRevenue ?? 0)}
-                />
-                <SummaryMetric
-                  label="Orders today"
-                  value={data?.todayOrders ?? 0}
-                />
-                <SummaryMetric
-                  label="To fulfil"
-                  value={data?.processingOrders ?? 0}
-                  onClick={() => navigate('/orders?status=processing')}
-                />
-                <SummaryMetric
-                  label="Low stock"
-                  value={data?.lowStockCount ?? 0}
-                  onClick={() => navigate('/inventory?lowStock=1')}
-                />
-              </CardContent>
-            </Card>
-
-            <div className="grid items-start gap-4 lg:grid-cols-3">
-              <Tabs defaultValue="orders" className="gap-0 lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recent</CardTitle>
-                    <CardAction>
-                      <TabsList>
-                        <TabsTrigger value="orders">Orders</TabsTrigger>
-                        <TabsTrigger value="customers">Customers</TabsTrigger>
-                      </TabsList>
-                    </CardAction>
-                  </CardHeader>
-                  <CardContent>
-                    <TabsContent value="orders" className="flex flex-col gap-3">
-                      {recentOrders.length === 0 ? (
-                        <Empty className="min-h-48 border">
-                          <EmptyHeader>
-                            <ShoppingCart aria-hidden />
-                            <EmptyTitle>No orders yet</EmptyTitle>
-                          </EmptyHeader>
-                        </Empty>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Order</TableHead>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {recentOrders.map((order) => {
-                              const openOrder = () => navigate(`/orders/${order.id}`);
-                              return (
-                                <TableRow
-                                  key={order.id}
-                                  role="link"
-                                  tabIndex={0}
-                                  className="cursor-pointer"
-                                  aria-label={`Open order ${order.orderNumber ?? order.displayOrderId}`}
-                                  onClick={openOrder}
-                                  onKeyDown={(event) => activateRow(event, openOrder)}
-                                >
-                                  <TableCell className="font-medium">#{order.orderNumber ?? order.displayOrderId}</TableCell>
-                                  <TableCell>{order.customer || 'Guest'}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={statusBadgeVariant(order.status)}>
-                                      {statusLabel(order.status)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">{formatINR(order.total)}</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      )}
-                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/orders')}>
-                        View all
-                        <ArrowRight data-icon="inline-end" aria-hidden />
-                      </Button>
-                    </TabsContent>
-
-                    <TabsContent value="customers" className="flex flex-col gap-3">
-                      {recentCustomers.length === 0 ? (
-                        <Empty className="min-h-48 border">
-                          <EmptyHeader>
-                            <Users aria-hidden />
-                            <EmptyTitle>No customers yet</EmptyTitle>
-                          </EmptyHeader>
-                        </Empty>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Contact</TableHead>
-                              <TableHead className="text-right">Joined</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {recentCustomers.map((customer) => {
-                              const openCustomer = () => navigate(`/customers/${customer.id}`);
-                              return (
-                                <TableRow
-                                  key={customer.id}
-                                  role="link"
-                                  tabIndex={0}
-                                  className="cursor-pointer"
-                                  aria-label={`Open customer ${customer.name}`}
-                                  onClick={openCustomer}
-                                  onKeyDown={(event) => activateRow(event, openCustomer)}
-                                >
-                                  <TableCell>
-                                    <span className="flex items-center gap-2 font-medium">
-                                      <Avatar className="size-7">
-                                        <AvatarFallback>{initial(customer.name || customer.contact)}</AvatarFallback>
-                                      </Avatar>
-                                      {customer.name || 'Unknown'}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell>{customer.contact || '—'}</TableCell>
-                                  <TableCell className="text-right text-muted-foreground">
-                                    {new Date(customer.createdAt).toLocaleDateString()}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      )}
-                      <Button variant="ghost" size="sm" className="self-end" onClick={() => navigate('/customers')}>
-                        View all
-                        <ArrowRight data-icon="inline-end" aria-hidden />
-                      </Button>
-                    </TabsContent>
-                  </CardContent>
-                </Card>
-              </Tabs>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Store</CardTitle>
-                  <CardDescription>{data?.ordersCapped ? 'Latest 1,000 orders' : 'All time'}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-1">
-                  <StoreMetric label="Total sales" value={formatINR(data?.totalRevenue ?? 0)} />
-                  <StoreMetric label="Total orders" value={data?.totalOrders ?? 0} />
-                  <StoreMetric
-                    label="Awaiting payment"
-                    value={data?.pendingOrders ?? 0}
-                    onClick={() => navigate('/orders?status=pending')}
-                  />
-                  <StoreMetric
-                    label="Shipped"
-                    value={data?.shippedOrders ?? 0}
-                    onClick={() => navigate('/orders?status=shipped')}
-                  />
-                  <StoreMetric
-                    label="Active products"
-                    value={`${data?.activeProducts ?? 0} / ${data?.totalProducts ?? 0}`}
-                    onClick={() => navigate('/products')}
-                  />
-                  <StoreMetric
-                    label="Customers"
-                    value={data?.totalCustomers ?? 0}
-                    onClick={() => navigate('/customers')}
-                  />
-                  <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/products/new')}>
-                    Add product
-                    <ArrowRight data-icon="inline-end" aria-hidden />
-                  </Button>
-                </CardContent>
-              </Card>
+    <Page title="Overview" primaryAction={{ label: 'Add product', to: '/products/new' }}>
+      {data === undefined ? (
+        <OverviewSkeleton />
+      ) : (
+        <>
+          <Card padding="none">
+            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--admin-border)] sm:grid-cols-4 sm:divide-y-0">
+              <Metric label="Sales today" value={formatINR(data?.todayRevenue ?? 0)} />
+              <Metric label="Orders today" value={data?.todayOrders ?? 0} />
+              <Metric label="To prepare" value={data?.processingOrders ?? 0} to="/orders?status=processing" />
+              <Metric label="Low stock" value={data?.lowStockCount ?? 0} to="/inventory?lowStock=1" />
             </div>
-          </>
-        )}
-      </div>
-    </div>
+          </Card>
+
+          <PageLayout
+            main={
+              <Card padding="none">
+                <Tabs
+                  value={view}
+                  onChange={setView}
+                  tabs={[
+                    { id: 'orders', label: 'Recent orders' },
+                    { id: 'customers', label: 'New customers' },
+                  ]}
+                />
+                {view === 'orders' ? (
+                  <DataTable
+                    columns={ORDER_COLUMNS}
+                    rows={recentOrders}
+                    getRowId={(o) => o.id}
+                    onRowClick={(o) => navigate(`/orders/${o.id}`)}
+                    rowLabel={(o) => `Open order ${o.number}`}
+                    empty={<EmptyState icon={<ShoppingCart />} title="No orders yet" />}
+                  />
+                ) : (
+                  <DataTable
+                    columns={CUSTOMER_COLUMNS}
+                    rows={recentCustomers}
+                    getRowId={(c) => c.id}
+                    onRowClick={(c) => navigate(`/customers/${c.id}`)}
+                    rowLabel={(c) => `Open customer ${c.name}`}
+                    empty={<EmptyState icon={<Users />} title="No customers yet" />}
+                  />
+                )}
+                <div className="flex justify-end border-t border-[var(--admin-border)] px-2 py-1.5">
+                  <Button variant="plain" size="sm" onClick={() => navigate(view === 'orders' ? '/orders' : '/customers')}>
+                    View all
+                    <ArrowRight aria-hidden />
+                  </Button>
+                </div>
+              </Card>
+            }
+            aside={
+              <Card title="Store" actions={<span className="text-xs text-[var(--admin-text-muted)]">{data?.ordersCapped ? 'Latest 1,000 orders' : 'All time'}</span>}>
+                <div className="-mx-2 flex flex-col">
+                  <StoreRow label="Total sales" value={formatINR(data?.totalRevenue ?? 0)} />
+                  <StoreRow label="Total orders" value={data?.totalOrders ?? 0} />
+                  <StoreRow label="Awaiting payment" value={data?.pendingOrders ?? 0} to="/orders?status=pending" />
+                  <StoreRow label="Shipped" value={data?.shippedOrders ?? 0} to="/orders?status=shipped" />
+                  <StoreRow label="Active products" value={`${data?.activeProducts ?? 0} / ${data?.totalProducts ?? 0}`} to="/products" />
+                  <StoreRow label="Customers" value={data?.totalCustomers ?? 0} to="/customers" />
+                </div>
+              </Card>
+            }
+          />
+        </>
+      )}
+    </Page>
   );
 }

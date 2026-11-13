@@ -1034,7 +1034,7 @@ export function CheckoutPage() {
             <div className="glass-card p-6 mb-8">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-sans-premium text-muted-foreground">Order Number</span>
-                <span className="font-sans-premium text-foreground">#{completedOrder?.display_order_id || 'Loading...'}</span>
+                <span className="font-sans-premium text-foreground">{completedOrder?.display_order_id || 'Loading...'}</span>
               </div>
               <Separator className="my-4" />
               <div className="flex items-center justify-between text-sm">

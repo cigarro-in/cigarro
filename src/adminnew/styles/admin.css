@@ -1,0 +1,238 @@
+/* =========================================================================
+   Cigarro admin tokens (store admin + super-admin)
+   ------------------------------------------------------------------------
+   Loaded only by the admin host bundles (src/adminnew/AdminRoot.tsx, which
+   AdminApp and SaApp both mount). AdminRoot puts `admin-root` on <html> and
+   removes any storefront `data-theme`, so these variables also reach Radix
+   portals (dialogs, menus, sheets) rendered straight into <body>.
+
+   Two layers:
+   1. `--admin-*`  semantic admin tokens. Use these in new admin code
+      (e.g. `bg-[var(--admin-surface)]`) or through the shadcn aliases below.
+   2. `--color-*` / `--text-*` / `--radius-*` overrides, so Tailwind utilities
+      and the shared shadcn components (bg-primary, text-muted-foreground,
+      border, rounded-md, text-sm ...) render in the admin look instead of the
+      storefront's creme/serif identity.
+   No storefront theme (classic / vivid) tokens apply inside the admin.
+   ========================================================================= */
+
+html.admin-root {
+  /* -------- Surfaces -------- */
+  --admin-bg: #f4f4f5;
+  --admin-surface: #ffffff;
+  --admin-surface-subtle: #fafafa;
+  --admin-surface-hover: #f4f4f5;
+  --admin-surface-selected: #eef0fb;
+  --admin-sidebar: #ffffff;
+  --admin-sidebar-hover: #f2f2f4;
+  --admin-sidebar-active: #ebebef;
+
+  /* -------- Text -------- */
+  --admin-text: #1a1a1f;
+  --admin-text-muted: #5f6068;
+  --admin-text-subtle: #8a8b93;
+  --admin-text-on-primary: #ffffff;
+
+  /* -------- Borders -------- */
+  --admin-border: #e3e3e6;
+  --admin-border-strong: #c9cad0;
+  --admin-focus: #4f5fd6;
+
+  /* -------- Primary accent (deep indigo) -------- */
+  --admin-primary: #3f4bc4;
+  --admin-primary-hover: #343fa8;
+  --admin-primary-active: #2b348d;
+  --admin-primary-soft: #eef0fb;
+
+  /* -------- Semantic tones -------- */
+  --admin-success: #13734a;
+  --admin-success-soft: #e4f4ea;
+  --admin-success-border: #b5dfc5;
+  --admin-warning: #8a5300;
+  --admin-warning-soft: #fff3d6;
+  --admin-warning-border: #f1d595;
+  --admin-critical: #c4281c;
+  --admin-critical-hover: #a52116;
+  --admin-critical-soft: #fdecea;
+  --admin-critical-border: #f4c3bd;
+  --admin-info: #1f5fbf;
+  --admin-info-soft: #e7f0fd;
+  --admin-info-border: #bcd4f6;
+  --admin-neutral-soft: #ededf0;
+
+  /* -------- Shape, depth, type -------- */
+  --admin-radius: 8px;
+  --admin-radius-sm: 6px;
+  --admin-shadow-popover: 0 4px 16px rgba(20, 20, 30, 0.12), 0 0 0 1px rgba(20, 20, 30, 0.06);
+  --admin-shadow-island: 0 1px 2px rgba(20, 20, 30, 0.04), 0 4px 12px rgba(20, 20, 30, 0.04);
+  --admin-shadow-bar: 0 -1px 0 rgba(20, 20, 30, 0.06), 0 8px 24px rgba(20, 20, 30, 0.16);
+  --admin-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --admin-content-width: 1100px;
+
+  /* -------- Tailwind / shadcn aliases -------- */
+  --font-sans: var(--admin-font);
+  --font-family-sans: var(--admin-font);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  --color-background: var(--admin-bg);
+  --color-foreground: var(--admin-text);
+  --color-card: var(--admin-surface);
+  --color-card-foreground: var(--admin-text);
+  --color-popover: var(--admin-surface);
+  --color-popover-foreground: var(--admin-text);
+  --color-primary: var(--admin-primary);
+  --color-primary-foreground: var(--admin-text-on-primary);
+  --color-secondary: var(--admin-surface);
+  --color-secondary-foreground: var(--admin-text);
+  --color-muted: var(--admin-neutral-soft);
+  --color-muted-foreground: var(--admin-text-muted);
+  --color-accent: var(--admin-surface-hover);
+  --color-accent-foreground: var(--admin-text);
+  --color-destructive: var(--admin-critical);
+  --color-destructive-foreground: #ffffff;
+  --color-success: var(--admin-success);
+  --color-success-muted: var(--admin-success-soft);
+  --color-warning: var(--admin-warning);
+  --color-warning-muted: var(--admin-warning-soft);
+  --color-info: var(--admin-info);
+  --color-info-muted: var(--admin-info-soft);
+  --color-border: var(--admin-border);
+  --color-input: var(--admin-border-strong);
+  --color-input-background: var(--admin-surface);
+  --color-ring: var(--admin-focus);
+  --color-sidebar: var(--admin-sidebar);
+  --color-sidebar-foreground: var(--admin-text);
+  --color-sidebar-primary: var(--admin-primary);
+  --color-sidebar-primary-foreground: var(--admin-text-on-primary);
+  --color-sidebar-accent: var(--admin-sidebar-hover);
+  --color-sidebar-accent-foreground: var(--admin-text);
+  --color-sidebar-border: var(--admin-border);
+  --color-sidebar-ring: var(--admin-focus);
+
+  /* Legacy storefront palette names still referenced by older admin / SA
+     markup (bg-creme, text-dark, bg-canyon ...) resolve to admin neutrals. */
+  --color-creme: var(--admin-bg);
+  --color-creme-light: var(--admin-surface);
+  --color-coyote: var(--admin-border);
+  --color-canyon: var(--admin-primary);
+  --color-dark: var(--admin-text);
+
+  color-scheme: light;
+  background-color: var(--admin-bg);
+}
+
+html.admin-root body {
+  padding-top: 0;
+  margin: 0;
+  font-family: var(--admin-font);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  color: var(--admin-text);
+  background-color: var(--admin-bg);
+  font-feature-settings: "cv11", "ss01";
+}
+
+@layer base {
+  :where(html.admin-root) *,
+  :where(html.admin-root) *::before,
+  :where(html.admin-root) *::after {
+    border-color: var(--admin-border);
+  }
+}
+
+html.admin-root ::selection {
+  background: var(--admin-primary-soft);
+  color: var(--admin-text);
+}
+
+/* Flat cards: border and tone, never a resting shadow. */
+html.admin-root [data-slot="card"] {
+  border-radius: var(--admin-radius);
+  box-shadow: none;
+}
+
+/* index.css forces creme selects with !important; restore admin surfaces. */
+html.admin-root [data-radix-select-content],
+html.admin-root [data-radix-select-item],
+html.admin-root [data-radix-select-trigger] {
+  background-color: var(--admin-surface) !important;
+  border-color: var(--admin-border) !important;
+}
+html.admin-root [data-radix-select-item][data-highlighted] {
+  background-color: var(--admin-surface-hover) !important;
+}
+
+/* Island sidebar (desktop): floating panel inset 12px from the viewport,
+   matching the Page header island. The phone drawer stays edge-attached. */
+html.admin-root [data-variant="floating"] [data-slot="sidebar-inner"] {
+  border-radius: 12px;
+  border-color: var(--admin-border);
+  box-shadow: var(--admin-shadow-island);
+}
+html.admin-root [data-variant="floating"][data-collapsible="icon"] [data-slot="sidebar-gap"] {
+  width: calc(var(--sidebar-width-icon) + 1.5rem + 2px);
+}
+
+/* Transient elevation for popovers, menus and dialogs. */
+html.admin-root [data-slot="dropdown-menu-content"],
+html.admin-root [data-slot="popover-content"],
+html.admin-root [data-slot="select-content"] {
+  box-shadow: var(--admin-shadow-popover);
+  border-radius: var(--admin-radius);
+}
+
+/* Visible keyboard focus for plain controls. */
+html.admin-root :where(a, button, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 1px;
+}
+
+/* Skeleton shimmer: calm, no layout change. */
+@keyframes admin-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+html.admin-root .admin-skeleton {
+  background: linear-gradient(90deg, #ececef 25%, #f5f5f7 37%, #ececef 63%);
+  background-size: 400% 100%;
+  animation: admin-shimmer 1.4s ease infinite;
+}
+
+/* Bulk action bar slide-in. */
+@keyframes admin-bar-in {
+  from { transform: translate(-50%, 12px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+html.admin-root .admin-bulk-bar {
+  animation: admin-bar-in 160ms ease-out;
+}
+
+/* Comfortable touch targets on phones. */
+@media (max-width: 767px) {
+  html.admin-root [data-slot="button"],
+  html.admin-root [data-slot="select-trigger"] {
+    min-height: 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.admin-root .admin-skeleton,
+  html.admin-root .admin-bulk-bar {
+    animation: none;
+  }
+}

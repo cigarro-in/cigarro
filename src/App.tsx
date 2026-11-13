@@ -1,5 +1,5 @@
 import { readStoredPreference, writeStoredPreference } from './lib/browserStorage';
-import { useState, useEffect, useLayoutEffect, useRef, Suspense, startTransition } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, Suspense, startTransition, lazy } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider, type HelmetServerState } from 'react-helmet-async';
 import { AgeVerification, AgeGateOverlay } from './components/auth/AgeVerification';
@@ -19,12 +19,10 @@ import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
 import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useOrg } from './lib/convex/useOrg';
 import { useOrgInfo } from './lib/org/OrgContext';
-import { SaApp } from './sa/SaApp';
-import { StorePicker } from './adminnew/StorePicker';
 import { ThemeProvider, useTheme } from './themes';
 
 // Phase 3: no toasts anywhere. All success/failure feedback renders inline
@@ -35,89 +33,15 @@ import { ThemeProvider, useTheme } from './themes';
 // by the entry (src/main.tsx for the client; a future server entry wraps the
 // same App in StaticRouter), so App never creates one itself.
 
+// Admin host (admin.<root>) and super-admin (/sa) are separate bundles with
+// their own styling (src/adminnew/styles/admin.css). They never wear a store theme.
+const AdminApp = lazy(() => import('./adminnew/AdminApp'));
+const SaApp = lazy(() => import('./sa/SaApp').then((m) => ({ default: m.SaApp })));
+
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
 function LoadingSpinner() {
   return null;
-}
-
-// Admin subdomain (admin.cigarro.in): same phone identity as the storefront,
-// admin-only UX. No age gate, no shop, noindex so it never enters search.
-function AdminHostView() {
-  const info = useOrgInfo();
-  const { user, isLoading, signOut } = useAuth();
-  const [loginOpen, setLoginOpen] = useState(true);
-  // Store named in the admin path (admin.<root>/<store>/...), null when absent.
-  const adminPathStore = info.basename ? info.basename.slice(1) : null;
-  // Admin for THIS storefront org only (user.isAdmin spans every org).
-  const scopedProfile = useQuery(
-    api.userState.getMyProfile,
-    user && adminPathStore ? { orgSlug: info.slug } : 'skip',
-  );
-
-  // admin.<root>/ with no store in the path: pick a store (or enter one).
-  if (adminPathStore === null) return <StorePicker />;
-
-  if (isLoading) return null;
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-creme px-4">
-        <div className="text-center space-y-3">
-          <p className="font-bold text-lg">Cigarro Admin</p>
-          <p className="text-sm text-muted-foreground">Sign in with your admin phone number.</p>
-          <button
-            onClick={() => setLoginOpen(true)}
-            className="h-11 px-6 rounded-xl bg-canyon text-creme font-semibold text-[15px]"
-          >
-            Sign in
-          </button>
-        </div>
-        <PhoneAuthDialog open={loginOpen} onOpenChange={setLoginOpen} />
-      </div>
-    );
-  }
-
-  if (scopedProfile === undefined) return null;
-
-  if (!scopedProfile?.isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-creme px-4">
-        <div className="text-center space-y-3 max-w-sm">
-          <p className="font-bold text-lg">Access denied</p>
-          <p className="text-sm text-muted-foreground">
-            {user.phone || 'This number'} isn't an admin account. Use it on {info.primaryHost} for shopping.
-          </p>
-          <div className="flex gap-2 justify-center">
-            <a
-              href={`https://${info.primaryHost}`}
-              className="h-11 px-6 inline-flex items-center rounded-xl bg-canyon text-creme font-semibold text-[15px]"
-            >
-              Go to store
-            </a>
-            <button
-              onClick={() => void signOut()}
-              className="h-11 px-6 rounded-xl border font-semibold text-[15px]"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <HelmetProvider>
-      <Helmet>
-        <meta name="robots" content="noindex, nofollow" />
-        <title>Cigarro Admin</title>
-      </Helmet>
-      <Suspense fallback={<LoadingSpinner />}>
-        <AppRoutes isAdminRoute={true} />
-      </Suspense>
-    </HelmetProvider>
-  );
 }
 
 // Single global auth-dialog host: the only PhoneAuthDialog mounted on the
@@ -234,12 +158,6 @@ function AppContent({ helmetContext }: AppContentProps) {
   // (Admin lives only on admin.cigarro.in; same phone number = storefront here.)
   if (!isAdminHost && isAdminPath) {
     return <Navigate to="/" replace />;
-  }
-
-  // Admin host: phone-gated, admin-only. Same Supabase identity as the
-  // storefront (same number), but non-admins stop at a deny message.
-  if (isAdminHost) {
-    return <AdminHostView />;
   }
 
   // Manual scroll restoration is now handled by SmoothScrollToTop inside PageTransition
@@ -359,7 +277,34 @@ export default function App({ initialThemeId, helmetContext }: AppProps = {}) {
   const info = useOrgInfo();
   // Citadel super-admin app (admin host /sa/*): no store, no storefront providers.
   // SaApp brings its own router, so this branch must not be wrapped by the entry's router.
-  if (info.isSa) return <SaApp />;
+  if (info.isSa) {
+    return (
+      <Suspense fallback={null}>
+        <SaApp />
+      </Suspense>
+    );
+  }
+  if (info.isAdminHost) {
+    // Same auth/data providers as the storefront; the theme provider only
+    // backs the Settings theme picker and never touches <html data-theme>.
+    return (
+      <ErrorBoundary>
+        <AuthProvider>
+          <ConvexAuthProvider>
+            <WishlistProvider>
+              <CartProvider>
+                <ThemeProvider applyToDocument={false}>
+                  <Suspense fallback={null}>
+                    <AdminApp />
+                  </Suspense>
+                </ThemeProvider>
+              </CartProvider>
+            </WishlistProvider>
+          </ConvexAuthProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    );
+  }
   return (
     <ErrorBoundary>
       <AuthProvider>

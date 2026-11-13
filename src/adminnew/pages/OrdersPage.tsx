@@ -305,7 +305,7 @@ export function OrdersPage() {
 // display id (ORD-...) stays as small copyable secondary text. Legacy rows
 // with no number fall back to the display id as the primary label.
 function OrderNumberCell({ order }: { order: Order }) {
-  const primary = order.order_number !== undefined ? `#${order.order_number}` : `#${order.display_order_id}`;
+  const primary = order.order_number !== undefined ? String(order.order_number) : order.display_order_id;
   const copy = (value: string) => {
     void navigator.clipboard?.writeText(value).catch(() => undefined);
   };

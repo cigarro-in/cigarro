@@ -227,7 +227,7 @@ export function TransactionProcessingPage() {
     typeof rawNumber === 'number' && Number.isInteger(rawNumber) && rawNumber >= 10000 && rawNumber <= 99999
       ? rawNumber
       : null;
-  const orderLabel = orderNumber ? `#${orderNumber}` : `#${order.displayOrderId}`;
+  const orderLabel = orderNumber ? String(orderNumber) : order.displayOrderId;
   // Download reuses the already-generated QR data URL — same pixels, same
   // server-generated UPI URL. Never regenerate with different params.
   const qrFilename = `${orgSlug}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;

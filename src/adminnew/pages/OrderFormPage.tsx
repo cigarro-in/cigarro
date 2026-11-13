@@ -177,7 +177,7 @@ export function OrderFormPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <PageHeader
-        title={`Order #${orderNumberOf(order) ?? order.displayOrderId}`}
+        title={`Order ${orderNumberOf(order) ?? order.displayOrderId}`}
         description={`${createdAt.toLocaleDateString()} at ${createdAt.toLocaleTimeString()} · ${order.displayOrderId}`}
         backUrl="/orders"
       >

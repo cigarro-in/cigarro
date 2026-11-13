@@ -106,6 +106,9 @@ export const getDashboardStats = query({
       shipping_name: o.address?.name ?? "Guest",
       total: rupees(o.finalAmountPaise),
       status: o.shippingStatus ?? o.status,
+      // Raw lifecycles so views can derive one stage (src/lib/orders/orderStage.ts).
+      payment_status: o.status,
+      shipping_status: o.shippingStatus ?? null,
       created_at: o.createdAt,
     }));
 

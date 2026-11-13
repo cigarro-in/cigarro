@@ -2,42 +2,42 @@
 name: Cigarro Admin
 description: Quiet, compact operations UI for managing a multi-tenant cigarette storefront.
 colors:
-  admin-background: "#f6f5f3"
-  admin-foreground: "#252522"
+  admin-background: "#f4f4f5"
+  admin-foreground: "#1a1a1f"
   admin-surface: "#ffffff"
-  admin-primary: "#30302d"
-  admin-secondary: "#efeeeb"
-  admin-muted: "#656560"
-  admin-accent: "#e9e8e4"
-  admin-border: "#deddd8"
-  admin-sidebar: "#eeede9"
-  admin-destructive: "#b42318"
-  admin-success: "#166534"
-  admin-warning: "#854d0e"
-  admin-info: "#1e40af"
+  admin-primary: "#3f4bc4"
+  admin-secondary: "#ffffff"
+  admin-muted: "#5f6068"
+  admin-accent: "#f4f4f5"
+  admin-border: "#e3e3e6"
+  admin-sidebar: "#ffffff"
+  admin-destructive: "#c4281c"
+  admin-success: "#13734a"
+  admin-warning: "#8a5300"
+  admin-info: "#1f5fbf"
 typography:
   body:
-    fontFamily: "DM-Sans, system-ui, sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.5
   title:
-    fontFamily: "DM-Sans, system-ui, sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "1.125rem"
     fontWeight: 600
     lineHeight: 1.25
   card-title:
-    fontFamily: "DM-Sans, system-ui, sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 600
     lineHeight: 1.25
   control:
-    fontFamily: "DM-Sans, system-ui, sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 500
     lineHeight: 1.25
   label:
-    fontFamily: "DM-Sans, system-ui, sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 500
     lineHeight: 1.25
@@ -88,6 +88,8 @@ components:
 ---
 
 # Design System: Cigarro Admin
+
+> **Source of truth (2026-11):** tokens live in `src/adminnew/styles/admin.css` (scoped to `html.admin-root`, loaded only by the admin and `/sa` bundles; no storefront theme applies). Primitives and page rules are in `src/adminnew/ui/README.md`: one 1100px content width, island page header and floating sidebar, deep indigo as the single accent, Inter/system font, 8px radius, no toasts. Where the prose below disagrees, those files win.
 
 ## Overview
 

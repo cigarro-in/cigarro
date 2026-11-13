@@ -19,6 +19,11 @@ interface ProviderProps {
   children: ReactNode;
   /** Theme chosen by the server render. Wins over the edge-injected and default themes. */
   initialThemeId?: string;
+  /**
+   * Write the theme to <html data-theme>. False on the admin host: the admin
+   * still reads/sets the store's theme (Settings) but never wears it.
+   */
+  applyToDocument?: boolean;
 }
 
 /**
@@ -32,7 +37,7 @@ function readEdgeThemeId(): string | undefined {
   return org?.themeId ?? undefined;
 }
 
-export function ThemeProvider({ children, initialThemeId }: ProviderProps) {
+export function ThemeProvider({ children, initialThemeId, applyToDocument = true }: ProviderProps) {
   // Render-safe: no storage access here. The first valid candidate wins, else the default.
   const [themeId, setThemeIdState] = useState<string>(() => {
     const candidates = [initialThemeId, readEdgeThemeId()];
@@ -53,12 +58,13 @@ export function ThemeProvider({ children, initialThemeId }: ProviderProps) {
 
   // Client-only side effects.
   useEffect(() => {
+    if (!applyToDocument) return;
     const attrs = themeHtmlAttrs(themeId);
     for (const [name, value] of Object.entries(attrs)) {
       document.documentElement.setAttribute(name, value);
     }
     writeStoredPreference(STORAGE_KEY, themeId);
-  }, [themeId]);
+  }, [themeId, applyToDocument]);
 
   const setTheme = (id: string) => {
     if (!getTheme(id)) return;

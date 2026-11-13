@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronsUpDown, LogOut } from 'lucide-react';
-import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
+import { Check, ChevronsUpDown, ExternalLink, LogOut, UserRound } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,108 +9,158 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '../../components/ui/sidebar';
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '../../components/ui/sidebar';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useAdminStores } from '../hooks/useAdminStores';
 import { maskPhone, signOutOfAdmin, switchAdminStore } from '../lib/adminAuth';
+import { Dialog, ErrorBanner, toActionError, type ActionError } from '../ui';
 
 function getInitial(value?: string | null) {
   return value?.trim().charAt(0).toUpperCase() || 'C';
 }
 
+/** Store icon: logo/favicon from site settings, else the first letter. */
+export function StoreIcon({ name, iconUrl, size = 'md' }: { name: string; iconUrl?: string; size?: 'sm' | 'md' }) {
+  const [broken, setBroken] = useState(false);
+  const box = size === 'sm' ? 'size-6 text-xs rounded-[5px]' : 'size-8 text-sm rounded-[7px]';
+  if (iconUrl && !broken) {
+    return (
+      <img
+        src={iconUrl}
+        alt=""
+        onError={() => setBroken(true)}
+        className={`${box} shrink-0 border border-[var(--admin-border)] bg-white object-contain`}
+      />
+    );
+  }
+  return (
+    <span className={`${box} flex shrink-0 items-center justify-center bg-[var(--admin-primary)] font-semibold text-white`}>
+      {getInitial(name)}
+    </span>
+  );
+}
+
 /**
- * Top-left profile and store menu for the admin shell (desktop sidebar header
- * and mobile drawer). Shows the current store, the other stores this phone
- * administers (switch without OTP), the masked phone, and sign out.
+ * Top-left store + account menu (desktop sidebar header and mobile drawer).
+ * Shows the store icon, store name and the signed-in admin. Opens: Profile,
+ * Switch store (no new OTP), View store, Log out.
  */
-export function AdminStoreMenu({ storeName }: { storeName: string }) {
-  const { isMobile } = useSidebar();
+export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; iconUrl?: string }) {
   const { user } = useAuth();
   const { stores } = useAdminStores();
-  const currentSlug = useOrgInfo().slug;
-  const status = useInlineStatus();
-  const [switching, setSwitching] = useState(false);
+  const info = useOrgInfo();
+  const [switching, setSwitching] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<ActionError | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
-  const others = stores.filter((store) => store.slug !== currentSlug);
+  const adminLabel = user?.name || maskPhone(user?.phone) || 'Admin';
 
   const handleSwitch = async (targetSlug: string) => {
-    status.clear();
-    setSwitching(true);
+    setSwitchError(null);
+    setSwitching(targetSlug);
     try {
       // Navigates to the target store on success.
       await switchAdminStore(targetSlug);
     } catch (error) {
-      status.setError(error instanceof Error ? error.message : 'Could not switch store.');
-      setSwitching(false);
+      setSwitchError(toActionError(error, 'Could not switch store.'));
+      setSwitching(null);
     }
   };
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" tooltip={storeName} aria-label="Store and account menu">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-                {getInitial(storeName)}
-              </span>
-              <span className="grid min-w-0 flex-1 text-left leading-tight">
-                <span className="truncate text-sm font-semibold">{storeName}</span>
-                <span className="truncate text-xs text-muted-foreground">Admin</span>
-              </span>
-              <ChevronsUpDown className="ml-auto" aria-hidden />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start" className="w-64">
-            <DropdownMenuLabel>Current store</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <div className="flex items-center gap-2 px-2 py-1.5 text-sm">
-                <Check className="size-4 shrink-0" aria-hidden />
-                <span className="truncate">{storeName}</span>
+    <>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton size="lg" tooltip={storeName} aria-label="Store and account menu" className="h-12 gap-2.5">
+                <StoreIcon name={storeName} iconUrl={iconUrl} />
+                <span className="grid min-w-0 flex-1 text-left leading-tight">
+                  <span className="truncate text-sm font-semibold">{storeName}</span>
+                  <span className="truncate text-xs text-[var(--admin-text-muted)]">{adminLabel}</span>
+                </span>
+                <ChevronsUpDown className="ml-auto size-4 text-[var(--admin-text-muted)]" aria-hidden />
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="start" className="w-[17rem] p-1">
+              <div className="flex items-center gap-2.5 px-2 py-2">
+                <StoreIcon name={storeName} iconUrl={iconUrl} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{storeName}</p>
+                  <p className="truncate text-xs text-[var(--admin-text-muted)]">{info.primaryHost}</p>
+                </div>
               </div>
-            </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="gap-2" onSelect={() => setProfileOpen(true)}>
+                  <UserRound className="size-4" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">Profile</span>
+                  <span className="text-xs tabular-nums text-[var(--admin-text-subtle)]">{maskPhone(user?.phone)}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2">
+                  <a href={`https://${info.primaryHost}`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4" aria-hidden />
+                    View store
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
 
-            {others.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Switch store</DropdownMenuLabel>
-                <DropdownMenuGroup>
-                  {others.map((store) => (
-                    <DropdownMenuItem
-                      key={store.slug}
-                      disabled={switching}
-                      onSelect={() => void handleSwitch(store.slug)}
-                    >
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold">
-                        {getInitial(store.name)}
-                      </span>
-                      <span className="truncate">{store.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </>
-            )}
+              {stores.length > 1 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs font-medium text-[var(--admin-text-muted)]">Switch store</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    {stores.map((store) => {
+                      const current = store.slug === info.slug;
+                      return (
+                        <DropdownMenuItem
+                          key={store.slug}
+                          className="gap-2"
+                          disabled={current || switching !== null}
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            void handleSwitch(store.slug);
+                          }}
+                        >
+                          <StoreIcon name={store.name} size="sm" />
+                          <span className="min-w-0 flex-1 truncate">{store.name}</span>
+                          {current && <Check className="size-4 text-[var(--admin-primary)]" aria-label="Current store" />}
+                          {switching === store.slug && <span className="text-xs text-[var(--admin-text-subtle)]">Opening...</span>}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuGroup>
+                  {switchError && (
+                    <div className="p-1">
+                      <ErrorBanner error={switchError} />
+                    </div>
+                  )}
+                </>
+              )}
 
-            {status.status.kind && (
-              <div className="p-2">
-                <InlineStatus status={status.status} />
-              </div>
-            )}
-
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Signed in as</DropdownMenuLabel>
-            <div className="px-2 pb-1.5 text-sm tabular-nums">{maskPhone(user?.phone)}</div>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => signOutOfAdmin()}>
-                <LogOut aria-hidden />
-                Sign out
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onSelect={() => signOutOfAdmin()}>
+                <LogOut className="size-4" aria-hidden />
+                Log out
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen} title="Profile" size="sm">
+        <dl className="grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
+          <dt className="text-[var(--admin-text-muted)]">Name</dt>
+          <dd className="truncate">{user?.name || 'Not set'}</dd>
+          <dt className="text-[var(--admin-text-muted)]">Phone</dt>
+          <dd className="tabular-nums">{user?.phone || 'Not set'}</dd>
+          <dt className="text-[var(--admin-text-muted)]">Store</dt>
+          <dd className="truncate">{storeName}</dd>
+          <dt className="text-[var(--admin-text-muted)]">Stores</dt>
+          <dd>{stores.length || 1}</dd>
+        </dl>
+      </Dialog>
+    </>
   );
 }

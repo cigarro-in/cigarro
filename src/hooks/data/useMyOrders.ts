@@ -7,6 +7,7 @@ import { useAuth } from '../useAuth';
 import { paiseToRupees } from '../../lib/convex/money';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { useFullCatalog } from './useCatalog';
+import { deriveOrderStage, type OrderStage } from '../../lib/orders/orderStage';
 
 export type OrderUiStatus =
   | 'pending'
@@ -70,17 +71,21 @@ export interface NormalizedOrder {
 
 const TERMINAL_STATUSES = new Set(['expired', 'cancelled', 'refunded', 'voided']);
 
+// Same single-stage mapping as the admin (src/lib/orders/orderStage.ts),
+// projected onto the customer uiStatus union (kept for theme compatibility).
+const STAGE_TO_UI: Record<OrderStage, OrderUiStatus> = {
+  unpaid: 'pending',
+  paid: 'placed',
+  preparing: 'processing',
+  shipped: 'shipped',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+  refunded: 'cancelled',
+  returned: 'returned',
+};
+
 function deriveUiStatus(o: any): OrderUiStatus {
-  if (o.status === 'pending') return 'pending';
-  if (TERMINAL_STATUSES.has(o.status)) return 'cancelled';
-  // paid / late_paid — overlay shipping
-  switch (o.shippingStatus) {
-    case 'processing': return 'processing';
-    case 'shipped': return 'shipped';
-    case 'delivered': return 'delivered';
-    case 'returned': return 'returned';
-    default: return 'placed';
-  }
+  return STAGE_TO_UI[deriveOrderStage(o)];
 }
 
 // Data-layer image resolution shared by every order surface (customer +
