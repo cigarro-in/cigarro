@@ -56,7 +56,7 @@ function parseAttrs(source: string): Record<string, string> {
   return out;
 }
 
-function renderTag(tag: string, attrs: Record<string, string>): string {
+function renderTag(tag: string, attrs: Record<string, string>, imgPrefix?: string): string {
   const allowed = ATTRS_BY_TAG[tag];
   if (!allowed) return `<${tag}>`;
   const parts: string[] = [];
@@ -72,6 +72,7 @@ function renderTag(tag: string, attrs: Record<string, string>): string {
   // img
   const src = attrs.src !== undefined ? safeSrc(attrs.src) : null;
   if (!src) return '';
+  if (imgPrefix && !src.startsWith(imgPrefix)) return '';
   parts.push(`src="${escapeAttr(src)}"`);
   if (attrs.alt !== undefined) parts.push(`alt="${escapeAttr(attrs.alt)}"`);
   if (attrs.width && /^\d{1,5}$/.test(attrs.width)) parts.push(`width="${attrs.width}"`);
@@ -86,7 +87,9 @@ function renderTag(tag: string, attrs: Record<string, string>): string {
 // loading). Everything else is dropped: all on* handlers, style, script/iframe
 // (with their content), comments and unknown tags. Text is kept, with a stray "<"
 // escaped.
-export function sanitizeBlogBody(html: string | null | undefined): string {
+// opts.imgPrefix: when set, an <img> is kept only if its src starts with this
+// prefix (product and category descriptions pass the CDN origin). Unset = any https src.
+export function sanitizeBlogBody(html: string | null | undefined, opts?: { imgPrefix?: string }): string {
   if (!html) return '';
   const input = String(html).replace(/<!--[\s\S]*?-->/g, '').replace(/<![^>]*>/g, '');
   const tokens = /<\/?([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)|(<)/g;
@@ -117,7 +120,7 @@ export function sanitizeBlogBody(html: string | null | undefined): string {
       if (!VOID_TAGS.has(name)) out += `</${name}>`;
       continue;
     }
-    out += renderTag(name, parseAttrs(m[2] ?? ''));
+    out += renderTag(name, parseAttrs(m[2] ?? ''), opts?.imgPrefix);
   }
   return out;
 }

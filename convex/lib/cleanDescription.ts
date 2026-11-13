@@ -4,10 +4,11 @@
 // (src/lib/storeImport/dukaan.ts), in the one-off migration (convex/migrations.ts)
 // and in the check script (scripts/check-clean-description.ts).
 //
-// Output uses only: p, ul, ol, li, strong, em, h2, h3, a[href], br. That set is a
-// subset of the blog allowlist (src/lib/blog/blogRender.ts, sanitizeBlogBody), so
-// the blog sanitizer keeps every tag this produces. Running it twice gives the
-// same result as running it once.
+// Output uses only: p, ul, ol, li, strong, em, h2, h3, a[href], br, and img (src on
+// the R2 CDN only; attributes src, alt, loading). That set is a subset of the blog
+// allowlist (src/lib/blog/blogRender.ts, sanitizeBlogBody, which takes
+// { imgPrefix: "https://cdn.cigarro.in/" } for these descriptions). Running it
+// twice gives the same result as running it once.
 
 type Frame = { name: string; html: string; implicit?: boolean; href?: string };
 
@@ -41,6 +42,21 @@ function prepare(input: string): string {
     .replace(/&(zwnj|zwj|shy);|&#0*(8203|8204|8205|173|65279);|&#x0*(200b|200c|200d|feff|ad);/gi, "")
     .replace(/[­​-‍⁠﻿]/g, "")
     .replace(/\r\n?/g, "\n");
+}
+
+// Images must be on the R2 CDN. Output keeps only src, alt and loading.
+const CDN_IMG = /^https:\/\/cdn\.cigarro\.in\/[^\s"'<>]+$/;
+
+function imgTag(attrs: Record<string, string>, fallbackAlt: string | undefined): string {
+  const src = (attrs.src ?? "").trim();
+  if (!CDN_IMG.test(src)) return "";
+  const alt = (attrs.alt ?? fallbackAlt ?? "")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `<img src="${src}" alt="${alt}" loading="lazy">`;
 }
 
 function parseAttrs(source: string): Record<string, string> {
@@ -155,7 +171,8 @@ function finish(f: Frame): string {
   }
 }
 
-export function cleanDescription(input: string | null | undefined): string {
+// opts.imgAlt: alt text for an <img> that has none (the product or category name).
+export function cleanDescription(input: string | null | undefined, opts: { imgAlt?: string } = {}): string {
   if (!input) return "";
   const src = prepare(String(input));
   const stack: Frame[] = [{ name: "root", html: "" }];
@@ -240,6 +257,11 @@ export function cleanDescription(input: string | null | undefined): string {
     if (BREAK_TAGS.has(name)) return breakFlow();
     if (name === "p" || name === "h2" || name === "h3" || name === "ul" || name === "ol") return openBlock(name);
     if (name === "li") return openLi();
+    if (name === "img") {
+      ensureBlock();
+      top().html += imgTag(attrs, opts.imgAlt);
+      return;
+    }
     if (name === "strong" || name === "em") {
       ensureBlock();
       stack.push({ name, html: "" });
@@ -249,7 +271,7 @@ export function cleanDescription(input: string | null | undefined): string {
       ensureBlock();
       stack.push({ name, html: "", href: safeHref(attrs.href) ?? undefined });
     }
-    // img, span, font, unknown tags: dropped, their text is kept.
+    // span, font, unknown tags: dropped, their text is kept.
   };
 
   const closeTag = (name: string) => {

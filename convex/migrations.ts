@@ -291,7 +291,7 @@ export const cleanSmokeshopDescriptionsBatch = internalMutation({
       for (const row of page.page) {
         scanned++;
         if (!row.description) continue;
-        const after = cleanDescription(row.description);
+        const after = cleanDescription(row.description, { imgAlt: row.name });
         if (after === row.description) continue;
         await ctx.db.patch(row._id, { description: after });
         changed++;
@@ -306,7 +306,7 @@ export const cleanSmokeshopDescriptionsBatch = internalMutation({
       for (const row of page.page) {
         scanned++;
         if (!row.description) continue;
-        const after = cleanDescription(row.description);
+        const after = cleanDescription(row.description, { imgAlt: row.name });
         if (after === row.description) continue;
         await ctx.db.patch(row._id, { description: after });
         changed++;

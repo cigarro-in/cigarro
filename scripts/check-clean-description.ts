@@ -18,11 +18,14 @@ const cases: Array<[string, string, string]> = [
   ["loose text becomes p", "Hello<br>world", "<p>Hello<br>world</p>"],
   ["keeps strong and em", "<p><b>Bold</b> and <em>it</em></p>", "<p><strong>Bold</strong> and <em>it</em></p>"],
   ["empty input", "", ""],
+  ["cdn img keeps src, alt, lazy only", '<p><img src="https://cdn.cigarro.in/asset_images/orgs/smokeshop/x.webp" width="200" class="a" onerror="x()"></p>', '<p><img src="https://cdn.cigarro.in/asset_images/orgs/smokeshop/x.webp" alt="Pack Name" loading="lazy"></p>'],
+  ["cdn img keeps its own alt", '<p><img src="https://cdn.cigarro.in/a.webp" alt="Hero"></p>', '<p><img src="https://cdn.cigarro.in/a.webp" alt="Hero" loading="lazy"></p>'],
+  ["img from another host dropped", '<p>a<img src="https://evil.test/x.png" alt="x"></p>', "<p>a</p>"],
 ];
 
 let failed = 0;
 for (const [name, input, expected] of cases) {
-  const got = cleanDescription(input);
+  const got = cleanDescription(input, { imgAlt: "Pack Name" });
   try {
     assert.equal(got, expected);
   } catch {
@@ -34,17 +37,22 @@ for (const [name, input, expected] of cases) {
 // Idempotent, and every output passes the blog allowlist unchanged.
 const samples = [
   "<ul>\n<li><strong>Pack</strong> - 30g</li>\n</ul>\n<p><br>American Spirit is a brand.&nbsp;</p>",
-  '<p><br><img src="https://x.test/a.png"><br><br>Read <a href="https://cigarcountry.com/x/" target="_blank">this</a></p>',
+  '<p><br><img src="https://cdn.cigarro.in/asset_images/orgs/smokeshop/a.webp"><br><br>Read <a href="https://cigarcountry.com/x/" target="_blank">this</a></p>',
   "<h4><span>ESSE DOUBLE CHANGE </span></h4>\n<h3>Applemint</h3>\n<p>Changing</p>",
 ];
+const imgPrefix = "https://cdn.cigarro.in/";
+{
+  const bad = sanitizeBlogBody('<p><img src="https://evil.test/a.png"><img src="https://cdn.cigarro.in/a.webp" alt="x" loading="lazy"></p>', { imgPrefix });
+  assert.equal(bad, '<p><img src="https://cdn.cigarro.in/a.webp" alt="x" loading="lazy"></p>');
+}
 for (const s of samples) {
-  const once = cleanDescription(s);
-  assert.equal(cleanDescription(once), once, `not idempotent: ${once}`);
+  const once = cleanDescription(s, { imgAlt: "Pack Name" });
+  assert.equal(cleanDescription(once, { imgAlt: "Pack Name" }), once, `not idempotent: ${once}`);
   // The blog sanitizer adds rel="noopener nofollow" to external links; ignore that one attribute.
-  const sanitized = sanitizeBlogBody(once).replace(/ rel="noopener nofollow"/g, "");
+  const sanitized = sanitizeBlogBody(once, { imgPrefix }).replace(/ rel="noopener nofollow"/g, "");
   assert.equal(sanitized, once, `sanitizer changed output: ${once}`);
   const tags = new Set([...once.matchAll(/<\/?([a-z0-9]+)/gi)].map((x) => x[1].toLowerCase()));
-  for (const t of tags) assert.ok(["p", "ul", "ol", "li", "strong", "em", "h2", "h3", "a", "br"].includes(t), `tag ${t}`);
+  for (const t of tags) assert.ok(["p", "ul", "ol", "li", "strong", "em", "h2", "h3", "a", "br", "img"].includes(t), `tag ${t}`);
 }
 
 if (failed) {

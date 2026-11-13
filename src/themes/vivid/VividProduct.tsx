@@ -291,7 +291,7 @@ export default function VividProduct() {
               {/* Descriptions are HTML (cleaned on import) or legacy plain text; sanitizeBlogBody keeps only the allowlist. */}
               <div
                 className={`text-[var(--color-foreground)] text-sm leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_li]:mb-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_strong]:font-semibold [&_a]:underline ${/<[a-z][\s\S]*>/i.test(product.description) ? '' : 'whitespace-pre-line'}`}
-                dangerouslySetInnerHTML={{ __html: sanitizeBlogBody(product.description) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeBlogBody(product.description, { imgPrefix: 'https://cdn.cigarro.in/' }) }}
               />
             </div>
           )}
