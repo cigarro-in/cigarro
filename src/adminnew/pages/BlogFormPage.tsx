@@ -1,497 +1,329 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Star, Pin, ExternalLink } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Switch } from '../../components/ui/switch';
-import { Badge } from '../../components/ui/badge';
+import { useMutation, useQuery } from 'convex/react';
+import { Star, Pin } from 'lucide-react';
+import { api } from '../../../convex/_generated/api';
+import type { Id } from '../../../convex/_generated/dataModel';
+import { ORG_SLUG } from '../../lib/convex/org';
 import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Label,
+  Page,
+  PageLayout,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { PageHeader } from '../components/shared/PageHeader';
-import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
-import {
-  AdminCard,
-  AdminCardContent,
-  AdminCardHeader,
-  AdminCardTitle,
-  AdminCardDescription,
-} from '../components/shared/AdminCard';
-import { format } from 'date-fns';
+  Skeleton,
+  Switch,
+  Card,
+  CardSection,
+  toActionError,
+  useButtonFeedback,
+} from '../ui';
+import { ContentWritingEditor } from '../features/content/ContentWritingEditor';
+import { ContentSidebar } from '../features/content/ContentSidebar';
+import { parseTags, readingMinutes, slugify, snapshot } from '../features/content/contentForm';
 
-interface BlogCategory {
-  slug: string;
-  name: string;
-  color?: string;
-}
-
-interface BlogPost {
-  id: string;
+interface BlogForm {
   title: string;
   slug: string;
-  excerpt: string | null;
-  content: string | null;
-  featured_image: string | null;
-  status: 'draft' | 'published' | 'archived';
-  is_featured: boolean;
-  is_pinned: boolean;
-  category_id: string | null;
-  meta_title: string | null;
-  meta_description: string | null;
-  published_at: string | null;
-  reading_time: number | null;
-  view_count: number;
-  created_at: string;
-  updated_at: string;
+  excerpt: string;
+  body: string;
+  cover: string;
+  status: string;
+  categorySlug: string;
+  isFeatured: boolean;
+  isPinned: boolean;
+  tagsText: string;
+  metaTitle: string;
+  metaDescription: string;
 }
+
+const EMPTY_FORM: BlogForm = {
+  title: '',
+  slug: '',
+  excerpt: '',
+  body: '',
+  cover: '',
+  status: 'draft',
+  categorySlug: '',
+  isFeatured: false,
+  isPinned: false,
+  tagsText: '',
+  metaTitle: '',
+  metaDescription: '',
+};
+
+const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft (hidden from readers)' },
+  { value: 'published', label: 'Published' },
+  { value: 'archived', label: 'Archived' },
+];
 
 export function BlogFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const isEditing = id && id !== 'new';
+  const isEditing = !!id && id !== 'new';
 
-  const [loading, setLoading] = useState(isEditing);
-  const [saving, setSaving] = useState(false);
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-  const populatedRef = useRef(false);
-
-  // Public category list (slug-keyed now — Convex posts link by categorySlug).
+  const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, { orgSlug: ORG_SLUG });
   const categoryRows = useQuery(api.content.listBlogCategories, { orgSlug: ORG_SLUG });
-  const categories: BlogCategory[] = (categoryRows || []).map((c: any) => ({
-    slug: c.slug,
-    name: c.name,
-    color: c.color,
-  }));
-  const postRows = useQuery(api.adminCatalog.listBlogPostsForAdmin, { orgSlug: ORG_SLUG });
   const savePost = useMutation(api.adminCatalog.saveBlogPost);
   const removePost = useMutation(api.adminCatalog.deleteBlogPost);
 
-  const [form, setForm] = useState({
-    title: '',
-    slug: '',
-    excerpt: '',
-    content: '',
-    featured_image: '',
-    status: 'draft' as 'draft' | 'published' | 'archived',
-    is_featured: false,
-    is_pinned: false,
-    category_id: '',
-    meta_title: '',
-    meta_description: '',
-  });
+  const [form, setForm] = useState<BlogForm>(EMPTY_FORM);
+  // Snapshot of the last saved form; '' for a new post, so it starts unsaved.
+  const [saved, setSaved] = useState('');
+  // Existing posts keep their URL. New posts follow the title until the slug is edited.
+  const [slugLocked, setSlugLocked] = useState(false);
+  const [loaded, setLoaded] = useState(!isEditing);
+  const [missing, setMissing] = useState(false);
+  const [showTitleError, setShowTitleError] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const save = useButtonFeedback();
 
-  // Populate once from the Convex admin list (route :id is the Convex _id now).
+  const postId = isEditing ? (id as Id<'blogPosts'>) : null;
+
+  // Populate once from the admin list (the route id is the Convex _id).
   useEffect(() => {
-    if (!isEditing || !postRows || populatedRef.current) return;
-    populatedRef.current = true;
-    const data: any = postRows.find((p: any) => p._id === id);
-    if (!data) {
-      setOpError('Post not found');
-      navigate('/blogs');
+    if (!isEditing || loaded || rows === undefined) return;
+    const row = rows.find((p) => p._id === id);
+    if (!row) {
+      setMissing(true);
+      setLoaded(true);
       return;
     }
-    setPost({
-      id: data._id,
-      title: data.title,
-      slug: data.slug,
-      excerpt: data.excerpt ?? null,
-      content: data.content,
-      featured_image: data.featuredImage ?? null,
-      status: data.status,
-      is_featured: data.isFeatured ?? false,
-      is_pinned: data.isPinned ?? false,
-      category_id: data.categorySlug ?? null,
-      meta_title: data.metaTitle ?? null,
-      meta_description: data.metaDescription ?? null,
-      published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : null,
-      reading_time: data.readingTime ?? null,
-      view_count: data.viewCount ?? 0,
-      created_at: new Date(data._creationTime).toISOString(),
-      updated_at: new Date(data.updatedAt ?? data._creationTime).toISOString(),
-    });
-    setForm({
-      title: data.title || '',
-      slug: data.slug || '',
-      excerpt: data.excerpt || '',
-      content: data.content || '',
-      featured_image: data.featuredImage || '',
-      status: data.status || 'draft',
-      is_featured: data.isFeatured ?? false,
-      is_pinned: data.isPinned ?? false,
-      category_id: data.categorySlug || '',
-      meta_title: data.metaTitle || '',
-      meta_description: data.metaDescription || '',
-    });
-    setLoading(false);
-  }, [postRows]);
+    const next: BlogForm = {
+      title: row.title ?? '',
+      slug: row.slug ?? '',
+      excerpt: row.excerpt ?? '',
+      body: row.content ?? '',
+      cover: row.featuredImage ?? '',
+      status: row.status ?? 'draft',
+      categorySlug: row.categorySlug ?? '',
+      isFeatured: row.isFeatured ?? false,
+      isPinned: row.isPinned ?? false,
+      tagsText: (row.tags ?? []).join(', '),
+      metaTitle: row.metaTitle ?? '',
+      metaDescription: row.metaDescription ?? '',
+    };
+    setForm(next);
+    setSaved(snapshot(next));
+    setSlugLocked(true);
+    setLoaded(true);
+  }, [rows, loaded, isEditing, id]);
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+  const dirty = saved !== snapshot(form);
+
+  const update = <K extends keyof BlogForm>(key: K, value: BlogForm[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const onTitleChange = (title: string) =>
+    setForm((prev) => ({ ...prev, title, slug: slugLocked ? prev.slug : slugify(title) }));
+
+  const onSlugChange = (value: string) => {
+    setSlugLocked(true);
+    update('slug', value);
   };
 
-  const calculateReadingTime = (content: string) => {
-    const wordsPerMinute = 200;
-    const words = content.trim().split(/\s+/).length;
-    return Math.ceil(words / wordsPerMinute);
-  };
-
-  const handleTitleChange = (title: string) => {
-    setForm(prev => ({
-      ...prev,
-      title,
-      slug: prev.slug || generateSlug(title),
-    }));
-  };
-
-  const handleSave = async () => {
-    setSaveAttempted(true);
+  const onSave = () => {
     if (!form.title.trim()) {
-      setOpError('Post title is required');
+      setShowTitleError(true);
       return;
     }
-
-    setSaving(true);
-    try {
-      const slug = form.slug || generateSlug(form.title);
-
-      await savePost({
-        orgSlug: ORG_SLUG,
-        id: isEditing && post ? (post.id as any) : undefined,
-        post: {
-          slug,
-          title: form.title.trim(),
-          excerpt: form.excerpt.trim() || undefined,
-          content: form.content,
-          featuredImage: form.featured_image || undefined,
-          status: form.status,
-          isFeatured: form.is_featured,
-          isPinned: form.is_pinned,
-          categorySlug: form.category_id || undefined,
-          readingTime: calculateReadingTime(form.content),
-          metaTitle: form.meta_title.trim() || undefined,
-          metaDescription: form.meta_description.trim() || undefined,
-        },
-      });
-      setOpOk(isEditing ? 'Post updated successfully' : 'Post created successfully');
-
-      navigate('/blogs');
-    } catch (error: any) {
-      console.error('Error saving post:', error);
-      const code = error?.data?.code;
-      if (code === 'SLUG_TAKEN') {
-        setOpError('A post with this slug already exists');
-      } else {
-        setOpError(error?.message || 'Failed to save post');
+    const current = form;
+    save.run(async () => {
+      const slug = current.slug.trim() || slugify(current.title);
+      const post = {
+        slug,
+        title: current.title.trim(),
+        excerpt: current.excerpt.trim() || undefined,
+        content: current.body,
+        featuredImage: current.cover || undefined,
+        status: current.status,
+        isFeatured: current.isFeatured,
+        isPinned: current.isPinned,
+        categorySlug: current.categorySlug || undefined,
+        tags: parseTags(current.tagsText),
+        readingTime: readingMinutes(current.body),
+        metaTitle: current.metaTitle.trim() || undefined,
+        metaDescription: current.metaDescription.trim() || undefined,
+      };
+      try {
+        if (postId) {
+          await savePost({ orgSlug: ORG_SLUG, id: postId, post });
+          setSaved(snapshot(current));
+          setForm((prev) => ({ ...prev, slug }));
+          setSlugLocked(true);
+        } else {
+          const res = await savePost({ orgSlug: ORG_SLUG, post });
+          navigate(`/blogs/${res.id}`, { replace: true });
+        }
+      } catch (err) {
+        if ((err as { data?: { code?: string } })?.data?.code === 'SLUG_TAKEN') {
+          throw { message: 'Another post already uses this URL slug. Change the slug and save again.', code: 'SLUG_TAKEN' };
+        }
+        throw toActionError(err, 'Could not save the post. Try again.');
       }
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
-  const handleDelete = async () => {
-    if (!post) return;
-    if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
-
-    try {
-      await removePost({ id: post.id as any, orgSlug: ORG_SLUG });
-      setOpOk('Post deleted');
-      navigate('/blogs');
-    } catch (error: any) {
-      console.error('Error deleting post:', error);
-      setOpError(error?.message || 'Failed to delete post');
-    }
+  const onDelete = async () => {
+    if (!postId) return;
+    await removePost({ id: postId, orgSlug: ORG_SLUG });
+    navigate('/blogs', { replace: true });
   };
 
-  if (loading) {
+  if (!loaded) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <Page title="Loading post" backTo="/blogs">
+        <div className="space-y-3">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </Page>
     );
   }
 
+  if (missing) {
+    return (
+      <Page title="Post not found" backTo="/blogs">
+        <Card>
+          <EmptyState
+            title="This post no longer exists"
+            description="It may have been deleted. Go back to the list to find another post."
+            action={<Button variant="secondary" onClick={() => navigate('/blogs')}>Back to blogs</Button>}
+          />
+        </Card>
+      </Page>
+    );
+  }
+
+  const categories = categoryRows ?? [];
+  const titleError = showTitleError && !form.title.trim() ? 'Add a title before saving.' : null;
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <PageHeader
-        title={isEditing ? `Edit: ${post?.title || 'Post'}` : 'New Blog Post'}
-        description={isEditing ? 'Update blog post details' : 'Create a new blog post'}
-        backUrl="/blogs"
-      >
-        {isEditing && (
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Post'}
-        </Button>
-      </PageHeader>
-
-      <div className="max-w-400 mx-auto px-4 sm:px-6">
-        <InlineStatus status={opStatus} />
-      </div>
-
-      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        {/* Left Column - Main Content */}
-        <div className="space-y-4">
-          {/* Post Content */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Post Content</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="title">Title <Req /></Label>
-                <Input
-                  id="title"
-                  value={form.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="Enter post title"
-                  aria-invalid={saveAttempted && isBlank(form.title)}
-                />
-                <ReqError show={saveAttempted && isBlank(form.title)} />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  value={form.slug}
-                  onChange={(e) => setForm(prev => ({ ...prev, slug: e.target.value }))}
-                  placeholder="post-url-slug"
-                />
-                <p className="text-xs text-muted-foreground">
-                  URL: /blog/{form.slug || 'your-post-slug'}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="excerpt">Excerpt</Label>
-                <Textarea
-                  id="excerpt"
-                  value={form.excerpt}
-                  onChange={(e) => setForm(prev => ({ ...prev, excerpt: e.target.value }))}
-                  placeholder="Brief summary of the post"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
-                  value={form.content}
-                  onChange={(e) => setForm(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Write your post content here..."
-                  rows={15}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  ~{calculateReadingTime(form.content)} min read
-                </p>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* SEO Settings */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>SEO Settings</AdminCardTitle>
-              <AdminCardDescription>
-                Optimize your post for search engines
-              </AdminCardDescription>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="meta_title">Meta Title</Label>
-                <Input
-                  id="meta_title"
-                  value={form.meta_title}
-                  onChange={(e) => setForm(prev => ({ ...prev, meta_title: e.target.value }))}
-                  placeholder="SEO title (defaults to post title)"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="meta_description">Meta Description</Label>
-                <Textarea
-                  id="meta_description"
-                  value={form.meta_description}
-                  onChange={(e) => setForm(prev => ({ ...prev, meta_description: e.target.value }))}
-                  placeholder="SEO description (defaults to excerpt)"
-                  rows={2}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-
-        {/* Right Column - Sidebar */}
-        <div className="space-y-4">
-          {/* Featured Image */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Featured Image</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <SingleImagePicker
-                value={form.featured_image || null}
-                onChange={(url) => setForm(prev => ({ ...prev, featured_image: url || '' }))}
-                searchHint={form.title ? `${form.title} blog` : undefined}
-              />
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Status & Settings */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Settings</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(value: 'draft' | 'published' | 'archived') =>
-                    setForm(prev => ({ ...prev, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">
-                      <div className="flex items-center gap-2">
-                        <EyeOff className="h-4 w-4" />
-                        Draft
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="published">
-                      <div className="flex items-center gap-2">
-                        <Eye className="h-4 w-4" />
-                        Published
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="archived">
-                      <div className="flex items-center gap-2">
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        Archived
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={form.category_id || 'none'}
-                  onValueChange={(value) =>
-                    setForm(prev => ({ ...prev, category_id: value === 'none' ? '' : value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Category</SelectItem>
-                    {categories.map((cat) => (
-                        <SelectItem key={cat.slug} value={cat.slug}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            // eslint-disable-next-line shadcn/no-inline-styles -- category color is data-driven
-                            style={{ backgroundColor: cat.color }}
-                          />
-                          {cat.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <Label className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-sunflower" />
-                    Featured
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Show in featured section</p>
-                </div>
-                <Switch
-                  checked={form.is_featured}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, is_featured: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <Label className="flex items-center gap-2">
-                    <Pin className="h-4 w-4 text-info" />
-                    Pinned
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Pin to top of list</p>
-                </div>
-                <Switch
-                  checked={form.is_pinned}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, is_pinned: checked }))}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Post Info (for existing posts) */}
-          {post && (
-            <AdminCard>
-              <AdminCardHeader>
-                <AdminCardTitle>Post Info</AdminCardTitle>
-              </AdminCardHeader>
-              <AdminCardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Created: {format(new Date(post.created_at), 'MMM dd, yyyy')}</p>
-                <p>Updated: {format(new Date(post.updated_at), 'MMM dd, yyyy')}</p>
-                {post.published_at && (
-                  <p>Published: {format(new Date(post.published_at), 'MMM dd, yyyy')}</p>
-                )}
-                <p>Views: {post.view_count}</p>
-                {post.status === 'published' && (
-                  <a
-                    href={`/blog/${post.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-info hover:underline flex items-center gap-1 mt-2"
+    <Page
+      title={isEditing ? form.title.trim() || 'Untitled post' : 'New post'}
+      backTo="/blogs"
+      titleMeta={
+        <Badge tone={dirty ? 'attention' : 'success'}>
+          {dirty ? (isEditing ? 'Unsaved changes' : 'Not saved') : 'Saved'}
+        </Badge>
+      }
+      primaryAction={{ label: 'Save', onClick: onSave, state: save.state }}
+      secondaryActions={
+        isEditing
+          ? [{ label: 'Delete', critical: true, onClick: () => setDeleteOpen(true) }]
+          : []
+      }
+    >
+      <ErrorBanner error={save.error} />
+      <PageLayout
+        main={
+          <ContentWritingEditor
+            title={form.title}
+            onTitleChange={onTitleChange}
+            titleError={titleError}
+            titlePlaceholder="Post title"
+            body={form.body}
+            onBodyChange={(v) => update('body', v)}
+            cover={form.cover || null}
+            onCoverChange={(url) => update('cover', url ?? '')}
+            coverHint={form.title ? `${form.title} blog` : undefined}
+          />
+        }
+        aside={
+          <ContentSidebar
+            status={form.status}
+            onStatusChange={(v) => update('status', v)}
+            statusOptions={STATUS_OPTIONS}
+            statusHint={
+              form.status === 'published' ? `Live at /blog/${form.slug || '…'}` : 'Only published posts appear on the storefront.'
+            }
+            slug={form.slug}
+            onSlugChange={onSlugChange}
+            slugPrefix="/blog/"
+            slugLocked={slugLocked}
+            onResetSlug={() => {
+              setSlugLocked(false);
+              update('slug', slugify(form.title));
+            }}
+            excerpt={form.excerpt}
+            onExcerptChange={(v) => update('excerpt', v)}
+            tagsText={form.tagsText}
+            onTagsChange={(v) => update('tagsText', v)}
+            metaTitle={form.metaTitle}
+            onMetaTitleChange={(v) => update('metaTitle', v)}
+            metaTitlePlaceholder={form.title || 'Defaults to the post title'}
+            metaDescription={form.metaDescription}
+            onMetaDescriptionChange={(v) => update('metaDescription', v)}
+            metaDescriptionPlaceholder={form.excerpt || 'Defaults to the excerpt'}
+          >
+            <Card title="Organise">
+              <CardSection>
+                <div className="space-y-1.5">
+                  <Label htmlFor="blog-category">Category</Label>
+                  <Select
+                    value={form.categorySlug || 'none'}
+                    onValueChange={(v) => update('categorySlug', v === 'none' ? '' : v)}
                   >
-                    View Post <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </AdminCardContent>
-            </AdminCard>
-          )}
-        </div>
-      </div>
-    </div>
+                    <SelectTrigger id="blog-category" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No category</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c.slug} value={c.slug}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardSection>
+              <CardSection>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label htmlFor="blog-featured" className="flex items-center gap-2">
+                      <Star className="size-4 text-muted-foreground" aria-hidden /> Featured
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Show in the featured section</p>
+                  </div>
+                  <Switch id="blog-featured" checked={form.isFeatured} onCheckedChange={(v) => update('isFeatured', v)} />
+                </div>
+              </CardSection>
+              <CardSection>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label htmlFor="blog-pinned" className="flex items-center gap-2">
+                      <Pin className="size-4 text-muted-foreground" aria-hidden /> Pinned
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Keep at the top of the list</p>
+                  </div>
+                  <Switch id="blog-pinned" checked={form.isPinned} onCheckedChange={(v) => update('isPinned', v)} />
+                </div>
+              </CardSection>
+            </Card>
+          </ContentSidebar>
+        }
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={`Delete "${form.title.trim() || 'this post'}"?`}
+        description="This cannot be undone. The post URL stops working."
+        confirmLabel="Delete post"
+        critical
+        onConfirm={onDelete}
+      />
+    </Page>
   );
 }

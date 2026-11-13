@@ -22,6 +22,8 @@ import {
   CustomerFormPage,
   DiscountFormPage,
   BlogFormPage,
+  StorePagesPage,
+  StorePageFormPage,
   HeroSlideFormPage,
   PaymentsPage,
   MarketingPage,
@@ -51,6 +53,7 @@ export const ADMIN_ROUTES = [
   { path: '/discounts', element: DiscountsPage, label: 'Discounts', section: 'platform' },
   { path: '/homepage', element: HomepagePage, label: 'Homepage', section: 'platform' },
   { path: '/blogs', element: BlogsPage, label: 'Blogs', section: 'platform' },
+  { path: '/pages', element: StorePagesPage, label: 'Pages', section: 'platform' },
   { path: '/reviews', element: ReviewsPage, label: 'Reviews', section: 'platform' },
   { path: '/assets', element: AssetsPage, label: 'Assets', section: 'platform' },
   { path: '/seo', element: SeoHealthPage, label: 'SEO health', section: 'seo' },
@@ -106,6 +109,7 @@ export function AdminRouter() {
         <Route path="/hero-slides/:id" element={<HeroSlideFormPage />} />
         <Route path="/blogs/new" element={<BlogFormPage />} />
         <Route path="/blogs/:id" element={<BlogFormPage />} />
+        <Route path="/pages/:slug" element={<StorePageFormPage />} />
         
         {/* List routes */}
         {ADMIN_ROUTES.map(({ path, element: Element }) => (

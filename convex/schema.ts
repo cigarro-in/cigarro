@@ -710,6 +710,7 @@ export default defineSchema({
     // Plain string — no profiles join.
     authorName: v.string(),
     categorySlug: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
     readingTime: v.optional(v.number()),
     metaTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
@@ -732,6 +733,21 @@ export default defineSchema({
     .index("by_org_slug", ["orgId", "slug"])
     .index("by_org_status", ["orgId", "status", "publishedAt"])
     .index("by_org_category", ["orgId", "categorySlug", "status", "publishedAt"]),
+
+  // Store pages (About, Contact, policies): one row per org + slug. Unpublished
+  // or missing rows fall back to the built-in storefront page.
+  storePages: defineTable({
+    orgId: v.id("organizations"),
+    slug: v.string(),
+    title: v.string(),
+    body: v.string(),
+    published: v.boolean(),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_slug", ["orgId", "slug"]),
 
   heroSlides: defineTable({
     orgId: v.optional(v.id("organizations")),

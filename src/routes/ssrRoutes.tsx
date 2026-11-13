@@ -6,6 +6,7 @@
 //
 // Anything not listed renders nothing here; the edge keeps serving those paths
 // through the SPA shell / bot renderer until they are ported (P5-SSR slice 8).
+import { StorePageGate } from '../pages/storePages/StorePageGate';
 import type { ComponentType } from 'react';
 import { Route, Routes, useParams } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
@@ -90,14 +91,14 @@ export function SsrRoutes({ location }: SsrRoutesProps) {
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
       <Route path={ROUTES.BLOGS} element={<BlogsHubRoute />} />
       <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
-      <Route path={ROUTES.ABOUT} element={<AboutPage />} />
-      <Route path={ROUTES.CONTACT} element={<ContactPage />} />
+      <Route path={ROUTES.ABOUT} element={<StorePageGate slug="about" fallback={<AboutPage />} />} />
+      <Route path={ROUTES.CONTACT} element={<StorePageGate slug="contact" fallback={<ContactPage />} />} />
       <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
-      <Route path={ROUTES.LEGAL} element={<LegalPage />} />
-      <Route path={ROUTES.TERMS} element={<TermsPage />} />
-      <Route path={ROUTES.PRIVACY} element={<PrivacyPage />} />
-      <Route path={ROUTES.SHIPPING} element={<ShippingPage />} />
-      <Route path={ROUTES.RETURNS} element={<ReturnsPage />} />
+      <Route path={ROUTES.LEGAL} element={<StorePageGate slug="legal" fallback={<LegalPage />} />} />
+      <Route path={ROUTES.TERMS} element={<StorePageGate slug="terms" fallback={<TermsPage />} />} />
+      <Route path={ROUTES.PRIVACY} element={<StorePageGate slug="privacy" fallback={<PrivacyPage />} />} />
+      <Route path={ROUTES.SHIPPING} element={<StorePageGate slug="shipping" fallback={<ShippingPage />} />} />
+      <Route path={ROUTES.RETURNS} element={<StorePageGate slug="returns" fallback={<ReturnsPage />} />} />
       <Route path="*" element={null} />
     </Routes>
   );

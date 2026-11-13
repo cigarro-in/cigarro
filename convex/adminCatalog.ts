@@ -1434,6 +1434,7 @@ export const saveBlogPost = mutation({
       status: v.string(),
       authorName: v.optional(v.string()),
       categorySlug: v.optional(v.string()),
+      tags: v.optional(v.array(v.string())),
       readingTime: v.optional(v.number()),
       metaTitle: v.optional(v.string()),
       metaDescription: v.optional(v.string()),

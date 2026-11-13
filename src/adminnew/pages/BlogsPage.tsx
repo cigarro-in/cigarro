@@ -1,296 +1,255 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Trash2, BookOpen, Plus, ChevronDown, Star, Pin, Search } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../components/ui/select';
-import { useQuery, useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
+import { BookOpen, Plus } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
+import type { Id } from '../../../convex/_generated/dataModel';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { DataTable } from '../components/shared/DataTable';
-import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
-import { PageHeader } from '../components/shared/PageHeader';
-import { format } from 'date-fns';
+import {
+  Badge,
+  BulkActionBar,
+  Button,
+  Card,
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  ErrorBanner,
+  FilterBar,
+  FilterSelect,
+  Page,
+  Pagination,
+  paginate,
+  useButtonFeedback,
+  useRowSelection,
+  type BadgeTone,
+  type Column,
+} from '../ui';
 
-interface BlogPost {
+type PostStatus = 'draft' | 'published' | 'archived';
+
+interface BlogRow {
   id: string;
   title: string;
-  slug: string;
-  excerpt: string | null;
-  featured_image: string | null;
-  status: 'draft' | 'published' | 'archived';
-  is_featured: boolean;
-  is_pinned: boolean;
-  category_id: string | null;
-  published_at: string | null;
-  view_count: number;
-  created_at: string;
-  updated_at: string;
-  category?: { id: string; name: string; color: string } | null;
+  excerpt: string;
+  featuredImage: string | null;
+  status: PostStatus;
+  isFeatured: boolean;
+  isPinned: boolean;
+  categoryName: string | null;
+  viewCount: number;
+  date: number;
+  searchText: string;
+}
+
+const PAGE_SIZE = 25;
+
+const STATUS_TONE: Record<PostStatus, BadgeTone> = {
+  published: 'success',
+  draft: 'warning',
+  archived: 'neutral',
+};
+
+const STATUS_LABEL: Record<PostStatus, string> = {
+  published: 'Published',
+  draft: 'Draft',
+  archived: 'Archived',
+};
+
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'published', label: 'Published' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'archived', label: 'Archived' },
+];
+
+function formatDate(ms: number) {
+  return new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function BlogsPage() {
   const navigate = useNavigate();
-  const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-
   const rows = useQuery(api.adminCatalog.listBlogPostsForAdmin, { orgSlug: ORG_SLUG });
-  const removePost = useMutation(api.adminCatalog.deleteBlogPost);
   const setStatus = useMutation(api.adminCatalog.setBlogPostsStatus);
+  const removePost = useMutation(api.adminCatalog.deleteBlogPost);
 
-  // Boundary: Convex camelCase → table shape (ids are Convex _ids now —
-  // content rows never carried supabaseIds).
-  const posts: BlogPost[] = (rows || []).map((p: any) => ({
-    id: p._id,
-    title: p.title,
-    slug: p.slug,
-    excerpt: p.excerpt ?? null,
-    featured_image: p.featuredImage ?? null,
-    status: p.status,
-    is_featured: p.isFeatured ?? false,
-    is_pinned: p.isPinned ?? false,
-    category_id: p.categorySlug ?? null,
-    published_at: p.publishedAt ? new Date(p.publishedAt).toISOString() : null,
-    view_count: p.viewCount ?? 0,
-    created_at: new Date(p._creationTime).toISOString(),
-    updated_at: new Date(p.updatedAt ?? p._creationTime).toISOString(),
-    category: p.category,
-  }));
-  const loading = rows === undefined;
+  const sel = useRowSelection();
+  const [query, setQuery] = useState('');
+  const [status, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleAddPost = () => {
-    navigate('/blogs/new');
-  };
+  const publish = useButtonFeedback();
+  const draft = useButtonFeedback();
+  const archive = useButtonFeedback();
 
-  const handleEditPost = (post: BlogPost) => {
-    navigate(`/blogs/${post.id}`);
-  };
+  const posts: BlogRow[] | undefined = useMemo(
+    () =>
+      rows?.map((p) => ({
+        id: p._id,
+        title: p.title,
+        excerpt: p.excerpt ?? '',
+        featuredImage: p.featuredImage ?? null,
+        status: p.status as PostStatus,
+        isFeatured: p.isFeatured ?? false,
+        isPinned: p.isPinned ?? false,
+        categoryName: p.category?.name ?? null,
+        viewCount: p.viewCount ?? 0,
+        date: p.publishedAt ?? p.updatedAt ?? p._creationTime,
+        searchText: `${p.title} ${p.excerpt ?? ''} ${p.slug}`.toLowerCase(),
+      })),
+    [rows],
+  );
 
-  const handleBulkDelete = async (postIds: string[]) => {
-    if (!confirm(`Delete ${postIds.length} posts? This cannot be undone.`)) return;
-    try {
-      for (const id of postIds) {
-        await removePost({ id: id as any, orgSlug: ORG_SLUG });
-      }
-      setOpOk(`${postIds.length} posts deleted`);
-      setSelectedPosts([]);
-    } catch (error: any) {
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to delete posts');
-    }
-  };
+  const filtered = useMemo(() => {
+    if (!posts) return undefined;
+    const q = query.trim().toLowerCase();
+    return posts.filter((p) => (status === 'all' || p.status === status) && (!q || p.searchText.includes(q)));
+  }, [posts, query, status]);
 
-  const handleBulkStatusChange = async (postIds: string[], status: 'draft' | 'published' | 'archived') => {
-    try {
-      await setStatus({ ids: postIds as any, status, orgSlug: ORG_SLUG });
-      setOpOk(`${postIds.length} posts updated to ${status}`);
-      setSelectedPosts([]);
-    } catch (error: any) {
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to update posts');
-    }
-  };
+  // A new view resets paging and selection, so bulk actions never touch hidden rows.
+  useEffect(() => {
+    setPage(1);
+    sel.clear();
+  }, [query, status]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'published': return 'default';
-      case 'draft': return 'secondary';
-      case 'archived': return 'outline';
-      default: return 'secondary';
-    }
-  };
+  const { pageItems, pageCount } = paginate(filtered ?? [], page, PAGE_SIZE);
+  const selectedIds = sel.ids as Id<'blogPosts'>[];
 
-  // Filter posts
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || post.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const bulkStatus = (fb: ReturnType<typeof useButtonFeedback>, next: PostStatus) =>
+    fb.run(async () => {
+      await setStatus({ ids: selectedIds, status: next, orgSlug: ORG_SLUG });
+      sel.clear();
+    });
 
-  const columns = [
+  const columns: Column<BlogRow>[] = [
     {
-      key: 'title',
-      label: 'Post',
-      render: (_: any, post: BlogPost) => (
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-9 rounded-md overflow-hidden bg-muted flex-shrink-0">
-            {post.featured_image ? (
-              <ImageWithFallback
-                src={post.featured_image}
-                alt={post.title}
-                className="w-full h-full object-cover"
-              />
+      id: 'post',
+      header: 'Post',
+      cell: (p) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-14 flex-none items-center justify-center overflow-hidden rounded-md bg-muted">
+            {p.featuredImage ? (
+              <img src={p.featuredImage} alt="" loading="lazy" className="h-full w-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-muted-foreground" />
-              </div>
+              <BookOpen className="size-4 text-muted-foreground" aria-hidden />
             )}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate">{post.title}</span>
-              {post.is_featured && <Star className="h-3 w-3 text-sunflower fill-sunflower flex-shrink-0" />}
-              {post.is_pinned && <Pin className="h-3 w-3 text-info flex-shrink-0" />}
-            </div>
-            <p className="text-xs text-muted-foreground truncate max-w-75">
-              {post.excerpt || 'No excerpt'}
+            <p className="truncate font-medium text-foreground">
+              {p.title}
+              {p.isPinned && <span className="ml-2 text-xs font-normal text-muted-foreground">Pinned</span>}
+              {p.isFeatured && <span className="ml-2 text-xs font-normal text-muted-foreground">Featured</span>}
             </p>
+            <p className="truncate text-xs text-muted-foreground">{p.excerpt || 'No excerpt'}</p>
           </div>
         </div>
       ),
     },
     {
-      key: 'category',
-      label: 'Category',
-      render: (_: any, post: BlogPost) => (
-        post.category ? (
-          <Badge 
-            variant="outline" 
-            // eslint-disable-next-line shadcn/no-inline-styles -- category color is data-driven
-            style={{ borderColor: post.category.color, color: post.category.color }}
-            className="text-xs"
-          >
-            {post.category.name}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )
-      ),
+      id: 'category',
+      header: 'Category',
+      hideBelow: 'md',
+      cell: (p) => <span className="text-sm text-muted-foreground">{p.categoryName ?? '—'}</span>,
     },
     {
-      key: 'status',
-      label: 'Status',
-      render: (_: any, post: BlogPost) => (
-        <Badge variant={getStatusColor(post.status) as any} className="text-xs capitalize">
-          {post.status}
-        </Badge>
-      ),
+      id: 'status',
+      header: 'Status',
+      cell: (p) => <Badge tone={STATUS_TONE[p.status]}>{STATUS_LABEL[p.status]}</Badge>,
     },
     {
-      key: 'view_count',
-      label: 'Views',
-      render: (_: any, post: BlogPost) => (
-        <span className="text-sm text-muted-foreground">{post.view_count || 0}</span>
-      ),
+      id: 'views',
+      header: 'Views',
+      align: 'right',
+      hideBelow: 'lg',
+      cell: (p) => <span className="tabular-nums text-muted-foreground">{p.viewCount}</span>,
     },
     {
-      key: 'created_at',
-      label: 'Date',
-      render: (_: any, post: BlogPost) => (
-        <div className="text-xs text-muted-foreground">
-          {post.published_at 
-            ? format(new Date(post.published_at), 'MMM dd, yyyy')
-            : format(new Date(post.created_at), 'MMM dd, yyyy')}
-        </div>
-      ),
+      id: 'date',
+      header: 'Date',
+      hideBelow: 'sm',
+      cell: (p) => <span className="whitespace-nowrap text-sm text-muted-foreground">{formatDate(p.date)}</span>,
     },
   ];
 
+  const bulkError = publish.error || draft.error || archive.error;
+  const filtering = query.trim() !== '' || status !== 'all';
+
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Blog Posts"
-        description={`${posts.length} posts total`}
-      >
-        <Button 
-          onClick={handleAddPost}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Post
-        </Button>
-      </PageHeader>
-
-      <div className="p-4 sm:p-6 max-w-400 mx-auto space-y-4 sm:space-y-6">
-        <InlineStatus status={opStatus} />
-        {/* Filters */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search posts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+    <Page
+      title="Blogs"
+      titleMeta={posts ? <span className="text-sm font-normal text-muted-foreground">{posts.length} total</span> : undefined}
+      primaryAction={{ label: 'New post', icon: <Plus />, onClick: () => navigate('/blogs/new') }}
+    >
+      <ErrorBanner error={bulkError} />
+      <Card padding="none">
+        <FilterBar search={{ value: query, onChange: setQuery, placeholder: 'Search posts' }}>
+          <FilterSelect label="Status" value={status} options={STATUS_FILTERS} onChange={setStatusFilter} />
+        </FilterBar>
+        <DataTable
+          columns={columns}
+          rows={filtered === undefined ? undefined : pageItems}
+          getRowId={(p) => p.id}
+          selection={sel}
+          onRowClick={(p) => navigate(`/blogs/${p.id}`)}
+          rowLabel={(p) => `Edit ${p.title}`}
+          empty={
+            <EmptyState
+              icon={<BookOpen />}
+              title={filtering ? 'No posts match these filters' : 'No posts yet'}
+              description={filtering ? 'Clear the search or status filter.' : 'Write the first post for your readers.'}
+              action={
+                filtering ? undefined : (
+                  <Button variant="primary" onClick={() => navigate('/blogs/new')}>
+                    New post
+                  </Button>
+                )
+              }
             />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          }
+        />
+        {filtered !== undefined && pageCount > 1 && (
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            summary={`${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+          />
+        )}
+      </Card>
 
-        {/* Bulk Actions */}
-        {selectedPosts.length > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-card border border-border/20 rounded-lg">
-            <span className="text-sm font-medium">
-              {selectedPosts.length} selected
-            </span>
-            <div className="flex-1" />
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Change Status <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleBulkStatusChange(selectedPosts, 'published')}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Publish
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleBulkStatusChange(selectedPosts, 'draft')}>
-                  <EyeOff className="mr-2 h-4 w-4" />
-                  Set as Draft
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleBulkStatusChange(selectedPosts, 'archived')}>
-                  <EyeOff className="mr-2 h-4 w-4" />
-                  Archive
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => handleBulkDelete(selectedPosts)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
+      <BulkActionBar
+        count={sel.count}
+        onClear={sel.clear}
+        actions={
+          <>
+            <Button size="sm" variant="secondary" state={publish.state} onClick={() => bulkStatus(publish, 'published')}>
+              Publish
+            </Button>
+            <Button size="sm" variant="secondary" state={draft.state} onClick={() => bulkStatus(draft, 'draft')}>
+              Move to draft
+            </Button>
+            <Button size="sm" variant="secondary" state={archive.state} onClick={() => bulkStatus(archive, 'archived')}>
+              Archive
+            </Button>
+            <Button size="sm" variant="critical" onClick={() => setConfirmOpen(true)}>
               Delete
             </Button>
-          </div>
-        )}
+          </>
+        }
+      />
 
-        {/* Data Table */}
-        <DataTable
-          data={filteredPosts}
-          columns={columns}
-          loading={loading}
-          onRowClick={handleEditPost}
-          selectedItems={selectedPosts}
-          onSelectionChange={setSelectedPosts}
-        />
-      </div>
-    </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete ${sel.count} ${sel.count === 1 ? 'post' : 'posts'}?`}
+        description="Deleted posts cannot be recovered and their URLs stop working."
+        confirmLabel="Delete posts"
+        critical
+        onConfirm={async () => {
+          for (const id of selectedIds) await removePost({ id, orgSlug: ORG_SLUG });
+          sel.clear();
+        }}
+      />
+    </Page>
   );
 }

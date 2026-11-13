@@ -76,7 +76,7 @@ export const ADMIN_NAVIGATION: NavSection[] = [
       { label: 'Customers', path: '/customers', icon: Users },
       { label: 'Discounts', path: '/discounts', icon: Percent },
       { label: 'Reviews', path: '/reviews', icon: Star },
-      { label: 'Content', path: '/blogs', icon: FileText, children: [{ label: 'Blogs', path: '/blogs' }] },
+      { label: 'Content', path: '/blogs', icon: FileText, children: [{ label: 'Blogs', path: '/blogs' }, { label: 'Pages', path: '/pages' }] },
       { label: 'SEO', path: '/seo', icon: Search },
       { label: 'Assets', path: '/assets', icon: ImageIcon },
     ],

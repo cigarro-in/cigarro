@@ -364,13 +364,26 @@ function trimSiteSettingsOnly(preload: PreloadMap): PreloadMap {
   return out;
 }
 
+// Static pages read the site settings and, for store pages, the admin-edited
+// row for the page slug (id === slug). A null row keeps the built-in page.
 function staticPageRoute(id: string, path: string): SsrRoute {
   return {
     id,
     match: (pathname) => (pathname === path || pathname === `${path}/` ? {} : null),
-    preloadRequests: (_params, org) => [{ fnName: 'content:getSiteSettings', args: { orgSlug: org.slug } }],
-    trimPreload: (preload) => trimSiteSettingsOnly(preload),
+    preloadRequests: (_params, org) => [
+      { fnName: 'content:getSiteSettings', args: { orgSlug: org.slug } },
+      { fnName: 'storePages:getBySlug', args: { orgSlug: org.slug, slug: id } },
+    ],
+    trimPreload: (preload) => trimStaticPagePreload(preload),
   };
+}
+
+function trimStaticPagePreload(preload: PreloadMap): PreloadMap {
+  const out: PreloadMap = trimSiteSettingsOnly(preload);
+  for (const key of Object.keys(preload)) {
+    if (key.startsWith('storePages:getBySlug:')) out[key] = preload[key];
+  }
+  return out;
 }
 
 const STATIC_PAGE_ROUTES: SsrRoute[] = [
