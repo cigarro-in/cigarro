@@ -1,155 +1,148 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
 import { useQuery } from 'convex/react';
+import { Users } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { formatOrderDate } from '../../lib/orders/format';
 import { formatINR } from '../../utils/currency';
-import { DataTable } from '../components/shared/DataTable';
-import { PageHeader } from '../components/shared/PageHeader';
+import { CustomerCards } from '../features/customers/CustomerCards';
+import {
+  matchesCustomer,
+  sortByLastOrder,
+  type CustomerListRow,
+} from '../features/customers/customerModel';
+import {
+  Badge,
+  Card,
+  DataTable,
+  EmptyState,
+  FilterBar,
+  Page,
+  Pagination,
+  paginate,
+  type Column,
+} from '../ui';
 
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  is_admin: boolean;
-  orderCount: number;
-  totalSpent: number;
-  averageOrderValue: number;
-  lastOrderDate?: string;
-  firstOrderDate?: string;
-  created_at: string;
-  updated_at: string;
-}
+const PAGE_SIZE = 25;
 
+const COLUMNS: Column<CustomerListRow>[] = [
+  {
+    id: 'name',
+    header: 'Customer',
+    cell: (c) => (
+      <span className="flex items-center gap-2">
+        <span className="font-medium text-foreground">{c.name}</span>
+        {c.isAdmin && <Badge tone="neutral">Admin</Badge>}
+      </span>
+    ),
+  },
+  {
+    id: 'phone',
+    header: 'Phone',
+    hideBelow: 'md',
+    cell: (c) => <span className="tabular-nums text-muted-foreground">{c.phone || '-'}</span>,
+  },
+  {
+    id: 'orders',
+    header: 'Orders',
+    align: 'right',
+    cell: (c) => <span className="tabular-nums">{c.orderCount}</span>,
+  },
+  {
+    id: 'spent',
+    header: 'Total spent',
+    align: 'right',
+    hideBelow: 'sm',
+    cell: (c) => <span className="tabular-nums">{formatINR(c.totalSpent)}</span>,
+  },
+  {
+    id: 'last',
+    header: 'Last order',
+    align: 'right',
+    cell: (c) => (
+      <span className="text-muted-foreground">{c.lastOrderDate ? formatOrderDate(c.lastOrderDate) : 'Never'}</span>
+    ),
+  },
+];
+
+/** Customers in this store with order count, lifetime spend and last order. */
 export function CustomersPage() {
   const navigate = useNavigate();
   const org = useOrg();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
 
-  const rows = useQuery(
-    api.adminStats.listCustomersForAdmin,
-    org ? { orgId: org._id } : 'skip'
+  const raw = useQuery(api.adminStats.listCustomersForAdmin, org ? { orgId: org._id } : 'skip');
+
+  const rows = useMemo<CustomerListRow[] | undefined>(() => {
+    if (raw === undefined) return undefined;
+    return sortByLastOrder(
+      raw.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        isAdmin: c.is_admin,
+        orderCount: c.orderCount,
+        totalSpent: c.totalSpent,
+        lastOrderDate: c.lastOrderDate ?? null,
+        createdAt: c.created_at,
+      })),
+    );
+  }, [raw]);
+
+  const filtered = useMemo(
+    () => (rows ?? []).filter((r) => matchesCustomer(r, query)),
+    [rows, query],
   );
+  const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
+  const currentPage = Math.min(page, pageCount);
+  const start = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
-  // Boundary: Convex ms dates → ISO strings the table already renders.
-  const toISO = (ms?: number | null) => (ms ? new Date(ms).toISOString() : undefined);
-  const customers: Customer[] = (rows || []).map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    email: c.phone || '',
-    phone: c.phone || undefined,
-    is_admin: c.is_admin,
-    orderCount: c.orderCount,
-    totalSpent: c.totalSpent,
-    averageOrderValue: c.averageOrderValue,
-    lastOrderDate: toISO(c.lastOrderDate),
-    firstOrderDate: toISO(c.firstOrderDate),
-    created_at: new Date(c.created_at).toISOString(),
-    updated_at: new Date(c.updated_at).toISOString()
-  }));
-  const loading = rows === undefined;
-
-  const handleViewCustomer = (customer: Customer) => {
-    navigate(`/customers/${customer.id}`);
+  const onQuery = (value: string) => {
+    setQuery(value);
+    setPage(1);
   };
-
-  const columns = [
-    {
-      key: 'name',
-      label: 'Customer',
-      render: (name: string, customer: Customer) => (
-        <div>
-          <div className="font-medium text-foreground">{name}</div>
-          {customer.phone && (
-            <div className="text-sm text-muted-foreground flex items-center">
-              <Phone className="w-3 h-3 mr-1" />
-              {customer.phone}
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'orderCount',
-      label: 'Orders',
-      render: (count: number) => (
-        <div className="text-center">
-          <div className="font-medium">{count}</div>
-          <div className="text-xs text-muted-foreground">orders</div>
-        </div>
-      )
-    },
-    {
-      key: 'totalSpent',
-      label: 'Spent (shown)',
-      render: (amount: number) => (
-        <div className="font-medium">{formatINR(amount)}</div>
-      )
-    },
-    {
-      key: 'averageOrderValue',
-      label: 'Avg. Order (shown)',
-      render: (amount: number) => (
-        <div className="text-sm">{formatINR(amount)}</div>
-      )
-    },
-    {
-      key: 'lastOrderDate',
-      label: 'Last Order',
-      render: (date?: string) => (
-        <div className="text-sm">
-          {date ? new Date(date).toLocaleDateString() : 'Never'}
-        </div>
-      )
-    },
-    {
-      key: 'is_admin',
-      label: 'Role',
-      render: (_: any, customer: Customer) => (
-        <div className="space-y-1">
-          {customer.is_admin ? (
-            <Badge variant="outline" className="text-xs">
-              Admin
-            </Badge>
-          ) : (
-            <span className="text-sm text-muted-foreground">Customer</span>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'created_at',
-      label: 'Joined',
-      render: (date: string) => (
-        <div className="text-sm">{new Date(date).toLocaleDateString()}</div>
-      )
-    }
-  ];
+  const open = (c: CustomerListRow) => navigate(`/customers/${c.id}`);
+  const loading = rows === undefined;
+  const nothing = !loading && filtered.length === 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Customers"
-        description="Customer accounts · spend and orders shown from the current admin dataset"
-        search={{
-          value: searchTerm,
-          onChange: setSearchTerm,
-          placeholder: "Search customers..."
-        }}
-      />
-
-      <div className="p-6 max-w-400 mx-auto space-y-6">
-        <DataTable
-          data={customers}
-          columns={columns}
-          loading={loading}
-          onRowClick={handleViewCustomer}
-          searchTerm={searchTerm}
-        />
-      </div>
-    </div>
+    <Page title="Customers">
+      <Card padding="none">
+        <FilterBar search={{ value: query, onChange: onQuery, placeholder: 'Search name or phone' }} />
+        {nothing ? (
+          <EmptyState
+            icon={<Users />}
+            title={query ? 'No customers match' : 'No customers yet'}
+            description={query ? 'Try a different name or phone number.' : 'Customers appear here after their first order or sign-in.'}
+          />
+        ) : (
+          <>
+            <div className="md:hidden">
+              <CustomerCards rows={pageItems} loading={loading} onOpen={open} />
+            </div>
+            <div className="hidden md:block">
+              <DataTable
+                columns={COLUMNS}
+                rows={loading ? undefined : pageItems}
+                getRowId={(c) => c.id}
+                onRowClick={open}
+                rowLabel={(c) => `Open customer ${c.name}`}
+              />
+            </div>
+          </>
+        )}
+        {!nothing && !loading && (
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            summary={`${start}–${end} of ${filtered.length}`}
+          />
+        )}
+      </Card>
+    </Page>
   );
 }

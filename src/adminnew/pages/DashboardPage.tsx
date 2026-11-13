@@ -5,6 +5,8 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { formatINR } from '../../utils/currency';
+import { AttentionRow, type AttentionItem } from '../features/overview/AttentionRow';
+import { SalesComparison } from '../features/overview/SalesComparison';
 import {
   Button,
   Card,
@@ -37,33 +39,16 @@ interface RecentCustomer {
   createdAt: number;
 }
 
-function Metric({ label, value, to }: { label: string; value: ReactNode; to?: string }) {
-  const body = (
-    <>
-      <span className="text-[13px] text-[var(--admin-text-muted)]">{label}</span>
-      <span className="text-xl font-semibold tabular-nums text-[var(--admin-text)]">{value}</span>
-    </>
-  );
-  const cls = 'flex flex-col gap-1 p-4';
-  return to ? (
-    <Link to={to} className={`${cls} transition-colors hover:bg-[var(--admin-surface-hover)]`}>
-      {body}
-    </Link>
-  ) : (
-    <div className={cls}>{body}</div>
-  );
-}
-
 function StoreRow({ label, value, to }: { label: string; value: ReactNode; to?: string }) {
-  const cls = 'flex h-9 items-center justify-between gap-3 rounded-[var(--admin-radius-sm)] px-2 text-sm';
+  const cls = 'flex h-9 items-center justify-between gap-3 rounded-md px-2 text-sm';
   const content = (
     <>
-      <span className="text-[var(--admin-text-muted)]">{label}</span>
+      <span className="text-muted-foreground">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </>
   );
   return to ? (
-    <Link to={to} className={`${cls} hover:bg-[var(--admin-surface-hover)]`}>
+    <Link to={to} className={`${cls} hover:bg-muted`}>
       {content}
     </Link>
   ) : (
@@ -73,7 +58,7 @@ function StoreRow({ label, value, to }: { label: string; value: ReactNode; to?: 
 
 const ORDER_COLUMNS: Column<RecentOrder>[] = [
   { id: 'number', header: 'Order', cell: (o) => <span className="font-medium tabular-nums">{o.number}</span> },
-  { id: 'date', header: 'Date', hideBelow: 'sm', cell: (o) => <span className="text-[var(--admin-text-muted)]">{formatOrderDate(o.createdAt)}</span> },
+  { id: 'date', header: 'Date', hideBelow: 'sm', cell: (o) => <span className="text-muted-foreground">{formatOrderDate(o.createdAt)}</span> },
   { id: 'customer', header: 'Customer', hideBelow: 'md', cell: (o) => o.customer || 'Guest' },
   { id: 'status', header: 'Status', cell: (o) => <StatusBadge order={{ status: o.paymentStatus, shippingStatus: o.shippingStatus }} /> },
   { id: 'total', header: 'Total', align: 'right', cell: (o) => <span className="tabular-nums">{formatINR(o.total)}</span> },
@@ -82,14 +67,21 @@ const ORDER_COLUMNS: Column<RecentOrder>[] = [
 const CUSTOMER_COLUMNS: Column<RecentCustomer>[] = [
   { id: 'name', header: 'Customer', cell: (c) => <span className="font-medium">{c.name || 'Unknown'}</span> },
   { id: 'contact', header: 'Phone', cell: (c) => <span className="tabular-nums">{c.contact || '-'}</span> },
-  { id: 'joined', header: 'Joined', align: 'right', cell: (c) => <span className="text-[var(--admin-text-muted)]">{formatOrderDate(c.createdAt)}</span> },
+  { id: 'joined', header: 'Joined', align: 'right', cell: (c) => <span className="text-muted-foreground">{formatOrderDate(c.createdAt)}</span> },
 ];
+
+function greetingFor(date: Date): string {
+  const h = date.getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 function OverviewSkeleton() {
   return (
     <>
       <Card padding="none">
-        <div className="grid grid-cols-2 divide-x divide-y divide-[var(--admin-border)] sm:grid-cols-4 sm:divide-y-0">
+        <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-4 sm:divide-y-0">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="flex flex-col gap-2 p-4">
               <Skeleton className="h-3.5 w-20" />
@@ -97,6 +89,9 @@ function OverviewSkeleton() {
             </div>
           ))}
         </div>
+      </Card>
+      <Card title="Needs attention">
+        <Skeleton className="h-14 w-full" />
       </Card>
       <PageLayout
         main={
@@ -131,7 +126,8 @@ export function DashboardPage() {
 
   const recentOrders: RecentOrder[] = (data?.recentOrders ?? []).map((order) => ({
     id: String(order.id),
-    number: formatOrderNumber(order.order_number, order.display_order_id),
+    // Never fall back to the ORD-xxxx display id.
+    number: formatOrderNumber(order.order_number) || 'Order',
     customer: order.shipping_name,
     total: order.total,
     paymentStatus: order.payment_status,
@@ -146,20 +142,48 @@ export function DashboardPage() {
     createdAt: Number(customer.created_at),
   }));
 
+  const storeName = org?.name;
+  const title = `${greetingFor(new Date())}${storeName ? `, ${storeName}` : ''}`;
+
+  const attention: AttentionItem[] = data
+    ? [
+        { key: 'unpaid', label: 'Awaiting payment', count: data.pendingOrders, to: '/orders?status=pending' },
+        { key: 'prepare', label: 'To prepare', count: data.processingOrders, to: '/orders?status=processing' },
+        {
+          key: 'unmatched',
+          label: 'Unmatched payments',
+          count: data.unmatchedPayments,
+          capped: data.unmatchedCapped,
+          to: '/payments/unmatched',
+        },
+        { key: 'stock', label: 'Low stock', count: data.lowStockCount, to: '/inventory?lowStock=1' },
+      ]
+    : [];
+
+  if (data === null) {
+    return (
+      <Page title="Overview">
+        <Card padding="none">
+          <EmptyState icon={<ShoppingCart />} title="Store not found" />
+        </Card>
+      </Page>
+    );
+  }
+
   return (
-    <Page title="Overview" primaryAction={{ label: 'Add product', to: '/products/new' }}>
+    <Page title={title} primaryAction={{ label: 'Add product', to: '/products/new' }}>
       {data === undefined ? (
         <OverviewSkeleton />
       ) : (
         <>
-          <Card padding="none">
-            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--admin-border)] sm:grid-cols-4 sm:divide-y-0">
-              <Metric label="Sales today" value={formatINR(data?.todayRevenue ?? 0)} />
-              <Metric label="Orders today" value={data?.todayOrders ?? 0} />
-              <Metric label="To prepare" value={data?.processingOrders ?? 0} to="/orders?status=processing" />
-              <Metric label="Low stock" value={data?.lowStockCount ?? 0} to="/inventory?lowStock=1" />
-            </div>
-          </Card>
+          <SalesComparison
+            todayRevenue={data.todayRevenue}
+            yesterdayRevenue={data.yesterdayRevenue}
+            todayOrders={data.todayOrders}
+            yesterdayOrders={data.yesterdayOrders}
+          />
+
+          <AttentionRow items={attention} />
 
           <PageLayout
             main={
@@ -191,7 +215,7 @@ export function DashboardPage() {
                     empty={<EmptyState icon={<Users />} title="No customers yet" />}
                   />
                 )}
-                <div className="flex justify-end border-t border-[var(--admin-border)] px-2 py-1.5">
+                <div className="flex justify-end border-t border-border px-2 py-1.5">
                   <Button variant="plain" size="sm" onClick={() => navigate(view === 'orders' ? '/orders' : '/customers')}>
                     View all
                     <ArrowRight aria-hidden />
@@ -200,14 +224,13 @@ export function DashboardPage() {
               </Card>
             }
             aside={
-              <Card title="Store" actions={<span className="text-xs text-[var(--admin-text-muted)]">{data?.ordersCapped ? 'Latest 1,000 orders' : 'All time'}</span>}>
+              <Card title="Store" actions={<span className="text-xs text-muted-foreground">{data.ordersCapped ? 'Latest 1,000 orders' : 'All time'}</span>}>
                 <div className="-mx-2 flex flex-col">
-                  <StoreRow label="Total sales" value={formatINR(data?.totalRevenue ?? 0)} />
-                  <StoreRow label="Total orders" value={data?.totalOrders ?? 0} />
-                  <StoreRow label="Awaiting payment" value={data?.pendingOrders ?? 0} to="/orders?status=pending" />
-                  <StoreRow label="Shipped" value={data?.shippedOrders ?? 0} to="/orders?status=shipped" />
-                  <StoreRow label="Active products" value={`${data?.activeProducts ?? 0} / ${data?.totalProducts ?? 0}`} to="/products" />
-                  <StoreRow label="Customers" value={data?.totalCustomers ?? 0} to="/customers" />
+                  <StoreRow label="Total sales" value={formatINR(data.totalRevenue)} />
+                  <StoreRow label="Total orders" value={data.totalOrders} />
+                  <StoreRow label="Shipped" value={data.shippedOrders} to="/orders?status=shipped" />
+                  <StoreRow label="Active products" value={`${data.activeProducts} / ${data.totalProducts}`} to="/products" />
+                  <StoreRow label="Customers" value={data.totalCustomers} to="/customers" />
                 </div>
               </Card>
             }
