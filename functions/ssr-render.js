@@ -197,6 +197,8 @@ function pageResponse(method, { body, status }, cacheState) {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': notFound ? 'no-store' : SSR_CACHE_CONTROL,
     'X-SSR': '1',
+    // Carries window.__ORG__ (see the shell script). The service worker caches only these.
+    'X-Org-Injected': '1',
     'x-ssr-cache': cacheState,
     ...(notFound ? { 'X-Robots-Tag': 'noindex, follow' } : {}),
     ...SECURITY_HEADERS,

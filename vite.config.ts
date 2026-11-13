@@ -1,11 +1,32 @@
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
+// The app shell chunk (src/boot.tsx, loaded by src/main.tsx) starts downloading
+// as soon as the HTML is parsed, not after main.js has run.
+function bootModulePreload(): Plugin {
+  return {
+    name: 'boot-modulepreload',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, ctx) {
+        const boot = Object.values(ctx.bundle ?? {}).find(
+          (c) => c.type === 'chunk' && c.name === 'boot',
+        );
+        if (!boot) return;
+        return [{ tag: 'link', attrs: { rel: 'modulepreload', href: `/${boot.fileName}` }, injectTo: 'head' }];
+      },
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    bootModulePreload(),
     VitePWA({
       // 'prompt': the app decides when to apply a new worker (see UpdateSW in
       // src/main.tsx). autoUpdate would reload mid-login.
@@ -20,96 +41,18 @@ export default defineConfig({
         'icons/android-chrome-512x512.png'
       ],
       manifest: false, // Use manifest.json from public folder
-      workbox: {
-        // No index.html in the precache. Workbox's directoryIndex maps a
-        // navigation to "/" onto a precached index.html, which has no
-        // edge-injected window.__ORG__, so the client fell back to another store.
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}'],
+      // Custom service worker (src/sw.js). Navigations are network-first and
+      // cached per URL, and no precached index.html shell exists (it has no
+      // edge-injected window.__ORG__, so it can name the wrong store).
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: {
+        // Static assets plus the offline page only. index.html is not precached.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}', 'offline.html'],
         // Don't cache images in precache (too large)
         globIgnores: ['**/assets/images/**'],
-        cleanupOutdatedCaches: true,
-        // Must stay false in prompt mode: the waiting worker activates only
-        // when the app applies the update.
-        skipWaiting: false,
-        clientsClaim: true,
-        // Document requests go to the network first. A cached storefront
-        // document can be an older SSR render that no longer matches the
-        // client bundle (React #418 on return visits). Cached copies answer
-        // only when the network fails, and no precached shell is served for
-        // navigations.
-        navigateFallback: null,
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages',
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-            },
-          },
-          // CDN images load directly. Intercepting cross-origin image requests
-          // here can make Workbox reject otherwise healthy R2 responses.
-          // Cache API responses (homepage data, products, etc.). Never on the
-          // admin host: those responses are store-scoped and admin data must
-          // not go stale or cross stores (the admin app is per store path).
-          {
-            urlPattern: ({ url }) =>
-              url.hostname.split('.')[0] !== 'admin' &&
-              /\/api\/(homepage-data|products|categories|brands)/i.test(url.pathname),
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 // 1 hour
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          // Cache Google Fonts
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              }
-            }
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          // Cache page navigations
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 1 day
-              },
-              networkTimeoutSeconds: 3
-            }
-          }
-        ]
-      }
+      },
     })
   ],
   resolve: {

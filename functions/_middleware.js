@@ -240,7 +240,8 @@ async function nextWithOrg(context) {
       element(el) { el.setAttribute('href', manifestHref); },
     });
   }
-  return rewriter.transform(res);
+  // Marks a document that carries window.__ORG__. The service worker caches only these.
+  return withHeader(rewriter.transform(res), 'X-Org-Injected', '1');
 }
 
 // ?format=json|md on a catalog route is an agent feed (any UA), never SSR.
