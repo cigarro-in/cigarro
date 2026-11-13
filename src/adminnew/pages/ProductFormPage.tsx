@@ -833,7 +833,55 @@ export function ProductFormPage() {
             </Card>
 
             <Card title="Pricing">
-              {defaultVariant ? (
+              {form.variants.length > 1 ? (
+                // Several options: every price is edited here, one row per option.
+                <div className="flex flex-col gap-4">
+                  {variantOrder.map(({ variant, index }) => {
+                    const p = `pr${index}`;
+                    const isDefaultRow = index === defaultIndex;
+                    return (
+                      <div key={variant.id ?? `new-${index}`} className="flex flex-col gap-2 border-t border-[var(--admin-border)] pt-3 first:border-t-0 first:pt-0">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-[13px] font-medium text-[var(--admin-text)]">
+                            {variant.variant_name || 'Untitled option'}
+                          </span>
+                          {variant.is_default && <Badge tone="info">Default</Badge>}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Field label="Price" htmlFor={`${p}-price`}>
+                            <MoneyInput
+                              id={`${p}-price`}
+                              value={variant.price}
+                              onChange={(price) => updateVariant(index, { price })}
+                              invalid={isDefaultRow && priceMissing}
+                            />
+                          </Field>
+                          <Field label="Compare-at" htmlFor={`${p}-compare`}>
+                            <MoneyInput
+                              id={`${p}-compare`}
+                              value={variant.compare_at_price}
+                              onChange={(compare_at_price) => updateVariant(index, { compare_at_price })}
+                            />
+                          </Field>
+                          <Field label="Cost" htmlFor={`${p}-cost`}>
+                            <MoneyInput
+                              id={`${p}-cost`}
+                              value={variant.cost_price}
+                              onChange={(cost_price) => updateVariant(index, { cost_price })}
+                            />
+                          </Field>
+                        </div>
+                        {isDefaultRow && priceMissing && (
+                          <p role="alert" className="text-xs text-[var(--admin-critical)]">Set a price above ₹0</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-[var(--admin-text-muted)]">
+                    Compare-at shows struck through when higher than the price. Cost is never shown to customers.
+                  </p>
+                </div>
+              ) : defaultVariant ? (
                 <div className="flex flex-col gap-3">
                   <Field label="Price" htmlFor="p-price" required error={priceMissing ? 'Set a price above ₹0' : undefined}>
                     <MoneyInput id="p-price" value={defaultVariant.price} onChange={(price) => updateDefault({ price })} invalid={priceMissing} />
@@ -859,11 +907,6 @@ export function ProductFormPage() {
                   >
                     <MoneyInput id="p-cost" value={defaultVariant.cost_price} onChange={(cost_price) => updateDefault({ cost_price })} />
                   </Field>
-                  {form.variants.length > 1 && (
-                    <p className="text-xs text-[var(--admin-text-muted)]">
-                      For the default option ({defaultVariant.variant_name || 'Untitled'}). Other options are priced under Options.
-                    </p>
-                  )}
                 </div>
               ) : (
                 <p className="text-sm text-[var(--admin-text-muted)]">Mark an option as default to set pricing.</p>
@@ -1086,23 +1129,8 @@ function VariantEditor({
         </Field>
       </div>
 
-      {isDefault ? (
-        <p className="text-xs text-[var(--admin-text-muted)]">
-          Price, inventory and media of the default option are set in Pricing, Inventory and Media.
-        </p>
-      ) : (
+      {!isDefault && (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Price" htmlFor={`${p}-price`}>
-              <MoneyInput id={`${p}-price`} value={variant.price} onChange={(price) => onChange({ price })} />
-            </Field>
-            <Field label="Compare-at price" htmlFor={`${p}-compare`}>
-              <MoneyInput id={`${p}-compare`} value={variant.compare_at_price} onChange={(compare_at_price) => onChange({ compare_at_price })} />
-            </Field>
-            <Field label="Cost per item" htmlFor={`${p}-cost`}>
-              <MoneyInput id={`${p}-cost`} value={variant.cost_price} onChange={(cost_price) => onChange({ cost_price })} />
-            </Field>
-          </div>
           <div className="max-w-sm">
             <InventoryFields variant={variant} onChange={onChange} liveAvailable={liveAvailable} idPrefix={p} />
           </div>
@@ -1117,6 +1145,11 @@ function VariantEditor({
             />
           </Field>
         </>
+      )}
+      {isDefault && (
+        <p className="text-xs text-[var(--admin-text-muted)]">
+          Inventory and media of the default option are set in Inventory and Media. Prices are set in Pricing.
+        </p>
       )}
 
       <Field label="Image alt text" htmlFor={`${p}-alt`} help="Filled in from the title and option name when left empty.">
