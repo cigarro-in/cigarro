@@ -5,6 +5,7 @@ import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware
 import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
 import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
+import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
 import { applyRedirect } from './lib/redirects.js';
 import { isSsrEnabledFor, ssrRender } from './ssr-render.js';
 
@@ -13,7 +14,21 @@ export async function onRequest(context) {
   // *.pages.dev aliases and previews duplicate the store: never index them.
   const host = new URL(context.request.url).hostname;
   const withDiag = context.data?.ssrDiag ? withHeader(response, 'x-ssr', context.data.ssrDiag) : response;
-  return host.endsWith('.pages.dev') ? withNoindex(withDiag) : withDiag;
+  const withPwa = await withStorefrontPwaHead(context, withDiag);
+  return host.endsWith('.pages.dev') ? withNoindex(withPwa) : withPwa;
+}
+
+// Storefront HTML (SPA shell, SSR and bot pages alike) gets the store's own
+// manifest link, icons, theme colour and home-screen title. Applied after the
+// response is built, so cached SSR bodies stay store-neutral and are never stale.
+// The admin host and /sa keep their own head.
+async function withStorefrontPwaHead(context, res) {
+  const org = context.data?.org;
+  if (!org || org.admin || org.unavailable || !org.slug) return res;
+  if (!res.body || !(res.headers.get('content-type') || '').includes('text/html')) return res;
+  if (typeof HTMLRewriter === 'undefined') return res;
+  const brand = await resolveStoreBrand(context.env, org);
+  return rewriteStorefrontHead(res, org, brand);
 }
 
 // SSR diagnostics header: "on" (served by SSR), "off" (flag or route not matched),
