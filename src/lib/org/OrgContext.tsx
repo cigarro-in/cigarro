@@ -7,6 +7,7 @@
 // source of truth and must not be called on the server.
 
 import { createContext, useContext, type ReactNode } from 'react';
+import { LEGACY_ORG_SLUG } from './legacyOrg';
 
 export interface OrgInfo {
   slug: string;
@@ -46,7 +47,7 @@ export function getClientOrgInfo(): OrgInfo {
     adminPathStore ||
     org?.slug ||
     import.meta.env?.VITE_ORG_SLUG ||
-    'smokeshop';
+    LEGACY_ORG_SLUG;
 
   const primaryHost = org?.primaryHost || (loc ? loc.host : '');
 

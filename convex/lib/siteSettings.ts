@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { DatabaseReader } from "../_generated/server";
+import { isLegacyOrg } from "./legacyOrg";
 
 // Per-org storefront settings (siteSettings row, key = "main").
 // Every field is optional so pre-existing rows keep validating. Validators are
@@ -54,7 +55,7 @@ export const storeSocialsV = v.object({
 export const DEFAULT_REFERRAL_REWARD_PAISE = 10000; // Rs 100
 
 /**
- * The org's siteSettings row. Smokeshop also reads pre-backfill legacy rows
+ * The org's siteSettings row. The legacy org also reads pre-backfill legacy rows
  * (orgId absent), matching the other org-scoped readers.
  */
 export async function readOrgSiteSettings(
@@ -65,7 +66,7 @@ export async function readOrgSiteSettings(
     .query("siteSettings")
     .withIndex("by_org_key", (q) => q.eq("orgId", org._id).eq("key", "main"))
     .unique();
-  if (row || org.slug !== "smokeshop") return row;
+  if (row || !isLegacyOrg(org)) return row;
   const legacy = await ctx.db
     .query("siteSettings")
     .withIndex("by_key", (q) => q.eq("key", "main"))

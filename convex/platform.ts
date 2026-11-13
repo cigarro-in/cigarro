@@ -5,6 +5,7 @@ import { audit } from "./lib/audit";
 import { normalizePhoneE164 } from "./lib/phone";
 import { role } from "./schema";
 import { insertOrganization } from "./organizations";
+import { pickUniqueBankAlias } from "./lib/bankAlias";
 import { ensureStoreSubdomain } from "./domains";
 
 // Super-admin (Citadel SSO) store management. Every function takes `saToken`:
@@ -98,13 +99,16 @@ export const createStore = mutation({
     const name = args.name.trim();
     if (!name || name.length > 80) throw new ConvexError({ code: "INVALID_NAME" });
 
-    // The bank alias mirrors the slug. An empty VPA is allowed here; the store
+    // The bank alias starts from the slug. An empty VPA is allowed here; the store
     // must set one (updateSettings) before it takes payments.
+    // Never reuse an alias that already routes bank email to another org
+    // (the legacy org owns `smokeshop`-era aliases); suffix -2, -3, ... instead.
+    const bankEmailAlias = await pickUniqueBankAlias(ctx, slug);
     const orgId = await insertOrganization(ctx, {
       slug,
       name,
       upiVpa: (args.upiVpa ?? "").trim(),
-      bankEmailAlias: slug,
+      bankEmailAlias,
     });
     // <slug>.<platform root>: registered on Cloudflare, primary while the store has none.
     await ensureStoreSubdomain(ctx, { orgId, slug, adminId: sa.adminId });

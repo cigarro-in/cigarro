@@ -4,7 +4,7 @@
  * These are the fallbacks used when a store has not set a value in its
  * siteSettings row. Consumed only through src/hooks/data/useStoreSettings.ts
  * (the store's own settings always win). Keep the values equal to what the
- * smokeshop storefront has always shown.
+ * legacy (oldsmokeshop) storefront has always shown.
  */
 
 export const siteConfig = {

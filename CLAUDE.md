@@ -8,7 +8,7 @@ This is a multi-tenant cigarette e-commerce storefront (React + Vite) with payme
 - **Auth**: own ES256 JWT (`phone-verify` mints `cigarro_token`, `auth.config.ts` trusts only `https://cigarro.in/auth`). Bridged into Convex via `ConvexAuthProvider` (`src/lib/convex/`).
 - **Payments + orders + wallet**: Convex PROD at `prestigious-bass-64.convex.cloud`; DEV at `proper-coyote-383.convex.cloud` (local `.env.local`). All code under `convex/`.
 - **Images**: Cloudflare R2 (`cigarro-assets` bucket, `https://cdn.cigarro.in`, keys under `asset_images/`). URL helpers in `src/lib/images/urls.ts`. No Supabase anywhere.
-- **Org scoping**: `useOrg()` returns the active organization (default slug `smokeshop`, set via `VITE_ORG_SLUG`). Every Convex payment/order/wallet call is scoped by `orgId`.
+- **Org scoping**: `useOrg()` returns the active organization (default slug `oldsmokeshop`, the original cigarro.in store, set via `VITE_ORG_SLUG`; `smokeshop` is a future new store and is not special — see `convex/lib/legacyOrg.ts`). Every Convex payment/order/wallet call is scoped by `orgId`.
 - **Money**: integers in paise at the DB/Convex boundary, rupees in UI. Use `rupeesToPaise` / `paiseToRupees` from `src/lib/convex/money.ts`. Never multiply by 100 inline.
 
 ## Theme decoupling (IMPORTANT)

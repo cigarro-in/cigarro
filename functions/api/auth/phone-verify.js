@@ -9,7 +9,7 @@ import { getRequestOrg } from '../../lib/org.js';
  *   3. Server verifies the token with MSG91's verifyAccessToken API
  *   4. Server resolves phone -> stable userId via Convex, scoped to the store
  *      (resolvePhoneIdentity HTTP action; one users row per store+phone, legacy
- *      smokeshop phones keep their existing userId — no Supabase)
+ *      legacy-org phones keep their existing userId — no Supabase)
  *   5. Server mints our ES256 JWT (sub = userId, org = store slug) and returns it.
  *   6. Client stores it and talks to Convex directly.
  *

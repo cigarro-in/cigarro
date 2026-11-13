@@ -22,6 +22,7 @@ import {
 } from "./lib/hosts";
 import { appendStatusHistory, deriveDomainStatus } from "./lib/domainStatus";
 import { cfConfig, type CfDomainState } from "./cloudflare";
+import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 export { normalizeHost } from "./lib/hosts";
 
@@ -37,7 +38,7 @@ function platformRoot(): string {
 }
 
 function defaultOrgSlug(): string {
-  return process.env.DEFAULT_ORG_SLUG ?? "smokeshop";
+  return process.env.DEFAULT_ORG_SLUG ?? LEGACY_ORG_SLUG;
 }
 
 // Hosts Cloudflare Pages must serve (customer hosts and store subdomains).
@@ -261,7 +262,7 @@ export async function ensureStoreSubdomain(
     reason,
   });
   if (!root) return skip(null, "no_platform_root");
-  // smokeshop is served on cigarro.in itself; it gets no subdomain row.
+  // The legacy org is served on cigarro.in itself; it gets no subdomain row.
   if (args.slug === defaultOrgSlug()) return skip(null, "default_org");
 
   const hostname = `${args.slug}.${root}`;
@@ -699,15 +700,15 @@ export const monitor = internalAction({
 // ---------- Seed ----------
 
 // Idempotent. Bypasses addDomain's reserved-host check on purpose: cigarro.in
-// is the platform root and is the smokeshop primary by design.
-export const seedSmokeshopDomains = internalMutation({
+// is the platform root and is the legacy org's primary by design.
+export const seedLegacyDomains = internalMutation({
   args: {},
   handler: async (ctx) => {
     const org = await ctx.db
       .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", "smokeshop"))
+      .withIndex("by_slug", (q) => q.eq("slug", LEGACY_ORG_SLUG))
       .unique();
-    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND", slug: "smokeshop" });
+    if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND", slug: LEGACY_ORG_SLUG });
 
     const existingRows = await ctx.db
       .query("orgDomains")

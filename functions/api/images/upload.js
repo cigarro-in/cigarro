@@ -1,3 +1,4 @@
+import { LEGACY_ORG_SLUG } from '../../lib/legacyOrg.js';
 import { requiredConvexUrl } from '../../lib/env.js';
 /**
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
@@ -17,7 +18,7 @@ const CDN_BASE = (env) =>
   (env.CDN_BASE_URL || 'https://cdn.cigarro.in').replace(/\/$/, '');
 const LIB_PREFIX = 'asset_images/';
 // Unprefixed legacy keys under LIB_PREFIX belong to this org only.
-const LEGACY_LIBRARY_ORG = 'smokeshop';
+const LEGACY_LIBRARY_ORG = LEGACY_ORG_SLUG;
 const MAX_BYTES = 10 * 1024 * 1024;
 
 function json(payload, status = 200) {

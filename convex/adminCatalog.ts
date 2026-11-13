@@ -15,6 +15,7 @@ import {
 import { dropRedirectForLivePath, recordSlugChange } from "./redirects";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
 import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
+import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 // ---------- Wave 5: catalog + content authorship (Supabase -> Convex) ----------
 // Catalog/content tables are ORG-SCOPED. Every read/write takes orgSlug,
@@ -24,7 +25,7 @@ import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeS
 // Forms keep working with Supabase UUID strings: new rows mint a supabaseId
 // via crypto.randomUUID(), joins key on those same strings (scoped per org).
 
-// Slug clash scoped to the org (+ legacy null-orgId rows for smokeshop).
+// Slug clash scoped to the org (+ legacy null-orgId rows for the legacy org).
 async function assertOrgSlugUnique(
   ctx: any,
   org: any,
@@ -43,7 +44,7 @@ async function assertOrgSlugUnique(
   ) {
     throw new ConvexError({ code: "SLUG_TAKEN", slug });
   }
-  if (org.slug !== "smokeshop") return;
+  if (!isLegacyOrg(org)) return;
   const legacy = await ctx.db
     .query(table)
     .withIndex("by_slug", (q: any) => q.eq("slug", slug))
@@ -72,7 +73,7 @@ async function storeHostsForOrg(ctx: any, org: any): Promise<Set<string>> {
       .filter((r: any) => r.status === "active")
       .map((r: any) => r.hostname),
     platformRoot: process.env.PLATFORM_ROOT_DOMAIN ?? "cigarro.in",
-    defaultOrgSlug: process.env.DEFAULT_ORG_SLUG ?? "smokeshop",
+    defaultOrgSlug: process.env.DEFAULT_ORG_SLUG ?? LEGACY_ORG_SLUG,
   });
 }
 
@@ -135,7 +136,7 @@ async function assertVariantHasNoInventoryHistory(
 }
 
 // Join rows for one side of a join, scoped to the org (+ legacy null-orgId
-// rows for smokeshop, which callers delete + reinsert with orgId to heal).
+// rows for the legacy org, which callers delete + reinsert with orgId to heal).
 async function orgJoinRows(
   ctx: any,
   org: any,
@@ -149,7 +150,7 @@ async function orgJoinRows(
     .query(table)
     .withIndex(orgIndex, (q: any) => q.eq("orgId", org._id).eq(field, value))
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query(table)
     .withIndex(legacyIndex, (q: any) => q.eq(field, value))
@@ -517,7 +518,7 @@ export const listBrandsForAdmin = query({
         )
         .take(1000);
       let n = prods.length;
-      if (org.slug === "smokeshop" && n < 1000) {
+      if (isLegacyOrg(org) && n < 1000) {
         const legacy = await ctx.db
           .query("catalogProducts")
           .withIndex("by_brand_active", (q) =>
@@ -623,7 +624,7 @@ export const deleteBrand = mutation({
       )
       .first();
     if (used) throw new ConvexError({ code: "BRAND_IN_USE" });
-    if (org.slug === "smokeshop" && row.orgId == null) {
+    if (isLegacyOrg(org) && row.orgId == null) {
       const legacyUsed = await ctx.db
         .query("catalogProducts")
         .withIndex("by_brand_active", (q) => q.eq("brandSupabaseId", supabaseId))
@@ -1623,7 +1624,7 @@ export const saveSectionConfig = mutation({
       )
       .unique();
     const legacy =
-      !row && org.slug === "smokeshop"
+      !row && isLegacyOrg(org)
         ? (
             await ctx.db
               .query("sectionConfigurations")
@@ -1661,7 +1662,7 @@ export const saveHomepageComponent = mutation({
       )
       .unique();
     const legacy =
-      !row && org.slug === "smokeshop"
+      !row && isLegacyOrg(org)
         ? (
             await ctx.db
               .query("homepageComponentConfig")

@@ -2,6 +2,12 @@ import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { assertTokenOrg, requireIdentity } from "./auth";
+import {
+  LEGACY_ORG_SLUG,
+  PRE_RENAME_LEGACY_SLUG,
+  isLegacyOrg,
+  renameDone,
+} from "./legacyOrg";
 
 type Ctx = QueryCtx | MutationCtx;
 type Org = { _id: Id<"organizations">; slug: string };
@@ -9,20 +15,28 @@ type Org = { _id: Id<"organizations">; slug: string };
 // Merchant-owned reads/writes resolve the org from this slug (never from a
 // caller-supplied id alone), so a forged orgId can't cross tenant boundaries.
 export async function resolveOrg(ctx: Ctx, orgSlug: string) {
-  const org = await ctx.db
-    .query("organizations")
-    .withIndex("by_slug", (q) => q.eq("slug", orgSlug))
-    .unique();
+  let org = await orgBySlug(ctx, orgSlug);
+  // Deploy-to-migration window: the legacy org still carries its pre-rename
+  // slug until renameSmokeshopToOldsmokeshop-v1 has run. Never after that.
+  if (!org && orgSlug === LEGACY_ORG_SLUG && !(await renameDone(ctx)))
+    org = await orgBySlug(ctx, PRE_RENAME_LEGACY_SLUG);
   if (!org || !org.active)
     throw new ConvexError({ code: "ORG_NOT_FOUND", orgSlug });
   return org;
+}
+
+async function orgBySlug(ctx: Ctx, slug: string) {
+  return await ctx.db
+    .query("organizations")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .unique();
 }
 
 // Admin surface: owner/admin of THIS org only (never "admin of any org").
 export async function requireOrgAdminBySlug(ctx: Ctx, orgSlug: string) {
   const org = await resolveOrg(ctx, orgSlug);
   const identity = await requireIdentity(ctx);
-  assertTokenOrg(identity, org);
+  await assertTokenOrg(ctx, identity, org);
   const membership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q) =>
@@ -52,7 +66,7 @@ export function assertOrgMatch(
 }
 
 // Row belongs to org? Pre-backfill rows carry no orgId; they belong to the
-// legacy single-tenant org (smokeshop) only. Never true for another org's
+// legacy single-tenant org (LEGACY_ORG_SLUG) only. Never true for another org's
 // rows, and never true across orgs — no global fallback.
 export function inOrg(
   row: { orgId?: Id<"organizations"> | null },
@@ -61,11 +75,11 @@ export function inOrg(
   if (row.orgId === org._id) return true;
   return (
     (row.orgId === undefined || row.orgId === null) &&
-    org.slug === "smokeshop"
+    isLegacyOrg(org)
   );
 }
 
-// by_org collect + legacy null-orgId rows for the smokeshop window. After the
+// by_org collect + legacy null-orgId rows for the legacy org. After the
 // backfill assigns every row, the legacy half finds nothing and this is a
 // plain scoped collect.
 export async function collectInOrg(
@@ -77,7 +91,7 @@ export async function collectInOrg(
     .query(table)
     .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query(table)
     .withIndex("by_org", (q: any) => q.eq("orgId", undefined))
@@ -87,7 +101,7 @@ export async function collectInOrg(
   return scoped;
 }
 
-// Scoped supabaseId lookup with a smokeshop-only legacy fallback. Never uses
+// Scoped supabaseId lookup with a legacy-org-only fallback. Never uses
 // the global by_supabase .unique() blindly: post-backfill two orgs may hold
 // the same supabaseId (per-org copies), which would make .unique() throw.
 export async function findOrgDocBySupabase(
@@ -103,7 +117,7 @@ export async function findOrgDocBySupabase(
     )
     .unique();
   if (scoped) return scoped;
-  if (org.slug !== "smokeshop") return null;
+  if (!isLegacyOrg(org)) return null;
   const legacy = await ctx.db
     .query(table)
     .withIndex("by_supabase", (q: any) => q.eq("supabaseId", supabaseId))
@@ -126,7 +140,7 @@ export async function findOrgDocBySlug(
     )
     .unique();
   if (scoped) return scoped;
-  if (org.slug !== "smokeshop") return null;
+  if (!isLegacyOrg(org)) return null;
   const rows = await ctx.db
     .query(table)
     .withIndex("by_slug", (q: any) => q.eq("slug", slug))

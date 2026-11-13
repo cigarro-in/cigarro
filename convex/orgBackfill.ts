@@ -1,16 +1,17 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireOrgAdminBySlug } from "./lib/org";
+import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 // ---------- Org-isolation backfill ----------
 // Assigns missing orgId on merchant-owned rows to the caller's org (run it
-// for the legacy org, `smokeshop`, first). Bounded batches: each call patches
+// for the legacy org, `oldsmokeshop`, first). Bounded batches: each call patches
 // at most `batchSize` rows per table and reports remaining counts, so repeat
 // calls converge without hitting mutation limits. Admin-authorized: only an
 // owner/admin of the target org can claim rows into it.
 //
 // Run (after `npx convex deploy` ships the schema):
-//   npx convex run orgBackfill:backfillOrgIds '{"orgSlug":"smokeshop","batchSize":200}'
+//   npx convex run orgBackfill:backfillOrgIds '{"orgSlug":"oldsmokeshop","batchSize":200}'
 // until every table reports mayHaveMore: false.
 
 const MERCHANT_TABLES = [
@@ -40,8 +41,8 @@ export const backfillOrgIds = mutation({
     batchSize: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    if (args.orgSlug !== "smokeshop")
-      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_SMOKESHOP" });
+    if (args.orgSlug !== LEGACY_ORG_SLUG)
+      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_LEGACY_ORG" });
     const { orgId } = await requireOrgAdminBySlug(ctx, args.orgSlug);
     const batch = Math.max(1, Math.min(args.batchSize ?? 200, 500));
     const out: Record<string, { patched: number; mayHaveMore: boolean }> = {};
@@ -68,8 +69,8 @@ export const backfillOrgIds = mutation({
 export const backfillStatus = query({
   args: { orgSlug: v.string() },
   handler: async (ctx, args) => {
-    if (args.orgSlug !== "smokeshop")
-      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_SMOKESHOP" });
+    if (args.orgSlug !== LEGACY_ORG_SLUG)
+      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_LEGACY_ORG" });
     await requireOrgAdminBySlug(ctx, args.orgSlug);
     const out: Record<string, { missing: number; capped: boolean }> = {};
     for (const table of MERCHANT_TABLES) {

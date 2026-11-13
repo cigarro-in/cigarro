@@ -2,6 +2,11 @@ import { ConvexError } from "convex/values";
 import type { UserIdentity } from "convex/server";
 import { Doc, Id } from "../_generated/dataModel";
 import { sha256Hex } from "./citadelAuth";
+import {
+  PRE_RENAME_LEGACY_SLUG,
+  isLegacyOrg,
+  storeSlugTaken,
+} from "./legacyOrg";
 import { MutationCtx, QueryCtx } from "../_generated/server";
 
 export type Role = Doc<"memberships">["role"];
@@ -15,25 +20,34 @@ export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
 // Store binding for the JWT. phone-verify stamps an `org` claim (the store
 // slug the token was minted for). A token whose claim differs from the store
 // being acted on is rejected. Tokens with NO claim are legacy (minted before
-// per-store auth, valid up to 30 days) and are accepted for smokeshop only.
+// per-store auth) and are accepted for the legacy org only.
+// Pre-rename tokens carry the claim `smokeshop` (the legacy org's old slug):
+// they match the legacy org only while no store holds `smokeshop`, and match a
+// store named `smokeshop` only if issued after that store was created (so a
+// legacy token can never act on the new store).
 // Convex exposes custom JWT claims as extra fields on UserIdentity.
-// Non-throwing form of the store binding check. True when the token may act
-// on `org`. Writes use assertTokenOrg (throws WRONG_STORE); read queries use
-// this so a wrong-store token yields an empty result instead of a crash.
-export function tokenMatchesOrg(
+export async function tokenMatchesOrg(
+  ctx: QueryCtx | MutationCtx,
   identity: UserIdentity,
-  org: { slug: string },
-): boolean {
+  org: { slug: string; _creationTime: number },
+): Promise<boolean> {
   const claim = identity.org;
-  if (claim === undefined || claim === null) return org.slug === "smokeshop";
-  return claim === org.slug;
+  if (claim === undefined || claim === null) return isLegacyOrg(org);
+  if (claim !== PRE_RENAME_LEGACY_SLUG) return claim === org.slug;
+  if (org.slug === PRE_RENAME_LEGACY_SLUG) {
+    const iat = identity.iat;
+    return typeof iat === "number" && iat * 1000 >= org._creationTime;
+  }
+  if (isLegacyOrg(org)) return !(await storeSlugTaken(ctx, PRE_RENAME_LEGACY_SLUG));
+  return false;
 }
 
-export function assertTokenOrg(
+export async function assertTokenOrg(
+  ctx: QueryCtx | MutationCtx,
   identity: UserIdentity,
-  org: { slug: string },
+  org: { slug: string; _creationTime: number },
 ) {
-  if (!tokenMatchesOrg(identity, org)) {
+  if (!(await tokenMatchesOrg(ctx, identity, org))) {
     throw new ConvexError({ code: "WRONG_STORE" });
   }
 }
@@ -46,7 +60,7 @@ export async function requireMember(
   const identity = await requireIdentity(ctx);
   const org = await ctx.db.get(orgId);
   if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
-  assertTokenOrg(identity, org);
+  await assertTokenOrg(ctx, identity, org);
   // .first(), not .unique(): a duplicate membership row must not surface as a
   // plain Error (redacted to "Server Error" in prod).
   const membership = await ctx.db
@@ -72,7 +86,7 @@ export async function optionalMember(
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
   const org = await ctx.db.get(orgId);
-  if (!org || !tokenMatchesOrg(identity, org)) return null;
+  if (!org || !(await tokenMatchesOrg(ctx, identity, org))) return null;
   const membership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q) =>

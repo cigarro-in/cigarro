@@ -794,7 +794,7 @@ export const wake = mutation({
     const identity = await requireIdentity(ctx);
     const orderOrg = await ctx.db.get(order.orgId);
     if (!orderOrg) throw new ConvexError({ code: "ORG_NOT_FOUND" });
-    assertTokenOrg(identity, orderOrg);
+    await assertTokenOrg(ctx, identity, orderOrg);
     if (order.userId !== identity.subject)
       throw new ConvexError({ code: "FORBIDDEN" });
 

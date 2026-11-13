@@ -2,11 +2,12 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { collectInOrg, inOrg, resolveOrg } from "./lib/org";
 import { readOrgSiteSettings } from "./lib/siteSettings";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 2: content reads (Supabase -> Convex) ----------
 // Content is ORG-SCOPED and public: every query takes the storefront orgSlug,
 // resolves it via organizations by_slug, and returns only that org's rows.
-// Pre-backfill rows (no orgId) read as the legacy smokeshop org's rows.
+// Pre-backfill rows (no orgId) read as the legacy org's rows.
 
 const postShape = (p: any) => ({
   _id: p._id,
@@ -49,7 +50,7 @@ async function orgPostsByStatus(
     )
     .order("desc")
     .take(limit);
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("blogPosts")
     .withIndex("by_status_published", (q: any) => q.eq("status", status))
@@ -90,7 +91,7 @@ export const getBlogPostBySlug = query({
       )
       .unique();
     const legacy =
-      !row && org.slug === "smokeshop"
+      !row && isLegacyOrg(org)
         ? (
             await ctx.db
               .query("blogPosts")
@@ -137,7 +138,7 @@ export const listRelatedPosts = query({
           .order("desc")
           .take(limit);
     let rows = scoped;
-    if (org.slug === "smokeshop") {
+    if (isLegacyOrg(org)) {
       const legacy = args.categorySlug
         ? await ctx.db
             .query("blogPosts")
@@ -229,7 +230,7 @@ export const getSectionConfig = query({
       )
       .unique();
     const legacy =
-      !row && org.slug === "smokeshop"
+      !row && isLegacyOrg(org)
         ? (
             await ctx.db
               .query("sectionConfigurations")

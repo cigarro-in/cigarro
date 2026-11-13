@@ -2,6 +2,7 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { collectInOrg } from "./lib/org";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -20,7 +21,7 @@ export const checkMyAdmin = query({
     const orgs = await ctx.db.query("organizations").collect();
     const org = orgSlug
       ? orgs.find((o) => o.slug === orgSlug)
-      : orgs.find((o) => o.slug === "smokeshop") ?? orgs[0];
+      : orgs.find((o) => isLegacyOrg(o)) ?? orgs[0];
     if (!org) return { ok: false };
     const membership = await ctx.db
       .query("memberships")

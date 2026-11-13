@@ -8,6 +8,7 @@ import {
   requireOrgAdminBySlug,
   resolveOrg,
 } from "./lib/org";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 10: product reviews, Convex-native ----------
 // ORG-SCOPED, like catalog. Only approved rows are public. One review per
@@ -37,7 +38,7 @@ async function orgReviewsByProduct(
     )
     .order("desc")
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("productReviews")
     .withIndex("by_product", (q: any) =>
@@ -64,7 +65,7 @@ async function orgReviewsByUser(
     )
     .order("desc")
     .take(100);
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("productReviews")
     .withIndex("by_user_product", (q: any) => q.eq("userId", userId))
@@ -107,7 +108,7 @@ export const listMyReviews = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const rows = await orgReviewsByUser(ctx, org, identity.subject);
     const products = await collectInOrg(ctx, "catalogProducts", org);
     const bySupabaseId = new Map(products.map((p) => [p.supabaseId, p]));
@@ -138,7 +139,7 @@ export const submitReview = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     if (!Number.isFinite(a.rating) || a.rating < 1 || a.rating > 5)
       throw new ConvexError({ code: "BAD_RATING" });
     const product = await findOrgDocBySupabase(
@@ -159,7 +160,7 @@ export const submitReview = mutation({
       )
       .unique();
     const legacy =
-      !existing && org.slug === "smokeshop"
+      !existing && isLegacyOrg(org)
         ? await ctx.db
             .query("productReviews")
             .withIndex("by_user_product", (q) =>

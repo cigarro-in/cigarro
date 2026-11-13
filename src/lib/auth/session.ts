@@ -2,15 +2,24 @@
 // Storage is local only — never committed.
 
 import { ORG_SLUG } from '../convex/org';
+import { LEGACY_ORG_SLUG } from '../org/legacyOrg';
 
 // One session per store. The pre-namespacing key is migrated once, and only
-// into smokeshop: that was the only store the old key ever held a session for.
+// into the legacy store: that was the only store the old key ever held a
+// session for. Its per-store key was also under the pre-rename slug
+// (`smokeshop`), so that key is moved to the current one too.
 const LEGACY_KEY = 'cigarro.session.v1';
+const PRE_RENAME_KEY = 'cigarro.session.v1:smokeshop';
 const KEY = `cigarro.session.v1:${ORG_SLUG}`;
 
 function migrateLegacyKey() {
   try {
-    if (ORG_SLUG !== 'smokeshop') return;
+    if (ORG_SLUG !== LEGACY_ORG_SLUG) return;
+    const preRename = localStorage.getItem(PRE_RENAME_KEY);
+    if (preRename !== null) {
+      if (localStorage.getItem(KEY) === null) localStorage.setItem(KEY, preRename);
+      localStorage.removeItem(PRE_RENAME_KEY);
+    }
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy === null) return;
     if (localStorage.getItem(KEY) === null) localStorage.setItem(KEY, legacy);

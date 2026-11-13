@@ -5,6 +5,7 @@ import { adminPaymentsFallback, isSafeReturnTo } from "./lib/auth";
 import { encryptSecret } from "./lib/crypto";
 import { gmailRedirectUri } from "./gmail";
 import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
+import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 const http = httpRouter();
 
@@ -211,8 +212,8 @@ http.route({
       internal.userState.resolvePhoneIdentity,
       {
         phone,
-        // Older edge builds omit orgSlug; they only ever served smokeshop.
-        orgSlug: String(body.orgSlug || "smokeshop"),
+        // Older edge builds omit orgSlug; they only ever served the legacy org.
+        orgSlug: String(body.orgSlug || LEGACY_ORG_SLUG),
         name: body.name ? String(body.name).slice(0, 100) : undefined,
       },
     );

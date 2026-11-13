@@ -8,13 +8,14 @@ import {
   requireOrgAdminBySlug,
   resolveOrg,
 } from "./lib/org";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 3: catalog reads (Supabase -> Convex) ----------
 // Catalog is ORG-SCOPED and public: every query takes the storefront orgSlug,
 // resolves it via organizations by_slug, and returns only that org's rows.
 // Money fields are RUPEES (numbers, as in Supabase); paise conversion happens
 // only at the order boundary (rupeesToPaise on createOrder). Pre-backfill rows
-// (no orgId) read as the legacy smokeshop org's rows.
+// (no orgId) read as the legacy org's rows.
 
 const brandShape = (b: any) => ({
   _id: b._id,
@@ -114,7 +115,7 @@ async function orgVariantsByProduct(
       q.eq("orgId", org._id).eq("productSupabaseId", productSupabaseId),
     )
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("catalogVariants")
     .withIndex("by_product", (q: any) =>
@@ -140,7 +141,7 @@ async function orgActiveProducts(
     )
     .order("desc")
     .take(limit);
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("catalogProducts")
     .withIndex("by_active_created", (q: any) => q.eq("isActive", true))
@@ -312,7 +313,7 @@ export const catalogCounts = query({
         .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
         .take(2000);
       let n = rows.length;
-      if (org.slug === "smokeshop" && n < 2000) {
+      if (isLegacyOrg(org) && n < 2000) {
         const legacy = (await ctx.db.query(t).take(2000)).filter(
           (r: any) => r.orgId == null,
         );
@@ -626,7 +627,7 @@ export const getCategoryDetail = query({
       )
       .take(20);
     const legacyJoins =
-      org.slug === "smokeshop"
+      isLegacyOrg(org)
         ? (
             await ctx.db
               .query("catalogProductCategories")
@@ -671,7 +672,7 @@ export const getBrandDetail = query({
       )
       .take(12);
     let list = rows;
-    if (org.slug === "smokeshop" && list.length < 12) {
+    if (isLegacyOrg(org) && list.length < 12) {
       const legacy = await ctx.db
         .query("catalogProducts")
         .withIndex("by_brand_active", (q) =>

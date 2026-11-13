@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { findOrgDocBySupabase, inOrg } from "./org";
+import { isLegacyOrg } from "./legacyOrg";
 
 export type InventoryMovement =
   | "opening_balance"
@@ -35,7 +36,7 @@ async function orgVariantsByProduct(
       q.eq("orgId", org._id).eq("productSupabaseId", productSupabaseId),
     )
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("catalogVariants")
     .withIndex("by_product", (q) =>
@@ -57,7 +58,7 @@ async function orgComboItems(
       q.eq("orgId", org._id).eq("comboSupabaseId", comboSupabaseId),
     )
     .collect();
-  if (org.slug !== "smokeshop") return scoped;
+  if (!isLegacyOrg(org)) return scoped;
   const legacy = await ctx.db
     .query("catalogComboItems")
     .withIndex("by_combo", (q) => q.eq("comboSupabaseId", comboSupabaseId))

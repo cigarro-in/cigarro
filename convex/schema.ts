@@ -341,7 +341,7 @@ export default defineSchema({
   // Multiple UPI VPAs per org for rotation / failover.
   paymentVpas: defineTable({
     orgId: v.id("organizations"),
-    vpa: v.string(),                        // e.g. "smokeshop@ybl"
+    vpa: v.string(),                        // e.g. "store@ybl"
     label: v.optional(v.string()),          // e.g. "HDFC primary"
     active: v.boolean(),
     priority: v.number(),                   // lower = preferred
@@ -354,7 +354,7 @@ export default defineSchema({
   // Multiple inbound email aliases per org (for multi-bank or rotation).
   bankInboxes: defineTable({
     orgId: v.id("organizations"),
-    alias: v.string(),                      // e.g. "bank-smokeshop@cigarro.in"
+    alias: v.string(),                      // e.g. "bank-store@cigarro.in"
     label: v.optional(v.string()),          // e.g. "HDFC personal"
     bankKey: v.optional(v.string()),        // hint to template selector
     active: v.boolean(),
@@ -622,7 +622,7 @@ export default defineSchema({
     // the same phone shopping two stores gets two rows with two userIds.
     userId: v.string(),
     // Owning store. Optional only until backfillUserOrgs has run; legacy rows
-    // without it belong to smokeshop.
+    // without it belong to the legacy org.
     orgId: v.optional(v.id("organizations")),
     phone: v.optional(v.string()), // E.164, e.g. +919876543210
     name: v.optional(v.string()),

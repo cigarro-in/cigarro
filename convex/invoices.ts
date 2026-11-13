@@ -40,7 +40,7 @@ const nonEmpty = (s: string | null | undefined) => {
  * Seller identity for invoices. Precedence per field:
  *   invoiceSettings override (if set) -> siteSettings.business -> siteName -> org.name.
  * invoiceSettings.businessName equal to the internal org name is a legacy
- * auto-default and is treated as unset, so "Smokeshop" never leaks when a
+ * auto-default and is treated as unset, so the internal org name never leaks when a
  * storefront name exists.
  */
 function resolveSeller(

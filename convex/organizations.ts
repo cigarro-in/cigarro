@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
+import { LEGACY_ORG_SLUG, PRE_RENAME_LEGACY_SLUG } from "./lib/legacyOrg";
 import { role } from "./schema";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
@@ -230,5 +231,26 @@ export const seedOrg = internalMutation({
     });
 
     return { orgId };
+  },
+});
+
+// Migration step (convex/migrations.ts, renameSmokeshopToOldsmokeshop-v1): the
+// legacy store moves from the slug `smokeshop` to LEGACY_ORG_SLUG, freeing
+// `smokeshop` for a new store. Idempotent: a no-op once the legacy slug exists.
+export const renameLegacyOrgSlug = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const taken = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", LEGACY_ORG_SLUG))
+      .first();
+    if (taken) return { renamed: false, reason: "already-renamed" };
+    const legacy = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", PRE_RENAME_LEGACY_SLUG))
+      .first();
+    if (!legacy) return { renamed: false, reason: "no-legacy-org" };
+    await ctx.db.patch(legacy._id, { slug: LEGACY_ORG_SLUG });
+    return { renamed: true, orgId: legacy._id };
   },
 });

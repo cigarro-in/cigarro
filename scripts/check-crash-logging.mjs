@@ -38,12 +38,12 @@ const ctx = { db: {
     take: async () => table === 'crashLogs' ? saved : [], order() { return this; } }),
   insert: async (table, data) => { assert.equal(table, 'crashLogs'); saved.push(data); return 'id'; },
 } };
-assert.equal((await backend.record.handler(ctx, { orgSlug: 'smokeshop', reporter: 'hashed', report: { source: 'app', message: dirty, path: '/cart?token=secret' } })).accepted, true);
+assert.equal((await backend.record.handler(ctx, { orgSlug: 'oldsmokeshop', reporter: 'hashed', report: { source: 'app', message: dirty, path: '/cart?token=secret' } })).accepted, true);
 assert.equal(saved[0].orgId, 'org');
 assert.equal(saved[0].path, '/cart');
 assert.equal(saved[0].message, clean);
 saved.length = 20;
-assert.equal((await backend.record.handler(ctx, { orgSlug: 'smokeshop', reporter: 'hashed', report: { source: 'app', message: 'flood' } })).accepted, false);
+assert.equal((await backend.record.handler(ctx, { orgSlug: 'oldsmokeshop', reporter: 'hashed', report: { source: 'app', message: 'flood' } })).accepted, false);
 await assert.rejects(backend.list.handler(ctx, { orgId: 'org' }), /FORBIDDEN/);
 authorized = true;
 assert.equal((await backend.list.handler(ctx, { orgId: 'org' })).length, 20);

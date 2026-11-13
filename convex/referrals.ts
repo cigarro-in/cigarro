@@ -5,6 +5,7 @@ import { inOrg, resolveOrg } from "./lib/org";
 import { creditWallet } from "./wallet";
 import { rupeesToPaise, paiseToRupees } from "./lib/money";
 import { DEFAULT_REFERRAL_REWARD_PAISE, readOrgSiteSettings } from "./lib/siteSettings";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
 // ORG-SCOPED: one row per user per org. Ports the record/validate semantics
@@ -32,7 +33,7 @@ async function genCode(ctx: any, org: any): Promise<string> {
       )
       .unique();
     if (!clash) return code;
-    if (org.slug === "smokeshop") {
+    if (isLegacyOrg(org)) {
       const legacy = await ctx.db
         .query("referrals")
         .withIndex("by_code", (q: any) => q.eq("referralCode", code))
@@ -86,7 +87,7 @@ async function myReferral(ctx: any, org: any, userId: string) {
     )
     .unique();
   if (scoped) return scoped;
-  if (org.slug !== "smokeshop") return null;
+  if (!isLegacyOrg(org)) return null;
   const legacy = await ctx.db
     .query("referrals")
     .withIndex("by_user", (q: any) => q.eq("userId", userId))
@@ -103,7 +104,7 @@ async function referralByCode(ctx: any, org: any, code: string) {
     )
     .unique();
   if (scoped) return scoped;
-  if (org.slug !== "smokeshop") return null;
+  if (!isLegacyOrg(org)) return null;
   const legacy = await ctx.db
     .query("referrals")
     .withIndex("by_code", (q: any) => q.eq("referralCode", want))
@@ -118,7 +119,7 @@ export const ensureMyReferral = mutation({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const existing = await myReferral(ctx, org, identity.subject);
     if (existing) return toReferral(existing);
     const now = Date.now();
@@ -145,7 +146,7 @@ export const getMyReferral = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const row = await myReferral(ctx, org, identity.subject);
     return row ? toReferral(row) : null;
   },
@@ -250,7 +251,7 @@ export async function rewardDeliveredReferral(
     )
     .unique();
   const legacyMine =
-    !mine && org.slug === "smokeshop"
+    !mine && isLegacyOrg(org)
       ? await ctx.db
           .query("referrals")
           .withIndex("by_user", (q: any) => q.eq("userId", order.userId))
@@ -267,7 +268,7 @@ export async function rewardDeliveredReferral(
     )
     .unique();
   const legacyReferrer =
-    !referrer && org.slug === "smokeshop"
+    !referrer && isLegacyOrg(org)
       ? await ctx.db
           .query("referrals")
           .withIndex("by_user", (q: any) => q.eq("userId", mineRow.referredByUserId))
@@ -338,7 +339,7 @@ export const recordReferral = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     return attach(ctx, org, identity.subject, a.referredUserId, a.referralCode, a.signupSource, a.ipAddress, a.userAgent);
   },
 });
@@ -349,7 +350,7 @@ export const attachReferralLate = mutation({
   handler: async (ctx, a) => {
     const org = await resolveOrg(ctx, a.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     return attach(ctx, org, identity.subject, a.referredUserId, a.referralCode, "checkout_late");
   },
 });
@@ -360,7 +361,7 @@ export const checkEligibility = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     if (!mine) return { eligible: true, applied: false };
     if (!mine.referredByUserId && !mine.firstOrderCompleted)
@@ -377,7 +378,7 @@ export const checkIfReferred = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     if (!mine?.referredByUserId) return { was_referred: false };
     return {
@@ -396,7 +397,7 @@ export const getReferralStats = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const mine = await myReferral(ctx, org, identity.subject);
     // No row yet (pre-migration signup): zero stats with no code yet — the
     // row mints on first record/attach, same lazy pattern as users spine.
@@ -431,7 +432,7 @@ export const getReferredUsers = query({
   handler: async (ctx, args) => {
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const scoped = await ctx.db
       .query("referrals")
       .withIndex("by_org_referrer", (q: any) =>
@@ -439,7 +440,7 @@ export const getReferredUsers = query({
       )
       .collect();
     let rows = scoped;
-    if (org.slug === "smokeshop") {
+    if (isLegacyOrg(org)) {
       const legacy = await ctx.db
         .query("referrals")
         .withIndex("by_referrer", (q: any) =>
@@ -478,7 +479,7 @@ export const getLeaderboard = query({
       .withIndex("by_org", (q: any) => q.eq("orgId", org._id))
       .collect();
     let rows = scoped;
-    if (org.slug === "smokeshop") {
+    if (isLegacyOrg(org)) {
       const legacy = await ctx.db
         .query("referrals")
         .withIndex("by_org", (q: any) => q.eq("orgId", undefined))

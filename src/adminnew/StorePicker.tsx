@@ -47,7 +47,7 @@ export function StorePicker() {
               autoComplete="organization"
               autoCapitalize="none"
               spellCheck={false}
-              placeholder="e.g. smokeshop"
+              placeholder="e.g. my-store"
               className="h-11 w-full rounded-xl border px-3 text-base bg-background"
             />
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

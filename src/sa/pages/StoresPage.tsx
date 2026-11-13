@@ -56,7 +56,7 @@ export function StoresPage() {
         <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-4 items-end">
           <div>
             <Label htmlFor="sa-slug">Slug</Label>
-            <Input id="sa-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="smokeshop2" required disabled={!writeOpen} />
+            <Input id="sa-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-store" required disabled={!writeOpen} />
           </div>
           <div>
             <Label htmlFor="sa-name">Name</Label>

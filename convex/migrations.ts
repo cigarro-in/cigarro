@@ -15,14 +15,20 @@ import {
   internalQuery,
   type ActionCtx,
 } from "./_generated/server";
+import { LEGACY_ORG_SLUG, RENAME_MIGRATION } from "./lib/legacyOrg";
 
 const MAX_RUNS = 5;
 const MAX_RESULT_CHARS = 2048;
 
 // Modules absent from the generated api.d.ts until codegen runs; referenced by path.
 const seedDomainsRef = makeFunctionReference<"mutation", Record<string, never>, unknown>(
-  "domains:seedSmokeshopDomains",
+  "domains:seedLegacyDomains",
 );
+const renameLegacyOrgRef = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  unknown
+>("organizations:renameLegacyOrgSlug");
 const cleanupCanonicalUrlsRef = makeFunctionReference<
   "mutation",
   { orgSlug: string; dryRun: boolean },
@@ -118,8 +124,13 @@ interface Migration {
   run: (ctx: ActionCtx) => Promise<unknown>;
 }
 
-// Order matters: later migrations may depend on earlier ones.
+// Order matters: later migrations may depend on earlier ones. The slug rename
+// goes first so every later step (and every org-slug lookup) sees the final slug.
 const MIGRATIONS: Migration[] = [
+  {
+    name: RENAME_MIGRATION,
+    run: async (ctx) => await ctx.runMutation(renameLegacyOrgRef, {}),
+  },
   {
     name: "backfillUserOrgs-v1",
     run: async (ctx) => {
@@ -132,7 +143,7 @@ const MIGRATIONS: Migration[] = [
           isDone: boolean;
           continueCursor: string;
         } = await ctx.runMutation(internal.userState.backfillUserOrgs, {
-          orgSlug: "smokeshop",
+          orgSlug: LEGACY_ORG_SLUG,
           cursor,
         });
         patched += page.patched;
@@ -156,7 +167,7 @@ const MIGRATIONS: Migration[] = [
     name: "cleanupCanonicalUrls-v1",
     run: async (ctx) =>
       await ctx.runMutation(cleanupCanonicalUrlsRef, {
-        orgSlug: "smokeshop",
+        orgSlug: LEGACY_ORG_SLUG,
         dryRun: false,
       }),
   },

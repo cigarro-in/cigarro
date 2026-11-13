@@ -4,6 +4,7 @@
 // Run: npx tsx scripts/check-cigars-category.ts
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../convex/_generated/api';
+import { LEGACY_ORG_SLUG } from '../convex/lib/legacyOrg';
 
 const URL = process.env.CONVEX_URL ?? 'https://proper-coyote-383.convex.cloud';
 const WANT = new Set([
@@ -13,7 +14,7 @@ const WANT = new Set([
 
 async function main() {
   const client = new ConvexHttpClient(URL);
-  const org: any = await client.query(api.organizations.getBySlug, { slug: 'smokeshop' } as any);
+  const org: any = await client.query(api.organizations.getBySlug, { slug: LEGACY_ORG_SLUG } as any);
   const b: any = await client.query(api.catalog.fullCatalog, { orgId: org._id } as any);
 
   const cat = (b.categories ?? []).find((c: any) => c.slug === 'cigars');

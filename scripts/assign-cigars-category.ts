@@ -6,6 +6,7 @@
 // via find-by-slug-first idempotency. Never touches prices/variants/images.
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
+import { LEGACY_ORG_SLUG } from "../convex/lib/legacyOrg";
 
 const CONVEX_URL =
   process.env.CONVEX_URL ?? "https://proper-coyote-383.convex.cloud";
@@ -40,7 +41,7 @@ async function main() {
     async () => {
       // fullCatalog may require orgId on this deployment; resolve it publicly.
       const org: any = await client.query(api.organizations.getBySlug, {
-        slug: process.env.VITE_ORG_SLUG ?? "smokeshop",
+        slug: process.env.VITE_ORG_SLUG ?? LEGACY_ORG_SLUG,
       } as any);
       return client.query(api.catalog.fullCatalog, { orgId: org._id } as any);
     },

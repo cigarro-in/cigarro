@@ -13,6 +13,7 @@ import {
   query,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 // ---------- Phase 1: user state (cart, wishlist, profiles, addresses) ----------
 // Identity: identity.subject (Supabase sub today; stable string carried
@@ -83,7 +84,7 @@ export const ensureMyProfile = mutation({
     // minted for that store (assertTokenOrg). No env allow-list: every store
     // gets its own customer membership.
     const org = await resolveOrg(ctx, args.orgSlug);
-    assertTokenOrg(identity, org);
+    await assertTokenOrg(ctx, identity, org);
     const existing = await ctx.db
       .query("users")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
@@ -102,8 +103,8 @@ export const ensureMyProfile = mutation({
     let userId = existing?._id;
     if (existing) {
       await ctx.db.patch(existing._id, {
-        // Pre-backfill legacy row (smokeshop only) claims its store here.
-        ...(existing.orgId === undefined && org.slug === "smokeshop"
+        // Pre-backfill legacy row (legacy org only) claims its store here.
+        ...(existing.orgId === undefined && isLegacyOrg(org)
           ? { orgId: org._id }
           : {}),
         ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
@@ -142,8 +143,8 @@ export const ensureMyProfile = mutation({
 // Pre-login identity resolution for the phone-verify edge endpoint (auth
 // cutover: no Supabase). Users are per store: lookup is by (orgId, phone), so
 // the same phone shopping two stores gets two rows and two userIds. A new
-// store mints a fresh row. Legacy rows (no orgId, pre-backfill) are smokeshop
-// customers, so they resolve for smokeshop only and keep their userId.
+// store mints a fresh row. Legacy rows (no orgId, pre-backfill) are legacy-org
+// customers, so they resolve for the legacy org only and keep their userId.
 export const resolvePhoneIdentity = internalMutation({
   args: {
     phone: v.string(),
@@ -160,14 +161,14 @@ export const resolvePhoneIdentity = internalMutation({
         q.eq("orgId", org._id).eq("phone", phone),
       )
       .first();
-    if (!existing && org.slug === "smokeshop") {
+    if (!existing && isLegacyOrg(org)) {
       const samePhone = await ctx.db
         .query("users")
         .withIndex("by_phone", (q) => q.eq("phone", phone))
         .collect();
       existing = legacyUserRow(samePhone);
       if (existing) {
-        // Claim the legacy row for smokeshop in the same write.
+        // Claim the legacy row for the legacy org in the same write.
         await ctx.db.patch(existing._id, { orgId: org._id });
       }
     }
@@ -195,12 +196,12 @@ function legacyUserRow(rows: Doc<"users">[]) {
   return rows.find((r) => r.orgId === undefined) ?? null;
 }
 
-// One-time, resumable backfill: stamps orgId = smokeshop on every users row
+// One-time, resumable backfill: stamps orgId = the legacy org on every users row
 // that predates per-store accounts. Paginates the undefined-orgId partition of
 // by_org_phone with a cursor; patched rows leave that partition, and the cursor
 // never revisits them, so repeat calls converge. Run it until isDone is true.
-//   npx convex run userState:backfillUserOrgs '{"orgSlug":"smokeshop"}'
-//   npx convex run userState:backfillUserOrgs '{"orgSlug":"smokeshop","cursor":"<continueCursor>"}'
+//   npx convex run userState:backfillUserOrgs '{"orgSlug":"oldsmokeshop"}'
+//   npx convex run userState:backfillUserOrgs '{"orgSlug":"oldsmokeshop","cursor":"<continueCursor>"}'
 export const backfillUserOrgs = internalMutation({
   args: {
     orgSlug: v.string(),
@@ -208,8 +209,8 @@ export const backfillUserOrgs = internalMutation({
     batchSize: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    if (args.orgSlug !== "smokeshop")
-      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_SMOKESHOP" });
+    if (args.orgSlug !== LEGACY_ORG_SLUG)
+      throw new ConvexError({ code: "LEGACY_DATA_BELONGS_TO_LEGACY_ORG" });
     const org = await resolveOrg(ctx, args.orgSlug);
     const numItems = Math.max(1, Math.min(args.batchSize ?? 200, 500));
     const page = await ctx.db

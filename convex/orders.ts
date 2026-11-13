@@ -16,6 +16,7 @@ import { buildOrderPollOffsets } from "./lib/pollSchedule";
 import { addressV, orderItemV, orderKind } from "./schema";
 import { creditWallet, debitWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -43,7 +44,7 @@ async function resolveShippingPricePaise(
     throw new ConvexError({ code: "INVALID_SHIPPING_METHOD" });
 
   // This org's shipping config only — never another tenant's. Legacy
-  // (pre-backfill) rows read as smokeshop's; otherwise defaults apply.
+  // (pre-backfill) rows read as the legacy org's; otherwise defaults apply.
   const settings =
     (await ctx.db
       .query("siteSettings")
@@ -51,7 +52,7 @@ async function resolveShippingPricePaise(
         q.eq("orgId", org._id).eq("key", "main"),
       )
       .unique()) ??
-    (org.slug === "smokeshop"
+    (isLegacyOrg(org)
       ? (
           await ctx.db
             .query("siteSettings")
@@ -245,7 +246,7 @@ async function pricePurchaseItems(
           )
           .collect();
         const legacy =
-          org.slug === "smokeshop"
+          isLegacyOrg(org)
             ? (
                 await ctx.db
                   .query("catalogVariants")
@@ -851,7 +852,7 @@ export const getMine = query({
     const org = await resolveOrg(ctx, orgSlug).catch(() => null);
     if (!org || order.orgId !== org._id) return null;
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !tokenMatchesOrg(identity, org)) return null;
+    if (!identity || !(await tokenMatchesOrg(ctx, identity, org))) return null;
     if (order.userId !== identity.subject) return null;
     return order;
   },
@@ -867,7 +868,7 @@ export const listMyOrders = query({
     const org = await resolveOrg(ctx, orgSlug).catch(() => null);
     if (!org || orgId !== org._id) return [];
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !tokenMatchesOrg(identity, org)) return [];
+    if (!identity || !(await tokenMatchesOrg(ctx, identity, org))) return [];
     return await ctx.db
       .query("orders")
       .withIndex("by_org_user", (q) =>

@@ -1,6 +1,6 @@
 // One-off / operational data maintenance. Internal only: run from the CLI,
 // never exposed to clients. Example:
-//   npx convex run --prod maintenance:cleanupCanonicalUrls '{"orgSlug":"smokeshop","dryRun":true}'
+//   npx convex run --prod maintenance:cleanupCanonicalUrls '{"orgSlug":"oldsmokeshop","dryRun":true}'
 
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
@@ -10,6 +10,7 @@ import {
   storeHostSet,
   type CanonicalRef,
 } from "./lib/hosts";
+import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 
 const MAX_DOCS_PER_TABLE = 4000;
 
@@ -34,7 +35,7 @@ export const cleanupCanonicalUrls = internalMutation({
         .filter((d) => d.status === "active")
         .map((d) => d.hostname),
       platformRoot: process.env.PLATFORM_ROOT_DOMAIN ?? "cigarro.in",
-      defaultOrgSlug: process.env.DEFAULT_ORG_SLUG ?? "smokeshop",
+      defaultOrgSlug: process.env.DEFAULT_ORG_SLUG ?? LEGACY_ORG_SLUG,
     });
 
     const products = await collectInOrg(ctx, "catalogProducts", org);

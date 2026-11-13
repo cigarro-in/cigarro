@@ -216,7 +216,7 @@ async function writeCache(host, value) {
 
 // Store-facing brand name for every edge output (titles, JSON-LD, robots, PWA):
 // the storefront siteName from content:getSiteSettings when set, else the
-// organizations.name (an internal label such as "Smokeshop").
+// organizations.name (an internal label, never shown to customers by design).
 export function brandName(org) {
   return org?.siteName || org?.name || FALLBACK_STORE_NAME;
 }
