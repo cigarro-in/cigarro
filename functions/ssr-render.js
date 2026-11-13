@@ -132,18 +132,32 @@ function injectIntoShell(shell, { html, head, htmlAttrs, org, preload, orgScript
   return rewriter.transform(new Response(shell, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
 }
 
-// Cache key: host + path, plus ?variant= when present. Every other query
-// parameter is ignored (the rendered page does not depend on it).
-function ssrCacheKey(url) {
-  const variant = url.searchParams.get('variant');
-  const query = variant ? `?variant=${encodeURIComponent(variant)}` : '';
-  return new Request(`https://${url.host}${url.pathname}${query}`);
+// Query parameters the rendered page depends on. /products reads its filter,
+// sort and search state from the URL (src/pages/products/ProductsPage.tsx); other
+// routes read only ?variant=. Every other parameter is ignored, so tracking
+// parameters never fragment the cache.
+const PRODUCTS_RENDER_KEYS = ['category', 'brand', 'price', 'sort', 'q', 'search', 'variant'];
+const VARIANT_RENDER_KEYS = ['variant'];
+
+function renderQueryFor(url) {
+  const keys = url.pathname === '/products' ? PRODUCTS_RENDER_KEYS : VARIANT_RENDER_KEYS;
+  const out = new URLSearchParams();
+  for (const key of keys) {
+    const value = url.searchParams.get(key);
+    if (value) out.set(key, value);
+  }
+  const query = out.toString();
+  return query ? `?${query}` : '';
 }
 
-// Path the page is rendered for: the same pathname + variant the cache key holds.
+// Cache key: host + path + the render query (see renderQueryFor).
+function ssrCacheKey(url) {
+  return new Request(`https://${url.host}${url.pathname}${renderQueryFor(url)}`);
+}
+
+// Path the page is rendered for: the same pathname + query the cache key holds.
 function renderPathFor(url) {
-  const variant = url.searchParams.get('variant');
-  return url.pathname + (variant ? `?variant=${encodeURIComponent(variant)}` : '');
+  return url.pathname + renderQueryFor(url);
 }
 
 // Full server render (Convex preload, React, shell injection). Throws on failure.

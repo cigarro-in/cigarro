@@ -1,5 +1,7 @@
 import { requiredConvexUrl } from '../../lib/env.js';
 import { getRequestOrg } from '../../lib/org.js';
+import { mintOwnJwt } from '../../lib/jwt.js';
+import { convexSiteUrl, fetchAdminStores } from '../../lib/adminStores.js';
 /**
  * Phone OTP verification endpoint (MSG91 → own ES256 JWT).
  *
@@ -13,6 +15,14 @@ import { getRequestOrg } from '../../lib/org.js';
  *   5. Server mints our ES256 JWT (sub = userId, org = store slug) and returns it.
  *   6. Client stores it and talks to Convex directly.
  *
+ * Admin host modes (admin.<root>):
+ *   - With body.orgSlug (path login at admin.<root>/<store>/): as above, for that
+ *     store. Token carries ctx "admin".
+ *   - Without body.orgSlug (phone-only login at admin.<root>/): the phone's admin
+ *     stores are looked up after OTP. None -> NO_ADMIN_ACCESS. Otherwise a token
+ *     for body.store (if the phone administers it) or the first store, plus the
+ *     store list. Nothing is revealed before OTP verification.
+ *
  * Env vars required:
  *   - MSG91_AUTH_KEY            (server-only, MSG91 dashboard → Auth key)
  *   - EDGE_SHARED_SECRET        (server-only, must match Convex env)
@@ -21,63 +31,9 @@ import { getRequestOrg } from '../../lib/org.js';
  *     CONVEX_SITE_URL is set explicitly)
  */
 
-// ---------- Auth: our own JWT issuer ----------
-// iss/aud must match convex/auth.config.ts. sub = stable userId (legacy
-// phones keep their existing id via Convex phone lookup — no Supabase).
-const OWN_ISSUER = 'https://cigarro.in/auth';
-const OWN_AUDIENCE = 'cigarro-storefront';
-const OWN_TTL_S = 30 * 24 * 60 * 60; // 30 days; re-login is one OTP tap.
 // Store slug shape (matches organizations.slug). Anything else is rejected
 // before it reaches Convex.
 const ORG_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
-
-function b64url(bytes) {
-  let s = '';
-  const arr = new Uint8Array(bytes);
-  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function b64urlJson(obj) {
-  return b64url(new TextEncoder().encode(JSON.stringify(obj)));
-}
-
-// Returns { token } or null when JWT env is not configured (legacy
-// Supabase flow keeps working — the client falls back).
-async function mintOwnJwt(env, userId, phone, orgSlug) {
-  try {
-    const jwk = JSON.parse(env.JWT_PRIVATE_JWK || 'null');
-    if (!jwk || !jwk.d) return null;
-    const key = await crypto.subtle.importKey(
-      'jwk',
-      jwk,
-      { name: 'ECDSA', namedCurve: 'P-256' },
-      false,
-      ['sign'],
-    );
-    const now = Math.floor(Date.now() / 1000);
-    const head = b64urlJson({ alg: 'ES256', typ: 'JWT', kid: jwk.kid || 'cigarro-1' });
-    const body = b64urlJson({
-      iss: OWN_ISSUER,
-      aud: OWN_AUDIENCE,
-      sub: userId,
-      phone,
-      // Store the token was minted for. Convex rejects it on any other store.
-      org: orgSlug,
-      iat: now,
-      exp: now + OWN_TTL_S,
-    });
-    const sig = await crypto.subtle.sign(
-      { name: 'ECDSA', hash: 'SHA-256' },
-      key,
-      new TextEncoder().encode(`${head}.${body}`),
-    );
-    return `${head}.${body}.${b64url(sig)}`;
-  } catch (err) {
-    console.error('[phone-verify] own-JWT mint failed:', err.message);
-    return null;
-  }
-}
 
 // Active store by slug, or null. Uses the public organizations:getBySlug query
 // (returns null for unknown or inactive stores).
@@ -140,12 +96,13 @@ export async function onRequest(context) {
     }
 
     // The store comes from the request host. Only the admin host may name a
-    // store in the body, and only one that exists. TODO: per-store admin login
-    // arrives with the admin PWA; until then staff rights are still enforced
-    // by Convex memberships for the store named here.
+    // store in the body, and only one that exists.
     const requestOrg = getRequestOrg(context);
-    let orgSlug = requestOrg.slug;
-    if (requestOrg.admin === true && body.orgSlug !== undefined) {
+    const onAdminHost = requestOrg.admin === true;
+    // Admin host with no orgSlug in the body: phone-only admin login.
+    const discovery = onAdminHost && body.orgSlug === undefined;
+    let pathOrgSlug = null;
+    if (onAdminHost && body.orgSlug !== undefined) {
       const requested = String(body.orgSlug || '').trim().toLowerCase();
       if (!ORG_SLUG_RE.test(requested)) {
         return jsonResponse({ error: 'Invalid store' }, 400, corsHeaders);
@@ -154,13 +111,13 @@ export async function onRequest(context) {
       if (!org) {
         return jsonResponse({ error: 'Store not found' }, 404, corsHeaders);
       }
-      orgSlug = org.slug;
+      pathOrgSlug = org.slug;
     }
 
     const msg91AuthKey = env.MSG91_AUTH_KEY;
     const edgeSecret = env.EDGE_SHARED_SECRET;
     const convexUrl = requiredConvexUrl(env);
-    const convexSite = (env.CONVEX_SITE_URL || convexUrl).replace('.convex.cloud', '.convex.site');
+    const convexSite = convexSiteUrl(env);
 
     if (!msg91AuthKey || !edgeSecret) {
       const missing = [
@@ -174,6 +131,43 @@ export async function onRequest(context) {
     await verifyMsg91Token(token, msg91AuthKey);
 
     const normalizedPhone = normalizePhone(phone, countryCode);
+
+    if (discovery) {
+      // 2a. Phone-only admin login: stores this phone administers (post-OTP only).
+      const stores = await fetchAdminStores(env, normalizedPhone);
+      if (stores.length === 0) {
+        return jsonResponse(
+          { error: "This number isn't an admin of any store.", code: 'NO_ADMIN_ACCESS' },
+          403,
+          corsHeaders,
+        );
+      }
+      const wanted = body.store ? String(body.store).trim().toLowerCase() : null;
+      const chosen = (wanted && stores.find((s) => s.slug === wanted)) || stores[0];
+      const adminToken = await mintOwnJwt(env, {
+        userId: chosen.userId,
+        phone: normalizedPhone,
+        orgSlug: chosen.slug,
+        admin: true,
+      });
+      if (!adminToken) {
+        throw new Error('Server JWT not configured (JWT_PRIVATE_JWK)');
+      }
+      return jsonResponse(
+        {
+          cigarro_token: adminToken,
+          user_id: chosen.userId,
+          is_new_user: false,
+          phone: normalizedPhone,
+          store: chosen.slug,
+          stores: stores.map((s) => ({ slug: s.slug, name: s.name, logoUrl: null })),
+        },
+        200,
+        corsHeaders,
+      );
+    }
+
+    const orgSlug = pathOrgSlug || requestOrg.slug;
 
     // 2. Resolve phone -> stable userId via Convex (no Supabase). New
     // phones get a users row with a fresh UUID; legacy phones resolve to
@@ -194,7 +188,12 @@ export async function onRequest(context) {
     const isNewUser = !!idBody.isNewUser;
 
     // 3. Mint our JWT (required — no legacy session anymore).
-    const cigarroToken = await mintOwnJwt(env, userId, normalizedPhone, orgSlug);
+    const cigarroToken = await mintOwnJwt(env, {
+      userId,
+      phone: normalizedPhone,
+      orgSlug,
+      admin: onAdminHost,
+    });
     if (!cigarroToken) {
       throw new Error('Server JWT not configured (JWT_PRIVATE_JWK)');
     }

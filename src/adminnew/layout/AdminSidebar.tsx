@@ -50,8 +50,8 @@ import {
 } from '../../components/ui/dropdown-menu';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrg } from '../../lib/convex/useOrg';
-import { ORG_SLUG } from '../../lib/convex/org';
-import { useAdminStores } from '../hooks/useAdminStores';
+import { AdminStoreMenu } from './AdminStoreMenu';
+import { signOutOfAdmin } from '../lib/adminAuth';
 
 interface NavItem {
   label: string;
@@ -117,9 +117,8 @@ export function AdminSidebar() {
   const { settings: store } = useStoreSettings();
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const org = useOrg();
-  const { stores } = useAdminStores();
 
   const isActive = (path: string) =>
     path === '/'
@@ -130,44 +129,10 @@ export function AdminSidebar() {
     if (isMobile) setOpenMobile(false);
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <NavLink
-          to="/"
-          className="flex h-10 items-center gap-2 rounded-md px-2 outline-none ring-sidebar-ring focus-visible:ring-2"
-          onClick={closeMobileSidebar}
-        >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            {getInitial(org?.name)}
-          </span>
-          <span className="grid min-w-0 flex-1 text-left leading-tight">
-            <span className="truncate text-sm font-semibold">{org?.name || store.name}</span>
-            <span className="truncate text-xs text-muted-foreground">Admin</span>
-          </span>
-        </NavLink>
-        {stores.length > 1 && (
-          <label className="mt-1 block px-2 group-data-[collapsible=icon]:hidden">
-            <span className="sr-only">Switch store</span>
-            <select
-              value={ORG_SLUG}
-              onChange={(event) => window.location.assign(`/${event.target.value}/`)}
-              className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-            >
-              {stores.map((store) => (
-                <option key={store.slug} value={store.slug}>{store.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        <AdminStoreMenu storeName={org?.name || store.name} />
       </SidebarHeader>
 
       <SidebarContent>
@@ -235,7 +200,7 @@ export function AdminSidebar() {
                 <DropdownMenuLabel>Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onSelect={handleSignOut}>
+                  <DropdownMenuItem onSelect={() => signOutOfAdmin()}>
                     <LogOut aria-hidden />
                     Sign out
                   </DropdownMenuItem>

@@ -92,6 +92,56 @@ export function clearSession() {
   }
 }
 
+// Admin host (admin.<root>): one session per store, addressed by slug rather
+// than by the build-time store, so a store switch can write the target's key.
+const SESSION_PREFIX = 'cigarro.session.v1:';
+
+export function storeSessionForStore(slug: string, token: string, userId: string, phone: string) {
+  const exp = decodeExp(token) ?? Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const s: StoredSession = { token, userId, phone, exp };
+  try {
+    localStorage.setItem(`${SESSION_PREFIX}${slug}`, JSON.stringify(s));
+  } catch {
+    // Private mode: the switch still navigates; the target store will ask again.
+  }
+  return s;
+}
+
+// Slugs of stores that still hold an unexpired session on this origin.
+export function listStoredSessionSlugs(): string[] {
+  try {
+    const slugs: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(SESSION_PREFIX)) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const s = JSON.parse(raw) as StoredSession;
+      if (!s.token || !s.exp) continue;
+      const exp = decodeExp(s.token) ?? s.exp;
+      if (exp > Date.now()) slugs.push(key.slice(SESSION_PREFIX.length));
+    }
+    return slugs;
+  } catch {
+    return [];
+  }
+}
+
+// Sign out of every store on this origin.
+export function clearAllSessions() {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(SESSION_PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem(KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // Same-tab writes don't fire `storage` events (cross-tab only), so tell the
 // Convex auth bridge to re-fetch the token after store/clear.
 export function notifyAuthChanged() {

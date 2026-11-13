@@ -1,9 +1,10 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { LEGACY_ORG_SLUG, PRE_RENAME_LEGACY_SLUG } from "./lib/legacyOrg";
 import { role } from "./schema";
+import { adminStoresForPhone } from "./lib/adminStores";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
 const DEFAULT_QUARANTINE_MS = 20 * 60 * 1000; // 20 min — grace for late UPI arrivals
@@ -67,6 +68,30 @@ export const listMine = query({
     );
     return orgs.filter((x): x is NonNullable<typeof x> => x !== null);
   },
+});
+
+// Stores this admin-host session may switch to. Admin-host tokens only (they
+// carry ctx "admin"); storefront tokens get []. Never reveals stores to anyone
+// who has not passed phone OTP on the admin host.
+export const listMyAdminStores = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || (identity as { ctx?: unknown }).ctx !== "admin") return [];
+    const me = await ctx.db
+      .query("users")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .first();
+    if (!me?.phone) return [];
+    const stores = await adminStoresForPhone(ctx, me.phone);
+    return stores.map((s) => ({ slug: s.slug, name: s.name, role: s.role }));
+  },
+});
+
+// Edge-only (HTTP action with EDGE_SHARED_SECRET): per-store userIds for a phone.
+export const adminStoresForPhoneInternal = internalQuery({
+  args: { phone: v.string() },
+  handler: async (ctx, { phone }) => adminStoresForPhone(ctx, phone),
 });
 
 // ---------- Admin ----------

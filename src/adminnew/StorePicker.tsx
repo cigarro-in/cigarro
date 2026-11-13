@@ -1,97 +1,67 @@
-import { useState, type FormEvent } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useAdminStores } from './hooks/useAdminStores';
-
-const STORE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+import { useEffect, useState } from 'react';
+import { PhoneAuthDialog } from '../components/auth/PhoneAuthDialog';
+import { AuthError } from '../hooks/useAuth';
+import { listStoredSessionSlugs, storeSessionForStore } from '../lib/auth/session';
 
 /**
- * admin.<root>/ with no store in the path. Signed in: lists the stores this
- * number administers. Signed out: asks for the store ID, then that store's
- * own sign-in page takes over (the login must be scoped to one store).
+ * admin.<root>/ with no store in the path. Phone-only sign-in: the OTP is
+ * verified server-side, then the phone's admin stores are looked up and the
+ * session opens the first one (or ?store= when that phone administers it).
+ * Other stores are reached from the store menu in the sidebar, without a new OTP.
  */
 export function StorePicker() {
-  const { user, isLoading, signOut } = useAuth();
-  const { stores, loading } = useAdminStores();
-  const [storeId, setStoreId] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // A valid session already on this origin: go straight to that store.
+  const [resumeSlug] = useState<string | null>(() => listStoredSessionSlugs()[0] ?? null);
+  const [loginOpen, setLoginOpen] = useState(false);
 
-  if (isLoading) return null;
+  useEffect(() => {
+    if (resumeSlug) window.location.replace(`/${resumeSlug}/`);
+  }, [resumeSlug]);
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const slug = storeId.trim().toLowerCase();
-    if (!STORE_SLUG_RE.test(slug)) {
-      setError('Enter the store ID from your admin link.');
-      return;
+  // Runs after the MSG91 OTP is verified in PhoneAuthDialog. Errors thrown here
+  // (for example NO_ADMIN_ACCESS) show inline in the dialog.
+  const verifyAdminPhone = async ({ phone, token, countryCode }: { phone: string; token: string; countryCode: string }) => {
+    let res: Response;
+    try {
+      res = await fetch('/api/auth/phone-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, token, countryCode }),
+      });
+    } catch {
+      throw new AuthError('Network error. Check your connection and try again.', { code: 'NETWORK' });
     }
-    window.location.assign(`/${slug}/`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.cigarro_token || !data?.store) {
+      throw new AuthError(data?.error || 'Sign-in failed. Try again.', {
+        code: data?.code || `HTTP_${res.status}`,
+      });
+    }
+    storeSessionForStore(data.store, data.cigarro_token, data.user_id, data.phone || phone);
+    window.location.assign(`/${data.store}/`);
+    return { isNewUser: false };
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-creme px-4">
-      <div className="w-full max-w-sm space-y-4">
-        <p className="font-bold text-lg text-center">Cigarro Admin</p>
-
-        {!user && (
-          <form onSubmit={onSubmit} className="space-y-3">
-            <label className="block text-sm text-muted-foreground" htmlFor="store-id">
-              Store ID
-            </label>
-            <input
-              id="store-id"
-              value={storeId}
-              onChange={(e) => {
-                setStoreId(e.target.value);
-                setError(null);
-              }}
-              autoComplete="organization"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="e.g. my-store"
-              className="h-11 w-full rounded-xl border px-3 text-base bg-background"
-            />
-            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="h-11 w-full rounded-xl bg-canyon text-creme font-semibold text-base"
-            >
-              Continue
-            </button>
-          </form>
-        )}
-
-        {user && loading && <p className="text-sm text-center text-muted-foreground">Loading stores...</p>}
-
-        {user && !loading && stores.length === 0 && (
-          <div className="space-y-3 text-center">
-            <p className="text-sm text-muted-foreground">
-              {user.phone || 'This number'} is not an admin of any store.
-            </p>
-            <button
-              onClick={() => void signOut()}
-              className="h-11 px-6 rounded-xl border font-semibold text-base"
-            >
-              Sign out
-            </button>
-          </div>
-        )}
-
-        {user && !loading && stores.length > 0 && (
-          <ul className="space-y-2">
-            {stores.map((store) => (
-              <li key={store.slug}>
-                <a
-                  href={`/${store.slug}/`}
-                  className="flex h-11 items-center justify-between rounded-xl border bg-background px-4 font-semibold text-base"
-                >
-                  <span className="truncate">{store.name}</span>
-                  <span className="text-xs text-muted-foreground">{store.slug}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {resumeSlug ? (
+        <p className="text-sm text-muted-foreground">Opening your store...</p>
+      ) : (
+        <div className="w-full max-w-sm space-y-4 text-center">
+          <p className="font-bold text-lg">Cigarro Admin</p>
+          <p className="text-sm text-muted-foreground">
+            Sign in with your admin phone number. Your stores open after sign-in.
+          </p>
+          <button
+            type="button"
+            onClick={() => setLoginOpen(true)}
+            className="h-11 w-full rounded-xl bg-canyon text-creme font-semibold text-base"
+          >
+            Sign in with phone
+          </button>
+        </div>
+      )}
+      <PhoneAuthDialog open={loginOpen} onOpenChange={setLoginOpen} onVerified={verifyAdminPhone} />
     </div>
   );
 }

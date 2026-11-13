@@ -13,6 +13,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAuthSuccess?: () => void;
+  // Replaces the default session sign-in after OTP (admin-host phone login
+  // picks the store itself). Throw an AuthError to show the message inline.
+  onVerified?: (args: { phone: string; token: string; countryCode: string }) => Promise<{ isNewUser: boolean }>;
 }
 
 const OTP_LENGTH = 4;
@@ -117,7 +120,7 @@ function useVisualViewportHeight(): number | null {
   return height;
 }
 
-export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
+export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified }: Props) {
   const { signInWithPhone, user } = useAuth();
   const { updateDisplayName } = useMyProfile();
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -180,7 +183,9 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
       setStep('verifying');
       setSubmitting(true);
       try {
-        const result = await signInWithPhone({ phone: phoneInput, token, countryCode });
+        const result = onVerified
+          ? await onVerified({ phone: phoneInput, token, countryCode })
+          : await signInWithPhone({ phone: phoneInput, token, countryCode });
         if (result.isNewUser) {
           setSubmitting(false);
           setStep('name');
@@ -206,7 +211,7 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess }: Props) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [signInWithPhone, onOpenChange, onAuthSuccess, phoneInput, handleWidgetError, focusOtp]
+    [signInWithPhone, onVerified, onOpenChange, onAuthSuccess, phoneInput, handleWidgetError, focusOtp]
   );
 
   // Claims the singleton MSG91 dispatcher only while open — mounted-but-closed

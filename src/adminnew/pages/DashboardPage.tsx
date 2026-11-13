@@ -1,9 +1,11 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowRight, ShoppingCart, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
@@ -28,6 +30,8 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import { PageHeader } from '../components/shared/PageHeader';
+import { useAdminStores } from '../hooks/useAdminStores';
+import { switchAdminStore } from '../lib/adminAuth';
 
 interface RecentOrder {
   id: string;
@@ -158,6 +162,22 @@ export function DashboardPage() {
     api.adminStats.getDashboardStats,
     org ? { orgId: org._id } : 'skip',
   );
+  const { stores } = useAdminStores();
+  const currentSlug = useOrgInfo().slug;
+  const storeSwitch = useInlineStatus();
+  const [switching, setSwitching] = useState(false);
+
+  const handleSwitchStore = async (targetSlug: string) => {
+    storeSwitch.clear();
+    setSwitching(true);
+    try {
+      // Navigates to the target store on success.
+      await switchAdminStore(targetSlug);
+    } catch (error) {
+      storeSwitch.setError(error instanceof Error ? error.message : 'Could not switch store.');
+      setSwitching(false);
+    }
+  };
 
   const recentOrders: RecentOrder[] = (data?.recentOrders ?? []).map((order) => ({
     id: String(order.id),
@@ -180,6 +200,38 @@ export function DashboardPage() {
       <PageHeader title="Overview" />
 
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 pb-6 sm:px-6">
+        {stores.length > 1 && (
+          <Card className="gap-0 py-0">
+            <CardHeader className="p-4 sm:p-5">
+              <CardTitle>Your stores</CardTitle>
+              <CardDescription>Switching uses this admin session. No new code is needed.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-px p-0">
+              {stores.map((store) => {
+                const isCurrent = store.slug === currentSlug;
+                return (
+                  <Button
+                    key={store.slug}
+                    variant="ghost"
+                    className="h-auto justify-between rounded-none p-4 text-left sm:px-5"
+                    disabled={isCurrent || switching}
+                    onClick={() => void handleSwitchStore(store.slug)}
+                  >
+                    <span className="truncate font-semibold">{store.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {isCurrent ? 'Current' : 'Open'}
+                    </span>
+                  </Button>
+                );
+              })}
+            </CardContent>
+            {storeSwitch.status.kind && (
+              <div className="p-4 pt-0 sm:px-5">
+                <InlineStatus status={storeSwitch.status} />
+              </div>
+            )}
+          </Card>
+        )}
         {data === undefined ? (
           <DashboardSkeleton />
         ) : (

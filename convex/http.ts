@@ -221,6 +221,32 @@ http.route({
   }),
 });
 
+// Edge-only: stores where a phone is owner/admin (admin-host login and store
+// switch). Same shared secret as resolvePhoneIdentity; never called by browsers.
+http.route({
+  path: "/adminStores",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const expected = process.env.EDGE_SHARED_SECRET;
+    if (!expected) {
+      return jsonResponse({ ok: false, error: "misconfigured" }, 500);
+    }
+    if (req.headers.get("authorization") !== `Bearer ${expected}`) {
+      return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    }
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ ok: false, error: "bad json" }, 400);
+    }
+    const phone = String(body.phone ?? "").trim();
+    if (!phone) return jsonResponse({ ok: false, error: "missing phone" }, 400);
+    const stores = await ctx.runQuery(internal.organizations.adminStoresForPhoneInternal, { phone });
+    return jsonResponse({ ok: true, stores });
+  }),
+});
+
 // ---------- Marketing click redirect (/m?c=<campaignId>&p=<contactId>) ----------
 //
 // The {{link}} variable in WhatsApp copy expands to this URL. It logs the
