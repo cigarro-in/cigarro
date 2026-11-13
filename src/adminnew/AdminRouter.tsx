@@ -59,6 +59,8 @@ export const ADMIN_ROUTES = [
   { path: '/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },
   // Deep links into the Payments tabs (single page, tab picked from the path).
+  // /payments/unmatched is retired: PaymentsPage redirects it to the statement.
+  { path: '/payments/emails', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/payments/unmatched', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/payments/settings', element: PaymentsPage, label: 'Payments', section: 'payments' },
 ] as const;
