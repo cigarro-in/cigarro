@@ -1,14 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { MoreHorizontal } from 'lucide-react';
+import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import {
-  Badge,
   Banner,
   Button,
   Card,
   ConfirmDialog,
-  DataTable,
   Dialog,
   EmptyState,
   FilterBar,
@@ -17,11 +15,14 @@ import {
   Label,
   Menu,
   Page,
+  Skeleton,
   useButtonFeedback,
-  type Column,
 } from '../../adminnew/ui';
+import { formatINR } from '../../utils/currency';
+import { paiseToRupees } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
-import { runSa, DomainStatusBadge, formatCount, StoreStateBadge } from '../saUi';
+import { runSa, formatCount, HealthDot, StoreStateBadge } from '../saUi';
+import { storeAdminUrl, storeChecks, storeLiveUrl } from '../health';
 import {
   createStoreRef,
   listStoreStatsRef,
@@ -31,10 +32,11 @@ import {
   type StoreStatsRow,
 } from '../refs';
 
-type StatusFilter = 'all' | 'active' | 'suspended';
+type StatusFilter = 'all' | 'active' | 'suspended' | 'attention';
 
 interface Joined extends StoreRow {
   stats: StoreStatsRow | undefined;
+  problems: number;
 }
 
 export function StoresPage() {
@@ -59,7 +61,12 @@ export function StoresPage() {
   const rows = useMemo<Joined[] | undefined>(() => {
     if (!stores) return undefined;
     const byOrg = new Map((stats ?? []).map((s) => [s.orgId, s]));
-    return stores.map((s) => ({ ...s, stats: byOrg.get(s._id) }));
+    return stores
+      .map((s) => {
+        const st = byOrg.get(s._id);
+        return { ...s, stats: st, problems: st ? storeChecks(s, st).filter((c) => !c.ok).length : 0 };
+      })
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
   }, [stores, stats]);
 
   const filtered = useMemo(() => {
@@ -68,6 +75,7 @@ export function StoresPage() {
     return rows.filter((r) => {
       if (statusFilter === 'active' && !r.active) return false;
       if (statusFilter === 'suspended' && r.active) return false;
+      if (statusFilter === 'attention' && (!r.active || r.problems === 0)) return false;
       if (!needle) return true;
       return (
         r.name.toLowerCase().includes(needle) ||
@@ -79,103 +87,24 @@ export function StoresPage() {
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
-    const createdSlug = slug;
     const created = await create.run(() =>
       runSa(() => createStore({ saToken: token, slug, name, upiVpa: upiVpa || undefined })),
     );
     if (created === undefined) return;
-    setNotice(`Created store "${createdSlug}". Add its domain and members next.`);
     setSlug('');
     setName('');
     setUpiVpa('');
     setCreateOpen(false);
     create.reset();
+    navigate(`/sa/stores/${created}`);
   };
 
   const confirmToggle = async () => {
     if (!toggleTarget) return;
     const target = toggleTarget;
     await runSa(() => setActive({ saToken: token, orgId: target._id, active: !target.active }));
-    setNotice(target.active ? `Suspended ${target.slug}.` : `Activated ${target.slug}.`);
+    setNotice(target.active ? `${target.name} is suspended.` : `${target.name} is open again.`);
   };
-
-  const columns: Column<Joined>[] = [
-    {
-      id: 'store',
-      header: 'Store',
-      cell: (r) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-[var(--admin-text)]">{r.name}</p>
-          <p className="truncate font-mono text-xs text-[var(--admin-text-muted)]">{r.slug}</p>
-        </div>
-      ),
-    },
-    {
-      id: 'theme',
-      header: 'Theme',
-      hideBelow: 'md',
-      cell: (r) =>
-        r.stats?.theme ? (
-          <Badge tone="neutral">{r.stats.theme}</Badge>
-        ) : (
-          <span className="text-[var(--admin-text-subtle)]">None</span>
-        ),
-    },
-    {
-      id: 'domain',
-      header: 'Primary domain',
-      cell: (r) =>
-        r.primaryHost ? (
-          <div className="flex min-w-0 flex-col items-start gap-1">
-            <span className="max-w-full truncate font-mono text-[13px]">{r.primaryHost}</span>
-            {r.primaryStatus && <DomainStatusBadge status={r.primaryStatus} />}
-          </div>
-        ) : (
-          <span className="text-[var(--admin-text-subtle)]">No domain</span>
-        ),
-    },
-    {
-      id: 'orders',
-      header: 'Orders, 7 days',
-      align: 'right',
-      hideBelow: 'sm',
-      cell: (r) => <span className="tabular-nums">{formatCount(r.stats?.orders7d ?? 0)}</span>,
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      cell: (r) => <StoreStateBadge active={r.active} />,
-    },
-    {
-      id: 'actions',
-      header: '',
-      align: 'right',
-      width: '3rem',
-      cell: (r) => (
-        // Keep row-click navigation off the menu trigger.
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <Menu
-            align="end"
-            trigger={
-              <Button variant="plain" size="icon" aria-label={`Actions for ${r.name}`}>
-                <MoreHorizontal aria-hidden />
-              </Button>
-            }
-            items={[
-              { label: 'Manage store', onSelect: () => navigate(`/sa/stores/${r._id}`) },
-              { label: 'Catalog import', onSelect: () => navigate(`/sa/stores/${r._id}/import`) },
-              {
-                label: r.active ? 'Suspend store' : 'Activate store',
-                tone: r.active ? 'critical' : 'default',
-                disabled: !writeOpen,
-                onSelect: () => setToggleTarget(r),
-              },
-            ]}
-          />
-        </div>
-      ),
-    },
-  ];
 
   return (
     <Page
@@ -193,43 +122,56 @@ export function StoresPage() {
 
       <Card padding="none">
         <FilterBar
-          search={{ value: q, onChange: setQ, placeholder: 'Search name, slug or domain' }}
+          search={{ value: q, onChange: setQ, placeholder: 'Search by name or web address' }}
           end={
             <FilterSelect<StatusFilter>
-              label="Status"
+              label="Show"
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
                 { value: 'all', label: 'All stores' },
-                { value: 'active', label: 'Active' },
+                { value: 'attention', label: 'Needs attention' },
+                { value: 'active', label: 'Open' },
                 { value: 'suspended', label: 'Suspended' },
               ]}
             />
           }
         />
-        <DataTable
-          columns={columns}
-          rows={filtered}
-          getRowId={(r) => r._id}
-          onRowClick={(r) => navigate(`/sa/stores/${r._id}`)}
-          rowLabel={(r) => `Manage ${r.name}`}
-          empty={
-            (rows?.length ?? 0) === 0 ? (
-              <EmptyState
-                title="No stores yet"
-                description="Create the first store, then add its domain and members."
-                action={
-                  <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={!writeOpen}>
-                    Create store
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState title="No stores match" description="Clear the search or status filter." />
-            )
-          }
-        />
       </Card>
+
+      {filtered === undefined ? (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-busy="true" aria-label="Loading stores">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="mt-3 h-4 w-56" />
+              <Skeleton className="mt-6 h-10 w-full" />
+            </Card>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          {(rows?.length ?? 0) === 0 ? (
+            <EmptyState
+              title="No stores yet"
+              description="Create the first store. It gets a free cigarro.in address right away."
+              action={
+                <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={!writeOpen}>
+                  Create store
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState title="No stores match" description="Clear the search or change what is shown." />
+          )}
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          {filtered.map((r) => (
+            <StoreCard key={r._id} r={r} writeOpen={writeOpen} onToggle={() => setToggleTarget(r)} />
+          ))}
+        </div>
+      )}
 
       <Dialog
         open={createOpen}
@@ -238,7 +180,7 @@ export function StoresPage() {
           if (!o) create.reset();
         }}
         title="Create store"
-        description="The bank alias is derived from the slug. The UPI VPA can be added now or later."
+        description="The store gets <short name>.cigarro.in straight away. You can add its own domain later."
         footer={
           <>
             <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={create.busy}>
@@ -252,7 +194,11 @@ export function StoresPage() {
       >
         <form id="sa-create-store" onSubmit={onCreate} className="flex flex-col gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="sa-slug">Slug</Label>
+            <Label htmlFor="sa-name">Store name</Label>
+            <Input id="sa-name" value={name} onChange={(e) => setName(e.target.value)} required disabled={!writeOpen || create.busy} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sa-slug">Short name</Label>
             <Input
               id="sa-slug"
               value={slug}
@@ -261,13 +207,10 @@ export function StoresPage() {
               required
               disabled={!writeOpen || create.busy}
             />
+            <p className="text-xs text-[var(--admin-text-muted)]">Lowercase letters, numbers and dashes. Used in the web address.</p>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="sa-name">Name</Label>
-            <Input id="sa-name" value={name} onChange={(e) => setName(e.target.value)} required disabled={!writeOpen || create.busy} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="sa-vpa">UPI VPA (optional)</Label>
+            <Label htmlFor="sa-vpa">UPI ID (optional)</Label>
             <Input
               id="sa-vpa"
               value={upiVpa}
@@ -285,16 +228,95 @@ export function StoresPage() {
         onOpenChange={(o) => {
           if (!o) setToggleTarget(null);
         }}
-        title={toggleTarget?.active ? `Suspend ${toggleTarget.name}?` : `Activate ${toggleTarget?.name ?? 'store'}?`}
+        title={toggleTarget?.active ? `Suspend ${toggleTarget.name}?` : `Open ${toggleTarget?.name ?? 'store'} again?`}
         description={
           toggleTarget?.active
-            ? 'A suspended store stops serving customers and taking payments until it is activated again. Nothing is deleted.'
-            : 'The store resumes serving customers on its domains.'
+            ? 'Customers cannot shop or pay until you open it again. Nothing is deleted.'
+            : 'Customers can shop and pay again.'
         }
-        confirmLabel={toggleTarget?.active ? 'Suspend store' : 'Activate store'}
+        confirmLabel={toggleTarget?.active ? 'Suspend store' : 'Open store'}
         critical={!!toggleTarget?.active}
         onConfirm={confirmToggle}
       />
     </Page>
+  );
+}
+
+function StoreCard({ r, writeOpen, onToggle }: { r: Joined; writeOpen: boolean; onToggle: () => void }) {
+  const live = storeLiveUrl(r);
+  const checks = storeChecks(r, r.stats);
+  return (
+    <section className="relative flex min-w-0 flex-col rounded-[var(--admin-radius)] border border-[var(--admin-border)] bg-[var(--admin-surface)] transition-colors duration-150 hover:border-[var(--admin-border-strong)]">
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-[var(--admin-neutral-soft)] text-sm font-semibold text-[var(--admin-text-muted)]"
+        >
+          {r.name.charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          {/* Stretched link: the whole card opens the store page. */}
+          <Link
+            to={`/sa/stores/${r._id}`}
+            className="block truncate font-semibold text-[var(--admin-text)] after:absolute after:inset-0 after:rounded-[var(--admin-radius)] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-[var(--admin-focus)]"
+          >
+            {r.name}
+          </Link>
+          {live ? (
+            <a
+              href={live}
+              target="_blank"
+              rel="noreferrer"
+              className="relative z-10 mt-0.5 inline-flex max-w-full items-center gap-1 text-[13px] text-[var(--admin-text-muted)] hover:text-[var(--admin-primary)] hover:underline"
+            >
+              <span className="truncate">{r.primaryHost}</span>
+              <ExternalLink className="size-3 shrink-0" aria-hidden />
+            </a>
+          ) : (
+            <p className="mt-0.5 text-[13px] text-[var(--admin-text-subtle)]">No web address</p>
+          )}
+        </div>
+        <div className="relative z-10 flex shrink-0 items-center gap-1">
+          <StoreStateBadge active={r.active} />
+          <Menu
+            align="end"
+            trigger={
+              <Button variant="plain" size="icon" aria-label={`More for ${r.name}`}>
+                <MoreHorizontal aria-hidden />
+              </Button>
+            }
+            items={[
+              { label: 'Open store admin', href: storeAdminUrl(r.slug), external: true },
+              ...(live ? [{ label: 'View store', href: live, external: true }] : []),
+              {
+                label: r.active ? 'Suspend store' : 'Open store again',
+                tone: r.active ? ('critical' as const) : ('default' as const),
+                disabled: !writeOpen,
+                onSelect: onToggle,
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 px-4 pb-3">
+        {checks.map((c) => (
+          <HealthDot key={c.id} ok={c.ok} label={c.label} />
+        ))}
+      </div>
+
+      <dl className="mt-auto grid grid-cols-2 border-t border-[var(--admin-border)]">
+        <div className="px-4 py-3">
+          <dt className="text-xs text-[var(--admin-text-muted)]">Orders this week</dt>
+          <dd className="mt-0.5 text-base font-semibold tabular-nums text-[var(--admin-text)]">{formatCount(r.stats?.orders7d ?? 0)}</dd>
+        </div>
+        <div className="border-l border-[var(--admin-border)] px-4 py-3">
+          <dt className="text-xs text-[var(--admin-text-muted)]">Sales this week</dt>
+          <dd className="mt-0.5 text-base font-semibold tabular-nums text-[var(--admin-text)]">
+            {formatINR(paiseToRupees(r.stats?.gmv7dPaise ?? 0))}
+          </dd>
+        </div>
+      </dl>
+    </section>
   );
 }

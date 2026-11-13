@@ -1,43 +1,29 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { MoreHorizontal } from 'lucide-react';
-import {
-  Banner,
-  Button,
-  Card,
-  ConfirmDialog,
-  DataTable,
-  EmptyState,
-  FilterBar,
-  Menu,
-  Page,
-  Tabs,
-  useButtonFeedback,
-  type Column,
-} from '../../adminnew/ui';
+import { Banner, Card, ConfirmDialog, EmptyState, FilterBar, Page, Skeleton, Tabs, useButtonFeedback } from '../../adminnew/ui';
 import { useSa } from '../SuperGate';
-import { DnsRecords, DomainStatusBadge, ManagedTag, relativeTime, runSa } from '../saUi';
-import {
-  listAllDomainsRef,
-  refreshDomainStatusRef,
-  removeDomainRef,
-  setPrimaryRef,
-  type AllDomainRow,
-  type DomainStatus,
-} from '../refs';
+import { runSa, StoreStateBadge } from '../saUi';
+import { DomainList, PRIMARY_WARNING } from '../DomainList';
+import { listAllDomainsRef, refreshDomainStatusRef, removeDomainRef, setPrimaryRef, type AllDomainRow, type DomainStatus } from '../refs';
 
-const PRIMARY_WARNING =
-  "Switching primary moves canonical URLs to that domain. Only do this after the merchant's DNS points there.";
+type View = 'all' | 'attention';
 
-type View = 'all' | 'active' | 'pending' | 'error';
-
-// Sort problems first: error, then pending, disabled, active.
+// Problems first inside each store: error, pending, disabled, active.
 const RANK: Record<DomainStatus, number> = { error: 0, pending: 1, disabled: 2, active: 3 };
 
+interface Group {
+  orgId: string;
+  storeName: string;
+  storeActive: boolean;
+  domains: AllDomainRow[];
+  problems: number;
+}
+
+// Every web address on the platform, grouped by store. The owner comes here to
+// see which addresses are not live yet and nudge them.
 export function DomainsPage() {
   const { token, writeOpen } = useSa();
-  const navigate = useNavigate();
   const domains = useQuery(listAllDomainsRef, { saToken: token });
   const refresh = useAction(refreshDomainStatusRef);
   const setPrimary = useMutation(setPrimaryRef);
@@ -51,156 +37,48 @@ export function DomainsPage() {
   const [removeTarget, setRemoveTarget] = useState<AllDomainRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const rows = useMemo(
-    () =>
-      [...(domains ?? [])].sort(
-        (a, b) =>
-          RANK[a.status] - RANK[b.status] ||
-          a.storeName.localeCompare(b.storeName) ||
-          a.hostname.localeCompare(b.hostname),
-      ),
-    [domains],
-  );
-
-  const counts = useMemo(() => {
-    const c = { all: rows.length, active: 0, pending: 0, error: 0 };
-    for (const r of rows) {
-      if (r.status === 'active') c.active++;
-      else if (r.status === 'pending') c.pending++;
-      else if (r.status === 'error') c.error++;
+  const groups = useMemo<Group[]>(() => {
+    const byStore = new Map<string, Group>();
+    for (const d of domains ?? []) {
+      let g = byStore.get(d.orgId);
+      if (!g) {
+        g = { orgId: d.orgId, storeName: d.storeName, storeActive: d.storeActive, domains: [], problems: 0 };
+        byStore.set(d.orgId, g);
+      }
+      g.domains.push(d);
+      if (d.status !== 'active') g.problems++;
     }
-    return c;
-  }, [rows]);
+    for (const g of byStore.values()) {
+      g.domains.sort((a, b) => RANK[a.status] - RANK[b.status] || a.hostname.localeCompare(b.hostname));
+    }
+    return [...byStore.values()].sort((a, b) => b.problems - a.problems || a.storeName.localeCompare(b.storeName));
+  }, [domains]);
 
-  const filtered = useMemo(() => {
+  const attentionCount = useMemo(() => groups.reduce((n, g) => n + g.problems, 0), [groups]);
+
+  const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (view === 'active' && r.status !== 'active') return false;
-      if (view === 'pending' && r.status !== 'pending') return false;
-      if (view === 'error' && r.status !== 'error') return false;
-      if (!needle) return true;
-      return r.hostname.toLowerCase().includes(needle) || r.storeName.toLowerCase().includes(needle);
-    });
-  }, [rows, view, q]);
+    return groups
+      .map((g) => ({
+        ...g,
+        domains: g.domains.filter((d) => {
+          if (view === 'attention' && d.status === 'active') return false;
+          if (!needle) return true;
+          return d.hostname.toLowerCase().includes(needle) || g.storeName.toLowerCase().includes(needle);
+        }),
+      }))
+      .filter((g) => g.domains.length > 0);
+  }, [groups, view, q]);
 
-  // Row menu actions: errors land in the page banner (fb.error), never thrown.
-  const runRow = async (d: AllDomainRow, fn: () => Promise<unknown>, ok: string) => {
+  const onRefresh = async (d: AllDomainRow) => {
     setBusyId(d._id);
-    const res = await fb.run(() => runSa(fn));
+    const res = await fb.run(() => runSa(() => refresh({ saToken: token, domainId: d._id })));
     setBusyId(null);
-    if (res !== undefined) setNotice(ok);
+    if (res !== undefined) setNotice(`Checked ${d.hostname} again.`);
   };
 
-  const columns: Column<AllDomainRow>[] = [
-    {
-      id: 'host',
-      header: 'Hostname',
-      cell: (d) => (
-        <div className="min-w-0">
-          <p className="truncate font-mono text-[13px] text-[var(--admin-text)]">{d.hostname}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[var(--admin-text-muted)]">
-            <span className="capitalize">{d.kind}</span>
-            <ManagedTag managed={d.managed} />
-          </div>
-          {d.status === 'pending' && d.dnsInstructions && (
-            <details className="mt-2 text-xs">
-              <summary className="cursor-pointer font-medium text-[var(--admin-primary)]">DNS records</summary>
-              <div className="mt-2">
-                <DnsRecords hostname={d.hostname} cnameTarget={d.dnsInstructions.cnameTarget} txtRecords={d.dnsInstructions.txtRecords} />
-              </div>
-            </details>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'store',
-      header: 'Store',
-      cell: (d) => (
-        <div className="min-w-0">
-          <Link to={`/sa/stores/${d.orgId}`} className="block truncate font-medium text-[var(--admin-text)] hover:underline">
-            {d.storeName}
-          </Link>
-          {!d.storeActive && <span className="text-xs text-[var(--admin-text-muted)]">Suspended</span>}
-        </div>
-      ),
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      cell: (d) => (
-        <div className="flex min-w-0 flex-col items-start gap-1">
-          <DomainStatusBadge status={d.status} />
-          {d.cfError && <p className="max-w-xs break-words text-xs text-[var(--admin-critical)]">{d.cfError}</p>}
-        </div>
-      ),
-    },
-    {
-      id: 'cf',
-      header: 'Cloudflare',
-      hideBelow: 'lg',
-      cell: (d) => (
-        <span className="font-mono text-xs text-[var(--admin-text-muted)]">{d.cfManaged ? (d.cfStatus ?? 'Not synced') : 'Platform'}</span>
-      ),
-    },
-    {
-      id: 'checked',
-      header: 'Checked',
-      hideBelow: 'md',
-      cell: (d) => <span className="whitespace-nowrap text-[13px] text-[var(--admin-text-muted)]">{relativeTime(d.cfCheckedAt)}</span>,
-    },
-    {
-      id: 'active',
-      header: 'Last active',
-      hideBelow: 'lg',
-      cell: (d) => <span className="whitespace-nowrap text-[13px] text-[var(--admin-text-muted)]">{relativeTime(d.lastActiveAt)}</span>,
-    },
-    {
-      id: 'actions',
-      header: '',
-      align: 'right',
-      width: '3rem',
-      cell: (d) => {
-        const busy = busyId === d._id;
-        return (
-          <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-            <Menu
-              align="end"
-              trigger={
-                <Button variant="plain" size="icon" aria-label={`Actions for ${d.hostname}`} disabled={busy}>
-                  <MoreHorizontal aria-hidden />
-                </Button>
-              }
-              items={[
-                { label: `Open ${d.storeName}`, onSelect: () => navigate(`/sa/stores/${d.orgId}`) },
-                ...(d.cfManaged
-                  ? [
-                      {
-                        label: 'Refresh now',
-                        disabled: !writeOpen || busy,
-                        onSelect: () => void runRow(d, () => refresh({ saToken: token, domainId: d._id }), `Refreshed ${d.hostname}.`),
-                      },
-                    ]
-                  : []),
-                ...(d.status === 'active' && d.kind === 'alias' && d.cfManaged
-                  ? [{ label: 'Make primary', disabled: !writeOpen || busy, onSelect: () => setPrimaryTarget(d) }]
-                  : []),
-                { label: 'Remove domain', tone: 'critical' as const, disabled: !writeOpen || busy, onSelect: () => setRemoveTarget(d) },
-              ]}
-            />
-          </div>
-        );
-      },
-    },
-  ];
-
   return (
-    <Page
-      title="Domains"
-      titleMeta={
-        domains ? <span className="text-sm font-normal tabular-nums text-[var(--admin-text-muted)]">{counts.all}</span> : undefined
-      }
-    >
+    <Page title="Domains">
       {notice && (
         <Banner tone="success" onDismiss={() => setNotice(null)}>
           {notice}
@@ -213,29 +91,68 @@ export function DomainsPage() {
           value={view}
           onChange={setView}
           tabs={[
-            { id: 'all', label: 'All', count: counts.all },
-            { id: 'active', label: 'Active', count: counts.active },
-            { id: 'pending', label: 'Pending', count: counts.pending },
-            { id: 'error', label: 'Error', count: counts.error },
+            { id: 'all', label: 'All addresses', count: domains?.length },
+            { id: 'attention', label: 'Not live yet', count: attentionCount },
           ]}
         />
-        <FilterBar search={{ value: q, onChange: setQ, placeholder: 'Search hostname or store' }} />
-        <DataTable
-          columns={columns}
-          rows={domains === undefined ? undefined : filtered}
-          getRowId={(d) => d._id}
-          empty={
-            (domains?.length ?? 0) === 0 ? (
-              <EmptyState title="No domains yet" description="Domains appear here once a store has one." />
-            ) : (
-              <EmptyState title="No domains match" description="Try another status tab or clear the search." />
-            )
-          }
-        />
+        <FilterBar search={{ value: q, onChange: setQ, placeholder: 'Search address or store' }} />
       </Card>
 
-      <p className="px-1 text-xs text-[var(--admin-text-muted)]">
-        Status comes from Cloudflare Pages and is rechecked every 15 minutes (active domains every 6 hours). Nothing here sets status by hand.
+      {domains === undefined ? (
+        <div className="grid items-start gap-3 xl:grid-cols-2" aria-busy="true" aria-label="Loading domains">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="mt-4 h-10 w-full" />
+              <Skeleton className="mt-2 h-10 w-full" />
+            </Card>
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
+        <Card>
+          {domains.length === 0 ? (
+            <EmptyState title="No web addresses yet" description="Each store's addresses appear here once it has one." />
+          ) : view === 'attention' && !q ? (
+            <EmptyState title="Every address is live" description="Addresses that are still connecting or failing show up here." />
+          ) : (
+            <EmptyState title="Nothing matches" description="Clear the search or switch to all addresses." />
+          )}
+        </Card>
+      ) : (
+        <div className="grid items-start gap-3 xl:grid-cols-2">
+          {visible.map((g) => (
+            <Card
+              key={g.orgId}
+              padding="none"
+              title={
+                <span className="flex items-center gap-2">
+                  <Link to={`/sa/stores/${g.orgId}?tab=domains`} className="truncate hover:underline">
+                    {g.storeName}
+                  </Link>
+                  {!g.storeActive && <StoreStateBadge active={false} />}
+                </span>
+              }
+              actions={
+                <span className="text-xs text-[var(--admin-text-muted)]">
+                  {g.problems === 0 ? 'All live' : `${g.problems} not live`}
+                </span>
+              }
+            >
+              <DomainList
+                domains={g.domains}
+                writeOpen={writeOpen}
+                busyId={busyId}
+                onRefresh={(d) => void onRefresh(d)}
+                onMakePrimary={setPrimaryTarget}
+                onRemove={setRemoveTarget}
+              />
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <p className="max-w-prose px-1 text-xs text-[var(--admin-text-muted)]">
+        Addresses are checked automatically every 15 minutes. New ones usually go live within an hour of the DNS record being added.
       </p>
 
       <ConfirmDialog
@@ -243,14 +160,14 @@ export function DomainsPage() {
         onOpenChange={(o) => {
           if (!o) setPrimaryTarget(null);
         }}
-        title={`Make ${primaryTarget?.hostname ?? 'domain'} primary?`}
-        description={`${primaryTarget?.storeName ?? 'This store'} canonical URLs move to this domain. ${PRIMARY_WARNING}`}
-        confirmLabel="Make primary"
+        title={`Make ${primaryTarget?.hostname ?? 'this'} the main address?`}
+        description={PRIMARY_WARNING}
+        confirmLabel="Make main address"
         onConfirm={async () => {
           if (!primaryTarget) return;
           const d = primaryTarget;
           await runSa(() => setPrimary({ saToken: token, domainId: d._id }));
-          setNotice(`${d.hostname} is now the primary domain.`);
+          setNotice(`${d.hostname} is now the main address of ${d.storeName}.`);
         }}
       />
 
@@ -259,15 +176,14 @@ export function DomainsPage() {
         onOpenChange={(o) => {
           if (!o) setRemoveTarget(null);
         }}
-        title={`Remove ${removeTarget?.hostname ?? 'domain'}?`}
+        title={`Remove ${removeTarget?.hostname ?? 'this address'}?`}
         description={[
-          `It is removed from ${removeTarget?.storeName ?? 'the store'}.`,
-          removeTarget?.cfManaged ? 'It is removed from Cloudflare Pages too.' : '',
-          removeTarget?.kind === 'primary' ? 'It is the primary, so another domain of this store is promoted.' : '',
+          `Visitors on this address stop reaching ${removeTarget?.storeName ?? 'the store'}.`,
+          removeTarget?.kind === 'primary' ? 'Another address of this store becomes the main one.' : '',
         ]
           .filter(Boolean)
           .join(' ')}
-        confirmLabel="Remove domain"
+        confirmLabel="Remove address"
         critical
         onConfirm={async () => {
           if (!removeTarget) return;

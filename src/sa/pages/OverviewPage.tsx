@@ -1,106 +1,140 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from 'convex/react';
-import { ArrowUpRight } from 'lucide-react';
-import { Banner, Card, Page, Skeleton } from '../../adminnew/ui';
+import { CheckCircle2, ChevronRight } from 'lucide-react';
+import { Banner, Card, EmptyState, Page, PageLayout, Skeleton } from '../../adminnew/ui';
 import { formatINR } from '../../utils/currency';
 import { paiseToRupees } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
-import { platformOverviewRef, type PlatformOverview } from '../refs';
-import { formatCount, formatDateTime } from '../saUi';
+import { listStoreStatsRef, listStoresRef, platformOverviewRef } from '../refs';
+import { storeChecks, type CheckId } from '../health';
+import { StatTile, StoreStateBadge, formatCount, formatDateTime } from '../saUi';
 
-interface Tile {
-  label: string;
-  value: string;
-  hint: string;
-  to: string;
-  attention?: boolean;
-}
+// Where each failed check is fixed on the store page.
+const FIX_TAB: Record<CheckId, string> = { domain: 'domains', gmail: 'overview', upi: 'overview' };
 
-function tiles(o: PlatformOverview): Tile[] {
-  return [
-    {
-      label: 'Stores',
-      value: formatCount(o.storeCount),
-      hint: `${formatCount(o.activeStoreCount)} active`,
-      to: '/sa/stores',
-    },
-    {
-      label: 'Orders today',
-      value: formatCount(o.ordersToday),
-      hint: `${formatCount(o.orders7d)} in the last 7 days`,
-      to: '/sa/stores',
-    },
-    {
-      label: 'Paid today',
-      value: formatINR(paiseToRupees(o.gmvTodayPaise)),
-      hint: `${formatINR(paiseToRupees(o.gmv7dPaise))} in the last 7 days`,
-      to: '/sa/stores',
-    },
-    {
-      label: 'Active stores without Gmail',
-      value: formatCount(o.storesGmailNotConnected),
-      hint: 'Bank alerts cannot match payments',
-      to: '/sa/stores',
-      attention: o.storesGmailNotConnected > 0,
-    },
-    {
-      label: 'Domains not active',
-      value: formatCount(o.domainsNotActive),
-      hint: 'Pending, error or disabled',
-      to: '/sa/domains',
-      attention: o.domainsNotActive > 0,
-    },
-  ];
-}
-
+// What the owner comes here for: is money coming in, and is anything broken.
 export function OverviewPage() {
   const { token } = useSa();
   const overview = useQuery(platformOverviewRef, { saToken: token });
+  const stores = useQuery(listStoresRef, { saToken: token });
+  const stats = useQuery(listStoreStatsRef, { saToken: token });
+
+  const issues = useMemo(() => {
+    if (!stores || !stats) return undefined;
+    const byOrg = new Map(stats.map((s) => [s.orgId, s]));
+    return stores
+      .filter((s) => s.active)
+      .flatMap((s) =>
+        storeChecks(s, byOrg.get(s._id))
+          .filter((c) => !c.ok)
+          .map((c) => ({ key: `${s._id}-${c.id}`, store: s, check: c })),
+      );
+  }, [stores, stats]);
+
+  const storeRows = useMemo(() => {
+    if (!stores) return undefined;
+    const byOrg = new Map((stats ?? []).map((s) => [s.orgId, s]));
+    return stores
+      .map((s) => ({ store: s, orders7d: byOrg.get(s._id)?.orders7d ?? 0 }))
+      .sort((a, b) => Number(b.store.active) - Number(a.store.active) || b.orders7d - a.orders7d);
+  }, [stores, stats]);
 
   return (
     <Page title="Overview">
       {overview === undefined ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Loading overview">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy="true" aria-label="Loading overview">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <Skeleton className="h-3 w-24" />
-              <Skeleton className="mt-4 h-7 w-20" />
-              <Skeleton className="mt-3 h-3 w-32" />
+              <Skeleton className="mt-3 h-7 w-20" />
             </Card>
           ))}
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {tiles(overview).map((t) => (
-              <Link
-                key={t.label}
-                to={t.to}
-                className="group block rounded-[var(--admin-radius)] focus-visible:outline-none"
-              >
-                <Card className="h-full transition-colors group-hover:border-[var(--admin-border-strong)] group-focus-visible:outline-2 group-focus-visible:outline-[var(--admin-focus)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-[13px] font-medium text-[var(--admin-text-muted)]">{t.label}</p>
-                    <ArrowUpRight className="size-4 shrink-0 text-[var(--admin-text-subtle)] transition-colors group-hover:text-[var(--admin-text)]" aria-hidden />
-                  </div>
-                  <p
-                    className={`mt-3 text-2xl font-semibold tracking-[-0.02em] tabular-nums ${
-                      t.attention ? 'text-[var(--admin-warning)]' : 'text-[var(--admin-text)]'
-                    }`}
-                  >
-                    {t.value}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--admin-text-muted)]">{t.hint}</p>
-                </Card>
-              </Link>
-            ))}
-          </div>
-          <p className="px-1 text-xs text-[var(--admin-text-subtle)]">
-            Paid orders (paid and late-paid) across all stores. Day boundaries use IST. Updated {formatDateTime(overview.generatedAt)}.
-          </p>
-        </>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile
+            label="Stores open"
+            value={formatCount(overview.activeStoreCount)}
+            hint={`of ${formatCount(overview.storeCount)} stores`}
+          />
+          <StatTile label="Paid orders today" value={formatCount(overview.ordersToday)} hint={`${formatCount(overview.orders7d)} this week`} />
+          <StatTile label="Sales today" value={formatINR(paiseToRupees(overview.gmvTodayPaise))} hint="All stores" />
+          <StatTile label="Sales last 7 days" value={formatINR(paiseToRupees(overview.gmv7dPaise))} hint={`Updated ${formatDateTime(overview.generatedAt)}`} />
+        </div>
       )}
       {overview === null && <Banner tone="critical">Could not load the overview.</Banner>}
+
+      <PageLayout
+        main={
+          <Card title="Needs attention" padding="none">
+            {issues === undefined ? (
+              <div className="space-y-3 p-4" aria-busy="true">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : issues.length === 0 ? (
+              <EmptyState
+                icon={<CheckCircle2 aria-hidden />}
+                title="Every open store is set up"
+                description="Websites are live, payments are tracked and UPI is set. Problems show up here."
+              />
+            ) : (
+              <ul className="divide-y divide-[var(--admin-border)]">
+                {issues.map(({ key, store, check }) => (
+                  <li key={key}>
+                    <Link
+                      to={`/sa/stores/${store._id}?tab=${FIX_TAB[check.id]}`}
+                      className="group flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-[var(--admin-surface-subtle)]"
+                    >
+                      <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--admin-warning)]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-[var(--admin-text)]">{store.name}</span>
+                        <span className="block truncate text-[13px] text-[var(--admin-text-muted)]">{check.problem}</span>
+                      </span>
+                      <span className="shrink-0 text-[13px] font-medium text-[var(--admin-primary)]">Fix</span>
+                      <ChevronRight className="size-4 shrink-0 text-[var(--admin-text-subtle)]" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        }
+        aside={
+          <Card
+            title="Stores"
+            padding="none"
+            actions={
+              <Link to="/sa/stores" className="text-[13px] font-medium text-[var(--admin-primary)] hover:underline">
+                All stores
+              </Link>
+            }
+          >
+            {storeRows === undefined ? (
+              <div className="space-y-3 p-4" aria-busy="true">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : (
+              <ul className="divide-y divide-[var(--admin-border)]">
+                {storeRows.slice(0, 8).map(({ store, orders7d }) => (
+                  <li key={store._id}>
+                    <Link
+                      to={`/sa/stores/${store._id}`}
+                      className="flex items-center gap-3 px-4 py-2.5 transition-colors duration-150 hover:bg-[var(--admin-surface-subtle)]"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--admin-text)]">{store.name}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-[var(--admin-text-muted)]">{formatCount(orders7d)} orders this week</span>
+                      {!store.active && <StoreStateBadge active={false} />}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        }
+      />
     </Page>
   );
 }

@@ -428,3 +428,24 @@ export const platformOverview = query({
     };
   },
 });
+
+// One store's setup facts for the super-admin store page: live product count
+// and brand logo. Reads only.
+export const storeSummary = query({
+  args: { saToken: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, { saToken, orgId }) => {
+    await requireSaSession(ctx, saToken);
+    const activeProducts = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_org_active", (q) => q.eq("orgId", orgId).eq("isActive", true))
+      .collect();
+    const setting = await ctx.db
+      .query("siteSettings")
+      .withIndex("by_org_key", (q) => q.eq("orgId", orgId).eq("key", "main"))
+      .unique();
+    return {
+      activeProductCount: activeProducts.length,
+      logoUrl: setting?.brand?.logoUrl ?? null,
+    };
+  },
+});

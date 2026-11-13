@@ -1,32 +1,36 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { MoreHorizontal } from 'lucide-react';
+import { CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
 import {
   Badge,
   Banner,
   Button,
   Card,
-  CardSection,
   ConfirmDialog,
   DataTable,
   EmptyState,
   Input,
   Label,
-  Menu,
   Page,
+  PageLayout,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Tabs,
   useButtonFeedback,
   type Column,
 } from '../../adminnew/ui';
 import type { Id } from '../../../convex/_generated/dataModel';
+import { formatINR } from '../../utils/currency';
+import { paiseToRupees } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
-import { runSa, DomainStatusBadge, DnsRecords, Facts, GmailBadge, ManagedTag, ROLE_LABEL, relativeTime, StoreStateBadge, formatDateTime } from '../saUi';
+import { runSa, formatCount, formatDateTime, GmailBadge, KeyValues, ROLE_LABEL, StatTile, StoreStateBadge } from '../saUi';
+import { DomainList, PRIMARY_WARNING } from '../DomainList';
+import { storeAdminUrl, storeLiveUrl } from '../health';
 import {
   addDomainRef,
   addStoreAdminRef,
@@ -40,30 +44,316 @@ import {
   removeMemberRef,
   setPrimaryRef,
   setStoreActiveRef,
+  storeSummaryRef,
   type DomainRow,
   type MemberRow,
   type Role,
+  type StoreRow,
+  type StoreStatsRow,
+  type StoreSummary,
 } from '../refs';
 
+type TabId = 'overview' | 'domains' | 'team' | 'import' | 'settings';
+const TAB_IDS: TabId[] = ['overview', 'domains', 'team', 'import', 'settings'];
 const ROLES: Role[] = ['owner', 'admin', 'staff', 'customer'];
 
-const PRIMARY_WARNING =
-  "Switching primary moves canonical URLs to this domain. Only do this after the merchant's DNS points here.";
-
-type DomainAction = { kind: 'primary' | 'remove'; domain: DomainRow };
-
+// One store, split into small tabs. Overview answers "is this store working?"
+// with a checklist; every other tab holds one job.
 export function StoreDetailPage() {
   const { orgId: orgParam } = useParams();
   const { token, writeOpen } = useSa();
   const orgId = (orgParam ?? '') as Id<'organizations'>;
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get('tab') as TabId | null;
+  const tab: TabId = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'overview';
+  const setTab = (t: TabId) => setParams(t === 'overview' ? {} : { tab: t }, { replace: true });
 
   const stores = useQuery(listStoresRef, { saToken: token });
   const stats = useQuery(listStoreStatsRef, { saToken: token });
+  const summary = useQuery(storeSummaryRef, { saToken: token, orgId });
+  const domains = useQuery(listDomainsRef, { saToken: token, orgId });
+  const members = useQuery(listMembersRef, { saToken: token, orgId });
   const store = stores?.find((s) => s._id === orgId);
   const storeStats = stats?.find((s) => s.orgId === orgId);
 
-  // Domains
-  const domains = useQuery(listDomainsRef, { saToken: token, orgId });
+  if (stores !== undefined && !store) {
+    return (
+      <Page title="Store" backTo="/sa/stores">
+        <Card>
+          <EmptyState title="Store not found" description="It may have been removed. Go back to the list of stores." />
+        </Card>
+      </Page>
+    );
+  }
+
+  const live = store ? storeLiveUrl(store) : null;
+  const team = (members ?? []).filter((m) => m.role !== 'customer');
+  const notLive = (domains ?? []).filter((d) => d.status !== 'active').length;
+
+  return (
+    <Page
+      title={store?.name ?? <Skeleton className="inline-block h-6 w-48 align-middle" />}
+      backTo="/sa/stores"
+      titleMeta={store ? <StoreStateBadge active={store.active} /> : undefined}
+      secondaryActions={
+        live
+          ? [
+              <Button key="view" asChild variant="secondary">
+                <a href={live} target="_blank" rel="noreferrer">
+                  View store
+                </a>
+              </Button>,
+            ]
+          : undefined
+      }
+      primaryAction={
+        store ? (
+          <Button asChild variant="primary">
+            <a href={storeAdminUrl(store.slug)} target="_blank" rel="noreferrer">
+              Open admin
+            </a>
+          </Button>
+        ) : undefined
+      }
+    >
+      <Card padding="none">
+        <div className="flex items-center gap-4 px-4 py-4">
+          <StoreLogo name={store?.name} logoUrl={summary?.logoUrl ?? null} />
+          <div className="min-w-0 flex-1">
+            {store ? (
+              <>
+                {live ? (
+                  <a
+                    href={live}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex max-w-full items-center gap-1.5 text-sm font-medium text-[var(--admin-primary)] hover:underline"
+                  >
+                    <span className="truncate">{store.primaryHost}</span>
+                    <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                  </a>
+                ) : (
+                  <p className="text-sm text-[var(--admin-text-muted)]">No web address yet</p>
+                )}
+                <p className="mt-0.5 truncate text-[13px] text-[var(--admin-text-muted)]">
+                  Admin at {window.location.host}/{store.slug}
+                </p>
+              </>
+            ) : (
+              <>
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="mt-2 h-3 w-32" />
+              </>
+            )}
+          </div>
+        </div>
+        <Tabs<TabId>
+          className="mb-0 border-b-0 border-t border-[var(--admin-border)]"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'domains', label: 'Domains', count: notLive > 0 ? notLive : undefined },
+            { id: 'team', label: 'Team', count: members?.length },
+            { id: 'import', label: 'Import' },
+            { id: 'settings', label: 'Settings' },
+          ]}
+        />
+      </Card>
+
+      {tab === 'overview' && (
+        <OverviewTab store={store} stats={storeStats} summary={summary} domains={domains} team={members ? team : undefined} onTab={setTab} />
+      )}
+      {tab === 'domains' && <DomainsTab orgId={orgId} store={store} domains={domains} token={token} writeOpen={writeOpen} />}
+      {tab === 'team' && <TeamTab orgId={orgId} members={members} token={token} writeOpen={writeOpen} />}
+      {tab === 'import' && <ImportTab orgId={orgId} productCount={summary?.activeProductCount} />}
+      {tab === 'settings' && <SettingsTab store={store} token={token} writeOpen={writeOpen} />}
+    </Page>
+  );
+}
+
+function StoreLogo({ name, logoUrl }: { name?: string; logoUrl: string | null }) {
+  const [broken, setBroken] = useState(false);
+  if (logoUrl && /^https?:\/\//.test(logoUrl) && !broken) {
+    return (
+      <img
+        src={logoUrl}
+        alt=""
+        onError={() => setBroken(true)}
+        className="size-12 shrink-0 rounded-[10px] border border-[var(--admin-border)] bg-white object-contain p-1"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="flex size-12 shrink-0 items-center justify-center rounded-[10px] bg-[var(--admin-neutral-soft)] text-lg font-semibold text-[var(--admin-text-muted)]"
+    >
+      {name?.charAt(0).toUpperCase() ?? ''}
+    </span>
+  );
+}
+
+// ---------- Overview ----------
+
+interface CheckItem {
+  label: string;
+  ok: boolean | undefined;
+  detail: string;
+  fix: ReactNode;
+}
+
+function OverviewTab({
+  store,
+  stats,
+  summary,
+  domains,
+  team,
+  onTab,
+}: {
+  store: StoreRow | undefined;
+  stats: StoreStatsRow | undefined;
+  summary: StoreSummary | undefined;
+  domains: DomainRow[] | undefined;
+  team: MemberRow[] | undefined;
+  onTab: (t: TabId) => void;
+}) {
+  const paymentsSettings = store ? storeAdminUrl(store.slug, '/payments/settings') : '#';
+  const fixLink = (label: string, href: string) => (
+    <Button asChild size="sm" variant="secondary">
+      <a href={href} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    </Button>
+  );
+  const fixTab = (label: string, t: TabId) => (
+    <Button size="sm" variant="secondary" onClick={() => onTab(t)}>
+      {label}
+    </Button>
+  );
+
+  const primary = domains?.find((d) => d.kind === 'primary');
+  const products = summary?.activeProductCount;
+  const admins = team?.filter((m) => m.role === 'owner' || m.role === 'admin').length;
+
+  const checks: CheckItem[] = [
+    {
+      label: 'Website is live',
+      ok: domains === undefined ? undefined : primary?.status === 'active',
+      detail: primary ? (primary.status === 'active' ? primary.hostname : `${primary.hostname} is not live yet`) : 'No web address yet',
+      fix: fixTab('Check domains', 'domains'),
+    },
+    {
+      label: 'Payments are tracked',
+      ok: stats === undefined ? undefined : stats.gmail === 'connected',
+      detail:
+        stats?.gmail === 'connected'
+          ? `Gmail ${stats.gmailEmail ?? 'connected'}`
+          : stats?.gmail === 'needs_reconnect'
+            ? 'Gmail needs to be reconnected'
+            : 'Gmail not connected, so UPI payments are not matched to orders',
+      fix: fixLink('Connect Gmail', paymentsSettings),
+    },
+    {
+      label: 'UPI ID is set',
+      ok: store === undefined ? undefined : !!store.upiVpa,
+      detail: store?.upiVpa || 'Customers cannot pay without one',
+      fix: fixLink('Set UPI ID', paymentsSettings),
+    },
+    {
+      label: 'Products are listed',
+      ok: products === undefined ? undefined : products > 0,
+      detail: products === undefined ? '' : `${formatCount(products)} product${products === 1 ? '' : 's'} on sale`,
+      fix: fixTab('Import products', 'import'),
+    },
+    {
+      label: 'Someone can run the store',
+      ok: admins === undefined ? undefined : admins > 0,
+      detail: admins === undefined ? '' : admins > 0 ? `${admins} owner or admin` : 'No owner or admin yet',
+      fix: fixTab('Add a person', 'team'),
+    },
+  ];
+  const done = checks.filter((c) => c.ok).length;
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Paid orders today" value={stats ? formatCount(stats.ordersToday) : '-'} />
+        <StatTile label="Sales today" value={stats ? formatINR(paiseToRupees(stats.gmvTodayPaise)) : '-'} />
+        <StatTile label="Paid orders this week" value={stats ? formatCount(stats.orders7d) : '-'} />
+        <StatTile label="Sales this week" value={stats ? formatINR(paiseToRupees(stats.gmv7dPaise)) : '-'} />
+      </div>
+
+      <PageLayout
+        main={
+          <Card
+            title="Setup checklist"
+            padding="none"
+            actions={<span className="text-xs tabular-nums text-[var(--admin-text-muted)]">{done} of {checks.length} done</span>}
+          >
+            <ul className="divide-y divide-[var(--admin-border)]">
+              {checks.map((c) => (
+                <li key={c.label} className="flex items-center gap-3 px-4 py-3">
+                  {c.ok === undefined ? (
+                    <Skeleton className="size-5 rounded-full" />
+                  ) : c.ok ? (
+                    <CheckCircle2 className="size-5 shrink-0 text-[var(--admin-success)]" aria-label="Done" />
+                  ) : (
+                    <CircleAlert className="size-5 shrink-0 text-[var(--admin-warning)]" aria-label="Needs attention" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[var(--admin-text)]">{c.label}</p>
+                    {c.detail && <p className="truncate text-[13px] text-[var(--admin-text-muted)]">{c.detail}</p>}
+                  </div>
+                  {c.ok === false && <div className="shrink-0">{c.fix}</div>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        }
+        aside={
+          <Card title="Store details">
+            {store ? (
+              <KeyValues
+                items={[
+                  { label: 'Short name', value: store.slug, mono: true },
+                  { label: 'Theme', value: stats?.theme ? <Badge tone="neutral">{stats.theme}</Badge> : 'None' },
+                  { label: 'UPI ID', value: store.upiVpa || 'Not set', mono: !!store.upiVpa },
+                  { label: 'Gmail', value: stats ? <GmailBadge state={stats.gmail} /> : '-' },
+                  { label: 'Created', value: formatDateTime(store.createdAt) },
+                ]}
+              />
+            ) : (
+              <div className="space-y-3" aria-busy="true">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            )}
+          </Card>
+        }
+      />
+    </>
+  );
+}
+
+// ---------- Domains ----------
+
+type DomainAction = { kind: 'primary' | 'remove'; domain: DomainRow };
+
+function DomainsTab({
+  orgId,
+  store,
+  domains,
+  token,
+  writeOpen,
+}: {
+  orgId: Id<'organizations'>;
+  store: StoreRow | undefined;
+  domains: DomainRow[] | undefined;
+  token: string;
+  writeOpen: boolean;
+}) {
   const addDomain = useMutation(addDomainRef);
   const setPrimary = useMutation(setPrimaryRef);
   const provisionSubdomain = useMutation(provisionSubdomainRef);
@@ -73,34 +363,19 @@ export function StoreDetailPage() {
   const addFb = useButtonFeedback();
   const provisionFb = useButtonFeedback();
   const rowFb = useButtonFeedback();
-  const [domainNotice, setDomainNotice] = useState<string | null>(null);
-  const [domainAction, setDomainAction] = useState<DomainAction | null>(null);
-
-  // Members
-  const members = useQuery(listMembersRef, { saToken: token, orgId });
-  const addAdmin = useMutation(addStoreAdminRef);
-  const removeMember = useMutation(removeMemberRef);
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<Role>('admin');
-  const memberFb = useButtonFeedback();
-  const [memberNotice, setMemberNotice] = useState<string | null>(null);
-  const [memberToRemove, setMemberToRemove] = useState<MemberRow | null>(null);
-
-  // Danger zone
-  const setActive = useMutation(setStoreActiveRef);
-  const [suspendOpen, setSuspendOpen] = useState(false);
-  const [storeNotice, setStoreNotice] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [action, setAction] = useState<DomainAction | null>(null);
 
   const hasSubdomain = (domains ?? []).some((d) => d.managed);
-  const pendingWithDns = (domains ?? []).filter((d) => d.status === 'pending' && d.dnsInstructions);
 
-  const onAddDomain = async (e: FormEvent) => {
+  const onAdd = async (e: FormEvent) => {
     e.preventDefault();
     const host = hostname;
     const ok = await addFb.run(() => runSa(() => addDomain({ saToken: token, orgId, hostname: host })));
     if (ok === undefined) return;
     setHostname('');
-    setDomainNotice(`Added ${host}. It stays pending until Cloudflare reports it active.`);
+    setNotice(`Added ${host}. Open "How to connect" on its row for the DNS record to add.`);
   };
 
   const onProvision = async () => {
@@ -108,136 +383,175 @@ export function StoreDetailPage() {
     if (res === undefined) return;
     if (!res.created) {
       provisionFb.reset();
-      setDomainNotice(
-        res.reason === 'exists'
-          ? `${res.hostname} is already set up.`
-          : `No subdomain was created (${res.reason ?? 'unknown'}).`,
-      );
+      setNotice(res.reason === 'exists' ? `${res.hostname} is already set up.` : `No address was created (${res.reason ?? 'unknown'}).`);
       return;
     }
-    setDomainNotice(`Provisioning ${store?.slug ?? 'store'} subdomain. It turns active once Cloudflare reports it.`);
+    setNotice(`Setting up ${res.hostname ?? 'the free address'}. It goes live in a few minutes.`);
   };
 
   const onRefresh = async (d: DomainRow) => {
+    setBusyId(d._id);
     const res = await rowFb.run(() => runSa(() => refreshDomain({ saToken: token, domainId: d._id })));
-    if (res !== undefined) setDomainNotice(`Refreshed ${d.hostname} from Cloudflare.`);
+    setBusyId(null);
+    if (res !== undefined) setNotice(`Checked ${d.hostname} again.`);
   };
 
-  const confirmDomainAction = async () => {
-    if (!domainAction) return;
-    const { kind, domain } = domainAction;
+  const confirmAction = async () => {
+    if (!action) return;
+    const { kind, domain } = action;
     if (kind === 'primary') {
       await runSa(() => setPrimary({ saToken: token, domainId: domain._id }));
-      setDomainNotice(`${domain.hostname} is now the primary domain.`);
+      setNotice(`${domain.hostname} is now the main address.`);
     } else {
       await runSa(() => removeDomain({ saToken: token, domainId: domain._id }));
-      setDomainNotice(`Removed ${domain.hostname}.`);
+      setNotice(`Removed ${domain.hostname}.`);
     }
   };
 
-  const onAddMember = async (e: FormEvent) => {
+  return (
+    <>
+      {notice && (
+        <Banner tone="success" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Banner>
+      )}
+      {rowFb.error && <Banner tone="critical">{rowFb.error.message}</Banner>}
+      <PageLayout
+        main={
+          <Card title="Web addresses" padding="none">
+            {domains === undefined ? (
+              <div className="space-y-3 p-4" aria-busy="true">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : domains.length === 0 ? (
+              <EmptyState title="No web address yet" description="Add the store's own domain, or set up its free cigarro.in address." />
+            ) : (
+              <DomainList
+                domains={domains}
+                writeOpen={writeOpen}
+                busyId={busyId}
+                onRefresh={(d) => void onRefresh(d)}
+                onMakePrimary={(d) => setAction({ kind: 'primary', domain: d })}
+                onRemove={(d) => setAction({ kind: 'remove', domain: d })}
+              />
+            )}
+          </Card>
+        }
+        aside={
+          <>
+            <Card title="Add an address">
+              <form onSubmit={onAdd} className="flex flex-col gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sa-host">Domain</Label>
+                  <Input
+                    id="sa-host"
+                    value={hostname}
+                    onChange={(e) => setHostname(e.target.value)}
+                    placeholder="shop.example.com"
+                    required
+                    disabled={!writeOpen || addFb.busy}
+                  />
+                </div>
+                <Button type="submit" variant="primary" state={addFb.state} disabled={!writeOpen}>
+                  Add address
+                </Button>
+                {addFb.error && <Banner tone="critical">{addFb.error.message}</Banner>}
+                <p className="text-xs text-[var(--admin-text-muted)]">
+                  After adding, the store owner points the domain here with one DNS record. It goes live on its own.
+                </p>
+              </form>
+            </Card>
+            {store && !hasSubdomain && domains !== undefined && (
+              <Card title="Free address">
+                <p className="text-[13px] text-[var(--admin-text-muted)]">
+                  Give the store {store.slug}.cigarro.in. No DNS work needed.
+                </p>
+                <Button
+                  className="mt-3"
+                  variant="secondary"
+                  state={provisionFb.state}
+                  disabled={!writeOpen || provisionFb.busy}
+                  onClick={() => void onProvision()}
+                >
+                  Set up {store.slug}.cigarro.in
+                </Button>
+                {provisionFb.error && (
+                  <div className="mt-3">
+                    <Banner tone="critical">{provisionFb.error.message}</Banner>
+                  </div>
+                )}
+              </Card>
+            )}
+          </>
+        }
+      />
+      <ConfirmDialog
+        open={action !== null}
+        onOpenChange={(o) => {
+          if (!o) setAction(null);
+        }}
+        title={
+          action?.kind === 'primary'
+            ? `Make ${action.domain.hostname} the main address?`
+            : `Remove ${action?.domain.hostname ?? 'this address'}?`
+        }
+        description={
+          action?.kind === 'primary'
+            ? PRIMARY_WARNING
+            : action?.domain.kind === 'primary'
+              ? 'Visitors on this address stop reaching the store. Another address becomes the main one.'
+              : 'Visitors on this address stop reaching the store.'
+        }
+        confirmLabel={action?.kind === 'primary' ? 'Make main address' : 'Remove address'}
+        critical={action?.kind === 'remove'}
+        onConfirm={confirmAction}
+      />
+    </>
+  );
+}
+
+// ---------- Team ----------
+
+function TeamTab({
+  orgId,
+  members,
+  token,
+  writeOpen,
+}: {
+  orgId: Id<'organizations'>;
+  members: MemberRow[] | undefined;
+  token: string;
+  writeOpen: boolean;
+}) {
+  const addAdmin = useMutation(addStoreAdminRef);
+  const removeMember = useMutation(removeMemberRef);
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<Role>('admin');
+  const fb = useButtonFeedback();
+  const [notice, setNotice] = useState<string | null>(null);
+  const [toRemove, setToRemove] = useState<MemberRow | null>(null);
+
+  const onAdd = async (e: FormEvent) => {
     e.preventDefault();
     const p = phone;
     const r = role;
-    const ok = await memberFb.run(() => runSa(() => addAdmin({ saToken: token, orgId, phone: p, role: r })));
+    const ok = await fb.run(() => runSa(() => addAdmin({ saToken: token, orgId, phone: p, role: r })));
     if (ok === undefined) return;
-    setMemberNotice(`Saved ${p} as ${ROLE_LABEL[r].toLowerCase()}.`);
+    setNotice(`${p} is now ${ROLE_LABEL[r].toLowerCase()}. They sign in with this phone number.`);
     setPhone('');
   };
 
-  const confirmRemoveMember = async () => {
-    if (!memberToRemove) return;
-    await runSa(() => removeMember({ saToken: token, membershipId: memberToRemove._id }));
-    setMemberNotice('Member removed.');
-  };
-
-  const confirmSuspend = async () => {
-    if (!store) return;
-    await runSa(() => setActive({ saToken: token, orgId, active: !store.active }));
-    setStoreNotice(store.active ? `Suspended ${store.slug}.` : `Activated ${store.slug}.`);
-  };
-
-  const domainColumns: Column<DomainRow>[] = [
+  const columns: Column<MemberRow>[] = [
     {
-      id: 'host',
-      header: 'Hostname',
-      cell: (d) => (
+      id: 'who',
+      header: 'Person',
+      cell: (m) => (
         <div className="min-w-0">
-          <p className="truncate font-mono text-[13px] text-[var(--admin-text)]">{d.hostname}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs capitalize text-[var(--admin-text-muted)]">{d.kind}</span>
-            {d.managed && <ManagedTag managed />}
-          </div>
+          <p className="truncate text-sm text-[var(--admin-text)]">{m.name ?? m.phone ?? '-'}</p>
+          {m.name && <p className="truncate font-mono text-xs text-[var(--admin-text-muted)]">{m.phone ?? ''}</p>}
         </div>
       ),
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      cell: (d) => (
-        <div className="flex min-w-0 flex-col items-start gap-1">
-          <DomainStatusBadge status={d.status} />
-          {d.cfError && <p className="max-w-xs break-words text-xs text-[var(--admin-critical)]">{d.cfError}</p>}
-        </div>
-      ),
-    },
-    {
-      id: 'cf',
-      header: 'Cloudflare',
-      hideBelow: 'md',
-      cell: (d) =>
-        d.cfManaged ? (
-          <span className="font-mono text-xs">{d.cfStatus ?? 'Not synced'}</span>
-        ) : (
-          <span className="text-xs text-[var(--admin-text-muted)]">Platform</span>
-        ),
-    },
-    {
-      id: 'checked',
-      header: 'Last checked',
-      hideBelow: 'lg',
-      cell: (d) => <span className="whitespace-nowrap text-[13px] text-[var(--admin-text-muted)]">{relativeTime(d.cfCheckedAt)}</span>,
-    },
-    {
-      id: 'actions',
-      header: '',
-      align: 'right',
-      width: '3rem',
-      cell: (d) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <Menu
-            align="end"
-            trigger={
-              <Button variant="plain" size="icon" aria-label={`Actions for ${d.hostname}`}>
-                <MoreHorizontal aria-hidden />
-              </Button>
-            }
-            items={[
-              ...(d.cfManaged
-                ? [{ label: 'Refresh now', disabled: !writeOpen || rowFb.busy, onSelect: () => void onRefresh(d) }]
-                : []),
-              ...(d.status === 'active' && d.kind === 'alias' && d.cfManaged
-                ? [{ label: 'Make primary', disabled: !writeOpen, onSelect: () => setDomainAction({ kind: 'primary', domain: d }) }]
-                : []),
-              { label: 'Remove domain', tone: 'critical' as const, disabled: !writeOpen, onSelect: () => setDomainAction({ kind: 'remove', domain: d }) },
-            ]}
-          />
-        </div>
-      ),
-    },
-  ];
-
-  const memberColumns: Column<MemberRow>[] = [
-    {
-      id: 'phone',
-      header: 'Phone',
-      cell: (m) => <span className="font-mono text-[13px]">{m.phone ?? '-'}</span>,
-    },
-    {
-      id: 'name',
-      header: 'Name',
-      hideBelow: 'sm',
-      cell: (m) => <span className="truncate">{m.name ?? '-'}</span>,
     },
     {
       id: 'role',
@@ -250,301 +564,203 @@ export function StoreDetailPage() {
       align: 'right',
       width: '6rem',
       cell: (m) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!writeOpen}
-            onClick={() => {
-              setMemberToRemove(m);
-            }}
-          >
-            Remove
-          </Button>
-        </div>
+        <Button variant="plain" size="sm" disabled={!writeOpen} onClick={() => setToRemove(m)}>
+          Remove
+        </Button>
       ),
     },
   ];
 
-  if (stores !== undefined && !store) {
-    return (
-      <Page title="Store" backTo="/sa/stores">
-        <Card>
-          <EmptyState title="Store not found" description="It may have been removed. Go back to the list and refresh." />
-        </Card>
-      </Page>
-    );
-  }
-
   return (
-    <Page
-      title={store?.name ?? <Skeleton className="inline-block h-6 w-48 align-middle" />}
-      backTo="/sa/stores"
-      titleMeta={store ? <StoreStateBadge active={store.active} /> : undefined}
-      primaryAction={store ? { label: 'Catalog import', to: `/sa/stores/${orgId}/import` } : undefined}
-    >
-      {/* 1. Identity */}
-      <Card title="Identity">
-        {store ? (
-          <Facts
-            items={[
-              { label: 'Store name', value: store.name },
-              { label: 'Slug', value: store.slug, mono: true },
-              { label: 'Theme', value: storeStats?.theme ?? 'None' },
-              { label: 'UPI VPA', value: store.upiVpa || 'Not set', mono: !!store.upiVpa },
-              { label: 'Bank alert alias', value: store.bankEmailAlias || '-', mono: true },
-              {
-                label: 'Gmail for bank alerts',
-                value: storeStats ? (
-                  <span className="inline-flex flex-wrap items-center gap-2">
-                    <GmailBadge state={storeStats.gmail} />
-                    {storeStats.gmailEmail && <span className="text-[var(--admin-text-muted)]">{storeStats.gmailEmail}</span>}
-                  </span>
-                ) : (
-                  '-'
-                ),
-              },
-              { label: 'Created', value: formatDateTime(store.createdAt) },
-              { label: 'Orders, 7 days', value: storeStats ? storeStats.orders7d.toLocaleString('en-IN') : '-' },
-            ]}
-          />
-        ) : (
-          <div className="space-y-3" aria-busy="true">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        )}
-      </Card>
-
-      {/* 2. Domains */}
-      <Card
-        title="Domains"
-        actions={
-          store && !hasSubdomain ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              state={provisionFb.state}
-              disabled={!writeOpen || provisionFb.busy}
-              onClick={() => void onProvision()}
-            >
-              Provision subdomain
-            </Button>
-          ) : undefined
-        }
-        padding="none"
-      >
-        <div className="flex flex-col gap-3 p-4">
-          <p className="text-[13px] text-[var(--admin-text-muted)]">
-            Status comes from Cloudflare Pages and is rechecked every 15 minutes. Platform hosts are never sent to Cloudflare.
-            {store ? ` ${store.slug}.cigarro.in is registered for you.` : ''}
-          </p>
-          <form onSubmit={onAddDomain} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div className="grid gap-1.5">
-              <Label htmlFor="sa-host">Add a hostname</Label>
-              <Input
-                id="sa-host"
-                value={hostname}
-                onChange={(e) => setHostname(e.target.value)}
-                placeholder="shop.example.com"
-                required
-                disabled={!writeOpen || addFb.busy}
-              />
-            </div>
-            <Button type="submit" variant="primary" state={addFb.state} disabled={!writeOpen}>
-              Add domain
-            </Button>
-          </form>
-          {addFb.error && <Banner tone="critical">{addFb.error.message}</Banner>}
-          {provisionFb.error && <Banner tone="critical">{provisionFb.error.message}</Banner>}
-          {domainNotice && (
-            <Banner tone="success" onDismiss={() => setDomainNotice(null)}>
-              {domainNotice}
-            </Banner>
-          )}
-          {rowFb.error && <Banner tone="critical">{rowFb.error.message}</Banner>}
-        </div>
-
-        {domains === undefined ? (
-          <div className="space-y-3 border-t border-[var(--admin-border)] p-4" aria-busy="true">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : (
-          <div className="border-t border-[var(--admin-border)]">
+    <>
+      {notice && (
+        <Banner tone="success" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Banner>
+      )}
+      <PageLayout
+        main={
+          <Card title="People with access" padding="none">
             <DataTable
-              columns={domainColumns}
-              rows={domains}
-              getRowId={(d) => d._id}
-              loading={domains === undefined}
-              empty={<EmptyState title="No domains yet" description="Add a hostname above, or provision the platform subdomain." />}
+              columns={columns}
+              rows={members}
+              getRowId={(m) => m._id}
+              loading={members === undefined}
+              empty={<EmptyState title="Nobody yet" description="Add the store owner's phone number to give them access." />}
             />
-          </div>
-        )}
-
-        {pendingWithDns.length > 0 && (
-          <div className="space-y-3 border-t border-[var(--admin-border)] p-4">
-            <p className="text-sm font-semibold text-[var(--admin-text)]">DNS to add</p>
-            {pendingWithDns.map((d) => (
-              <div key={`dns-${d._id}`} className="space-y-2">
-                <p className="font-mono text-xs text-[var(--admin-text-muted)]">{d.hostname}</p>
-                <DnsRecords
-                  hostname={d.hostname}
-                  cnameTarget={d.dnsInstructions!.cnameTarget}
-                  txtRecords={d.dnsInstructions!.txtRecords}
+          </Card>
+        }
+        aside={
+          <Card title="Add a person">
+            <form onSubmit={onAdd} className="flex flex-col gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sa-phone">Phone number</Label>
+                <Input
+                  id="sa-phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="9876543210"
+                  inputMode="tel"
+                  required
+                  disabled={!writeOpen || fb.busy}
                 />
               </div>
-            ))}
-          </div>
-        )}
-        <p className="border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-warning)]">{PRIMARY_WARNING}</p>
-      </Card>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sa-role">Role</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={!writeOpen || fb.busy}>
+                  <SelectTrigger id="sa-role" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" variant="primary" state={fb.state} disabled={!writeOpen}>
+                Give access
+              </Button>
+              {fb.error && <Banner tone="critical">{fb.error.message}</Banner>}
+              <p className="text-xs text-[var(--admin-text-muted)]">
+                Adding someone who is already listed changes their role.
+              </p>
+            </form>
+          </Card>
+        }
+      />
+      <ConfirmDialog
+        open={toRemove !== null}
+        onOpenChange={(o) => {
+          if (!o) setToRemove(null);
+        }}
+        title={`Remove ${toRemove?.name ?? toRemove?.phone ?? 'this person'}?`}
+        description="They can no longer open the store admin. Their customer account is kept."
+        confirmLabel="Remove access"
+        critical
+        onConfirm={async () => {
+          if (!toRemove) return;
+          await runSa(() => removeMember({ saToken: token, membershipId: toRemove._id }));
+          setNotice('Access removed.');
+        }}
+      />
+    </>
+  );
+}
 
-      {/* 3. Members */}
-      <Card title="Admins and members" padding="none">
-        <form onSubmit={onAddMember} className="grid gap-3 p-4 sm:grid-cols-[1fr_11rem_auto] sm:items-end">
-          <div className="grid gap-1.5">
-            <Label htmlFor="sa-phone">Phone</Label>
-            <Input
-              id="sa-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="9876543210"
-              inputMode="tel"
-              required
-              disabled={!writeOpen || memberFb.busy}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="sa-role">Role</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as Role)} disabled={!writeOpen || memberFb.busy}>
-              <SelectTrigger id="sa-role" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROLE_LABEL[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" variant="primary" state={memberFb.state} disabled={!writeOpen}>
-            Add or update
+// ---------- Import ----------
+
+function ImportTab({ orgId, productCount }: { orgId: Id<'organizations'>; productCount: number | undefined }) {
+  return (
+    <Card title="Bring a store over from Dukaan">
+      <div className="max-w-2xl">
+        <p className="text-sm text-[var(--admin-text-muted)]">
+          Copies categories, products, banners, blog posts, store settings and old links from a Dukaan export into this store.
+          Running it again updates what is already there, nothing is duplicated.
+        </p>
+        <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-[var(--admin-text)]">
+          <li>Have the export files ready (normalized.json, and optionally the image map and redirects).</li>
+          <li>Open the importer and pick the files.</li>
+          <li>Check the counts, then press Import.</li>
+        </ol>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button asChild variant="primary">
+            <Link to={`/sa/stores/${orgId}/import`}>Open importer</Link>
           </Button>
-        </form>
-        <div className="space-y-3 px-4 pb-4">
-          {memberFb.error && <Banner tone="critical">{memberFb.error.message}</Banner>}
-          {memberNotice && (
-            <Banner tone="success" onDismiss={() => setMemberNotice(null)}>
-              {memberNotice}
-            </Banner>
+          {productCount !== undefined && (
+            <span className="text-[13px] text-[var(--admin-text-muted)]">
+              {formatCount(productCount)} product{productCount === 1 ? '' : 's'} on sale now
+            </span>
           )}
         </div>
-        <div className="border-t border-[var(--admin-border)]">
-          <DataTable
-            columns={memberColumns}
-            rows={members}
-            getRowId={(m) => m._id}
-            loading={members === undefined}
-            empty={<EmptyState title="No members yet" description="Add a phone number above to give someone store access." />}
-          />
-        </div>
-      </Card>
+      </div>
+    </Card>
+  );
+}
 
-      {/* 4. Catalog import */}
-      <Card title="Catalog import">
-        <CardSection>
+// ---------- Settings ----------
+
+function SettingsTab({ store, token, writeOpen }: { store: StoreRow | undefined; token: string; writeOpen: boolean }) {
+  const setActive = useMutation(setStoreActiveRef);
+  const [open, setOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  return (
+    <>
+      {notice && (
+        <Banner tone="success" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Banner>
+      )}
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        <Card title="Store settings">
+          <p className="text-[13px] text-[var(--admin-text-muted)]">
+            Name, logo, UPI, checkout and shipping are changed by the store in its own admin.
+          </p>
+          {store && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button asChild variant="secondary" size="sm">
+                <a href={storeAdminUrl(store.slug, '/settings')} target="_blank" rel="noreferrer">
+                  Store settings
+                </a>
+              </Button>
+              <Button asChild variant="secondary" size="sm">
+                <a href={storeAdminUrl(store.slug, '/payments/settings')} target="_blank" rel="noreferrer">
+                  Payment settings
+                </a>
+              </Button>
+            </div>
+          )}
+          {store && (
+            <div className="mt-4 border-t border-[var(--admin-border)] pt-3">
+              <KeyValues
+                items={[
+                  { label: 'Store ID', value: store._id, mono: true },
+                  { label: 'Bank alert forwarding address', value: store.bankEmailAlias || '-', mono: true },
+                ]}
+              />
+            </div>
+          )}
+        </Card>
+
+        <Card title="Danger zone" className="border-[var(--admin-critical-border)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[13px] text-[var(--admin-text-muted)]">
-              Load a migrated Dukaan export: categories, products, hero slides, blog posts, settings and redirects. Re-running updates rows in place.
-            </p>
-            <Button asChild variant="secondary" className="shrink-0">
-              <Link to={`/sa/stores/${orgId}/import`}>Open importer</Link>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--admin-text)]">{store?.active ? 'Suspend this store' : 'Open this store again'}</p>
+              <p className="text-[13px] text-[var(--admin-text-muted)]">
+                {store?.active
+                  ? 'Customers cannot shop or pay until you open it again. Nothing is deleted.'
+                  : 'Customers can shop and pay again.'}
+              </p>
+            </div>
+            <Button
+              variant={store?.active ? 'critical' : 'secondary'}
+              disabled={!writeOpen || !store}
+              onClick={() => setOpen(true)}
+              className="shrink-0"
+            >
+              {store?.active ? 'Suspend store' : 'Open store'}
             </Button>
           </div>
-        </CardSection>
-      </Card>
-
-      {/* 5. Danger zone */}
-      <Card title="Danger zone" className="border-[var(--admin-critical-border)]">
-        <div className="flex flex-col gap-3 px-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--admin-text)]">
-              {store?.active ? 'Suspend this store' : 'Activate this store'}
-            </p>
-            <p className="text-[13px] text-[var(--admin-text-muted)]">
-              {store?.active
-                ? 'Stops storefront and checkout until reactivated. Data is kept.'
-                : 'Restores storefront and checkout for this store.'}
-            </p>
-          </div>
-          <Button
-            variant={store?.active ? 'critical' : 'secondary'}
-            disabled={!writeOpen || !store}
-            onClick={() => setSuspendOpen(true)}
-            className="shrink-0"
-          >
-            {store?.active ? 'Suspend store' : 'Activate store'}
-          </Button>
-        </div>
-        {storeNotice && (
-          <div className="px-4 pb-4">
-            <Banner tone="success" onDismiss={() => setStoreNotice(null)}>
-              {storeNotice}
-            </Banner>
-          </div>
-        )}
-      </Card>
-
+        </Card>
+      </div>
       <ConfirmDialog
-        open={domainAction !== null}
-        onOpenChange={(o) => {
-          if (!o) setDomainAction(null);
-        }}
-        title={
-          domainAction?.kind === 'primary'
-            ? `Make ${domainAction.domain.hostname} primary?`
-            : `Remove ${domainAction?.domain.hostname ?? 'domain'}?`
-        }
+        open={open}
+        onOpenChange={setOpen}
+        title={store?.active ? `Suspend ${store.name}?` : `Open ${store?.name ?? 'store'} again?`}
         description={
-          domainAction?.kind === 'primary'
-            ? PRIMARY_WARNING
-            : domainAction?.domain.cfManaged
-              ? 'It is removed from Cloudflare Pages too. Visitors on this host stop reaching the store.'
-              : 'Visitors on this host stop reaching the store.'
+          store?.active ? 'Customers cannot shop or pay until you open it again. Nothing is deleted.' : 'Customers can shop and pay again.'
         }
-        confirmLabel={domainAction?.kind === 'primary' ? 'Make primary' : 'Remove domain'}
-        critical={domainAction?.kind === 'remove'}
-        onConfirm={confirmDomainAction}
-      />
-
-      <ConfirmDialog
-        open={memberToRemove !== null}
-        onOpenChange={(o) => {
-          if (!o) setMemberToRemove(null);
-        }}
-        title={`Remove ${memberToRemove?.phone ?? 'this member'}?`}
-        description="They lose admin access to this store. Their customer account is kept."
-        confirmLabel="Remove member"
-        critical
-        onConfirm={confirmRemoveMember}
-      />
-
-      <ConfirmDialog
-        open={suspendOpen}
-        onOpenChange={setSuspendOpen}
-        title={store?.active ? `Suspend ${store.name}?` : `Activate ${store?.name ?? 'store'}?`}
-        description={
-          store?.active
-            ? 'Customers cannot shop or pay until the store is activated again. Nothing is deleted.'
-            : 'The storefront and checkout come back on.'
-        }
-        confirmLabel={store?.active ? 'Suspend store' : 'Activate store'}
+        confirmLabel={store?.active ? 'Suspend store' : 'Open store'}
         critical={!!store?.active}
-        onConfirm={confirmSuspend}
+        onConfirm={async () => {
+          if (!store) return;
+          await runSa(() => setActive({ saToken: token, orgId: store._id, active: !store.active }));
+          setNotice(store.active ? `${store.name} is suspended.` : `${store.name} is open again.`);
+        }}
       />
-    </Page>
+    </>
   );
 }

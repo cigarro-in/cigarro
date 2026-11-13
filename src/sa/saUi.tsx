@@ -58,20 +58,61 @@ export function ManagedTag({ managed }: { managed?: boolean }) {
   );
 }
 
-// Label/value grid used inside Cards (identity, store facts).
-export function Facts({ items }: { items: { label: string; value: ReactNode; mono?: boolean }[] }) {
+// Compact label/value list: label left, value right, hairline between rows.
+export function KeyValues({ items }: { items: { label: string; value: ReactNode; mono?: boolean }[] }) {
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+    <dl className="divide-y divide-[var(--admin-border)] text-sm">
       {items.map((it) => (
-        <div key={it.label} className="min-w-0">
-          <dt className="text-xs font-medium text-[var(--admin-text-muted)]">{it.label}</dt>
-          <dd className={`mt-1 min-w-0 break-words text-sm text-[var(--admin-text)] ${it.mono ? 'font-mono' : ''}`}>
-            {it.value}
-          </dd>
+        <div key={it.label} className="flex items-baseline justify-between gap-4 py-2 first:pt-0 last:pb-0">
+          <dt className="shrink-0 text-[var(--admin-text-muted)]">{it.label}</dt>
+          <dd className={`min-w-0 truncate text-right text-[var(--admin-text)] ${it.mono ? 'font-mono text-[13px]' : ''}`}>{it.value}</dd>
         </div>
       ))}
     </dl>
   );
+}
+
+// One number with a label, for stat grids. Optional link and warning tint.
+export function StatTile({ label, value, hint, attention }: { label: string; value: ReactNode; hint?: ReactNode; attention?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-[var(--admin-radius)] border border-[var(--admin-border)] bg-[var(--admin-surface)] p-4">
+      <p className="truncate text-[13px] font-medium text-[var(--admin-text-muted)]">{label}</p>
+      <p
+        className={`mt-2 truncate text-2xl font-semibold tracking-[-0.02em] tabular-nums ${
+          attention ? 'text-[var(--admin-warning)]' : 'text-[var(--admin-text)]'
+        }`}
+      >
+        {value}
+      </p>
+      {hint && <p className="mt-1 truncate text-xs text-[var(--admin-text-muted)]">{hint}</p>}
+    </div>
+  );
+}
+
+// Small round health marker: green tick when ok, amber dot otherwise.
+export function HealthDot({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--admin-text-muted)]">
+      <span
+        aria-hidden
+        className={`size-2 shrink-0 rounded-full ${ok ? 'bg-[var(--admin-success)]' : 'bg-[var(--admin-warning)]'}`}
+      />
+      <span className={ok ? '' : 'text-[var(--admin-text)]'}>{label}</span>
+      <span className="sr-only">{ok ? 'ok' : 'needs attention'}</span>
+    </span>
+  );
+}
+
+// "cleanSmokeshopDescriptions-v1" -> "Clean smokeshop descriptions (v1)".
+export function migrationLabel(name: string): string {
+  const m = name.match(/^(.*?)(?:-(v\d+))?$/);
+  const base = (m?.[1] ?? name)
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .trim();
+  const label = base.charAt(0).toUpperCase() + base.slice(1);
+  return m?.[2] ? `${label} (${m[2]})` : label;
 }
 
 // Coarse relative time ("5m ago"). Missing timestamps read as "never".

@@ -246,3 +246,14 @@ export const platformOverviewRef = makeFunctionReference<
   { saToken: string },
   PlatformOverview
 >('platform:platformOverview');
+
+export interface StoreSummary {
+  activeProductCount: number;
+  logoUrl: string | null;
+}
+
+export const storeSummaryRef = makeFunctionReference<
+  'query',
+  { saToken: string; orgId: Id<'organizations'> },
+  StoreSummary
+>('platform:storeSummary');

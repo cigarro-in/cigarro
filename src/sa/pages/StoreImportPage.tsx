@@ -10,6 +10,7 @@ import {
   Input,
   Label,
   Page,
+  PageLayout,
   Skeleton,
   type Column,
 } from '../../adminnew/ui';
@@ -241,7 +242,7 @@ export function StoreImportPage() {
   return (
     <Page
       title={store ? `Import into ${store.name}` : <Skeleton className="inline-block h-6 w-56 align-middle" />}
-      backTo={`/sa/stores/${orgId}`}
+      backTo={`/sa/stores/${orgId}?tab=import`}
     >
       {!writeOpen && <Banner tone="warning">Write access is closed. Re-launch from Citadel to import.</Banner>}
       {notice && (
@@ -250,71 +251,85 @@ export function StoreImportPage() {
         </Banner>
       )}
 
-      <Card title="Source files">
-        <CardSection>
-          <div className="grid gap-5">
-            {fileField(
-              'import-normalized',
-              'Normalized export (normalized.json)',
-              'application/json,.json',
-              (f) => void onPickNormalized(f),
-              fileName || 'Produced by scripts/dukaan-import/crawl.mjs',
+      <PageLayout
+        main={
+          <>
+            <Card title="Source files">
+              <CardSection>
+                <div className="grid gap-5">
+                  {fileField(
+                    'import-normalized',
+                    'Normalized export (normalized.json)',
+                    'application/json,.json',
+                    (f) => void onPickNormalized(f),
+                    fileName || 'Produced by scripts/dukaan-import/crawl.mjs',
+                  )}
+                  {fileField(
+                    'import-map',
+                    'Image map (image-map.json, optional)',
+                    'application/json,.json',
+                    (f) => void onPickMap(f),
+                    mapName ? `${mapName} · ${formatCount(Object.keys(imageMap).length)} entries` : 'Maps Dukaan image URLs to uploaded copies',
+                  )}
+                  {fileField(
+                    'import-redirects',
+                    'Redirects (redirects.csv, optional)',
+                    '.csv,text/csv',
+                    (f) => void onPickRedirects(f),
+                    redirectName ? `${redirectName} · ${formatCount(redirectRows.length)} rows` : 'Columns: from, to, status',
+                  )}
+                  <div className="grid max-w-sm gap-1.5">
+                    <Label htmlFor="import-theme">Theme to activate</Label>
+                    <Input id="import-theme" value={activeTheme} disabled={running} onChange={(e) => setActiveTheme(e.target.value.trim())} />
+                  </div>
+                </div>
+              </CardSection>
+            </Card>
+            {results.length > 0 && (
+              <Card title="Results" padding="none">
+                <DataTable columns={resultColumns} rows={results} getRowId={(r) => r.entity} />
+              </Card>
             )}
-            {fileField(
-              'import-map',
-              'Image map (image-map.json, optional)',
-              'application/json,.json',
-              (f) => void onPickMap(f),
-              mapName ? `${mapName} · ${formatCount(Object.keys(imageMap).length)} entries` : 'Maps Dukaan image URLs to uploaded copies',
+          </>
+        }
+        aside={
+          <>
+            {!plan && (
+              <Card title="Plan">
+                <p className="text-[13px] text-[var(--admin-text-muted)]">Pick the export file. The counts of what will be imported show here before anything is written.</p>
+              </Card>
             )}
-            {fileField(
-              'import-redirects',
-              'Redirects (redirects.csv, optional)',
-              '.csv,text/csv',
-              (f) => void onPickRedirects(f),
-              redirectName ? `${redirectName} · ${formatCount(redirectRows.length)} rows` : 'Columns: from, to, status',
+            {plan && (
+              <Card
+                title="Plan"
+                footer={
+                  <Button variant="primary" onClick={() => void run()} disabled={running || !writeOpen} loading={running}>
+                    {running ? 'Importing' : `Import into ${store?.slug ?? 'store'}`}
+                  </Button>
+                }
+              >
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  {planRows.map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-xs font-medium text-[var(--admin-text-muted)]">{label}</dt>
+                      <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--admin-text)]">{formatCount(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {plan.unmappedImages.length > 0 && (
+                  <div className="mt-5">
+                    <Banner tone="warning">
+                      {formatCount(plan.unmappedImages.length)} image URLs have no uploaded copy and would still point at Dukaan. Upload images
+                      first (scripts/dukaan-import/images.mjs) and attach the image map.
+                    </Banner>
+                  </div>
+                )}
+              </Card>
             )}
-            <div className="grid max-w-sm gap-1.5">
-              <Label htmlFor="import-theme">Theme to activate</Label>
-              <Input id="import-theme" value={activeTheme} disabled={running} onChange={(e) => setActiveTheme(e.target.value.trim())} />
-            </div>
-          </div>
-        </CardSection>
-      </Card>
 
-      {plan && (
-        <Card
-          title="Plan"
-          footer={
-            <Button variant="primary" onClick={() => void run()} disabled={running || !writeOpen} loading={running}>
-              {running ? 'Importing' : `Import into ${store?.slug ?? 'store'}`}
-            </Button>
-          }
-        >
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-            {planRows.map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs font-medium text-[var(--admin-text-muted)]">{label}</dt>
-                <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--admin-text)]">{formatCount(value)}</dd>
-              </div>
-            ))}
-          </dl>
-          {plan.unmappedImages.length > 0 && (
-            <div className="mt-5">
-              <Banner tone="warning">
-                {formatCount(plan.unmappedImages.length)} image URLs have no uploaded copy and would still point at Dukaan. Upload images
-                first (scripts/dukaan-import/images.mjs) and attach the image map.
-              </Banner>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {results.length > 0 && (
-        <Card title="Results" padding="none">
-          <DataTable columns={resultColumns} rows={results} getRowId={(r) => r.entity} />
-        </Card>
-      )}
+          </>
+        }
+      />
     </Page>
   );
 }
