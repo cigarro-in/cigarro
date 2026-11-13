@@ -1,11 +1,14 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { CalendarDays, Mail, Shield } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function PrivacyPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
   const privacySections = [
     {
       title: '1. Information We Collect',
@@ -90,13 +93,14 @@ export function PrivacyPage() {
   return (
     <>
       <SEOHead
-        title="Privacy Policy | Cigarro"
-        description="Learn what personal information Cigarro collects, why it is used, when it may be shared and how to make a privacy request."
+        title={`Privacy Policy | ${store.name}`}
+        description={`Learn what personal information ${store.name} collects, why it is used, when it may be shared and how to make a privacy request.`}
         url={location.pathname}
         type="website"
         keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
       />
       
+      <StaticPageBreadcrumbs path="/privacy" crumb="Privacy Policy" parent />
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         {/* Minimal Header */}
         <div className="bg-background/95 backdrop-blur-sm sticky top-0 z-40">
@@ -166,6 +170,13 @@ export function PrivacyPage() {
               </div>
             </div>
         </div>
+        <RelatedPages
+          links={[
+            { href: '/terms', label: 'Terms of service' },
+            { href: '/shipping', label: 'Shipping policy' },
+            { href: '/returns', label: 'Returns and refunds' },
+          ]}
+        />
       </div>
     </>
   );

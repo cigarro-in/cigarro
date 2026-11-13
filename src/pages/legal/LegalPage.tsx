@@ -2,6 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, FileText, RotateCcw, Shield, Truck } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Card, CardContent } from '../../components/ui/card';
+import { StaticPageBreadcrumbs } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 const policyLinks = [
   {
@@ -32,17 +34,19 @@ const policyLinks = [
 
 export function LegalPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
 
   return (
     <>
       <SEOHead
-        title="Cigarro Policies | Terms, Privacy, Shipping and Returns"
-        description="Find Cigarro's terms of service, privacy policy, shipping information and returns and refunds policy."
+        title={`${store.name} Policies | Terms, Privacy, Shipping and Returns`}
+        description={`Find ${store.name}'s terms of service, privacy policy, shipping information and returns and refunds policy.`}
         url={location.pathname}
         type="website"
-        keywords={['Cigarro policies', 'Cigarro terms', 'Cigarro privacy', 'Cigarro shipping', 'Cigarro returns']}
+        keywords={[`${store.name} policies`, `${store.name} terms`, `${store.name} privacy`, `${store.name} shipping`, `${store.name} returns`]}
       />
 
+      <StaticPageBreadcrumbs path="/legal" crumb="Policies" />
       <main className="min-h-screen bg-background pb-20 md:pb-12">
         <section className="border-b border-border/30 bg-creme-light/40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">

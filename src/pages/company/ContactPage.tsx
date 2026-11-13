@@ -4,6 +4,8 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { siteConfig } from '../../config/site';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 const helpTopics = [
   {
@@ -25,18 +27,20 @@ const helpTopics = [
 
 export function ContactPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
   const supportEmail = siteConfig.email.support;
 
   return (
     <>
       <SEOHead
-        title="Contact Cigarro | Order and Product Support"
-        description="Contact Cigarro for help with an order, a product listing, shipping or using the online store. Email support@cigarro.in."
+        title={`Contact ${store.name} | Order and Product Support`}
+        description={`Contact ${store.name} for help with an order, a product listing, shipping or using the online store. Email ${supportEmail}.`}
         url={location.pathname}
         type="website"
         keywords={['contact Cigarro', 'Cigarro support', 'Cigarro order help']}
       />
 
+      <StaticPageBreadcrumbs path="/contact" crumb="Contact" />
       <main className="min-h-screen bg-background pb-20 md:pb-12">
         <section className="border-b border-border/30 bg-creme-light/40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
@@ -128,6 +132,13 @@ export function ContactPage() {
             </div>
           </div>
         </section>
+
+        <RelatedPages
+          links={[
+            { href: '/shipping', label: 'Shipping policy' },
+            { href: '/returns', label: 'Returns and refunds' },
+          ]}
+        />
       </main>
     </>
   );

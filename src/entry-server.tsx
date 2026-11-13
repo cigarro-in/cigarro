@@ -316,7 +316,46 @@ const blogRoute: SsrRoute = {
   trimPreload: (preload) => trimBlogPreload(preload),
 };
 
-const SSR_ROUTES: SsrRoute[] = [homeRoute, productRoute, categoryRoute, categoryBrandRoute, brandRoute, blogRoute];
+// Static company and policy pages (P5-SSR slice 8). Only site settings are
+// preloaded: the shell reads them (store name, theme, shipping methods on
+// /shipping). The catalog is not read, so these pages never wait on it.
+function trimSiteSettingsOnly(preload: PreloadMap): PreloadMap {
+  const out: PreloadMap = {};
+  for (const key of Object.keys(preload)) {
+    if (key.startsWith('content:getSiteSettings:')) out[key] = preload[key];
+  }
+  return out;
+}
+
+function staticPageRoute(id: string, path: string): SsrRoute {
+  return {
+    id,
+    match: (pathname) => (pathname === path || pathname === `${path}/` ? {} : null),
+    preloadRequests: (_params, org) => [{ fnName: 'content:getSiteSettings', args: { orgSlug: org.slug } }],
+    trimPreload: (preload) => trimSiteSettingsOnly(preload),
+  };
+}
+
+const STATIC_PAGE_ROUTES: SsrRoute[] = [
+  staticPageRoute('about', '/about'),
+  staticPageRoute('contact', '/contact'),
+  staticPageRoute('agents', '/agents'),
+  staticPageRoute('legal', '/legal'),
+  staticPageRoute('terms', '/terms'),
+  staticPageRoute('privacy', '/privacy'),
+  staticPageRoute('shipping', '/shipping'),
+  staticPageRoute('returns', '/returns'),
+];
+
+const SSR_ROUTES: SsrRoute[] = [
+  homeRoute,
+  productRoute,
+  categoryRoute,
+  categoryBrandRoute,
+  brandRoute,
+  blogRoute,
+  ...STATIC_PAGE_ROUTES,
+];
 
 // Route that serves a pathname, with its params. Null when no SSR route matches.
 export function matchSsrRoute(pathname: string): { route: SsrRoute; params: Record<string, string> } | null {

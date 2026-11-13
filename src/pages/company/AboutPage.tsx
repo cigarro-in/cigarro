@@ -3,6 +3,8 @@ import { ArrowRight, CircleHelp, Layers3, Search, ShieldAlert } from 'lucide-rea
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 const waysToBrowse = [
   {
@@ -30,17 +32,19 @@ const waysToBrowse = [
 
 export function AboutPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
 
   return (
     <>
       <SEOHead
-        title="About Cigarro | Online Cigarette Store in India"
-        description="Learn how Cigarro helps adult customers in India browse cigarette brands, compare pack options and find clear product information online."
+        title={`About ${store.name} | Online Cigarette Store in India`}
+        description={`Learn how ${store.name} helps adult customers in India browse cigarette brands, compare pack options and find clear product information online.`}
         url={location.pathname}
         type="website"
         keywords={['about Cigarro', 'online cigarette store India', 'cigarette brands India']}
       />
 
+      <StaticPageBreadcrumbs path="/about" crumb="About" />
       <main className="min-h-screen bg-background pb-20 md:pb-12">
         <section className="border-b border-border/30 bg-creme-light/40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-28">
@@ -99,6 +103,9 @@ export function AboutPage() {
         </section>
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-14 sm:pb-20">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-canyon mb-6">
+            Ways to browse
+          </p>
           <div className="grid md:grid-cols-3 gap-5">
             {waysToBrowse.map((item) => (
               <Card key={item.title} className="border-2 border-border/40 bg-card h-full">
@@ -143,6 +150,13 @@ export function AboutPage() {
             </div>
           </div>
         </section>
+        <RelatedPages
+          links={[
+            { href: '/terms', label: 'Terms of service' },
+            { href: '/privacy', label: 'Privacy policy' },
+            { href: '/contact', label: `Contact ${store.name}` },
+          ]}
+        />
       </main>
     </>
   );

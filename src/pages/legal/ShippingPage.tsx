@@ -1,6 +1,8 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { Truck, Shield, CheckCircle, MapPin, Clock, Package, AlertTriangle, Globe, CalendarDays, Mail } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { useShippingMethods } from '../../hooks/data/useContent';
@@ -8,6 +10,7 @@ import { formatINR } from '../../utils/currency';
 
 export function ShippingPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
   // Live delivery options (same source as checkout) — the policy page can
   // never drift from what customers actually pay.
   const { methods } = useShippingMethods();
@@ -19,13 +22,14 @@ export function ShippingPage() {
   return (
     <>
       <SEOHead
-        title="Shipping and Delivery Policy | Cigarro"
-        description="See how Cigarro delivery availability, shipping options, dispatch, tracking and age verification work for orders within India."
+        title={`Shipping and Delivery Policy | ${store.name}`}
+        description={`See how ${store.name} delivery availability, shipping options, dispatch, tracking and age verification work for orders within India.`}
         url={location.pathname}
         type="website"
         keywords={['shipping policy', 'delivery information', 'shipping costs', 'delivery times India']}
       />
       
+      <StaticPageBreadcrumbs path="/shipping" crumb="Shipping Policy" parent />
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         {/* Minimal Header */}
         <div className="bg-background/95 backdrop-blur-sm sticky top-0 z-40">
@@ -197,6 +201,12 @@ export function ShippingPage() {
               </div>
             </div>
         </div>
+        <RelatedPages
+          links={[
+            { href: '/returns', label: 'Returns and refunds' },
+            { href: '/terms', label: 'Terms of service' },
+          ]}
+        />
       </div>
     </>
   );

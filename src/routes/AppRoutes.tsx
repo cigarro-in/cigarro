@@ -7,7 +7,19 @@ import { createContext, lazy, useContext, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { BlogRoute, BrandRoute, CategoryRoute } from './eagerRoutes';
+import {
+  AboutPage,
+  AgentsPage,
+  BlogRoute,
+  BrandRoute,
+  CategoryRoute,
+  ContactPage,
+  LegalPage,
+  PrivacyPage,
+  ReturnsPage,
+  ShippingPage,
+  TermsPage,
+} from './eagerRoutes';
 
 import { Slot } from '../themes';
 
@@ -41,16 +53,7 @@ const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLanding
 
 // Blog
 const BlogsPage = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogsPage })));
-const AboutPage = lazy(() => import('../pages/company/AboutPage').then(m => ({ default: m.AboutPage })));
-const ContactPage = lazy(() => import('../pages/company/ContactPage').then(m => ({ default: m.ContactPage })));
-const AgentsPage = lazy(() => import('../pages/agents/AgentsPage').then(m => ({ default: m.AgentsPage })));
-
-// Legal
-const LegalPage = lazy(() => import('../pages/legal/LegalPage').then(m => ({ default: m.LegalPage })));
-const TermsPage = lazy(() => import('../pages/legal/TermsPage').then(m => ({ default: m.TermsPage })));
-const PrivacyPage = lazy(() => import('../pages/legal/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
-const ShippingPage = lazy(() => import('../pages/legal/ShippingPage').then(m => ({ default: m.ShippingPage })));
-const ReturnsPage = lazy(() => import('../pages/legal/ReturnsPage').then(m => ({ default: m.ReturnsPage })));
+// Company and legal pages are SSR'd, so they are imported eagerly (eagerRoutes.tsx).
 
 // Admin - New modular admin system
 const AdminRouter = lazy(() => import('../adminnew/AdminRouter').then(m => ({ default: m.AdminRouter })));

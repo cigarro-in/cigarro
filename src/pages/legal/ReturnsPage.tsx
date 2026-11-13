@@ -1,22 +1,26 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { Shield, Clock, Package, AlertTriangle, CalendarDays, Mail, RotateCcw, XCircle, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function ReturnsPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
   
   return (
     <>
       <SEOHead
-        title="Returns and Refunds Policy | Cigarro"
-        description="Read Cigarro's policy for non-returnable tobacco products and how to report a damaged, defective or incorrect item within 48 hours."
+        title={`Returns and Refunds Policy | ${store.name}`}
+        description={`Read ${store.name}'s policy for non-returnable tobacco products and how to report a damaged, defective or incorrect item within 48 hours.`}
         url={location.pathname}
         type="website"
         keywords={['returns policy', 'refund policy', 'tobacco returns', 'damaged items replacement']}
       />
       
+      <StaticPageBreadcrumbs path="/returns" crumb="Returns and Refunds" parent />
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         <div className="bg-background/95 backdrop-blur-sm sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-2 sm:pb-4 pt-4">
@@ -158,6 +162,12 @@ export function ReturnsPage() {
             </div>
           </div>
         </div>
+        <RelatedPages
+          links={[
+            { href: '/shipping', label: 'Shipping policy' },
+            { href: '/terms', label: 'Terms of service' },
+          ]}
+        />
       </div>
     </>
   );

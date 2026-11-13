@@ -3,6 +3,7 @@ import { Bot, Search, MapPin, AlertTriangle, BookOpen, Ban } from 'lucide-react'
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { StaticPageBreadcrumbs } from '../../components/seo/StaticPageNav';
 
 /**
  * AgentsPage — dead-simple static doc for AI shopping agents.
@@ -15,6 +16,7 @@ export function AgentsPage() {
   const stateRules = store.ageGate.stateMinAge.map((s) => `${s.minAge}+ in ${s.state}`).join(', ');
   return (
     <>
+      <StaticPageBreadcrumbs path="/agents" crumb="Shopping Agents" />
       <SEOHead
         title={`Shopping Agents — Start Here | ${store.name}`}
         description={`Machine-readable guide for AI shopping agents: catalog entry points, search template, variant semantics, and compliance rules for ${primaryHost}. ${store.ageGate.minAge}+ only.`}

@@ -1,21 +1,25 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { AlertTriangle, CalendarDays, Mail } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 
 export function TermsPage() {
   const location = useLocation();
+  const { settings: store } = useStoreSettings();
   return (
     <>
       <SEOHead
-        title="Terms of Service | Cigarro"
-        description="Read the terms that apply when you browse, create an account or place an order with Cigarro."
+        title={`Terms of Service | ${store.name}`}
+        description={`Read the terms that apply when you browse, create an account or place an order with ${store.name}.`}
         url={location.pathname}
         type="website"
         keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
       />
       
+      <StaticPageBreadcrumbs path="/terms" crumb="Terms of Service" parent />
       <div className="min-h-screen bg-background pb-20 md:pb-8">
         {/* Minimal Header */}
         <div className="bg-background/95 backdrop-blur-sm sticky top-0 z-40">
@@ -105,6 +109,13 @@ export function TermsPage() {
               </div>
             </div>
         </div>
+        <RelatedPages
+          links={[
+            { href: '/privacy', label: 'Privacy policy' },
+            { href: '/shipping', label: 'Shipping policy' },
+            { href: '/returns', label: 'Returns and refunds' },
+          ]}
+        />
       </div>
     </>
   );
