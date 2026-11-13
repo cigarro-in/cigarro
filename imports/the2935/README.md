@@ -38,7 +38,7 @@ The crawler is sequential with a 1.2 s delay and a normal browser user agent. Im
 
 ## Going live (steps for the operator)
 
-1. **Create the store.** Only after `oldsmokeshop` rename has shipped. In `/sa` → Stores → Create: slug `smokeshop`, name `The Smoke Shop`. This also provisions `smokeshop.cigarro.in`.
+1. **Create the store.** The `oldsmokeshop` rename has shipped, so the slug `smokeshop` is free. In `/sa` → Stores → Create: slug `smokeshop`, name `The Smoke Shop`. This also provisions `smokeshop.cigarro.in`.
 2. **Upload images.** Needs a store-admin token for `smokeshop` (the upload endpoint checks store admin on the store's host):
    ```bash
    STORE_ORIGIN=https://smokeshop.cigarro.in IMPORT_TOKEN=<store admin cigarro_token> \

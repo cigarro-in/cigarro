@@ -1,94 +1,93 @@
-# Convex backend — payments & wallet
+# Convex backend
 
-First module of the Convex migration. Owns orders, payments, wallet, and admin reconciliation. Auth bridges into the existing Supabase session — no user migration needed.
+Owns the data, orders, payments, wallet and admin reconciliation for every store. Each store is an `organizations` row; every store-owned row carries `orgId`.
 
 ## Layout
 
 ```
 convex/
-  schema.ts                All tables + shared validators
-  auth.config.ts           Supabase → Convex JWT trust
-  http.ts                  /receiveBankEmail (called by Cloudflare Email Worker)
-  organizations.ts         Org settings + seedOrg bootstrap
+  schema.ts                All tables + shared validators (source of truth)
+  auth.config.ts           Trusts our own ES256 issuer (https://cigarro.in/auth) only
+  http.ts                  /receiveBankEmail (email-worker fallback), other HTTP routes
+  saHttp.ts                Super-admin HTTP endpoints (Citadel SSO exchange)
+  organizations.ts         Store settings, seedOrg bootstrap, legacy rename migration
+  domains.ts               orgDomains: resolveByHost (edge), status, monitor cron
+  cloudflare.ts            Cloudflare Pages Domains API client
+  crons.ts                 Scheduled jobs (domain monitor every 15 min, crash-log prune every 6 h)
   orders.ts                createOrder, cancelOrder, retryOrder, queries
   payments.ts              Internal: expireHeldSlot, releaseQuarantine, ingestBankEmail
-  gmail.ts                 Gmail OAuth poller (the verification feed), wake, triggerPoll
-  wallet.ts                Wallet primitives + balance/ledger queries + admin credit
+  gmail.ts                 Per-store Gmail poller (primary bank-email feed, pollInbox)
   admin.ts                 markPaid, refundOrder, voidOrder, resolveLatePayment
+  wallet.ts                Wallet primitives + balance/ledger queries + admin credit
+  storeImport.ts           Dukaan catalog importer
+  migrations.ts            One-off data jobs (run only from the /sa button or dev CLI)
   lib/
     auth.ts                requireIdentity / requireMember / requireOrgAdmin
-    audit.ts               audit log helper
-    email.ts               parseBankEmail (amount + UPI ref)
+    citadel*.ts            Super-admin (Citadel) session checks
+    legacyOrg.ts           LEGACY_ORG_SLUG (oldsmokeshop) and the rename migration
+    org.ts, hosts.ts       Store lookup helpers
+    audit.ts               adminAuditLog helper
+    email.ts, bankAlias.ts Bank-email parsing and alias routing
     ids.ts                 displayOrderId generator
     money.ts               integer-paise helpers
     upi.ts                 buildUpiUrl
+    crypto.ts              AES-GCM for stored Gmail refresh tokens
 ```
 
 ## Money
 
-Everything is **integer paise**. `500.47` rupees ↔ `50047` paise. No floats crossing the DB.
+Everything is **integer paise**. `500.47` rupees ↔ `50047` paise. No floats cross the DB.
 
 ## Paise fingerprinting (the matching trick)
 
-Bank alert emails only expose the amount (note field is stripped). To match a payment to an order, we make each pending order's amount unique via the last two paise digits:
+Bank alert emails only expose the amount (note field is stripped). To match a payment to an order, each pending order's amount is made unique via the last two paise digits:
 
-1. Re-price the cart, shipping, coupon, and wallet contribution on the server.
+1. Re-price the cart, shipping, coupon and wallet contribution on the server.
 2. Choose a 1–99 paise discount whose resulting amount is not used by a pending order, a recently terminal order in quarantine, or a recently paid order in the duplicate-detection window.
 3. Store that exact amount in `finalAmountPaise` and use it in the UPI request.
-4. Bank email arrives for `X` → `orders.by_org_final_status` identifies the order exactly.
+4. A bank email for `X` identifies the order through `orders.by_org_final_status`.
 
-Legacy `paymentSlots` rows remain supported for older orders, but new orders use the server-selected paise fingerprint directly.
+Legacy `paymentSlots` rows are still supported for older orders.
 
 ## Retry model
 
-Failed / expired / cancelled orders are **terminal**. Retries create a **new** `orders` row with `retryOfOrderId` set — no mutation of historical state. Clean audit, clean slot lifecycle, clean analytics.
+Failed, expired and cancelled orders are **terminal**. Retries create a **new** `orders` row with `retryOfOrderId` set. Historical state is never mutated.
 
 ## Wallet
 
-Append-only `walletLedger` + denormalized `walletAccounts.balancePaise` updated in the same mutation. Wallet loads are just `orders` with `kind: "wallet_load"` — same slot flow, same email matcher. A successful wallet-load credits the ledger.
+Append-only `walletLedger` plus denormalized `walletAccounts.balancePaise`, updated in the same mutation. Wallet loads are orders with `kind: "wallet_load"` and use the same payment flow.
 
 Partial wallet payment:
-- Debit at order creation
-- If order expires/cancels, `expireHeldSlot` inserts a refund credit
-- `walletRefundedAt` flag prevents double refund
+- Debit at order creation.
+- If the order expires or is cancelled, `expireHeldSlot` inserts a refund credit.
+- `walletRefundedAt` prevents a double refund.
 
 ## Multi-tenancy
 
-Every row is scoped by `orgId`. Slot pools, orders, wallets, bank emails — all org-isolated. `memberships(orgId, userId, role)` drives access. Org is resolved from the incoming email's To: alias (`bank-<slug>@yourdomain.com`) via `organizations.by_alias`.
+Every store-owned row is scoped by `orgId`: orders, payment slots, wallets, bank emails, catalog, users. `memberships(orgId, userId, role)` drives access. Stores are found by hostname (`orgDomains`) at the edge and by slug (`orgSlug`) for public catalog queries.
 
-## Setup
+## Setup (dev deployment)
 
 ```bash
-# 1. Install Convex CLI + client
 npm install
-
-# 2. Bootstrap Convex deployment (pick a name, follow prompts)
-npx convex dev
-
-# 3. In a second shell, set env vars on the Convex deployment
-npx convex env set EMAIL_WEBHOOK_SECRET <generate a random string>
-
-# 4. Copy your Convex URL into .env
-echo "VITE_CONVEX_URL=https://<deployment>.convex.cloud" >> .env
-
-# 5. Seed the first org (replace values)
+npx convex dev                                  # bootstrap the DEV deployment (.env.local)
+npx convex env set EMAIL_WEBHOOK_SECRET <random string>
 npx convex run organizations:seedOrg '{
-  "slug":"cigarro",
-  "name":"Cigarro",
-  "upiVpa":"cigarro@ybl",
-  "bankEmailAlias":"cigarro",
-  "ownerUserId":"<your-users.id>"
+  "slug":"<store-slug>",
+  "name":"<Store name>",
+  "upiVpa":"<vpa>",
+  "bankEmailAlias":"<alias>",
+  "ownerUserId":"<users row id>"
 }'
 ```
 
 ### Own JWT prerequisite
 
-Convex verifies our ES256 JWTs. The public JWKS endpoint
-`https://cigarro.in/.well-known/jwks.json` must be reachable; Convex fetches it on startup.
+Convex verifies our ES256 JWTs. The public JWKS endpoint `https://cigarro.in/.well-known/jwks.json` must be reachable; Convex fetches it.
 
 ### React wiring
 
-Wrap the app root with `ConvexAuthProvider` (once — above your router):
+Wrap the app root with `ConvexAuthProvider` once, above the router:
 
 ```tsx
 import { ConvexAuthProvider } from '@/lib/convex/ConvexAuthProvider';
@@ -98,47 +97,32 @@ import { ConvexAuthProvider } from '@/lib/convex/ConvexAuthProvider';
 </ConvexAuthProvider>
 ```
 
-Then use Convex hooks as usual:
+Components should not call Convex directly in theme files. Use hooks in `src/hooks/data/` (see `CLAUDE.md`).
 
-```tsx
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+### Email forwarding (fallback)
 
-const order = useQuery(api.orders.getMine, { orderId });
-const createOrder = useMutation(api.orders.createOrder);
-```
-
-### Email worker
+Gmail sign-in per store is the primary path. For forwarding, the `email-worker` posts to `POST /receiveBankEmail`:
 
 ```bash
 cd email-worker
 npm install
 npx wrangler secret put CONVEX_URL              # https://<deployment>.convex.site
-npx wrangler secret put EMAIL_WEBHOOK_SECRET    # same value you set on Convex
+npx wrangler secret put EMAIL_WEBHOOK_SECRET    # same value as on Convex
 npx wrangler deploy
 ```
 
-Then in Cloudflare dashboard:
-1. Domain → Email → Email Routing → Enable
-2. Add addresses `bank-<slug>@yourdomain.com` → action "Send to Worker" → pick `cigarro-bank-email`
-3. In Gmail, auto-forward bank alerts to that address
+In Cloudflare Email Routing, route each store alias (for example `<store>@pay.cigarro.in`) to the worker. The alias must match a store's `bankEmailAlias` or a `bankInboxes` row.
 
-## Testing the matcher without real email
+## Testing the matcher without a real email
 
 ```bash
 npx convex run payments:ingestBankEmail '{
-  "alias":"cigarro",
+  "alias":"<alias>",
   "from":"alerts@hdfcbank.net",
   "subject":"UPI credit",
   "rawBody":"Dear Customer, Rs 500.47 credited to A/c xxxx via UPI. UPI Ref: 412345678901",
-  "messageId":"test-"$RANDOM"@gmail.com"
+  "messageId":"test-'"$RANDOM"'@example.com"
 }'
 ```
 
-Then tail `bankEmails` and the matched `orders` row via the Convex dashboard.
-
-## Still TODO (flag when you pick these up)
-
-- Frontend: new `/checkout` page that calls `api.orders.createOrder` and redirects to a reactive `/transaction/:orderId` page that `useQuery`s `api.orders.getMine`.
-- Delete Supabase RPCs `verify_order_payment`, `process_order_payment`, `create_order`, and the Cloudflare function `functions/api/webhooks/payment-email.js` after cutover.
-- Admin UI screens for late payments, unmatched emails, wallet credits.
+Then check `bankEmails` and the matched `orders` row in the Convex dashboard.
