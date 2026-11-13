@@ -46,7 +46,7 @@ The crawler is sequential with a 1.2 s delay and a normal browser user agent. Im
    ```
    Re-running is safe: entries already in `image-map.json` are skipped.
 3. **Import the catalog.** `/sa` → Stores → `smokeshop` → "Import catalog (Dukaan)". Choose `normalized.json` and `image-map.json`, check the plan, run. Re-running updates rows in place (keys are `dukaan:the2935:<kind>:<id>`).
-4. **Check.** Open `smokeshop.cigarro.in` and a product page; the theme is activated by the import (`activeTheme: minimal`).
+4. **Check.** Open `smokeshop.cigarro.in` and a product page; the theme is activated by the import (`activeTheme: vivid`).
 5. **Redirects.** SEO → Redirects → import `redirects.csv`. Do this before the domain moves.
 6. **Domain.** Add `smokeshop.co.in` in `/sa` → Domains, point DNS, then set it primary. Submit the sitemap and watch GSC coverage for 14 days.
 

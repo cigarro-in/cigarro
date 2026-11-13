@@ -55,7 +55,7 @@ export function StoreImportPage() {
 
   const [normalized, setNormalized] = useState<DukaanNormalized | null>(null);
   const [imageMap, setImageMap] = useState<ImageMap>({});
-  const [activeTheme, setActiveTheme] = useState('minimal');
+  const [activeTheme, setActiveTheme] = useState('vivid');
   const [fileName, setFileName] = useState('');
   const [mapName, setMapName] = useState('');
   const [results, setResults] = useState<StepResult[]>([]);
