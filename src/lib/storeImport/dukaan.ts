@@ -6,6 +6,8 @@
 // Catalog money stays RUPEES (the catalog schema contract); the source already
 // stores whole rupees, so nothing is converted here.
 
+import { cleanDescription } from '../../../convex/lib/cleanDescription';
+
 export interface DukaanNormalized {
   source: { platform: 'dukaan'; storeSlug: string; baseUrl: string; crawledAt: string };
   store: {
@@ -289,7 +291,7 @@ export function buildImportPlan(src: DukaanNormalized, imageMap: ImageMap = {}, 
       sourceKey: sourceKey(storeKey, 'collection', c.slug),
       slug: c.slug,
       name: (c.name ?? c.slug).trim(),
-      description: c.descriptionHtml ? rewriteHtml(c.descriptionHtml, imageMap, storeKey, unmapped) : undefined,
+      description: c.descriptionHtml ? cleanDescription(rewriteHtml(c.descriptionHtml, imageMap, storeKey, unmapped)) : undefined,
       image: c.ogImage ? mapImage(c.ogImage, imageMap, unmapped) : undefined,
       metaTitle: c.title ?? undefined,
       metaDescription: c.metaDescription ?? undefined,
@@ -351,7 +353,7 @@ export function buildImportPlan(src: DukaanNormalized, imageMap: ImageMap = {}, 
       sourceKey: sourceKey(storeKey, 'product', p.sourceId),
       slug: p.slug,
       name: p.name,
-      description: p.descriptionHtml ? rewriteHtml(p.descriptionHtml, imageMap, storeKey, unmapped) : undefined,
+      description: p.descriptionHtml ? cleanDescription(rewriteHtml(p.descriptionHtml, imageMap, storeKey, unmapped)) : undefined,
       shortDescription: p.descriptionText ? p.descriptionText.slice(0, 280) : undefined,
       metaTitle: p.seo.title ?? undefined,
       metaDescription: p.seo.description ?? undefined,

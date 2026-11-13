@@ -15,9 +15,11 @@ import {
   internalMutation,
   internalQuery,
   type ActionCtx,
+  type MutationCtx,
 } from "./_generated/server";
-import { RENAME_MIGRATION } from "./lib/legacyOrg";
+import { RENAME_MIGRATION, renameDone } from "./lib/legacyOrg";
 import { genOrderNumberCandidate, isValidOrderNumber } from "./lib/ids";
+import { cleanDescription } from "./lib/cleanDescription";
 
 const MAX_RUNS = 5;
 const MAX_RESULT_CHARS = 2048;
@@ -175,6 +177,11 @@ const MIGRATIONS: Migration[] = [
     name: BACKFILL_ORDER_NUMBERS_MIGRATION,
     run: async (ctx) => await ctx.runMutation(backfillOrderNumbersRef, {}),
   },
+  {
+    // Literal name: the exported const below is declared after this array.
+    name: "cleanSmokeshopDescriptions-v1",
+    run: async (ctx) => await runCleanSmokeshopDescriptions(ctx),
+  },
 ];
 
 // Never throws: each migration is isolated, and failures are recorded.
@@ -228,3 +235,104 @@ export const runPending = internalAction({
     return summary;
   },
 });
+
+// ---------------------------------------------------------------------------
+// cleanSmokeshopDescriptions-v1: runs cleanDescription over the description of
+// the org with slug `smokeshop` (the Dukaan-imported store) only: catalog
+// products and categories. Catalog variants have no description column.
+// Idempotent: a row is patched only when its cleaned text differs. Batched by
+// cursor; the action loops until both tables are done and returns the counts.
+// ---------------------------------------------------------------------------
+
+export const CLEAN_SMOKESHOP_DESCRIPTIONS_MIGRATION = "cleanSmokeshopDescriptions-v1";
+const SMOKESHOP_SLUG = "smokeshop";
+const CLEAN_BATCH_SIZE = 100;
+
+export interface CleanBatchResult {
+  scanned: number;
+  changed: number;
+  continueCursor: string;
+  isDone: boolean;
+}
+
+const cleanSmokeshopBatchRef = makeFunctionReference<
+  "mutation",
+  { table: "catalogProducts" | "catalogCategories"; cursor: string | null },
+  CleanBatchResult
+>("migrations:cleanSmokeshopDescriptionsBatch");
+
+export const cleanSmokeshopDescriptionsBatch = internalMutation({
+  args: {
+    table: v.union(v.literal("catalogProducts"), v.literal("catalogCategories")),
+    cursor: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx: MutationCtx, { table, cursor }): Promise<CleanBatchResult> => {
+    // Until the rename runs, slug `smokeshop` still names the legacy store.
+    if (!(await renameDone(ctx))) {
+      throw new Error("renameSmokeshopToOldsmokeshop-v1 has not run; refusing to touch slug smokeshop");
+    }
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", SMOKESHOP_SLUG))
+      .first();
+    if (!org) throw new Error(`no organization with slug ${SMOKESHOP_SLUG}`);
+
+    const now = { cursor, numItems: CLEAN_BATCH_SIZE };
+    let scanned = 0;
+    let changed = 0;
+    let continueCursor = "";
+    let isDone = false;
+
+    if (table === "catalogProducts") {
+      const page = await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_org", (q) => q.eq("orgId", org._id))
+        .paginate(now);
+      for (const row of page.page) {
+        scanned++;
+        if (!row.description) continue;
+        const after = cleanDescription(row.description);
+        if (after === row.description) continue;
+        await ctx.db.patch(row._id, { description: after });
+        changed++;
+      }
+      continueCursor = page.continueCursor;
+      isDone = page.isDone;
+    } else {
+      const page = await ctx.db
+        .query("catalogCategories")
+        .withIndex("by_org", (q) => q.eq("orgId", org._id))
+        .paginate(now);
+      for (const row of page.page) {
+        scanned++;
+        if (!row.description) continue;
+        const after = cleanDescription(row.description);
+        if (after === row.description) continue;
+        await ctx.db.patch(row._id, { description: after });
+        changed++;
+      }
+      continueCursor = page.continueCursor;
+      isDone = page.isDone;
+    }
+    return { scanned, changed, continueCursor, isDone };
+  },
+});
+
+async function runCleanSmokeshopDescriptions(ctx: ActionCtx): Promise<unknown> {
+  const totals: Record<string, { scanned: number; changed: number }> = {
+    catalogProducts: { scanned: 0, changed: 0 },
+    catalogCategories: { scanned: 0, changed: 0 },
+  };
+  for (const table of ["catalogProducts", "catalogCategories"] as const) {
+    let cursor: string | null = null;
+    let isDone = false;
+    while (!isDone) {
+      const r: CleanBatchResult = await ctx.runMutation(cleanSmokeshopBatchRef, { table, cursor });
+      totals[table].scanned += r.scanned;
+      totals[table].changed += r.changed;
+      cursor = r.continueCursor;
+      isDone = r.isDone;
+    }
+  }
+  return totals;
+}
