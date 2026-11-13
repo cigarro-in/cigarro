@@ -19,6 +19,8 @@ export const SEO_HOW_TO: Record<string, string> = {
   redirect_targets_missing: 'Point the redirect at a live page, or delete it.',
   domain_status:
     'Domains are set up by the platform team. Ask them to activate the domain and check that its CNAME points to cigarro.pages.dev.',
+  store_logo_missing: 'Upload the store logo under Store details. It appears in the header, structured data and invoices.',
+  site_icon_missing: 'Upload a square site icon (favicon) under Store details. Browser tabs and bookmarks use it.',
 };
 
 export const SEO_FALLBACK_PATH: Record<string, string> = {
@@ -36,6 +38,8 @@ export const SEO_FALLBACK_PATH: Record<string, string> = {
   redirect_chains: '/seo/redirects',
   redirect_targets_missing: '/seo/redirects',
   domain_status: '/settings/advanced',
+  store_logo_missing: '/settings/store',
+  site_icon_missing: '/settings/store',
 };
 
 /**

@@ -2,6 +2,7 @@ import { query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { requireOrgAdminBySlug, collectInOrg } from "./lib/org";
+import { readOrgSiteSettings } from "./lib/siteSettings";
 
 // ---------- Per-store SEO health (admin read-only) ----------
 // Scans the store's own catalog, content, redirects and domains and reports
@@ -21,7 +22,7 @@ type Severity = "high" | "medium" | "low";
 
 type Item = {
   id: string;
-  kind: "product" | "category" | "blog" | "redirect" | "domain";
+  kind: "product" | "category" | "blog" | "redirect" | "domain" | "store";
   label: string;
   detail: string;
   adminPath: string;
@@ -344,6 +345,32 @@ export const getSeoHealth = query({
     }
     const domainTotal = Math.max(1, domains.length);
 
+    // 11. Store logo and site icon (Settings > Store details). Both feed the
+    // storefront header, the admin header, structured data and the invoice.
+    const siteSettings = await readOrgSiteSettings(ctx, org);
+    const storeAdminPath = "/settings/store";
+    const logoItems: Item[] = [];
+    const iconItems: Item[] = [];
+    if (textLen(siteSettings?.brand?.logoUrl) === 0) {
+      logoItems.push({
+        id: "store:logo",
+        kind: "store",
+        label: org.name,
+        detail: "No store logo is set, so the header shows the store name as text.",
+        adminPath: storeAdminPath,
+      });
+    }
+    const faviconUrl = siteSettings?.brand?.faviconUrl || siteSettings?.faviconUrl;
+    if (textLen(faviconUrl) === 0) {
+      iconItems.push({
+        id: "store:favicon",
+        kind: "store",
+        label: org.name,
+        detail: "No site icon is set, so browser tabs and bookmarks show the default icon.",
+        adminPath: storeAdminPath,
+      });
+    }
+
     const defs: CheckDef[] = [
       { id: "meta_title_missing", label: "Meta title missing", description: "Page has no meta title, so the name is used as the title.", severity: "high", weight: 3 },
       { id: "meta_description_missing", label: "Meta description missing", description: "No meta description, so search engines write their own snippet.", severity: "high", weight: 3 },
@@ -359,6 +386,8 @@ export const getSeoHealth = query({
       { id: "redirect_chains", label: "Redirect chains and loops", description: "Redirects that pass through other redirects, or loop.", severity: "high", weight: 2 },
       { id: "redirect_targets_missing", label: "Redirects to missing pages", description: "Redirect targets that no longer exist or are inactive.", severity: "medium", weight: 1 },
       { id: "domain_status", label: "Domain status", description: "Primary domain must be active; aliases should be active.", severity: "high", weight: 3 },
+      { id: "store_logo_missing", label: "Store logo missing", description: "No store logo, so the header and invoices show plain text.", severity: "medium", weight: 2 },
+      { id: "site_icon_missing", label: "Site icon missing", description: "No favicon, so browser tabs show the default icon.", severity: "medium", weight: 2 },
     ];
 
     const checks = [
@@ -376,6 +405,8 @@ export const getSeoHealth = query({
       makeCheck(defs[11], redirects.length, chainItems),
       makeCheck(defs[12], redirectActive, targetItems),
       makeCheck(defs[13], domainTotal, domainItems),
+      makeCheck(defs[14], 1, logoItems),
+      makeCheck(defs[15], 1, iconItems),
     ];
 
     // Weighted score: each check contributes its weight times the share of

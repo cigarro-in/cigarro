@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react';
 import { Package, Plus } from 'lucide-react';
 import { api } from '../../../../convex/_generated/api';
 import { ORG_SLUG } from '../../../lib/convex/org';
-import { Button, EmptyState, Input, SkeletonText } from '../../ui';
+import { Button, EmptyState, ErrorBanner, Input, SkeletonText, useButtonFeedback } from '../../ui';
 import { CatalogThumb } from './catalogShared';
 
 export interface CatalogProduct {
@@ -132,28 +132,108 @@ export function ProductMembers({
   );
 }
 
-/** Read-only list of the products assigned to a brand (brands are set on the product). */
-export function BrandProductList({ products, brandId }: { products: CatalogProduct[] | undefined; brandId: string | undefined }) {
+/**
+ * Products in one brand, editable from the brand page. Adding a product that
+ * belongs to another brand moves it. Removing clears its brand.
+ */
+export function BrandProductsEditor({
+  products,
+  brandId,
+  onAssign,
+}: {
+  products: CatalogProduct[] | undefined;
+  brandId: string;
+  onAssign: (productIds: string[], brandId: string | null) => Promise<unknown>;
+}) {
+  const [query, setQuery] = useState('');
+  const fb = useButtonFeedback();
+  const [pending, setPending] = useState<string | null>(null);
+  const term = query.trim().toLowerCase();
+
   if (products === undefined) return <SkeletonText lines={3} />;
-  const mine = brandId ? products.filter((p) => p.brandId === brandId) : [];
-  if (mine.length === 0) {
-    return (
-      <EmptyState
-        icon={<Package />}
-        title="No products in this brand"
-        description="Set the brand on a product in the product editor."
-        className="py-6"
-      />
-    );
-  }
+
+  const mine = products.filter((p) => p.brandId === brandId);
+  const matches = term
+    ? products
+        .filter(
+          (p) =>
+            p.brandId !== brandId &&
+            (p.name.toLowerCase().includes(term) || (p.brand ?? '').toLowerCase().includes(term)),
+        )
+        .slice(0, 8)
+    : [];
+
+  const assign = (productId: string, nextBrand: string | null) => {
+    setPending(productId);
+    void fb.run(() => onAssign([productId], nextBrand)).finally(() => setPending(null));
+  };
+
   return (
-    <ul className="divide-y divide-[var(--admin-border)] overflow-hidden rounded-[var(--admin-radius)] border border-[var(--admin-border)]">
-      {mine.map((p) => (
-        <li key={p.id} className="flex items-center gap-3 px-3 py-2">
-          <CatalogThumb src={p.image} icon={<Package />} alt={p.name} className="size-9" />
-          <div className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--admin-text)]">{p.name}</div>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <ErrorBanner error={fb.error} />
+      <Input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search products to add to this brand"
+        aria-label="Search products to add to this brand"
+      />
+
+      {term && (
+        <div className="overflow-hidden rounded-[var(--admin-radius)] border border-[var(--admin-border)]">
+          {matches.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-[var(--admin-text-muted)]">No products match.</p>
+          ) : (
+            matches.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 border-b border-[var(--admin-border)] px-3 py-2 last:border-b-0">
+                <CatalogThumb src={p.image} icon={<Package />} alt={p.name} className="size-9" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-[var(--admin-text)]">{p.name}</div>
+                  <div className="truncate text-xs text-[var(--admin-text-muted)]">
+                    {p.brand ? `Currently in ${p.brand}` : 'No brand'}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Plus />}
+                  disabled={pending !== null}
+                  onClick={() => assign(p.id, brandId)}
+                >
+                  {p.brand ? 'Move here' : 'Add'}
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {mine.length === 0 ? (
+        <EmptyState
+          icon={<Package />}
+          title="No products in this brand"
+          description="Search above to add products."
+          className="py-6"
+        />
+      ) : (
+        <ul className="divide-y divide-[var(--admin-border)] overflow-hidden rounded-[var(--admin-radius)] border border-[var(--admin-border)]">
+          {mine.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-3 py-2">
+              <CatalogThumb src={p.image} icon={<Package />} alt={p.name} className="size-9" />
+              <div className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--admin-text)]">{p.name}</div>
+              <Button
+                size="sm"
+                variant="plain"
+                aria-label={`Remove ${p.name} from this brand`}
+                disabled={pending !== null}
+                onClick={() => assign(p.id, null)}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -19,3 +19,11 @@ export function useStorePage(slug: StorePageSlug): StoredPage | null {
   const row = usePreloadedOrLive(api.storePages.getBySlug, { orgSlug, slug });
   return (row as StoredPage | null | undefined) ?? null;
 }
+
+// Published custom page (any slug) for /pages/:slug. Null when the page is
+// missing or unpublished. Undefined while a live read is still loading.
+export function useCustomStorePage(slug: string): StoredPage | null | undefined {
+  const { slug: orgSlug } = useOrgInfo();
+  const row = usePreloadedOrLive(api.storePages.getBySlug, { orgSlug, slug });
+  return row as StoredPage | null | undefined;
+}

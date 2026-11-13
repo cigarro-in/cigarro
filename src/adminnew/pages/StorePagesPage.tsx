@@ -4,7 +4,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { FileText } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { STORE_PAGES } from '../../lib/storePages/catalog';
+import { customPagePath, STORE_PAGES } from '../../lib/storePages/catalog';
 import {
   Badge,
   BulkActionBar,
@@ -30,6 +30,8 @@ interface PageRow {
   title: string;
   path: string;
   state: PageState;
+  /** Custom pages exist only as rows; built-in pages fall back to code. */
+  custom: boolean;
   hasRow: boolean;
   updatedAt: number | null;
 }
@@ -58,9 +60,9 @@ function formatDate(ms: number) {
 }
 
 /**
- * Store pages (About, Contact, policies). Every row is a built-in storefront
- * page: "Built-in" means no custom version exists, so the storefront renders
- * the default content.
+ * Store pages: the built-in pages (About, Contact, policies) plus custom pages.
+ * "Built-in" means a built-in page has no custom version, so the storefront
+ * renders the default content.
  */
 export function StorePagesPage() {
   const navigate = useNavigate();
@@ -71,13 +73,13 @@ export function StorePagesPage() {
   const sel = useRowSelection();
   const [query, setQuery] = useState('');
   const [state, setState] = useState('all');
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | 'revert' | 'delete'>(null);
   const publish = useButtonFeedback();
   const unpublish = useButtonFeedback();
 
   const pages: PageRow[] | undefined = useMemo(() => {
     if (rows === undefined) return undefined;
-    return STORE_PAGES.map((def) => {
+    const builtIn = STORE_PAGES.map((def) => {
       const row = rows.find((r) => r.slug === def.slug);
       const pageState: PageState = !row ? 'builtin' : row.published ? 'published' : 'draft';
       return {
@@ -85,10 +87,24 @@ export function StorePagesPage() {
         title: row?.title ?? def.title,
         path: def.path,
         state: pageState,
+        custom: false,
         hasRow: !!row,
         updatedAt: row?.updatedAt ?? null,
       };
     });
+    const custom = rows
+      .filter((r) => !STORE_PAGES.some((def) => def.slug === r.slug))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((r) => ({
+        slug: r.slug,
+        title: r.title,
+        path: customPagePath(r.slug),
+        state: (r.published ? 'published' : 'draft') as PageState,
+        custom: true,
+        hasRow: true,
+        updatedAt: r.updatedAt,
+      }));
+    return [...builtIn, ...custom];
   }, [rows]);
 
   const visible = useMemo(() => {
@@ -105,6 +121,8 @@ export function StorePagesPage() {
 
   const selected = (pages ?? []).filter((p) => sel.isSelected(p.slug));
   const selectedWithRows = selected.filter((p) => p.hasRow).map((p) => p.slug);
+  const revertTargets = selected.filter((p) => p.hasRow && !p.custom);
+  const deleteTargets = selected.filter((p) => p.custom);
 
   const setBulkPublished = (fb: ReturnType<typeof useButtonFeedback>, published: boolean) =>
     fb.run(async () => {
@@ -147,9 +165,14 @@ export function StorePagesPage() {
   ];
 
   const bulkError = publish.error || unpublish.error;
+  const confirmTargets = confirm === 'delete' ? deleteTargets : revertTargets;
 
   return (
-    <Page title="Pages" titleMeta={<span className="text-sm font-normal text-muted-foreground">Store pages</span>}>
+    <Page
+      title="Pages"
+      titleMeta={<span className="text-sm font-normal text-muted-foreground">Store pages</span>}
+      primaryAction={{ label: 'New page', to: '/pages/new' }}
+    >
       <ErrorBanner error={bulkError} />
       <Card padding="none">
         <FilterBar search={{ value: query, onChange: setQuery, placeholder: 'Search pages' }}>
@@ -184,22 +207,33 @@ export function StorePagesPage() {
             <Button size="sm" variant="secondary" state={unpublish.state} onClick={() => setBulkPublished(unpublish, false)}>
               Unpublish
             </Button>
-            <Button size="sm" variant="critical" onClick={() => setConfirmOpen(true)} disabled={!selected.some((p) => p.hasRow)}>
+            <Button size="sm" variant="secondary" onClick={() => setConfirm('revert')} disabled={revertTargets.length === 0}>
               Revert to built-in
+            </Button>
+            <Button size="sm" variant="critical" onClick={() => setConfirm('delete')} disabled={deleteTargets.length === 0}>
+              Delete
             </Button>
           </>
         }
       />
 
       <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={`Revert ${selected.filter((p) => p.hasRow).length} page(s) to built-in?`}
-        description="The custom text is deleted and the storefront shows the default page again. This cannot be undone."
-        confirmLabel="Revert and delete"
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={
+          confirm === 'delete'
+            ? `Delete ${confirmTargets.length} page(s)?`
+            : `Revert ${confirmTargets.length} page(s) to built-in?`
+        }
+        description={
+          confirm === 'delete'
+            ? 'Deleted pages return 404 on the storefront. This cannot be undone.'
+            : 'The custom text is deleted and the storefront shows the default page again. This cannot be undone.'
+        }
+        confirmLabel={confirm === 'delete' ? 'Delete pages' : 'Revert and delete'}
         critical
         onConfirm={async () => {
-          for (const p of selected.filter((x) => x.hasRow)) {
+          for (const p of confirmTargets) {
             await deletePage({ orgSlug: ORG_SLUG, slug: p.slug });
           }
           sel.clear();

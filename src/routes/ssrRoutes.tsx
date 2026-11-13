@@ -6,7 +6,7 @@
 //
 // Anything not listed renders nothing here; the edge keeps serving those paths
 // through the SPA shell / bot renderer until they are ported (P5-SSR slice 8).
-import { StorePageGate } from '../pages/storePages/StorePageGate';
+import { CustomStorePageRoute, StorePageGate } from '../pages/storePages/StorePageGate';
 import type { ComponentType } from 'react';
 import { Route, Routes, useParams } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
@@ -99,6 +99,7 @@ export function SsrRoutes({ location }: SsrRoutesProps) {
       <Route path={ROUTES.PRIVACY} element={<StorePageGate slug="privacy" fallback={<PrivacyPage />} />} />
       <Route path={ROUTES.SHIPPING} element={<StorePageGate slug="shipping" fallback={<ShippingPage />} />} />
       <Route path={ROUTES.RETURNS} element={<StorePageGate slug="returns" fallback={<ReturnsPage />} />} />
+      <Route path={ROUTES.STORE_PAGE} element={<CustomStorePageRoute />} />
       <Route path="*" element={null} />
     </Routes>
   );

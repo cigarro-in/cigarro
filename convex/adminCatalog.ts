@@ -1053,6 +1053,36 @@ export const setProductsActive = mutation({
   },
 });
 
+// Set (or clear, with brandId null) the brand of one or many products. Brands
+// are assigned from both sides: the product editor and the brand page.
+export const setProductsBrand = mutation({
+  args: {
+    orgSlug: v.string(),
+    productIds: v.array(v.string()),
+    brandId: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { orgSlug, productIds, brandId }) => {
+    const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
+    if (brandId) {
+      const brand = await findOrgDocBySupabase(ctx, "catalogBrands", org, brandId);
+      if (!brand || !inOrg(brand, org)) throw new ConvexError({ code: "BRAND_NOT_FOUND" });
+    }
+    let updated = 0;
+    for (const supabaseId of new Set(productIds)) {
+      const row = await findOrgDocBySupabase(ctx, "catalogProducts", org, supabaseId);
+      if (!row || !inOrg(row, org)) continue;
+      // An undefined field is removed by patch, which clears the brand.
+      await ctx.db.patch(row._id, {
+        brandSupabaseId: brandId ?? undefined,
+        orgId,
+        updatedAt: Date.now(),
+      });
+      updated += 1;
+    }
+    return { updated };
+  },
+});
+
 // Edit-form loader: product + variants + join ids (mirrors the old 3-query load).
 export const getProductForEdit = query({
   args: { orgSlug: v.string(), supabaseId: v.string() },

@@ -16,3 +16,15 @@ export type StorePageSlug = (typeof STORE_PAGES)[number]['slug'];
 export function storePageBySlug(slug: string) {
   return STORE_PAGES.find((p) => p.slug === slug) ?? null;
 }
+
+// Custom pages (any slug the admin creates) are served at /pages/<slug>. The
+// slug rule matches convex/storePages.ts (SLUG_PATTERN).
+export const CUSTOM_PAGE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function customPagePath(slug: string): string {
+  return `/pages/${slug}`;
+}
+
+export function isBuiltInStorePageSlug(slug: string): boolean {
+  return storePageBySlug(slug) !== null;
+}

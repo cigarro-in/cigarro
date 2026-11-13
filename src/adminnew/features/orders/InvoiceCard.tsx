@@ -4,6 +4,7 @@ import { useOrg } from '../../../lib/convex/useOrg';
 import { paiseToRupees } from '../../../lib/convex/money';
 import { formatINR } from '../../../utils/currency';
 import { Banner, Button, Card, useButtonFeedback } from '../../ui';
+import { useLiveStoreSettings } from '../settings/useSettingsDraft';
 import { renderInvoiceJpeg, type InvoiceData } from './invoiceImage';
 import { customerName, orderNumberLabel, splitItemName, whatsappUrl, type OrderDoc } from './orderModel';
 
@@ -23,7 +24,7 @@ function invoiceStatus(order: OrderDoc): string {
   }
 }
 
-export function buildInvoiceData(order: OrderDoc, storeName: string): InvoiceData {
+export function buildInvoiceData(order: OrderDoc, storeName: string, logoUrl?: string | null): InvoiceData {
   const a = order.address;
   const discount = order.discountPaise ?? 0;
   const delivery = order.shippingPricePaise ?? 0;
@@ -31,6 +32,7 @@ export function buildInvoiceData(order: OrderDoc, storeName: string): InvoiceDat
   const total = order.cartTotalPaise + delivery - discount;
   return {
     storeName,
+    logoUrl: logoUrl || null,
     orderNumber: orderNumberLabel(order),
     date: new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     customerName: customerName(order),
@@ -62,6 +64,8 @@ export function buildInvoiceData(order: OrderDoc, storeName: string): InvoiceDat
  */
 export function InvoiceCard({ order }: { order: OrderDoc }) {
   const org = useOrg();
+  const { live } = useLiveStoreSettings();
+  const logoUrl = live?.brand.logoUrl || null;
   const share = useButtonFeedback();
   const [fallback, setFallback] = useState<{ url: string; fileName: string; waHref: string | null } | null>(null);
 
@@ -77,7 +81,7 @@ export function InvoiceCard({ order }: { order: OrderDoc }) {
 
   const onShare = () =>
     share.run(async () => {
-      const blob = await renderInvoiceJpeg(buildInvoiceData(order, org?.name ?? 'Store'));
+      const blob = await renderInvoiceJpeg(buildInvoiceData(order, org?.name ?? 'Store', logoUrl));
       const file = new File([blob], fileName, { type: 'image/jpeg' });
       const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
       if (nav.share && nav.canShare?.({ files: [file] })) {

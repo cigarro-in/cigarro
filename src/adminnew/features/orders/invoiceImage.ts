@@ -10,6 +10,8 @@ export interface InvoiceLine {
 
 export interface InvoiceData {
   storeName: string;
+  /** Store logo (cdn.cigarro.in). Omitted or unloadable: the name is drawn instead. */
+  logoUrl?: string | null;
   orderNumber: string;
   date: string;
   customerName: string;
@@ -32,7 +34,34 @@ const MUTED = '#6b7280';
 const RULE = '#e5e7eb';
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
+const LOGO_H = 72;
+const LOGO_MAX_W = 240;
+const LOGO_GAP = 28;
+const LOGO_TIMEOUT_MS = 8000;
+
 const font = (weight: number, size: number) => `${weight} ${size}px ${FONT}`;
+
+/**
+ * Loads the logo for drawing. CORS is requested: a canvas drawn from an image
+ * without CORS headers is tainted and cannot be exported, so the image must
+ * come back with Access-Control-Allow-Origin or it is treated as unavailable.
+ */
+function loadLogo(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const timer = window.setTimeout(() => resolve(null), LOGO_TIMEOUT_MS);
+    img.onload = () => {
+      window.clearTimeout(timer);
+      resolve(img.naturalWidth > 0 && img.naturalHeight > 0 ? img : null);
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
 
 /** Truncates with an ellipsis so the text fits maxWidth in the given font. */
 function fit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, f: string): string {
@@ -44,7 +73,7 @@ function fit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, f: s
 }
 
 /** Draws the invoice on ctx and returns the bottom y (CSS px). Same call measures and paints. */
-function paint(ctx: CanvasRenderingContext2D, inv: InvoiceData): number {
+function paint(ctx: CanvasRenderingContext2D, inv: InvoiceData, logo: HTMLImageElement | null): number {
   const R = WIDTH - PAD;
   const qtyX = R - 340;
   const priceX = R - 200;
@@ -65,11 +94,23 @@ function paint(ctx: CanvasRenderingContext2D, inv: InvoiceData): number {
     ctx.stroke();
   };
 
-  // Header: store name, invoice label, order number and date.
+  // Header: logo (when loaded), store name, invoice label, order number and date.
+  let nameX = PAD;
+  if (logo) {
+    const ratio = logo.naturalWidth / logo.naturalHeight;
+    let w = LOGO_H * ratio;
+    let h = LOGO_H;
+    if (w > LOGO_MAX_W) {
+      w = LOGO_MAX_W;
+      h = w / ratio;
+    }
+    ctx.drawImage(logo, PAD, PAD, w, h);
+    nameX = PAD + w + LOGO_GAP;
+  }
   y += 52;
-  text(fit(ctx, inv.storeName, R - PAD - 260, font(700, 52)), PAD, y, font(700, 52), INK);
+  text(fit(ctx, inv.storeName, R - nameX - 260, font(700, 52)), nameX, y, font(700, 52), INK);
   text('INVOICE', R, y, font(600, 26), MUTED, 'right');
-  y += 50;
+  y += 50 + (logo ? 22 : 0);
   text(`Order ${inv.orderNumber}`, PAD, y, font(600, 34), INK);
   text(inv.date, R, y, font(400, 28), MUTED, 'right');
   y += 36;
@@ -142,10 +183,10 @@ function paint(ctx: CanvasRenderingContext2D, inv: InvoiceData): number {
   return y + PAD / 2;
 }
 
-export async function renderInvoiceJpeg(inv: InvoiceData): Promise<Blob> {
+async function encodeInvoice(inv: InvoiceData, logo: HTMLImageElement | null): Promise<Blob> {
   const probe = document.createElement('canvas').getContext('2d');
   if (!probe) throw new Error('Canvas is not available in this browser.');
-  const height = paint(probe, inv);
+  const height = paint(probe, inv, logo);
 
   const canvas = document.createElement('canvas');
   canvas.width = WIDTH * SCALE;
@@ -156,9 +197,22 @@ export async function renderInvoiceJpeg(inv: InvoiceData): Promise<Blob> {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.textBaseline = 'alphabetic';
-  paint(ctx, inv);
+  paint(ctx, inv, logo);
 
+  // A tainted canvas (logo served without CORS) throws SecurityError here.
   return await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not render the invoice image.'))), 'image/jpeg', 0.92),
   );
+}
+
+export async function renderInvoiceJpeg(inv: InvoiceData): Promise<Blob> {
+  const logo = inv.logoUrl ? await loadLogo(inv.logoUrl) : null;
+  if (logo) {
+    try {
+      return await encodeInvoice(inv, logo);
+    } catch {
+      // Could not export with the logo: draw the store name instead.
+    }
+  }
+  return encodeInvoice(inv, null);
 }

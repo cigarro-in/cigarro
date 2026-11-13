@@ -2,10 +2,13 @@ import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { collectInOrg, inOrg, requireOrgAdminBySlug, resolveOrg } from "./lib/org";
 
-// Store pages (About, Contact, policies). Each row overrides the built-in
-// storefront page with the same slug. No row, or an unpublished row, means the
-// storefront keeps rendering the built-in content.
-// Keep in sync with STORE_PAGE_SLUGS in src/lib/storePages/catalog.ts.
+// Store pages. Two kinds of rows share the storePages table:
+// - Built-in slugs (About, Contact, policies): a row overrides the built-in
+//   storefront page at its existing URL. No row, or an unpublished row, keeps
+//   the built-in content.
+// - Custom slugs: any valid slug, served at /pages/<slug>. Only a published row
+//   is visible; anything else is a 404.
+// Keep STORE_PAGE_SLUGS in sync with src/lib/storePages/catalog.ts.
 export const STORE_PAGE_SLUGS = [
   "about",
   "contact",
@@ -16,10 +19,37 @@ export const STORE_PAGE_SLUGS = [
   "returns",
 ] as const;
 
-function assertKnownSlug(slug: string) {
-  if (!(STORE_PAGE_SLUGS as readonly string[]).includes(slug))
-    throw new ConvexError({ code: "UNKNOWN_PAGE", slug });
+// Storefront path segments and admin words a custom slug may not use, so a
+// custom page never reads like another part of the store.
+const RESERVED_PAGE_SLUGS = new Set<string>([
+  ...STORE_PAGE_SLUGS,
+  "agents", "api", "admin", "blog", "blogs", "brand", "brands", "cart", "category",
+  "checkout", "desktop-checkout", "mobile-checkout", "categories", "login", "new",
+  "orders", "pages", "payment", "product", "products", "profile", "addresses",
+  "referral", "referrals", "reviews", "search",
+  "transaction", "wallet", "wishlist", "functions", "sa",
+]);
+
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SLUG_MAX = 80;
+
+export function isBuiltInPageSlug(slug: string) {
+  return (STORE_PAGE_SLUGS as readonly string[]).includes(slug);
 }
+
+function assertCustomSlug(slug: string) {
+  if (slug.length === 0 || slug.length > SLUG_MAX || !SLUG_PATTERN.test(slug))
+    throw new ConvexError({ code: "SLUG_INVALID" });
+  if (RESERVED_PAGE_SLUGS.has(slug)) throw new ConvexError({ code: "SLUG_RESERVED" });
+}
+
+const pageV = v.object({
+  title: v.string(),
+  body: v.string(),
+  published: v.boolean(),
+  metaTitle: v.optional(v.string()),
+  metaDescription: v.optional(v.string()),
+});
 
 // Admin: every page row for the store (published or not).
 export const listStorePagesForAdmin = query({
@@ -37,6 +67,22 @@ export const listStorePagesForAdmin = query({
       metaDescription: r.metaDescription ?? null,
       updatedAt: r.updatedAt,
     }));
+  },
+});
+
+// Storefront: published custom pages for the sitemap (built-in slugs excluded:
+// they already have fixed URLs in the sitemap).
+export const listPublishedCustomPages = query({
+  args: { orgSlug: v.string() },
+  handler: async (ctx, { orgSlug }) => {
+    const org = await resolveOrg(ctx, orgSlug);
+    const rows = await ctx.db
+      .query("storePages")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .collect();
+    return rows
+      .filter((r) => r.published && !isBuiltInPageSlug(r.slug) && inOrg(r, org))
+      .map((r) => ({ slug: r.slug, updatedAt: r.updatedAt }));
   },
 });
 
@@ -66,22 +112,16 @@ export const saveStorePage = mutation({
   args: {
     orgSlug: v.string(),
     slug: v.string(),
-    page: v.object({
-      title: v.string(),
-      body: v.string(),
-      published: v.boolean(),
-      metaTitle: v.optional(v.string()),
-      metaDescription: v.optional(v.string()),
-    }),
+    page: pageV,
   },
   handler: async (ctx, { orgSlug, slug, page }) => {
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
-    assertKnownSlug(slug);
     if (!page.title.trim()) throw new ConvexError({ code: "TITLE_REQUIRED" });
     const existing = await ctx.db
       .query("storePages")
       .withIndex("by_org_slug", (q) => q.eq("orgId", org._id).eq("slug", slug))
       .unique();
+    if (!existing && !isBuiltInPageSlug(slug)) assertCustomSlug(slug);
     const row = {
       title: page.title.trim(),
       body: page.body,
@@ -99,6 +139,33 @@ export const saveStorePage = mutation({
   },
 });
 
+// Create a custom page. Fails when the slug is taken in this store.
+export const createStorePage = mutation({
+  args: { orgSlug: v.string(), slug: v.string(), page: pageV },
+  handler: async (ctx, { orgSlug, slug, page }) => {
+    const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
+    if (isBuiltInPageSlug(slug)) throw new ConvexError({ code: "SLUG_TAKEN" });
+    assertCustomSlug(slug);
+    if (!page.title.trim()) throw new ConvexError({ code: "TITLE_REQUIRED" });
+    const existing = await ctx.db
+      .query("storePages")
+      .withIndex("by_org_slug", (q) => q.eq("orgId", org._id).eq("slug", slug))
+      .unique();
+    if (existing) throw new ConvexError({ code: "SLUG_TAKEN" });
+    const id = await ctx.db.insert("storePages", {
+      orgId,
+      slug,
+      title: page.title.trim(),
+      body: page.body,
+      published: page.published,
+      metaTitle: page.metaTitle?.trim() || undefined,
+      metaDescription: page.metaDescription?.trim() || undefined,
+      updatedAt: Date.now(),
+    });
+    return { id };
+  },
+});
+
 // Publish or unpublish several pages at once.
 export const setStorePagesPublished = mutation({
   args: { orgSlug: v.string(), slugs: v.array(v.string()), published: v.boolean() },
@@ -106,7 +173,6 @@ export const setStorePagesPublished = mutation({
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
     let updated = 0;
     for (const slug of slugs) {
-      assertKnownSlug(slug);
       const row = await ctx.db
         .query("storePages")
         .withIndex("by_org_slug", (q) => q.eq("orgId", org._id).eq("slug", slug))

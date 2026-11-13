@@ -104,10 +104,12 @@ async function generateSitemap(convexUrl, org) {
   const EXCLUDED_BRAND_SLUGS = new Set(['ktnng']);
 
   // Fetch data (with error handling) — Convex is the catalog source.
-  const [catalogResult, blogResult] = await Promise.allSettled([
+  const [catalogResult, blogResult, pagesResult] = await Promise.allSettled([
     cxQuery(convexUrl, 'catalog:sitemapCatalog', { orgSlug }),
 
     cxQuery(convexUrl, 'content:listBlogPosts', { orgSlug, limit: 100 }),
+
+    cxQuery(convexUrl, 'storePages:listPublishedCustomPages', { orgSlug }),
   ]);
 
   // A failed fetch must NOT produce a partial sitemap (see onRequest 503).
@@ -118,6 +120,10 @@ async function generateSitemap(convexUrl, org) {
   if (blogResult.status !== 'fulfilled') {
     console.error('Sitemap blog fetch failed:', blogResult.reason?.message || blogResult.reason);
     throw blogResult.reason;
+  }
+  if (pagesResult.status !== 'fulfilled') {
+    console.error('Sitemap store pages fetch failed:', pagesResult.reason?.message || pagesResult.reason);
+    throw pagesResult.reason;
   }
 
   const catalog = catalogResult.value;
@@ -150,6 +156,19 @@ async function generateSitemap(convexUrl, org) {
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
   </url>\n`;
+  });
+
+  // Published custom store pages (/pages/<slug>)
+  (pagesResult.value || []).forEach(page => {
+    if (!page.slug) return;
+    const lastmod = day(page.updatedAt);
+    xml += `  <url>
+    <loc>${BASE_URL}/pages/${escapeXml(page.slug)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+`;
   });
 
   // Products with images (Convex supplies active-variant images, max 5)

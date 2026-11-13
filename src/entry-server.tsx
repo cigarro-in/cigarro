@@ -386,6 +386,23 @@ function trimStaticPagePreload(preload: PreloadMap): PreloadMap {
   return out;
 }
 
+// Custom store pages at /pages/<slug> (any published slug the admin created).
+// Built-in slugs are handled by the component (404), not by this match.
+const CUSTOM_PAGE_PATH = /^\/pages\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/;
+
+const customPageRoute: SsrRoute = {
+  id: 'store-page',
+  match: (pathname) => {
+    const m = CUSTOM_PAGE_PATH.exec(pathname);
+    return m ? { slug: m[1] } : null;
+  },
+  preloadRequests: ({ slug }, org) => [
+    { fnName: 'content:getSiteSettings', args: { orgSlug: org.slug } },
+    { fnName: 'storePages:getBySlug', args: { orgSlug: org.slug, slug } },
+  ],
+  trimPreload: (preload) => trimStaticPagePreload(preload),
+};
+
 const STATIC_PAGE_ROUTES: SsrRoute[] = [
   staticPageRoute('about', '/about'),
   staticPageRoute('contact', '/contact'),
@@ -439,6 +456,7 @@ const SSR_ROUTES: SsrRoute[] = [
   brandsHubRoute,
   blogsHubRoute,
   ...STATIC_PAGE_ROUTES,
+  customPageRoute,
 ];
 
 // Route that serves a pathname, with its params. Null when no SSR route matches.

@@ -3,7 +3,7 @@
 // the client can, so the server entry needs eager imports for every route it
 // renders (or a manifest of preloaded chunks). Swap these to static imports
 // there, and keep the lazy versions for the client build.
-import { StorePageGate } from '../pages/storePages/StorePageGate';
+import { CustomStorePageRoute, StorePageGate } from '../pages/storePages/StorePageGate';
 import { createContext, lazy, useContext, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
@@ -128,6 +128,7 @@ export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) =>
       <Route path={ROUTES.SHIPPING} element={<StorePageGate slug="shipping" fallback={<ShippingPage />} />} />
       <Route path={ROUTES.RETURNS} element={<StorePageGate slug="returns" fallback={<ReturnsPage />} />} />
       <Route path={ROUTES.LEGAL} element={<StorePageGate slug="legal" fallback={<LegalPage />} />} />
+      <Route path={ROUTES.STORE_PAGE} element={<CustomStorePageRoute />} />
 
       {/* Catch-all route for broken links */}
       <Route path="*" element={<NotFoundPage />} />

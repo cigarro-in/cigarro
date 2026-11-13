@@ -44,6 +44,7 @@ export const ROUTES = {
   ABOUT: '/about',
   CONTACT: '/contact',
   AGENTS: '/agents',
+  STORE_PAGE: '/pages/:slug',
   
   // Legal
   LEGAL: '/legal',

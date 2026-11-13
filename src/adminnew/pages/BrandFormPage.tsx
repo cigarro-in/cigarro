@@ -6,7 +6,7 @@ import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
 import { generateSlug } from '../../types/product';
 import { SingleImagePicker } from '../components/shared/ImagePicker';
-import { BrandProductList, useCatalogProducts } from '../features/catalog/ProductMembers';
+import { BrandProductsEditor, useCatalogProducts } from '../features/catalog/ProductMembers';
 import {
   CatalogThumb,
   DisclosureCard,
@@ -55,6 +55,7 @@ export function BrandFormPage() {
   const createBrand = useMutation(api.adminCatalog.createBrand);
   const updateBrand = useMutation(api.adminCatalog.updateBrand);
   const removeBrand = useMutation(api.adminCatalog.deleteBrand);
+  const setProductsBrand = useMutation(api.adminCatalog.setProductsBrand);
   const products = useCatalogProducts();
 
   const source: any = isEdit ? rows?.find((b: any) => b.supabaseId === id) : undefined;
@@ -212,7 +213,11 @@ export function BrandFormPage() {
                 actions={<span className="text-xs text-[var(--admin-text-muted)]">{productCount} in this brand</span>}
               >
                 {isEdit ? (
-                  <BrandProductList products={products} brandId={id} />
+                  <BrandProductsEditor
+                    products={products}
+                    brandId={id!}
+                    onAssign={(productIds, brandId) => setProductsBrand({ orgSlug: ORG_SLUG, productIds, brandId })}
+                  />
                 ) : (
                   <EmptyState
                     icon={<Building2 />}
