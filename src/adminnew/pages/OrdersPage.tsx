@@ -1,329 +1,288 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Phone, Copy } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import { formatINR } from '../../utils/currency';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { DataTable } from '../components/shared/DataTable';
-import { BulkActionsMenu } from '../components/shared/BulkActionsMenu';
-import { PageHeader } from '../components/shared/PageHeader';
-import { useQuery, useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { cn } from '../../components/ui/utils';
 import { useOrg } from '../../lib/convex/useOrg';
-import { paiseToRupees } from '../../lib/convex/money';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { orderNumberOf } from '../../../convex/lib/ids';
+import { deriveOrderStage, type OrderStage } from '../../lib/orders/orderStage';
+import { formatINR } from '../../utils/currency';
+import {
+  BulkActionBar,
+  Button,
+  Card,
+  Checkbox,
+  DataTable,
+  DateRangePresets,
+  EmptyState,
+  ErrorBanner,
+  FilterBar,
+  FilterChip,
+  Page,
+  Pagination,
+  SkeletonTable,
+  StatusBadge,
+  formatOrderDate,
+  getDateRange,
+  inDateRange,
+  paginate,
+  useRowSelection,
+  type Column,
+  type DateRangePreset,
+} from '../ui';
+import {
+  STAGE_FILTERS,
+  customerName,
+  itemsSummary,
+  matchesStageFilter,
+  orderNumberLabel,
+  orderSearchText,
+  orderTotalRupees,
+  stageFilterFromParam,
+  type OrderDoc,
+  type StageFilter,
+} from '../features/orders/orderModel';
+import { useActionRunner } from '../features/orders/useActionRunner';
 
-interface OrderItem {
-  id: string;
-  product_id: string;
-  quantity: number;
-  price: number;
-  product_name: string;
-  variant_name?: string;
+const PAGE_SIZE = 25;
+const LOAD_LIMIT = 200;
+
+interface Entry {
+  order: OrderDoc;
+  stage: OrderStage;
 }
 
-const mapStatusToDisplay = (paymentStatus: string, shippingStatus?: string): Order['status'] => {
-  if (paymentStatus === 'paid' || paymentStatus === 'late_paid') {
-    if (shippingStatus === 'processing' || shippingStatus === 'shipped' || shippingStatus === 'delivered' || shippingStatus === 'returned') return shippingStatus;
-    return 'processing';
-  }
-  if (paymentStatus === 'pending') return 'pending';
-  return paymentStatus as Order['status'];
-};
-
-interface Order {
-  id: string;
-  // Five-digit customer-facing number. Undefined on legacy rows (pre-backfill).
-  order_number?: number;
-  display_order_id: string;
-  user_id: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'returned' | 'cancelled' | 'expired' | 'refunded' | 'voided' | 'late_paid' | 'paid';
-  payment_status: string;
-  shipping_status?: string;
-  payment_verified: string;
-  payment_method: string;
-  subtotal: number;
-  shipping: number;
-  discount: number;
-  total: number;
-  // Shipping info from orders table
-  shipping_name: string;
-  shipping_address: string;
-  shipping_city: string;
-  shipping_state: string;
-  shipping_zip_code: string;
-  shipping_phone: string;
-  created_at: string;
-  updated_at: string;
-  order_items?: OrderItem[];
-}
+const money = (order: OrderDoc) => formatINR(orderTotalRupees(order));
 
 export function OrdersPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const org = useOrg();
+
   const convexOrders = useQuery(
     api.admin.listRecentOrders,
-    org ? { orgId: org._id, limit: 100 } : 'skip',
+    org ? { orgId: org._id, limit: LOAD_LIMIT } : 'skip',
   );
-  const [searchTerm, setSearchTerm] = useState('');
-  // Five-digit search: look the order up directly so it is found even when it
-  // is older than the 100 most recent rows loaded above.
-  const numericSearch = /^#?\d{5}$/.test(searchTerm.trim())
-    ? Number(searchTerm.trim().replace('#', ''))
-    : undefined;
+
+  const [search, setSearch] = useState('');
+  const [stage, setStage] = useState<StageFilter>(() => stageFilterFromParam(searchParams.get('status')));
+  const [preset, setPreset] = useState<DateRangePreset>('all');
+  const [page, setPage] = useState(1);
+
+  // A five-digit search is looked up directly, so an order older than the
+  // loaded window is still found.
+  const trimmed = search.trim();
+  const orderNumberQuery = /^#?\d{5}$/.test(trimmed) ? Number(trimmed.replace('#', '')) : undefined;
   const foundByNumber = useQuery(
     api.admin.findOrderByNumber,
-    org && numericSearch !== undefined ? { orgId: org._id, orderNumber: numericSearch } : 'skip',
+    org && orderNumberQuery !== undefined ? { orgId: org._id, orderNumber: orderNumberQuery } : 'skip',
   );
-  const markPaid = useMutation(api.admin.markPaid);
-  const voidOrder = useMutation(api.admin.voidOrder);
 
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? 'all');
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const updateShipping = useMutation(api.admin.updateShipping);
+  const sel = useRowSelection();
+  const bulk = useActionRunner();
 
   const loading = convexOrders === undefined;
 
-  const orders: Order[] = useMemo(() => {
+  const entries: Entry[] = useMemo(() => {
     if (!convexOrders) return [];
-    const toRow = (o: any): Order => ({
-      id: o._id,
-      order_number: orderNumberOf(o),
-      display_order_id: o.displayOrderId,
-      user_id: o.userId,
-      status: mapStatusToDisplay(o.status, o.shippingStatus),
-      payment_status: o.status,
-      shipping_status: o.shippingStatus,
-      payment_verified: o.status === 'paid' || o.status === 'late_paid' ? 'YES' : 'NO',
-      payment_method: 'upi',
-      subtotal: paiseToRupees(o.cartTotalPaise),
-      shipping: 0,
-      discount: paiseToRupees(o.walletDebitPaise),
-      total: paiseToRupees(o.finalAmountPaise),
-      shipping_name: o.address?.name || '',
-      shipping_address: o.address?.line1 || '',
-      shipping_city: o.address?.city || '',
-      shipping_state: o.address?.state || '',
-      shipping_zip_code: o.address?.pincode || '',
-      shipping_phone: o.address?.phone || '',
-      created_at: new Date(o._creationTime).toISOString(),
-      updated_at: new Date(o._creationTime).toISOString(),
-      order_items: (o.items || []).map((it: any, idx: number) => ({
-        id: `${o._id}-${idx}`,
-        product_id: it.productId,
-        quantity: it.qty,
-        price: paiseToRupees(it.unitPricePaise),
-        product_name: it.name,
-        variant_name: it.variantId,
-      })),
-    });
-    const rows = convexOrders.map(toRow);
-    // Prepend a number-search hit that is not already in the recent list.
-    if (foundByNumber && !rows.some((r) => r.id === foundByNumber._id)) {
-      rows.unshift(toRow(foundByNumber));
-    }
-    return rows;
+    const rows: OrderDoc[] = [...convexOrders];
+    if (foundByNumber && !rows.some((o) => o._id === foundByNumber._id)) rows.unshift(foundByNumber);
+    return rows.map((order) => ({ order, stage: deriveOrderStage(order) }));
   }, [convexOrders, foundByNumber]);
 
-  const visibleOrders = useMemo(
-    () => statusFilter === 'all' ? orders : orders.filter((order) =>
-      statusFilter === 'paid' || statusFilter === 'late_paid'
-        ? order.payment_status === statusFilter
-        : order.status === statusFilter),
-    [orders, statusFilter],
+  const counts = useMemo(() => {
+    const out = {} as Record<StageFilter, number>;
+    for (const f of STAGE_FILTERS) {
+      out[f.id] = entries.filter((e) => matchesStageFilter(f.id, e.stage)).length;
+    }
+    return out;
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    const q = trimmed.toLowerCase();
+    const range = getDateRange(preset);
+    return entries.filter(({ order, stage: s }) => {
+      if (!matchesStageFilter(stage, s)) return false;
+      if (!inDateRange(order.createdAt, range)) return false;
+      return q === '' || orderSearchText(order).includes(q);
+    });
+  }, [entries, stage, preset, trimmed]);
+
+  useEffect(() => setPage(1), [search, stage, preset]);
+
+  const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
+  const current = Math.min(page, pageCount);
+  const firstShown = filtered.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1;
+  const lastShown = Math.min(current * PAGE_SIZE, filtered.length);
+  const filtersActive = trimmed !== '' || stage !== 'all' || preset !== 'all';
+
+  // Bulk shipping steps, limited to the orders each step applies to.
+  const selected = useMemo(() => entries.filter((e) => sel.isSelected(e.order._id)), [entries, sel]);
+  const pick = (stages: OrderStage[]) => selected.filter((e) => stages.includes(e.stage)).map((e) => e.order);
+  const toPrepare = pick(['paid']);
+  const toShip = pick(['paid', 'preparing']);
+  const toDeliver = pick(['shipped']);
+
+  const runBulk = (id: string, orders: OrderDoc[], shippingStatus: 'processing' | 'shipped' | 'delivered') =>
+    bulk.run(id, async () => {
+      const results = await Promise.allSettled(
+        orders.map((o) => updateShipping({ orderId: o._id, shippingStatus })),
+      );
+      const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (failed) throw failed.reason;
+      sel.clear();
+    });
+
+  const columns: Column<Entry>[] = [
+    {
+      id: 'number',
+      header: 'Order',
+      width: 'w-24',
+      cell: ({ order }) => <span className="font-semibold tabular-nums text-foreground">{orderNumberLabel(order)}</span>,
+    },
+    {
+      id: 'customer',
+      header: 'Customer',
+      cell: ({ order }) => <span className="block max-w-50 truncate text-foreground">{customerName(order)}</span>,
+    },
+    {
+      id: 'items',
+      header: 'Items',
+      hideBelow: 'md',
+      cell: ({ order }) => <span className="block max-w-65 truncate text-muted-foreground">{itemsSummary(order)}</span>,
+    },
+    {
+      id: 'total',
+      header: 'Total',
+      align: 'right',
+      cell: ({ order }) => <span className="tabular-nums text-foreground">{money(order)}</span>,
+    },
+    {
+      id: 'stage',
+      header: 'Stage',
+      cell: ({ stage: s }) => <StatusBadge stage={s} />,
+    },
+    {
+      id: 'date',
+      header: 'Date',
+      hideBelow: 'lg',
+      cell: ({ order }) => <span className="whitespace-nowrap text-muted-foreground">{formatOrderDate(order.createdAt)}</span>,
+    },
+  ];
+
+  const clearFilters = () => {
+    setSearch('');
+    setStage('all');
+    setPreset('all');
+  };
+
+  const emptyState = (
+    <EmptyState
+      title={filtersActive ? 'No orders match these filters' : 'No orders yet'}
+      action={filtersActive ? <Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button> : undefined}
+    />
   );
 
-  const handleEditOrder = (order: Order) => {
-    navigate(`/orders/${order.id}`);
-  };
-
-  const handleBulkMarkPaid = async (orderIds: string[]) => {
-    try {
-      await Promise.all(
-        orderIds.map((id) =>
-          markPaid({
-            orderId: id as any,
-            reference: `admin:bulk:${new Date().toISOString()}`,
-          }),
-        ),
-      );
-      setOpOk(`${orderIds.length} orders marked paid`);
-      setSelectedOrders([]);
-    } catch (error: any) {
-      setOpError(error?.data?.code || 'Failed to mark paid');
-    }
-  };
-
-  const handleBulkVoid = async (orderIds: string[]) => {
-    try {
-      await Promise.all(
-        orderIds.map((id) =>
-          voidOrder({ orderId: id as any, reason: 'bulk void by admin' }),
-        ),
-      );
-      setOpOk(`${orderIds.length} orders voided`);
-      setSelectedOrders([]);
-    } catch (error: any) {
-      setOpError(error?.data?.code || 'Failed to void orders');
-    }
-  };
-
-  const columns = [
-    {
-      key: 'order_number',
-      label: 'Order',
-      render: (_value: number | undefined, order: Order) => (
-        <OrderNumberCell order={order} />
-      )
-    },
-    {
-      key: 'shipping_name',
-      label: 'Customer',
-      render: (name: string, order: Order) => (
-        <div>
-          <div className="font-medium text-foreground">{name || 'Unknown'}</div>
-          <div className="text-xs text-muted-foreground flex items-center">
-            <Phone className="w-3 h-3 mr-1" />
-            {order.shipping_phone || 'N/A'}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'order_items',
-      label: 'Items',
-      render: (items: OrderItem[]) => (
-        <div className="space-y-1">
-          {items?.slice(0, 2).map((item, index) => (
-            <div key={index} className="text-sm text-muted-foreground">
-              {item.quantity}x {item.product_name}
-              {item.variant_name && (
-                <span className="text-muted-foreground"> ({item.variant_name})</span>
-              )}
-            </div>
+  return (
+    <Page title="Orders">
+      <ErrorBanner error={bulk.error} />
+      <Card padding="none">
+        <FilterBar
+          search={{ value: search, onChange: setSearch, placeholder: 'Search order no., customer, phone, item' }}
+        >
+          <DateRangePresets value={preset} onChange={(p) => setPreset(p)} />
+          {STAGE_FILTERS.map((f) => (
+            <FilterChip
+              key={f.id}
+              label={f.label}
+              count={counts[f.id]}
+              active={stage === f.id}
+              onClick={() => setStage(f.id)}
+            />
           ))}
-          {items?.length > 2 && (
-            <div className="text-xs text-muted-foreground">
-              +{items.length - 2} more items
-            </div>
+        </FilterBar>
+
+        {/* Desktop and tablet: dense table. */}
+        <div className="hidden md:block">
+          <DataTable<Entry>
+            columns={columns}
+            rows={loading ? undefined : pageItems}
+            getRowId={(e) => e.order._id}
+            selection={sel}
+            onRowClick={(e) => navigate(`/orders/${e.order._id}`)}
+            rowLabel={(e) => `Open order ${orderNumberLabel(e.order)}`}
+            empty={emptyState}
+          />
+        </div>
+
+        {/* Phones: one card per order. */}
+        <div className="md:hidden">
+          {loading && <SkeletonTable rows={5} columns={2} />}
+          {!loading && pageItems.length === 0 && emptyState}
+          {!loading && pageItems.length > 0 && (
+            <ul className="divide-y divide-border">
+              {pageItems.map(({ order, stage: s }) => {
+                const id = order._id;
+                const isSel = sel.isSelected(id);
+                return (
+                  <li key={id} className={cn('flex items-start gap-3 px-4 py-3', isSel && 'bg-primary/10')}>
+                    <div className="pt-1">
+                      <Checkbox label={`Select order ${orderNumberLabel(order)}`} checked={isSel} onCheckedChange={() => sel.toggle(id)} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/orders/${id}`)}
+                      className="flex min-w-0 flex-1 flex-col gap-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold tabular-nums text-foreground">{orderNumberLabel(order)}</span>
+                        <StatusBadge stage={s} />
+                      </div>
+                      <span className="truncate text-sm text-foreground">{customerName(order)}</span>
+                      <span className="truncate text-sm text-muted-foreground">{itemsSummary(order)}</span>
+                      <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>{formatOrderDate(order.createdAt)}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{money(order)}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-      )
-    },
-    {
-      key: 'total',
-      label: 'Total',
-      render: (total: number) => (
-        <div className="font-medium text-foreground">
-          {formatINR(total)}
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (status: string) => (
-        <Badge variant="secondary">
-          {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
-        </Badge>
-      )
-    },
-    {
-      key: 'payment_status',
-      label: 'Payment',
-      render: (status: string) => (
-        <Badge variant="secondary">
-          {status.replace('_', ' ')}
-        </Badge>
-      )
-    },
-    {
-      key: 'created_at',
-      label: 'Date',
-      render: (date: string) => (
-        <div className="text-sm text-muted-foreground">
-          {new Date(date).toLocaleDateString()}
-          <div className="text-xs text-muted-foreground">
-            {new Date(date).toLocaleTimeString()}
-          </div>
-        </div>
-      )
-    }
-  ];
 
-  const bulkActions = [
-    {
-      label: 'Mark Paid',
-      onClick: (orderIds: string[]) => handleBulkMarkPaid(orderIds),
-    },
-    {
-      label: 'Void Orders',
-      onClick: (orderIds: string[]) => handleBulkVoid(orderIds),
-      variant: 'destructive' as const,
-    },
-  ];
+        {!loading && filtered.length > 0 && (
+          <Pagination
+            page={current}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            summary={`${firstShown}–${lastShown} of ${filtered.length}`}
+          />
+        )}
+      </Card>
 
-  return (
-    <div className="min-h-screen bg-background">
-      <PageHeader
-        title="Orders"
-        description="Manage customer orders"
-        search={{ value: searchTerm, onChange: setSearchTerm, placeholder: 'Search orders…' }}
-      >
-        <div className="flex max-w-full flex-wrap items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-40" aria-label="Filter orders by status"><SelectValue placeholder="All statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {['pending', 'paid', 'late_paid', 'processing', 'shipped', 'delivered', 'returned', 'expired', 'cancelled', 'refunded', 'voided'].map((status) => <SelectItem key={status} value={status}>{status[0].toUpperCase() + status.slice(1).replace('_', ' ')}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <BulkActionsMenu selectedIds={selectedOrders} actions={bulkActions} />
-        </div>
-      </PageHeader>
-
-      <div className="p-6 max-w-400 mx-auto space-y-6">
-        <InlineStatus status={opStatus} />
-        <DataTable
-          data={visibleOrders}
-          searchText={(order) => [order.order_number !== undefined ? String(order.order_number) : '', order.display_order_id, order.shipping_name, order.shipping_phone, order.status, order.payment_status, ...(order.order_items ?? []).map((item) => `${item.product_name} ${item.variant_name ?? ''}`)].join(' ')}
-          columns={columns}
-          loading={loading}
-          selectedItems={selectedOrders}
-          onSelectionChange={setSelectedOrders}
-          onRowClick={handleEditOrder}
-          searchTerm={searchTerm}
-        />
-      </div>
-    </div>
-  );
-}
-
-// Five-digit number is the primary label everywhere in admin. The internal
-// display id (ORD-...) stays as small copyable secondary text. Legacy rows
-// with no number fall back to the display id as the primary label.
-function OrderNumberCell({ order }: { order: Order }) {
-  const primary = order.order_number !== undefined ? String(order.order_number) : order.display_order_id;
-  const copy = (value: string) => {
-    void navigator.clipboard?.writeText(value).catch(() => undefined);
-  };
-  return (
-    <div className="space-y-0.5">
-      <div className="font-mono text-sm font-semibold text-foreground">{primary}</div>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          copy(order.display_order_id);
-        }}
-        className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
-        title="Copy internal order id"
-      >
-        {order.display_order_id}
-        <Copy className="h-3 w-3" aria-hidden="true" />
-      </button>
-    </div>
+      <BulkActionBar
+        count={sel.count}
+        onClear={sel.clear}
+        noun="selected"
+        actions={
+          <>
+            <Button size="sm" variant="secondary" disabled={toPrepare.length === 0 || bulk.busy}
+              state={bulk.stateFor('prepare')} onClick={() => void runBulk('prepare', toPrepare, 'processing')}>
+              Start preparing ({toPrepare.length})
+            </Button>
+            <Button size="sm" variant="secondary" disabled={toShip.length === 0 || bulk.busy}
+              state={bulk.stateFor('ship')} onClick={() => void runBulk('ship', toShip, 'shipped')}>
+              Mark shipped ({toShip.length})
+            </Button>
+            <Button size="sm" variant="secondary" disabled={toDeliver.length === 0 || bulk.busy}
+              state={bulk.stateFor('deliver')} onClick={() => void runBulk('deliver', toDeliver, 'delivered')}>
+              Mark delivered ({toDeliver.length})
+            </Button>
+          </>
+        }
+      />
+    </Page>
   );
 }
