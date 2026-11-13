@@ -1,156 +1,58 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { Product } from '../../hooks/useCart';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useCategoryListing } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { ProductCard } from '../../components/products/ProductCard';
 import { Button } from '../../components/ui/button';
 import { Grid3X3, Grid2X2, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
-import { useCart } from '../../hooks/useCart';
+import { Product, useCart } from '../../hooks/useCart';
 import { trackViewItemList } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { BreadcrumbNav } from '../../components/layout/BreadcrumbNav';
+import { listingSeo } from '../../lib/seo/listingSeo';
+import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select";
+} from '../../components/ui/select';
 
-interface Category {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  meta_title: string;
-  meta_description: string;
+export interface CategoryPageProps {
+  /** Set by the route: /category/:slug, and the category half of /category/:category/:brand. */
+  categorySlug?: string;
+  /** Set by the route for /category/:category/:brand. */
+  brandSlug?: string;
 }
 
-export function CategoryPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
+// Category listing (classic theme). Derived state only: the rows come from
+// useCategoryListing on the first render, so the server render is the full list
+// (no effect-driven loading state).
+export function CategoryPage({ categorySlug, brandSlug }: CategoryPageProps) {
   const location = useLocation();
-  const [category, setCategory] = useState<Category | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
   const [showMobileSort, setShowMobileSort] = useState(false);
   const { addToCart, isLoading: cartLoading } = useCart();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
 
-  const isProductsPage = location.pathname === '/products';
+  const listing = useCategoryListing(categorySlug, brandSlug);
+  const isLoading = listing.status === 'loading';
+  const category = listing.category;
+  const brand = listing.brand;
+  const products = useMemo(() => (listing.products ?? []) as unknown as Product[], [listing.products]);
 
-  // Get search query from URL parameters
-  const searchParams = new URLSearchParams(location.search);
-  const searchQuery = searchParams.get('search') || '';
-
-  // Wave 3: products + joins from the Convex catalog (same shapes).
-  // Search filters locally (30 products) — no ilike round-trip.
-  const {
-    products: catalogProducts,
-    categories: catalogCategories,
-    productCategories,
-    loading: catalogLoading,
-  } = useFullCatalog();
-
-  useEffect(() => {
-    if (catalogLoading) return;
-    if (isProductsPage) {
-      fetchAllProducts();
-    } else if (slug) {
-      fetchCategory();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, isProductsPage, searchQuery, catalogLoading]);
-
-  const fetchAllProducts = async () => {
-    setIsLoading(true);
-    try {
-      let rows = (catalogProducts as any[]).filter((p: any) => p.is_active);
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        rows = rows.filter(
-          (p: any) =>
-            String(p.name || '').toLowerCase().includes(q) ||
-            String(p.description || '').toLowerCase().includes(q),
-        );
-      }
-
-      rows = [...rows].sort(
-        (a: any, b: any) =>
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
-      );
-
-      setProducts(rows as Product[]);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setOpError('Failed to load products');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchCategory = async () => {
-    if (!slug) return;
-    setIsLoading(true);
-
-    try {
-      const categoryData = (catalogCategories as any[]).find((c: any) => c.slug === slug);
-      if (!categoryData) {
-        navigate('/404');
-        return;
-      }
-
-      setCategory({
-        id: categoryData.supabaseId,
-        name: categoryData.name,
-        description: categoryData.description,
-        image: categoryData.image,
-        meta_title: categoryData.metaTitle || '',
-        meta_description: categoryData.metaDescription || '',
-      });
-
-      const byId = new Map((catalogProducts as any[]).map((p: any) => [p.id, p]));
-      const categoryProducts = (productCategories as any[])
-        .filter((j: any) => j.categorySupabaseId === categoryData.supabaseId)
-        .map((j: any) => byId.get(j.productSupabaseId))
-        .filter((p: any) => p && p.is_active);
-      setProducts(categoryProducts as Product[]);
-    } catch (error) {
-      console.error('Error fetching category:', error);
-      setOpError('Failed to load category');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddToCart = async (product: Product) => {
-    try {
-      await addToCart(product, 1);
-      setOpOk(`${product.name} added to cart!`);
-    } catch (error) {
-      setOpError('Failed to add to cart');
-    }
-  };
-
-  // Sort products
   const sortedProducts = useMemo(() => {
     const sorted = [...products];
     switch (sortBy) {
       case 'price-low':
-        return sorted.sort((a, b) => {
-          const priceA = a.product_variants?.find((v: any) => v.is_default)?.price || 0;
-          const priceB = b.product_variants?.find((v: any) => v.is_default)?.price || 0;
-          return priceA - priceB;
-        });
+        return sorted.sort((a, b) => priceOf(a) - priceOf(b));
       case 'price-high':
-        return sorted.sort((a, b) => {
-          const priceA = a.product_variants?.find((v: any) => v.is_default)?.price || 0;
-          const priceB = b.product_variants?.find((v: any) => v.is_default)?.price || 0;
-          return priceB - priceA;
-        });
+        return sorted.sort((a, b) => priceOf(b) - priceOf(a));
       case 'newest':
         return sorted.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       default: // name
@@ -158,9 +60,10 @@ export function CategoryPage() {
     }
   }, [products, sortBy]);
 
-  const pageTitle = category?.meta_title || category?.name || 'Products';
-  const pageDescription = category?.meta_description || category?.description || 'Premium tobacco products';
-  const listName = category?.name || (searchQuery ? 'search_results' : 'all_products');
+  const seo = category
+    ? listingSeo({ category, brand, products: sortedProducts, siteName: store.name, primaryHost })
+    : null;
+  const listName = brand ? `${category?.name ?? ''} ${brand.name}`.trim() : category?.name || 'category';
 
   // GA4 view_item_list: once per distinct result set.
   const listSentRef = useRef<string | null>(null);
@@ -172,14 +75,23 @@ export function CategoryPage() {
     trackViewItemList(sortedProducts, listName);
   }, [sortedProducts, isLoading, listName]);
 
+  const handleAddToCart = async (product: Product) => {
+    try {
+      await addToCart(product, 1);
+      setOpOk(`${product.name} added to cart!`);
+    } catch (error) {
+      setOpError('Failed to add to cart');
+    }
+  };
+
   const sortOptions = [
     { label: 'Name (A-Z)', value: 'name' },
     { label: 'Price: Low to High', value: 'price-low' },
     { label: 'Price: High to Low', value: 'price-high' },
-    { label: 'Newest First', value: 'newest' }
+    { label: 'Newest First', value: 'newest' },
   ];
 
-  if (isLoading) {
+  if (isLoading || !seo) {
     return (
       <div className="min-h-screen bg-creme flex items-center justify-center">
         <div className="text-center">
@@ -193,21 +105,23 @@ export function CategoryPage() {
   return (
     <>
       <SEOHead
-        title={pageTitle}
-        description={pageDescription}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
         url={location.pathname}
         type="website"
         keywords={[category?.name || 'tobacco products']}
+        extraJsonLd={seo.extraJsonLd}
       />
 
       <div className="min-h-screen bg-creme pb-16">
+        <BreadcrumbNav customBreadcrumbs={seo.visibleCrumbs} />
+
         {/* Header Section */}
         <div className="bg-creme-light border-b border-coyote/10">
           <div className="main-container py-12 md:py-20">
             <div className="text-center max-w-3xl mx-auto">
-              <h1 className="font-serif text-3xl md:text-5xl text-dark mb-4">
-                {category?.name || (searchQuery ? `Search: "${searchQuery}"` : 'All Products')}
-              </h1>
+              <h1 className="font-serif text-3xl md:text-5xl text-dark mb-4">{seo.heading}</h1>
               {category?.description && (
                 <p className="text-dark/70 font-sans text-base md:text-lg leading-relaxed">
                   {category.description}
@@ -239,7 +153,7 @@ export function CategoryPage() {
                 >
                   <span className="flex items-center gap-2">
                     <SlidersHorizontal className="w-4 h-4" />
-                    {sortOptions.find(o => o.value === sortBy)?.label}
+                    {sortOptions.find((o) => o.value === sortBy)?.label}
                   </span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${showMobileSort ? 'rotate-180' : ''}`} />
                 </Button>
@@ -252,7 +166,7 @@ export function CategoryPage() {
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent align="end">
-                    {sortOptions.map(opt => (
+                    {sortOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -280,7 +194,7 @@ export function CategoryPage() {
           {/* Mobile Sort Dropdown */}
           {showMobileSort && (
             <div className="sm:hidden mt-3 bg-white border border-coyote/20 rounded-xl overflow-hidden shadow-lg">
-              {sortOptions.map(opt => (
+              {sortOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => { setSortBy(opt.value); setShowMobileSort(false); }}
@@ -308,8 +222,8 @@ export function CategoryPage() {
             </div>
           ) : (
             <div className={`grid gap-4 md:gap-6 ${
-              viewMode === 'grid' 
-                ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' 
+              viewMode === 'grid'
+                ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
                 : 'grid-cols-1 md:grid-cols-2'
             }`}>
               {sortedProducts.map((product, index) => (
@@ -329,4 +243,8 @@ export function CategoryPage() {
       </div>
     </>
   );
+}
+
+function priceOf(p: Product): number {
+  return p.product_variants?.find((v) => v.is_default)?.price || 0;
 }

@@ -46,6 +46,9 @@ interface SEOHeadProps {
   additionalOffers?: Array<{ price: number; url: string; availability: 'in stock' | 'out of stock' }>;
   // Alt text for og:image / twitter:image (defaults to the title).
   imageAlt?: string;
+  // Use title exactly as given (no site title template). Listing pages carry the
+  // bot renderer's titles verbatim, which may omit the site name.
+  titleVerbatim?: boolean;
 }
 
 export function SEOHead({
@@ -79,6 +82,7 @@ export function SEOHead({
   productImages,
   additionalOffers,
   imageAlt,
+  titleVerbatim = false,
 }: SEOHeadProps) {
   // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
   // The 512px icon is a valid image for Organization/publisher logos (never a share image).
@@ -92,7 +96,7 @@ export function SEOHead({
   const description =
     descriptionProp ??
     (store.seo.defaultDescription || `Browse ${siteName} products online.`);
-  const fullTitle = title.includes(siteName)
+  const fullTitle = titleVerbatim || title.includes(siteName)
     ? title
     : store.seo.titleTemplate.replace('%s', title);
   
@@ -311,7 +315,8 @@ export function SEOHead({
       <meta name="title" content={fullTitle} />
       <meta name="description" content={optimizedDescription} />
       <meta name="keywords" content={keywords.join(', ')} />
-      <link rel="canonical" href={canonicalUrl} />
+      {/* noindex pages (404) carry no canonical, as the bot renderer's 404 does */}
+      {!robots.includes('noindex') && <link rel="canonical" href={canonicalUrl} />}
 
       {/* Open Graph / Facebook — og:type must be website/article, never "product" */}
       <meta property="og:type" content={ogType} />

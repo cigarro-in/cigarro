@@ -202,3 +202,34 @@ export function useCatalogCombos() {
   const rows = usePreloadedOrLive(api.catalog.listCombos, { activeOnly: true, orgSlug: orgSlug });
   return useMemo(() => ({ combos: rows ?? [] }), [rows]);
 }
+
+// Category listing (/category/:slug) and category+brand listing
+// (/category/:category/:brand). Derived from the full catalog, so the server
+// render and the client's first render produce the same rows. `missing` is
+// the 404 case: unknown category, unknown or inactive brand, or an empty
+// category+brand combo (the bot renderer returns 404 for the same inputs).
+export type ListingStatus = 'loading' | 'ok' | 'missing';
+
+export function useCategoryListing(categorySlug: string | undefined, brandSlug?: string) {
+  const { products, brands, categories, productCategories, loading } = useFullCatalog();
+  return useMemo(() => {
+    const empty = { status: 'loading' as ListingStatus, category: null, brand: null, products: [] as LegacyProduct[] };
+    if (loading) return empty;
+    const category = categorySlug
+      ? ((categories as any[]).find((c: any) => c.slug === categorySlug) ?? null)
+      : null;
+    if (!category) return { ...empty, status: 'missing' as ListingStatus };
+    const brand = brandSlug
+      ? ((brands as any[]).find((b: any) => b.slug === brandSlug && b.isActive) ?? null)
+      : null;
+    if (brandSlug && !brand) return { ...empty, status: 'missing' as ListingStatus, category };
+    const byId = new Map(products.map((p) => [p.id, p]));
+    let rows = (productCategories as any[])
+      .filter((j: any) => j.categorySupabaseId === category.supabaseId)
+      .map((j: any) => byId.get(j.productSupabaseId))
+      .filter((p: any): p is LegacyProduct => !!p && p.is_active);
+    if (brand) rows = rows.filter((p) => p.brand_id === brand.supabaseId);
+    if (brand && rows.length === 0) return { ...empty, status: 'missing' as ListingStatus, category, brand };
+    return { status: 'ok' as ListingStatus, category, brand, products: rows };
+  }, [categorySlug, brandSlug, products, brands, categories, productCategories, loading]);
+}

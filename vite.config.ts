@@ -29,7 +29,22 @@ export default defineConfig({
         // when the app applies the update.
         skipWaiting: false,
         clientsClaim: true,
+        // Document requests go to the network first. A cached storefront
+        // document can be an older SSR render that no longer matches the
+        // client bundle (React #418 on return visits). Cached copies answer
+        // only when the network fails, and no precached shell is served for
+        // navigations.
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
           // CDN images load directly. Intercepting cross-origin image requests
           // here can make Workbox reject otherwise healthy R2 responses.
           // Cache API responses (homepage data, products, etc.). Never on the

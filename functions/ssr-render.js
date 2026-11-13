@@ -83,6 +83,7 @@ async function loadShell(context) {
 // otherwise duplicate title, description, canonical and social tags.
 const STATIC_HEAD_TO_REPLACE = [
   'title',
+  'meta[name="robots"]',
   'meta[name="description"]',
   'meta[name="keywords"]',
   'meta[name="title"]',

@@ -112,19 +112,51 @@ function trimFullCatalogRows(rows: unknown, drop: string[] | undefined): unknown
   return rows.map((row) => without(row, drop));
 }
 
-export function trimProductPreload(preload: PreloadMap): PreloadMap {
+// Walks every fullCatalog bundle in the preload map and drops fields per table.
+// Collections are never read by the catalog routes, so they are always dropped.
+function trimCatalogBundles(preload: PreloadMap, drop: Record<string, string[] | undefined>): PreloadMap {
   const out: PreloadMap = { ...preload };
   for (const key of Object.keys(out)) {
     const bundle = out[key] as Record<string, unknown> | null;
     if (!key.startsWith('catalog:fullCatalog:') || !bundle || typeof bundle !== 'object') continue;
     out[key] = {
       ...bundle,
-      products: trimFullCatalogRows(bundle.products, TRIM_FULLCATALOG.products),
-      variants: trimFullCatalogRows(bundle.variants, TRIM_FULLCATALOG.variants),
-      brands: trimFullCatalogRows(bundle.brands, TRIM_FULLCATALOG.brands),
-      categories: trimFullCatalogRows(bundle.categories, TRIM_FULLCATALOG.categories),
+      products: trimFullCatalogRows(bundle.products, drop.products),
+      variants: trimFullCatalogRows(bundle.variants, drop.variants),
+      brands: trimFullCatalogRows(bundle.brands, drop.brands),
+      categories: trimFullCatalogRows(bundle.categories, drop.categories),
       collections: [],
       collectionProducts: [],
+    };
+  }
+  return out;
+}
+
+export function trimProductPreload(preload: PreloadMap): PreloadMap {
+  return trimCatalogBundles(preload, TRIM_FULLCATALOG);
+}
+
+// Category listings read the category's own copy (description, meta), the
+// product rows and each variant's first image (cards and the header read
+// images[0] only). Brand copy is not read on these routes: brand name and slug only.
+const TRIM_CATEGORY: Record<string, string[]> = {
+  products: [...TRIM_FULLCATALOG.products, 'description'],
+  variants: ['_id', 'createdAt', 'updatedAt'],
+  brands: ['_id', 'createdAt', 'updatedAt', 'description', 'heritage', 'metaDescription', 'metaTitle'],
+  categories: ['_id', 'createdAt', 'updatedAt', 'image', 'imageAltText'],
+};
+
+export function trimCategoryPreload(preload: PreloadMap): PreloadMap {
+  const out = trimCatalogBundles(preload, TRIM_CATEGORY);
+  for (const key of Object.keys(out)) {
+    const bundle = out[key] as { variants?: unknown } | null;
+    if (!key.startsWith('catalog:fullCatalog:') || !bundle || !Array.isArray(bundle.variants)) continue;
+    out[key] = {
+      ...bundle,
+      variants: bundle.variants.map((v) => {
+        const row = v as { images?: unknown };
+        return Array.isArray(row.images) ? { ...row, images: row.images.slice(0, 1) } : v;
+      }),
     };
   }
   return out;
@@ -167,7 +199,41 @@ const productRoute: SsrRoute = {
   trimPreload: (preload) => trimProductPreload(preload),
 };
 
-const SSR_ROUTES: SsrRoute[] = [homeRoute, productRoute];
+// Category listing (/category/:slug) and category+brand listing
+// (/category/:category/:brand). Mirrors useCategoryListing: site settings for the
+// shell and head, and the full catalog for the rows. No Convex calls beyond that.
+const CATEGORY_PATH = /^\/category\/([^/]+)\/?$/;
+const CATEGORY_BRAND_PATH = /^\/category\/([^/]+)\/([^/]+)\/?$/;
+
+function categoryPreloadRequests(org: OrgInfo): PreloadRequest[] {
+  const orgSlug = org.slug;
+  return [
+    { fnName: 'content:getSiteSettings', args: { orgSlug } },
+    { fnName: 'catalog:fullCatalog', args: { orgSlug } },
+  ];
+}
+
+const categoryRoute: SsrRoute = {
+  id: 'category',
+  match(pathname) {
+    const m = CATEGORY_PATH.exec(pathname);
+    return m ? { slug: safeDecode(m[1]) } : null;
+  },
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload) => trimCategoryPreload(preload),
+};
+
+const categoryBrandRoute: SsrRoute = {
+  id: 'category-brand',
+  match(pathname) {
+    const m = CATEGORY_BRAND_PATH.exec(pathname);
+    return m ? { category: safeDecode(m[1]), brand: safeDecode(m[2]) } : null;
+  },
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload) => trimCategoryPreload(preload),
+};
+
+const SSR_ROUTES: SsrRoute[] = [homeRoute, productRoute, categoryRoute, categoryBrandRoute];
 
 // Route that serves a pathname, with its params. Null when no SSR route matches.
 export function matchSsrRoute(pathname: string): { route: SsrRoute; params: Record<string, string> } | null {
@@ -190,16 +256,16 @@ export function planSsrRoute(pathname: string, org: OrgInfo) {
   };
 }
 
-// SSR_ROUTES flag entries: an exact path ("/") or a single-segment wildcard
-// ("/product/*", one slug, no further slashes).
+// SSR_ROUTES flag entries: an exact path ("/"), a path with '*' segments (each
+// '*' matches exactly one non-empty segment: "/product/*", "/category/*/*"), or
+// "*" for every SSR-capable route (the route table still decides the match).
 export function flagCovers(pattern: string, pathname: string): boolean {
-  if (pattern.endsWith('/*')) {
-    const prefix = pattern.slice(0, -1); // keeps the trailing slash
-    if (!pathname.startsWith(prefix)) return false;
-    const rest = pathname.slice(prefix.length);
-    return rest.length > 0 && !rest.includes('/');
-  }
-  return pattern === pathname;
+  if (pattern === '*') return true;
+  if (!pattern.includes('*')) return pattern === pathname;
+  const want = pattern.split('/');
+  const got = pathname.split('/');
+  if (want.length !== got.length) return false;
+  return want.every((seg, i) => (seg === '*' ? got[i].length > 0 : seg === got[i]));
 }
 
 function helmetToHead(state: HelmetServerState | undefined): string {

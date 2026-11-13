@@ -7,6 +7,7 @@ import { createContext, lazy, useContext, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { CategoryRoute } from './eagerRoutes';
 
 import { Slot } from '../themes';
 
@@ -15,7 +16,6 @@ const HomePage = () => <Slot name="Home" />;
 const CartPage = () => <Slot name="Cart" />;
 const ProductPage = () => <Slot name="Product" />;
 const ProductsPage = () => <Slot name="Products" />;
-const CategoryPage = () => <Slot name="Category" />;
 const CategoriesPage = () => <Slot name="Categories" />;
 const ProfilePage = () => <Slot name="Profile" />;
 const ProfileSettingsPage = () => <Slot name="ProfileSettings" />;
@@ -108,8 +108,8 @@ export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) =>
       <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductPage />} />
       <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
       <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
-      <Route path={ROUTES.CATEGORY} element={<CategoryPage />} />
-      <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryPage />} />
+      <Route path={ROUTES.CATEGORY} element={<CategoryRoute />} />
+      <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryRoute />} />
       <Route path={ROUTES.BRANDS} element={<BrandsPage />} />
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandPage />} />
 

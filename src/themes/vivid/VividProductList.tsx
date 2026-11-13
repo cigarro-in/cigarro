@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
-import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useCategoryListing, useFullCatalog } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { trackViewItemList } from '../../lib/analytics/ga';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { listingSeo } from '../../lib/seo/listingSeo';
 import { VividProductCard } from './VividProductCard';
 import { VividCartPanel } from './VividCartPanel';
 import type { HomepageProduct } from '../../types/home';
@@ -18,22 +21,38 @@ type SortKey = 'relevance' | 'price-low' | 'price-high' | 'newest';
 
 interface Props {
   mode: 'all' | 'category';
+  /** Category mode: set by the route (/category/:slug or /category/:category/:brand). */
+  categorySlug?: string;
+  brandSlug?: string;
 }
 
-export function VividProductList({ mode }: Props) {
-  const { slug } = useParams<{ slug: string }>();
+export function VividProductList({ mode, categorySlug, brandSlug }: Props) {
   const location = useLocation();
   const [sort, setSort] = useState<SortKey>('relevance');
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
 
   const search = new URLSearchParams(location.search).get('search') || '';
 
   // Wave 3: list rows from the Convex catalog (same shapes). Search filters
   // locally — no ilike round-trip.
-  const { products: catalogProducts, categories: catalogCategories, productCategories, loading } =
+  const { products: catalogProducts, categories: catalogCategories, productCategories, loading: catalogLoading } =
     useFullCatalog();
+  const listing = useCategoryListing(mode === 'category' ? categorySlug : undefined, brandSlug);
+  const loading = mode === 'all' ? catalogLoading : listing.status === 'loading';
 
   const data: ListResult | null = useMemo(() => {
     if (loading) return null;
+    if (mode === 'category') {
+      if (listing.status !== 'ok' || !listing.category) {
+        return { products: [], categoryName: null, categoryDescription: null };
+      }
+      return {
+        products: normalize(listing.products as any[]),
+        categoryName: listing.category.name,
+        categoryDescription: listing.category.description || null,
+      };
+    }
     if (mode === 'all') {
       const q = search.trim().toLowerCase();
       let rows = (catalogProducts as any[]).filter((p: any) => p.is_active);
@@ -50,20 +69,8 @@ export function VividProductList({ mode }: Props) {
       );
       return { products: normalize(rows), categoryName: null, categoryDescription: null };
     }
-    if (!slug) return { products: [], categoryName: null, categoryDescription: null };
-    const cat = (catalogCategories as any[]).find((c: any) => c.slug === slug);
-    if (!cat) return { products: [], categoryName: null, categoryDescription: null };
-    const byId = new Map((catalogProducts as any[]).map((p: any) => [p.id, p]));
-    const inner = (productCategories as any[])
-      .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
-      .map((j: any) => byId.get(j.productSupabaseId))
-      .filter((p: any) => p && p.is_active);
-    return {
-      products: normalize(inner),
-      categoryName: cat.name,
-      categoryDescription: cat.description || null,
-    };
-  }, [mode, slug, search, catalogProducts, catalogCategories, productCategories, loading]);
+    return { products: [], categoryName: null, categoryDescription: null };
+  }, [mode, search, catalogProducts, listing, loading]);
 
   const products = data?.products || [];
   const categoryName = data?.categoryName || null;
@@ -89,12 +96,17 @@ export function VividProductList({ mode }: Props) {
     }
   }, [products, sort]);
 
-  const title =
-    mode === 'category' && categoryName
-      ? categoryName
-      : search
-      ? `Search: "${search}"`
-      : 'All Products';
+  // Category listings share the bot-parity head model with the classic theme.
+  const seo =
+    mode === 'category' && listing.status === 'ok' && listing.category
+      ? listingSeo({ category: listing.category, brand: listing.brand, products, siteName: store.name, primaryHost })
+      : null;
+
+  const title = seo
+    ? seo.heading
+    : search
+    ? `Search: "${search}"`
+    : 'All Products';
   const listName =
     mode === 'category' ? categoryName || 'category' : search ? 'search_results' : 'all_products';
 
@@ -111,18 +123,44 @@ export function VividProductList({ mode }: Props) {
   return (
     <>
       <SEOHead
-        title={title}
-        description={categoryDescription || 'Premium tobacco products'}
+        title={seo ? seo.title : title}
+        titleVerbatim={!!seo}
+        description={seo ? seo.description : categoryDescription || 'Premium tobacco products'}
         url={location.pathname}
         type="website"
+        extraJsonLd={seo?.extraJsonLd}
       />
 
       <div className="max-w-[1280px] mx-auto px-4 pt-6 pb-10 grid gap-5 md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
+          {seo && (
+            <nav aria-label="Breadcrumb" className="text-sm text-[var(--color-muted-foreground)] mb-3">
+              <ol className="flex flex-wrap gap-1">
+                <li>
+                  <Link to="/" className="hover:text-[var(--color-primary)]">Home</Link>
+                  <span className="mx-1">/</span>
+                </li>
+                {seo.visibleCrumbs.map((c, i) => (
+                  <li key={c.label}>
+                    {c.href ? (
+                      <>
+                        <Link to={c.href} className="hover:text-[var(--color-primary)]">{c.label}</Link>
+                        <span className="mx-1">/</span>
+                      </>
+                    ) : (
+                      <span aria-current={i === seo.visibleCrumbs.length - 1 ? 'page' : undefined}>{c.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-[var(--color-foreground)]">{title}</h1>
-            {categoryDescription && (
-              <p className="text-[var(--color-muted-foreground)] text-sm mt-1">{categoryDescription}</p>
+            {(seo ? seo.description : categoryDescription) && (
+              <p className="text-[var(--color-muted-foreground)] text-sm mt-1">
+                {seo ? seo.description : categoryDescription}
+              </p>
             )}
           </div>
 
