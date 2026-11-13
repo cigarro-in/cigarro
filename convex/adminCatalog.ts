@@ -14,7 +14,7 @@ import {
 } from "./lib/hosts";
 import { dropRedirectForLivePath, recordSlugChange } from "./redirects";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
-import { storeAgeGateV, storeBrandV, storeBusinessV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
+import { storeAgeGateV, storeBrandV, storeBusinessV, storeReferralV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 import { orderNumberOf } from "./lib/ids";
 
@@ -1715,6 +1715,7 @@ export const saveSiteSettings = mutation({
     business: v.optional(storeBusinessV),
     ageGate: v.optional(storeAgeGateV),
     referralRewardPaise: v.optional(v.number()),
+    referral: v.optional(storeReferralV),
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
   },
@@ -1733,6 +1734,24 @@ export const saveSiteSettings = mutation({
       (!Number.isInteger(rest.referralRewardPaise) || rest.referralRewardPaise < 0)
     )
       throw new ConvexError({ code: "INVALID_REFERRAL_REWARD" });
+    if (rest.referral) {
+      const r = rest.referral;
+      const rewardOk = (x: { type: string; value: number }) =>
+        Number.isFinite(x.value) &&
+        x.value >= 0 &&
+        (x.type === "fixed" ? Number.isInteger(x.value) : x.value <= 100);
+      if (
+        !rewardOk(r.referrerReward) ||
+        !rewardOk(r.refereeReward) ||
+        !Number.isInteger(r.minOrderPaise) ||
+        r.minOrderPaise < 0 ||
+        !Number.isInteger(r.maxRewardsPerReferrer) ||
+        r.maxRewardsPerReferrer < 0 ||
+        !Number.isInteger(r.expiryDays) ||
+        r.expiryDays < 0
+      )
+        throw new ConvexError({ code: "INVALID_REFERRAL_RULES" });
+    }
     const found = await readOrgSiteSettings(ctx, org);
     if (found && !inOrg(found as any, org)) throw new ConvexError({ code: "NOT_FOUND" });
     const patch = {

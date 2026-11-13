@@ -8,11 +8,11 @@ import { getAccessToken } from '../../lib/auth/session';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check, Truck } from 'lucide-react';
+import { Save, RefreshCw, Globe, CreditCard, AlertCircle, Map, Database, ExternalLink, Zap, FileText, Cloud, Palette, Check, Truck, Gift } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { DEFAULT_SHIPPING_METHODS, mergeShippingMethods, toShippingConfig, type ShippingMethod } from '../../lib/shipping';
-import { resolveStoreSettings, type RawStoreSettings, type StoreSettings, type StoreStateMinAge } from '../../lib/storeSettings';
-import { rupeesToPaise } from '../../lib/convex/money';
+import { resolveStoreSettings, type RawStoreSettings, type ReferralRewardRule, type StoreReferralRules, type StoreSettings, type StoreStateMinAge } from '../../lib/storeSettings';
+import { paiseToRupees, rupeesToPaise } from '../../lib/convex/money';
 import { siteConfig } from '../../config/site';
 import { useTheme } from '../../themes';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -49,6 +49,7 @@ interface PerformanceResult {
 
 export function SettingsManager() {
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const referralStatus = useInlineStatus();
   const [settings, setSettings] = useState<SiteSettings>({
     id: 1,
     site_name: '',
@@ -270,6 +271,18 @@ export function SettingsManager() {
       setOpError('Minimum ages must be whole numbers between 0 and 100');
       return;
     }
+    const ref = store.referral;
+    const rewardInvalid = (r: ReferralRewardRule) =>
+      !Number.isFinite(r.value) || r.value < 0 || (r.type === 'percent' && r.value > 100);
+    if (rewardInvalid(ref.referrerReward) || rewardInvalid(ref.refereeReward)) {
+      referralStatus.setError('Percent rewards must be between 0 and 100');
+      return;
+    }
+    if (ref.minOrderPaise < 0 || ref.maxRewardsPerReferrer < 0 || ref.expiryDays < 0) {
+      referralStatus.setError('Minimum order, reward cap and expiry cannot be negative');
+      return;
+    }
+    referralStatus.clear();
 
     setIsSaving(true);
     try {
@@ -307,7 +320,15 @@ export function SettingsManager() {
             .map((r) => ({ state: r.state.trim(), minAge: r.minAge }))
             .filter((r) => r.state !== ''),
         },
-        referralRewardPaise: rupeesToPaise(store.referralRewardRupees),
+        referral: {
+          enabled: ref.enabled,
+          referrerReward: ref.referrerReward,
+          refereeReward: ref.refereeReward,
+          minOrderPaise: Math.round(ref.minOrderPaise),
+          creditWhen: ref.creditWhen,
+          maxRewardsPerReferrer: Math.floor(ref.maxRewardsPerReferrer),
+          expiryDays: Math.floor(ref.expiryDays),
+        },
         seo: {
           titleTemplate: store.seo.titleTemplate.trim() || undefined,
           defaultDescription: store.seo.defaultDescription.trim() || undefined,
@@ -391,6 +412,21 @@ export function SettingsManager() {
     setIsDirty(true);
   };
 
+  const patchReferral = (patch: Partial<StoreReferralRules>) => {
+    setStore((prev) => ({ ...prev, referral: { ...prev.referral, ...patch } }));
+    setIsDirty(true);
+  };
+
+  // Fixed rewards are stored as paise; percent rewards as 0-100.
+  const setRewardType = (key: 'referrerReward' | 'refereeReward', type: ReferralRewardRule['type']) =>
+    patchReferral({ [key]: { type, value: 0 } } as Partial<StoreReferralRules>);
+
+  const setRewardValue = (key: 'referrerReward' | 'refereeReward', rule: ReferralRewardRule, input: number) => {
+    const clean = Math.max(0, Number.isFinite(input) ? input : 0);
+    const value = rule.type === 'fixed' ? rupeesToPaise(Math.floor(clean)) : Math.min(100, clean);
+    patchReferral({ [key]: { type: rule.type, value } } as Partial<StoreReferralRules>);
+  };
+
   const patchAddress = (patch: Partial<StoreSettings['business']['address']>) => {
     setStore((prev) => ({
       ...prev,
@@ -444,6 +480,7 @@ export function SettingsManager() {
             ['settings-brand', 'Brand'],
             ['settings-business', 'Business'],
             ['settings-age', 'Age gate'],
+            ['settings-referral', 'Refer & earn'],
             ['settings-seo', 'SEO'],
             ['settings-payments', 'Payments'],
             ['settings-delivery', 'Delivery'],
@@ -681,10 +718,10 @@ export function SettingsManager() {
           <AdminCardHeader>
             <AdminCardTitle className="flex items-center">
               <AlertCircle className="mr-2 h-5 w-5" />
-              Age Gate & Referrals
+              Age Gate
             </AdminCardTitle>
             <AdminCardDescription>
-              Entry age rules shown to visitors, and the reward paid for a referred first order
+              Entry age rules shown to visitors
             </AdminCardDescription>
           </AdminCardHeader>
           <AdminCardContent className="space-y-4">
@@ -700,34 +737,17 @@ export function SettingsManager() {
                 onCheckedChange={(checked) => patchSection('ageGate', { enabled: checked })}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="min_age">Minimum age</Label>
-                <Input
-                  id="min_age"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={store.ageGate.minAge}
-                  onChange={(e) => patchSection('ageGate', { minAge: Number(e.target.value) || 0 })}
-                  className="max-w-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="referral_reward">Referral reward (₹)</Label>
-                <Input
-                  id="referral_reward"
-                  type="number"
-                  min={0}
-                  value={store.referralRewardRupees}
-                  onChange={(e) => {
-                    setStore((prev) => ({ ...prev, referralRewardRupees: Math.max(0, Number(e.target.value) || 0) }));
-                    setIsDirty(true);
-                  }}
-                  className="max-w-xs"
-                />
-                <p className="text-xs text-muted-foreground">Paid to both people when a referred first order is delivered</p>
-              </div>
+            <div className="space-y-1">
+              <Label htmlFor="min_age">Minimum age</Label>
+              <Input
+                id="min_age"
+                type="number"
+                min={0}
+                max={100}
+                value={store.ageGate.minAge}
+                onChange={(e) => patchSection('ageGate', { minAge: Number(e.target.value) || 0 })}
+                className="max-w-xs"
+              />
             </div>
             <div className="space-y-2">
               <Label>State-specific minimum ages</Label>
@@ -771,6 +791,138 @@ export function SettingsManager() {
               >
                 Add state rule
               </Button>
+            </div>
+          </AdminCardContent>
+        </AdminCard>
+
+        {/* Refer & earn */}
+        <AdminCard id="settings-referral" className="scroll-mt-24">
+          <AdminCardHeader>
+            <AdminCardTitle className="flex items-center">
+              <Gift className="mr-2 h-5 w-5" />
+              Refer & earn
+            </AdminCardTitle>
+            <AdminCardDescription>
+              Rewards for inviting friends. When off, customers get no referral codes, rewards or referral pages.
+            </AdminCardDescription>
+          </AdminCardHeader>
+          <AdminCardContent className="space-y-6">
+            <InlineStatus status={referralStatus.status} />
+
+            <div className="flex items-center justify-between p-4 border border-border/20 rounded-lg">
+              <div>
+                <Label>Refer & earn is on</Label>
+                <p className="text-xs text-muted-foreground">
+                  {store.referral.enabled ? 'Customers can invite friends and earn rewards' : 'Referral program is hidden from customers'}
+                </p>
+              </div>
+              <Switch
+                checked={store.referral.enabled}
+                onCheckedChange={(checked) => patchReferral({ enabled: checked })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(['referrerReward', 'refereeReward'] as const).map((key) => {
+                const rule = store.referral[key];
+                const isFixed = rule.type === 'fixed';
+                return (
+                  <div key={key} className="space-y-2">
+                    <Label>{key === 'referrerReward' ? 'Referrer reward' : 'New customer reward'}</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {key === 'referrerReward' ? 'Paid to the person who shared the code' : 'Paid to the friend who joined with the code'}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isFixed ? 'default' : 'outline'}
+                        onClick={() => setRewardType(key, 'fixed')}
+                      >
+                        Fixed ₹
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={!isFixed ? 'default' : 'outline'}
+                        onClick={() => setRewardType(key, 'percent')}
+                      >
+                        % of order
+                      </Button>
+                    </div>
+                    <Input
+                      aria-label={isFixed ? 'Reward in rupees' : 'Reward percent of order'}
+                      type="number"
+                      min={0}
+                      max={isFixed ? undefined : 100}
+                      step={isFixed ? 1 : 0.5}
+                      value={isFixed ? paiseToRupees(rule.value) : rule.value}
+                      onChange={(e) => setRewardValue(key, rule, Number(e.target.value))}
+                      className="max-w-xs"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <Label htmlFor="referral_min_order">Minimum order (₹)</Label>
+                <Input
+                  id="referral_min_order"
+                  type="number"
+                  min={0}
+                  value={paiseToRupees(store.referral.minOrderPaise)}
+                  onChange={(e) => patchReferral({ minOrderPaise: rupeesToPaise(Math.max(0, Number(e.target.value) || 0)) })}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">Orders below this do not qualify</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Credit reward when</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={store.referral.creditWhen === 'paid' ? 'default' : 'outline'}
+                    onClick={() => patchReferral({ creditWhen: 'paid' })}
+                  >
+                    Order paid
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={store.referral.creditWhen === 'delivered' ? 'default' : 'outline'}
+                    onClick={() => patchReferral({ creditWhen: 'delivered' })}
+                  >
+                    Order delivered
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="referral_max">Max rewards per referrer</Label>
+                <Input
+                  id="referral_max"
+                  type="number"
+                  min={0}
+                  value={store.referral.maxRewardsPerReferrer}
+                  onChange={(e) => patchReferral({ maxRewardsPerReferrer: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">0 means no limit</p>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="referral_expiry">Credit expiry (days)</Label>
+                <Input
+                  id="referral_expiry"
+                  type="number"
+                  min={0}
+                  value={store.referral.expiryDays}
+                  onChange={(e) => patchReferral({ expiryDays: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">0 means credits never expire</p>
+              </div>
             </div>
           </AdminCardContent>
         </AdminCard>

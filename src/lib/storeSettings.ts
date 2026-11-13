@@ -21,6 +21,22 @@ export interface StoreAddress {
   pincode: string;
 }
 
+export interface ReferralRewardRule {
+  type: 'fixed' | 'percent';
+  value: number; // fixed: paise; percent: 0-100
+}
+
+// Refer & earn program rules, normalized (see convex/lib/siteSettings.ts).
+export interface StoreReferralRules {
+  enabled: boolean;
+  referrerReward: ReferralRewardRule;
+  refereeReward: ReferralRewardRule;
+  minOrderPaise: number;
+  creditWhen: 'paid' | 'delivered';
+  maxRewardsPerReferrer: number; // 0 = unlimited
+  expiryDays: number; // 0 = never
+}
+
 export interface StoreSettings {
   name: string;
   metaTitle: string;
@@ -37,6 +53,7 @@ export interface StoreSettings {
   ageGate: { enabled: boolean; minAge: number; stateMinAge: StoreStateMinAge[] };
   referralRewardPaise: number;
   referralRewardRupees: number;
+  referral: StoreReferralRules;
   seo: {
     titleTemplate: string;
     defaultDescription: string;
@@ -74,6 +91,7 @@ export interface RawStoreSettings {
     stateMinAge: StoreStateMinAge[];
   } | null;
   referralRewardPaise?: number | null;
+  referral?: Partial<StoreReferralRules> | null;
   seo?: Partial<StoreSettings['seo']> | null;
   socials?: Partial<StoreSettings['socials']> | null;
 }
@@ -85,6 +103,38 @@ const str = (v: unknown, fallback = ''): string =>
 const DEFAULT_META_TITLE = 'Cigarro';
 const DEFAULT_META_DESCRIPTION = 'The finest selection of premium cigarettes and cigars.';
 
+/** Human copy for one reward rule: "₹100" or "5% of the order". */
+export function formatReferralReward(rule: ReferralRewardRule): string {
+  if (rule.type === 'fixed') return `₹${paiseToRupees(rule.value)}`;
+  return `${rule.value}% of the order`;
+}
+
+// Rows saved before the program existed use the flat reward for both sides.
+function resolveReferral(raw: RawStoreSettings | null | undefined, flatPaise: number): StoreReferralRules {
+  const flat: ReferralRewardRule = { type: 'fixed', value: flatPaise };
+  const r = raw?.referral;
+  if (!r) {
+    return {
+      enabled: true,
+      referrerReward: flat,
+      refereeReward: flat,
+      minOrderPaise: 0,
+      creditWhen: 'delivered',
+      maxRewardsPerReferrer: 0,
+      expiryDays: 0,
+    };
+  }
+  return {
+    enabled: r.enabled !== false,
+    referrerReward: r.referrerReward ?? flat,
+    refereeReward: r.refereeReward ?? flat,
+    minOrderPaise: r.minOrderPaise ?? 0,
+    creditWhen: r.creditWhen ?? 'delivered',
+    maxRewardsPerReferrer: r.maxRewardsPerReferrer ?? 0,
+    expiryDays: r.expiryDays ?? 0,
+  };
+}
+
 /** Pure normalizer: stored values win, missing values fall back to defaults. */
 export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettings {
   const d = siteConfig;
@@ -94,6 +144,7 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
     typeof raw?.referralRewardPaise === 'number'
       ? raw.referralRewardPaise
       : d.referralRewardPaise;
+  const referral = resolveReferral(raw, paise);
   return {
     name: str(raw?.siteName, d.name),
     metaTitle: str(raw?.metaTitle, DEFAULT_META_TITLE),
@@ -124,8 +175,10 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
         ? age.stateMinAge.map((s) => ({ state: s.state, minAge: s.minAge }))
         : d.ageGate.stateMinAge.map((s) => ({ ...s })),
     },
-    referralRewardPaise: paise,
-    referralRewardRupees: paiseToRupees(paise),
+    // Legacy flat mirror: the referee's fixed reward, or 0 for percent rules.
+    referralRewardPaise: referral.refereeReward.type === 'fixed' ? referral.refereeReward.value : 0,
+    referralRewardRupees: paiseToRupees(referral.refereeReward.type === 'fixed' ? referral.refereeReward.value : 0),
+    referral,
     seo: {
       titleTemplate: str(raw?.seo?.titleTemplate, d.seo.titleTemplate),
       defaultDescription: str(raw?.seo?.defaultDescription, d.seo.defaultDescription),

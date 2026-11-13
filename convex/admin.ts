@@ -6,7 +6,7 @@ import { freeSlot } from "./orders";
 import { orderStatus, shippingStatus } from "./schema";
 import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, returnOrderInventory } from "./lib/inventory";
-import { rewardDeliveredReferral } from "./referrals";
+import { rewardDeliveredReferral, rewardPaidReferral } from "./referrals";
 
 // ---------- Mark a pending order as paid manually ----------
 
@@ -46,6 +46,9 @@ export const markPaid = mutation({
         note: `manual:${reference}`,
       });
     }
+
+    // Refer & earn: rewards credited on payment when the store's rule says so.
+    await rewardPaidReferral(ctx, order, `admin:${identity.subject}`);
 
     await audit(ctx, {
       orgId: order.orgId,

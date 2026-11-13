@@ -162,14 +162,14 @@ export async function copyReferralLink(referralCode: string): Promise<boolean> {
 // =====================================================
 // SHARE REFERRAL LINK (Mobile Share API)
 // =====================================================
-export async function shareReferralLink(referralCode: string, rewardRupees: number): Promise<boolean> {
+export async function shareReferralLink(referralCode: string, rewardText: string): Promise<boolean> {
   try {
     const link = generateReferralLink(referralCode);
 
     if (navigator.share) {
       await navigator.share({
         title: 'Join us',
-        text: `Join using my referral code ${referralCode} and get ₹${rewardRupees} after your first order!`,
+        text: `Join using my referral code ${referralCode} and get ${rewardText} after your first order!`,
         url: link
       });
       return true;

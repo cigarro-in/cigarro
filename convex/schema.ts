@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { crashSource } from './lib/crashLog';
-import { storeAgeGateV, storeBrandV, storeBusinessV, storeSeoV, storeSocialsV } from './lib/siteSettings';
+import { storeAgeGateV, storeBrandV, storeBusinessV, storeReferralV, storeSeoV, storeSocialsV } from './lib/siteSettings';
 
 export const orderStatus = v.union(
   v.literal("pending"),
@@ -414,6 +414,7 @@ export default defineSchema({
     createdAt: v.number(),
     createdBy: v.string(),
     note: v.optional(v.string()),
+    expiresAt: v.optional(v.number()), // referral credits: when the reward lapses
   })
     .index("by_org_user_time", ["orgId", "userId", "createdAt"])
     .index("by_org_order", ["orgId", "relatedOrderId"]),
@@ -793,7 +794,8 @@ export default defineSchema({
     brand: v.optional(storeBrandV),
     business: v.optional(storeBusinessV),
     ageGate: v.optional(storeAgeGateV),
-    referralRewardPaise: v.optional(v.number()), // integer paise
+    referralRewardPaise: v.optional(v.number()), // integer paise (legacy flat reward; see `referral`)
+    referral: v.optional(storeReferralV), // Refer & earn program rules
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
     updatedAt: v.optional(v.number()),

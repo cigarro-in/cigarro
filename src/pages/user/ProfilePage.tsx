@@ -42,6 +42,8 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { paiseToRupees } from '../../lib/convex/money';
+import { useReferralProgram } from '../../hooks/data/useReferralProgram';
+import { formatReferralReward } from '../../lib/storeSettings';
 
 interface MembershipTier {
   name: string;
@@ -123,6 +125,7 @@ const membershipTiers: MembershipTier[] = [
 export function ProfilePage() {
   const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
+  const referralProgram = useReferralProgram();
   const { user, signOut } = useAuth();
   const org = useOrg();
   const { wishlistItems } = useWishlist();
@@ -513,6 +516,7 @@ export function ProfilePage() {
                   </button>
 
                   {/* Refer & Earn */}
+                  {referralProgram.enabled && (
                   <button
                     onClick={() => navigate('/referrals')}
                     className="w-full flex items-center justify-between p-4 rounded-lg border border-border/30 hover:border-accent/50 hover:bg-muted/10 transition-all group"
@@ -522,12 +526,13 @@ export function ProfilePage() {
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-foreground">Refer & Earn</span>
                         <Badge className="bg-green-50 text-green-600 border-green-200 text-xs">
-                          Get ₹100
+                          Get {formatReferralReward(referralProgram.rules.refereeReward)}
                         </Badge>
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors" />
                   </button>
+                  )}
 
                   {/* My Addresses */}
                   <button

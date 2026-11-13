@@ -3,8 +3,13 @@ import { ConvexError, v } from "convex/values";
 import { assertTokenOrg, requireIdentity } from "./lib/auth";
 import { inOrg, resolveOrg } from "./lib/org";
 import { creditWallet } from "./wallet";
-import { rupeesToPaise, paiseToRupees } from "./lib/money";
-import { DEFAULT_REFERRAL_REWARD_PAISE, readOrgSiteSettings } from "./lib/siteSettings";
+import { paiseToRupees } from "./lib/money";
+import {
+  computeReferralRewardPaise,
+  readOrgSiteSettings,
+  resolveReferralProgram,
+  type ReferralProgramRules,
+} from "./lib/siteSettings";
 import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 7: referrals, minimal (Supabase -> Convex) ----------
@@ -12,11 +17,19 @@ import { isLegacyOrg } from "./lib/legacyOrg";
 // from 040 and pays the configured reward from the trusted delivered-order
 // transition. Reads stay snake_case + ISO dates, matching the old row shape.
 
-// Reward snapshot taken when a referral row is created: the org's
-// referralRewardPaise setting (default Rs 100), stored as rupees on the row.
+// Org's Refer & earn rules (per store). A disabled program pays nothing and
+// hands out no working codes.
+async function programRules(ctx: any, org: any): Promise<ReferralProgramRules> {
+  return resolveReferralProgram(await readOrgSiteSettings(ctx, org));
+}
+
+// Reward snapshot taken when a referral row is created: the referee's fixed
+// reward in rupees. Percent rewards depend on the order, so they are written
+// when the reward is actually paid instead.
 async function orgRewardRupees(ctx: any, org: any): Promise<number> {
-  const s = await readOrgSiteSettings(ctx, org);
-  return paiseToRupees(s?.referralRewardPaise ?? DEFAULT_REFERRAL_REWARD_PAISE);
+  const rules = await programRules(ctx, org);
+  if (rules.refereeReward.type !== "fixed") return 0;
+  return paiseToRupees(computeReferralRewardPaise(rules.refereeReward, 0));
 }
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -160,6 +173,8 @@ export const validateReferralCode = query({
     const org = await resolveOrg(ctx, orgSlug);
     const want = code.trim().toUpperCase();
     if (!want) return { valid: false, error: "Invalid referral code" };
+    if (!(await programRules(ctx, org)).enabled)
+      return { valid: false, error: "Invalid referral code" };
     const row = await referralByCode(ctx, org, want);
     if (!row || !row.isActive || !inOrg(row, org))
       return { valid: false, error: "Invalid referral code" };
@@ -178,6 +193,9 @@ async function attach(
   userAgent?: string,
 ) {
   if (referredUserId !== subject) throw new ConvexError({ code: "FORBIDDEN" });
+  // Program off: no attach at all, so no referee reward can be set up.
+  if (!(await programRules(ctx, org)).enabled)
+    return { success: false, error: "Invalid referral code" };
   const want = referralCode.trim().toUpperCase();
   const referrer = await referralByCode(ctx, org, want);
   if (!referrer || !referrer.isActive || !inOrg(referrer, org))
@@ -232,17 +250,34 @@ async function attach(
   };
 }
 
-// Pay both sides exactly once when the referred customer's first order is
-// delivered. This is called from the shipping transition, not the client, so
-// a caller cannot award credits by replaying or fabricating a request.
-// Internal: scoped by the order's own orgId (signature unchanged for admin.ts).
-export async function rewardDeliveredReferral(
+type ReferralOrder = {
+  orgId: any;
+  userId: string;
+  _id: any;
+  kind?: string;
+  finalAmountPaise?: number;
+};
+
+// Pay both sides exactly once, for the referred customer's first qualifying
+// order. Called from the trusted admin transitions (paid / delivered), never
+// from the client, so a caller cannot award credits by replaying a request.
+// Rules come from the org's Refer & earn settings: program on/off, which
+// transition credits, minimum order value, fixed or percent rewards, per-referrer
+// cap, and credit expiry.
+async function rewardReferralForOrder(
   ctx: any,
-  order: { orgId: any; userId: string; _id: any },
+  order: ReferralOrder,
   createdBy: string,
+  trigger: "paid" | "delivered",
 ) {
   const org = await ctx.db.get(order.orgId);
   if (!org) return false;
+  const rules = await programRules(ctx, org);
+  if (!rules.enabled || rules.creditWhen !== trigger) return false;
+  if (order.kind && order.kind !== "purchase") return false;
+  const orderPaise = Math.max(0, order.finalAmountPaise ?? 0);
+  if (orderPaise < rules.minOrderPaise) return false;
+
   const orgRef = { _id: org._id, slug: org.slug };
   const mine = await ctx.db
     .query("referrals")
@@ -278,6 +313,11 @@ export async function rewardDeliveredReferral(
     referrer ?? legacyReferrer?.find((r: any) => r.orgId == null) ?? null;
   if (!referrerRow || !referrerRow.isActive || !mineRow.isActive) return false;
   if (!inOrg(mineRow, orgRef) || !inOrg(referrerRow, orgRef)) return false;
+  if (
+    rules.maxRewardsPerReferrer > 0 &&
+    referrerRow.successfulReferrals >= rules.maxRewardsPerReferrer
+  )
+    return false;
   const referrerMembership = await ctx.db
     .query("memberships")
     .withIndex("by_org_user", (q: any) =>
@@ -287,43 +327,59 @@ export async function rewardDeliveredReferral(
   if (!referrerMembership) return false;
 
   const now = Date.now();
-  const rewardPaise = Math.max(0, rupeesToPaise(mineRow.referralRewardAmount));
+  const refereePaise = computeReferralRewardPaise(rules.refereeReward, orderPaise);
+  const referrerPaise = computeReferralRewardPaise(rules.referrerReward, orderPaise);
+  const expiresAt =
+    rules.expiryDays > 0 ? now + rules.expiryDays * 24 * 60 * 60 * 1000 : undefined;
   await ctx.db.patch(mineRow._id, {
     orgId: order.orgId,
     firstOrderCompleted: true,
     firstOrderId: String(order._id),
     firstOrderDate: now,
-    ownRewardPaid: rewardPaise > 0,
-    ownRewardPaidAt: rewardPaise > 0 ? now : undefined,
+    ownRewardPaid: refereePaise > 0,
+    ownRewardPaidAt: refereePaise > 0 ? now : undefined,
+    referralRewardAmount: paiseToRupees(refereePaise),
     updatedAt: now,
   });
   await ctx.db.patch(referrerRow._id, {
     orgId: order.orgId,
     successfulReferrals: referrerRow.successfulReferrals + 1,
-    totalRewardsEarned: referrerRow.totalRewardsEarned + mineRow.referralRewardAmount,
+    totalRewardsEarned: referrerRow.totalRewardsEarned + paiseToRupees(referrerPaise),
     updatedAt: now,
   });
-  if (rewardPaise > 0) {
+  if (refereePaise > 0) {
     await creditWallet(ctx, {
       orgId: order.orgId,
       userId: order.userId,
-      amountPaise: rewardPaise,
+      amountPaise: refereePaise,
       reason: "referral_reward",
       relatedOrderId: order._id,
       createdBy,
       note: "referral_first_order",
+      expiresAt,
     });
+  }
+  if (referrerPaise > 0) {
     await creditWallet(ctx, {
       orgId: order.orgId,
       userId: referrerRow.userId,
-      amountPaise: rewardPaise,
+      amountPaise: referrerPaise,
       reason: "referral_reward",
       relatedOrderId: order._id,
       createdBy,
       note: "referral_success",
+      expiresAt,
     });
   }
   return true;
+}
+
+export function rewardDeliveredReferral(ctx: any, order: ReferralOrder, createdBy: string) {
+  return rewardReferralForOrder(ctx, order, createdBy, "delivered");
+}
+
+export function rewardPaidReferral(ctx: any, order: ReferralOrder, createdBy: string) {
+  return rewardReferralForOrder(ctx, order, createdBy, "paid");
 }
 
 // Signup-time attach (ReferralTracker) — mirrors record_referral (040).
@@ -362,6 +418,8 @@ export const checkEligibility = query({
     const org = await resolveOrg(ctx, args.orgSlug);
     const identity = await requireIdentity(ctx);
     await assertTokenOrg(ctx, identity, org);
+    if (!(await programRules(ctx, org)).enabled)
+      return { eligible: false, applied: false };
     const mine = await myReferral(ctx, org, identity.subject);
     if (!mine) return { eligible: true, applied: false };
     if (!mine.referredByUserId && !mine.firstOrderCompleted)

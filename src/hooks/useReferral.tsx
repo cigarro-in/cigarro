@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useOrgInfo } from '../lib/org/OrgContext';
 import { useStoreSettings } from './data/useStoreSettings';
+import { formatReferralReward } from '../lib/storeSettings';
 import type { ReferralStats, ReferredUser } from '../types/referral';
 import {
   getUserReferralStats,
@@ -68,7 +69,7 @@ export function useReferral() {
   // Share referral link
   const shareLink = async (): Promise<boolean> => {
     if (!stats?.referral_code) return false;
-    return await shareReferralLink(stats.referral_code, store.referralRewardRupees);
+    return await shareReferralLink(stats.referral_code, formatReferralReward(store.referral.refereeReward));
   };
 
   // Refresh data

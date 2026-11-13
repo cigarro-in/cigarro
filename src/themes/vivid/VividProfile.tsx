@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, Package, MapPin, Heart, Wallet, Star, Gift, Settings, LogOut, Phone } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { useReferralProgram } from '../../hooks/data/useReferralProgram';
 
 const initials = (name?: string | null) => {
   if (!name) return 'C';
@@ -34,6 +35,7 @@ const MENU: MenuItem[] = [
 export function VividProfile() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { enabled: referralOn } = useReferralProgram();
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,7 +75,7 @@ export function VividProfile() {
 
         {/* Menu */}
         <div className="vv-surface overflow-hidden">
-          {MENU.map((item, i) => (
+          {MENU.filter((item) => item.to !== '/referrals' || referralOn).map((item, i) => (
             <Link
               key={item.to}
               to={item.to}

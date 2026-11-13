@@ -78,6 +78,7 @@ export async function creditWallet(
     relatedOrderId?: Id<"orders">;
     createdBy?: string;
     note?: string;
+    expiresAt?: number;
   },
 ) {
   assertPositiveInt(args.amountPaise, "amountPaise");
@@ -99,6 +100,7 @@ export async function creditWallet(
     createdAt: Date.now(),
     createdBy: args.createdBy ?? "system",
     note: args.note,
+    expiresAt: args.expiresAt,
   });
 }
 

@@ -1,7 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { collectInOrg, inOrg, resolveOrg } from "./lib/org";
-import { readOrgSiteSettings } from "./lib/siteSettings";
+import { readOrgSiteSettings, resolveReferralProgram } from "./lib/siteSettings";
 import { isLegacyOrg } from "./lib/legacyOrg";
 
 // ---------- Wave 2: content reads (Supabase -> Convex) ----------
@@ -291,6 +291,7 @@ export const getSiteSettings = query({
       business: found.business ?? null,
       ageGate: found.ageGate ?? null,
       referralRewardPaise: found.referralRewardPaise ?? null,
+      referral: resolveReferralProgram(found),
       seo: found.seo ?? null,
       socials: found.socials ?? null,
       updatedAt: found.updatedAt,

@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useWishlist } from '../../hooks/useWishlist';
 import { InstallPWA } from '../pwa/InstallPWA';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useReferralProgram } from '../../hooks/data/useReferralProgram';
 import { 
   ShoppingBag, 
   Heart, 
@@ -33,6 +34,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
   const { settings: store } = useStoreSettings();
   const { user, signOut } = useAuth();
   const { wishlistCount } = useWishlist();
+  const { enabled: referralOn } = useReferralProgram();
 
   const menuSections = [
     {
@@ -49,7 +51,7 @@ export const MobileMenu = ({ isOpen, onClose }: MobileMenuProps) => {
       items: user ? [
         { icon: Package, label: 'My Orders', path: '/orders' },
         { icon: Heart, label: 'My Wishlist', path: '/wishlist' },
-        { icon: Sparkles, label: 'Refer & Earn', path: '/referrals' },
+        ...(referralOn ? [{ icon: Sparkles, label: 'Refer & Earn', path: '/referrals' }] : []),
         ...(user.isAdmin ? [{ icon: User, label: 'Admin Dashboard', path: '/admin' }] : []),
       ] : [
         { icon: User, label: 'Sign In / Register', path: '/auth', action: 'auth' },

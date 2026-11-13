@@ -54,6 +54,62 @@ export const storeSocialsV = v.object({
 
 export const DEFAULT_REFERRAL_REWARD_PAISE = 10000; // Rs 100
 
+// Refer & earn program rules (per store). A reward is either a fixed amount in
+// paise or a percent of the qualifying order's final amount.
+export const referralRewardV = v.object({
+  type: v.union(v.literal("fixed"), v.literal("percent")),
+  value: v.number(), // fixed: integer paise; percent: 0-100
+});
+
+export const storeReferralV = v.object({
+  enabled: v.boolean(),
+  referrerReward: referralRewardV,
+  refereeReward: referralRewardV,
+  minOrderPaise: v.number(), // integer paise; order must reach this to qualify
+  creditWhen: v.union(v.literal("paid"), v.literal("delivered")),
+  maxRewardsPerReferrer: v.number(), // 0 = unlimited
+  expiryDays: v.number(), // 0 = credits never expire
+});
+
+export type ReferralReward = { type: "fixed" | "percent"; value: number };
+export type ReferralProgramRules = {
+  enabled: boolean;
+  referrerReward: ReferralReward;
+  refereeReward: ReferralReward;
+  minOrderPaise: number;
+  creditWhen: "paid" | "delivered";
+  maxRewardsPerReferrer: number;
+  expiryDays: number;
+};
+
+/**
+ * Effective program rules for an org. Rows saved before the program existed
+ * keep the old behaviour: enabled, flat reward (siteSettings.referralRewardPaise)
+ * paid to both sides on delivery.
+ */
+export function resolveReferralProgram(
+  row: { referral?: ReferralProgramRules | null; referralRewardPaise?: number | null } | null | undefined,
+): ReferralProgramRules {
+  const r = row?.referral;
+  if (r) return r;
+  const flat = row?.referralRewardPaise ?? DEFAULT_REFERRAL_REWARD_PAISE;
+  return {
+    enabled: true,
+    referrerReward: { type: "fixed", value: flat },
+    refereeReward: { type: "fixed", value: flat },
+    minOrderPaise: 0,
+    creditWhen: "delivered",
+    maxRewardsPerReferrer: 0,
+    expiryDays: 0,
+  };
+}
+
+/** Paise a reward is worth on an order of `orderPaise` (never negative, integer). */
+export function computeReferralRewardPaise(reward: ReferralReward, orderPaise: number): number {
+  if (reward.type === "fixed") return Math.max(0, Math.round(reward.value));
+  return Math.max(0, Math.floor((orderPaise * reward.value) / 100));
+}
+
 /**
  * The org's siteSettings row. The legacy org also reads pre-backfill legacy rows
  * (orgId absent), matching the other org-scoped readers.
