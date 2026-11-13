@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Minus, Plus, ShoppingCart, Heart, ChevronLeft } from 'lucide-react';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { useCatalogProduct } from '../../hooks/data/useCatalog';
@@ -12,7 +12,7 @@ import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { productBreadcrumbs, productSeoProps } from '../../lib/seo/productSeo';
-import { getDefaultVariant, resolveProductCanonical } from '../../lib/seo/productOffer';
+import { getDefaultVariant, getVariantKey, resolveProductCanonical } from '../../lib/seo/productOffer';
 import { ProductReviews } from '../../components/products/ProductReviews';
 import type { ProductVariant } from '../../types/product';
 
@@ -58,11 +58,31 @@ export default function VividProduct() {
   );
   const loading = catalogLoading;
 
+  // Variant precedence: the shopper's pick > ?variant=<key> > catalog default
+  // (same rule as the classic ProductPage). A pick is written back to the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlVariantKey = (searchParams.get('variant') || '').toLowerCase();
+  const variantFromUrl = urlVariantKey
+    ? variants.find((v) => getVariantKey(v) === urlVariantKey) ?? null
+    : null;
   const pickedId = picked && picked.slug === slug ? picked.variantId : null;
   const selected: ProductVariant | null =
-    variants.find((v) => v.id === pickedId) ?? getDefaultVariant<ProductVariant>(variants);
-  const setSelected = (variant: ProductVariant) =>
+    variants.find((v) => v.id === pickedId) ??
+    variantFromUrl ??
+    getDefaultVariant<ProductVariant>(variants);
+  const setSelected = (variant: ProductVariant) => {
     setPicked({ slug: slug ?? '', variantId: variant.id });
+    // Replace, not push: the variant is part of the page's address, not a history step.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        const key = getVariantKey(variant);
+        if (key) next.set('variant', key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   useEffect(() => {
     setActiveImage(0);

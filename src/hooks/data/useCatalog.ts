@@ -233,3 +233,21 @@ export function useCategoryListing(categorySlug: string | undefined, brandSlug?:
     return { status: 'ok' as ListingStatus, category, brand, products: rows };
   }, [categorySlug, brandSlug, products, brands, categories, productCategories, loading]);
 }
+
+// Brand detail (/brand/:slug). Derived from the full catalog, like the category
+// listing. `missing` is the 404 case: unknown or inactive brand. A brand with no
+// products is still 200 (the page shows its empty state), as on the bot renderer.
+export function useBrandDetail(brandSlug: string | undefined) {
+  const { products, brands, loading } = useFullCatalog();
+  return useMemo(() => {
+    if (loading) return { status: 'loading' as ListingStatus, brand: null as any, products: [] as LegacyProduct[] };
+    const brand = brandSlug
+      ? ((brands as any[]).find((b: any) => b.slug === brandSlug && b.isActive) ?? null)
+      : null;
+    if (!brand) return { status: 'missing' as ListingStatus, brand: null as any, products: [] as LegacyProduct[] };
+    const rows = products
+      .filter((p) => p.brand_id === brand.supabaseId && p.is_active)
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return { status: 'ok' as ListingStatus, brand, products: rows };
+  }, [brandSlug, products, brands, loading]);
+}

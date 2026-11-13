@@ -17,7 +17,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 import { useCatalogProduct } from '../hooks/data/useCatalog';
 import { useSetRenderStatus } from '../lib/ssr/renderStatus';
 import { useTheme } from '../themes';
-import { CategoryRoute } from './eagerRoutes';
+import { BlogRoute, BrandRoute, CategoryRoute } from './eagerRoutes';
 
 // Eager home component per theme. Theme ids outside this map fall back to classic.
 const EAGER_HOME: Record<string, ComponentType> = {
@@ -68,6 +68,8 @@ export function SsrRoutes({ location }: SsrRoutesProps) {
       <Route path={ROUTES.PRODUCT_DETAIL} element={<SsrProduct />} />
       <Route path={ROUTES.CATEGORY} element={<CategoryRoute />} />
       <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryRoute />} />
+      <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
+      <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
       <Route path="*" element={null} />
     </Routes>
   );

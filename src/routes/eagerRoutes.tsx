@@ -7,8 +7,11 @@ import type { ComponentType } from 'react';
 import { useParams } from 'react-router-dom';
 import NotFoundPage from '../pages/NotFoundPage';
 import { CategoryPage, type CategoryPageProps } from '../pages/products/CategoryPage';
+import { BrandPage } from '../pages/brands/BrandPage';
+import { BlogPost } from '../pages/blog/BlogsPage';
 import { VividProductList } from '../themes/vivid/VividProductList';
-import { useCategoryListing } from '../hooks/data/useCatalog';
+import { useBrandDetail, useCategoryListing } from '../hooks/data/useCatalog';
+import { useBlogPost } from '../hooks/data/useContent';
 import { IS_SERVER } from '../lib/ssr/preload';
 import { useSetRenderStatus } from '../lib/ssr/renderStatus';
 import { useTheme } from '../themes';
@@ -42,4 +45,36 @@ export function CategoryRoute() {
   }
   const View = EAGER_CATEGORY[themeId] ?? CategoryPage;
   return <View categorySlug={categorySlug} brandSlug={brandSlug} />;
+}
+
+// /brand/:slug. Unknown or inactive brand: NotFound with HTTP 404. The server
+// throws while the preload is missing, as for categories.
+export function BrandRoute() {
+  const params = useParams<{ slug?: string }>();
+  const setStatus = useSetRenderStatus();
+  const detail = useBrandDetail(params.slug);
+  if (detail.status === 'loading' && IS_SERVER) {
+    throw new Error(`SSR brand preload missing: ${params.slug ?? ''}`);
+  }
+  if (detail.status === 'missing') {
+    setStatus(404);
+    return <NotFoundPage />;
+  }
+  return <BrandPage brandSlug={params.slug} />;
+}
+
+// /blog/:slug. Unknown or unpublished post: NotFound with HTTP 404 (the bot
+// renderer's rule). The server throws while the post preload is missing.
+export function BlogRoute() {
+  const params = useParams<{ slug?: string }>();
+  const setStatus = useSetRenderStatus();
+  const { post, loading } = useBlogPost(params.slug);
+  if (loading && IS_SERVER) {
+    throw new Error(`SSR blog preload missing: ${params.slug ?? ''}`);
+  }
+  if (!loading && !post) {
+    setStatus(404);
+    return <NotFoundPage />;
+  }
+  return <BlogPost />;
 }

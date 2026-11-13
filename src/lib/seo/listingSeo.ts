@@ -135,3 +135,41 @@ function collectionJsonLd(input: {
   });
   return blocks;
 }
+
+// Brand page head model (bot parity: functions/ssr-middleware.js generateBrandHTML).
+export interface BrandSeoInput {
+  brand: { name: string; slug: string; description?: string | null; logoUrl?: string | null; metaTitle?: string | null; metaDescription?: string | null };
+  products: ListingProduct[];
+  siteName: string;
+  primaryHost: string;
+}
+
+export function brandSeo({ brand, products, siteName, primaryHost }: BrandSeoInput) {
+  const site = `https://${primaryHost}`;
+  const canonical = `${site}/brand/${brand.slug}`;
+  const title = brand.metaTitle || `${brand.name} Products | ${siteName}`;
+  const description =
+    brand.metaDescription || brand.description || `Shop premium ${brand.name} cigarettes and tobacco products at ${siteName}`;
+  const crumbs = [
+    { name: 'Home', url: `${site}/` },
+    { name: 'Brands', url: `${site}/brands` },
+    { name: brand.name, url: canonical },
+  ];
+  const brandLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Brand',
+    name: brand.name,
+    description,
+    url: canonical,
+    ...(brand.logoUrl ? { logo: brand.logoUrl } : {}),
+  };
+  return {
+    heading: brand.name,
+    title,
+    description,
+    crumbs,
+    visibleCrumbs: [{ label: 'Brands', href: '/brands' }, { label: brand.name }],
+    // Bot brand pages emit Brand, ItemList and BreadcrumbList (no CollectionPage).
+    extraJsonLd: [brandLd, ...collectionJsonLd({ name: brand.name, description, canonical, products, site, crumbs }).filter((b) => b['@type'] !== 'CollectionPage')],
+  };
+}

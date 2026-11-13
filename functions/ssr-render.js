@@ -151,9 +151,14 @@ async function renderPage(context, url, orgInfo, org, orgScript) {
   const { env } = context;
   const plan = planSsrRoute(url.pathname, orgInfo);
   if (!plan) throw new Error(`no SSR route for ${url.pathname}`);
-  const preload = plan.trimPreload(
-    await fetchPreload(requiredConvexUrl(env), plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS }),
-  );
+  const convexUrl = requiredConvexUrl(env);
+  let raw = await fetchPreload(convexUrl, plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS });
+  // Second stage: reads that need a first-stage row (blog related posts).
+  const followUp = plan.followUpRequests(raw);
+  if (followUp.length > 0) {
+    raw = { ...raw, ...(await fetchPreload(convexUrl, followUp, { timeoutMs: PRELOAD_TIMEOUT_MS })) };
+  }
+  const preload = plan.trimPreload(raw);
   const themeId = themeIdFromPreload(preload, orgInfo.slug);
 
   const rendered = await render({ url: renderPathFor(url), org: orgInfo, preload, themeId });

@@ -7,7 +7,7 @@ import { createContext, lazy, useContext, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { CategoryRoute } from './eagerRoutes';
+import { BlogRoute, BrandRoute, CategoryRoute } from './eagerRoutes';
 
 import { Slot } from '../themes';
 
@@ -38,11 +38,9 @@ const ReferralPage = lazy(() => import('../pages/user/ReferralPage'));
 const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLandingPage'));
 
 // Products & Categories
-const BrandPage = lazy(() => import('../pages/brands/BrandPage').then(m => ({ default: m.BrandPage })));
 
 // Blog
 const BlogsPage = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogsPage })));
-const BlogPost = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogPost })));
 const AboutPage = lazy(() => import('../pages/company/AboutPage').then(m => ({ default: m.AboutPage })));
 const ContactPage = lazy(() => import('../pages/company/ContactPage').then(m => ({ default: m.ContactPage })));
 const AgentsPage = lazy(() => import('../pages/agents/AgentsPage').then(m => ({ default: m.AgentsPage })));
@@ -111,11 +109,11 @@ export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) =>
       <Route path={ROUTES.CATEGORY} element={<CategoryRoute />} />
       <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryRoute />} />
       <Route path={ROUTES.BRANDS} element={<BrandsPage />} />
-      <Route path={ROUTES.BRAND_DETAIL} element={<BrandPage />} />
+      <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
 
       {/* Content */}
       <Route path={ROUTES.BLOGS} element={<BlogsPage />} />
-      <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
+      <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
       <Route path={ROUTES.ABOUT} element={<AboutPage />} />
       <Route path={ROUTES.CONTACT} element={<ContactPage />} />
       <Route path={ROUTES.AGENTS} element={<AgentsPage />} />

@@ -5,7 +5,11 @@ import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { getBlogImageUrl } from '../../lib/images/urls';
 import type { BlogPost as BlogPostType } from '../../types/blog';
-import DOMPurify from 'dompurify';
+import { sanitizeBlogBody, formatBlogDate } from '../../lib/blog/blogRender';
+import { blogPostSeo } from '../../lib/seo/blogSeo';
+import { BreadcrumbNav } from '../../components/layout/BreadcrumbNav';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
 import { siteConfig } from '../../config/site';
 
@@ -166,6 +170,8 @@ export function BlogPost() {
     3
   );
   const isLoading = loading;
+  const { settings: store } = useStoreSettings();
+  const { primaryHost } = useOrgInfo();
 
   if (isLoading) {
     return (
@@ -191,25 +197,45 @@ export function BlogPost() {
     );
   }
 
+  const seo = blogPostSeo(
+    {
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      content: post.content,
+      metaTitle: post.metaTitle,
+      metaDescription: post.metaDescription,
+      featuredImage: post.featuredImage,
+      authorName: post.authorName,
+      publishedAt: post.publishedAt,
+      updatedAt: post.updatedAt,
+    },
+    store.name,
+    primaryHost,
+  );
+
   return (
     <>
       <SEOHead
-        title={post.meta_title || post.title}
-        description={post.meta_description || post.excerpt}
-        url={`${siteConfig.url}/blog/${post.slug}`}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
+        url={location.pathname}
         type="article"
-        author={post.author?.name || undefined}
-        publishedTime={post.published_at || undefined}
-        modifiedTime={post.updated_at || undefined}
-        image={post.featured_image || undefined}
+        author={seo.author}
+        publishedTime={seo.published}
+        modifiedTime={seo.modified}
+        image={seo.image}
         keywords={post.tags?.map(t => t.name) || []}
         ogTitle={post.og_title || undefined}
         ogDescription={post.og_description || undefined}
         ogImage={post.og_image || undefined}
+        extraJsonLd={seo.extraJsonLd}
       />
 
       <div className="min-h-screen bg-creme pt-24 pb-12">
         <div className="main-container">
+          <BreadcrumbNav customBreadcrumbs={seo.visibleCrumbs} />
 
           {/* Article Header */}
           <div className="max-w-4xl mx-auto mb-8">
@@ -234,7 +260,7 @@ export function BlogPost() {
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
-                <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
+                <span>{post.publishedAt ? formatBlogDate(post.publishedAt, 'long') : 'Not published'}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4" />
@@ -256,7 +282,7 @@ export function BlogPost() {
           <div className="max-w-3xl mx-auto">
             <div
               className="prose prose-lg max-w-none text-dark leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
+              dangerouslySetInnerHTML={{ __html: sanitizeBlogBody(post.content) }}
             />
 
             {/* Tags */}
@@ -324,7 +350,7 @@ export function BlogPost() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-3 h-3" />
-                              <span>{relatedPost.published_at ? new Date(relatedPost.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Not published'}</span>
+                              <span>{relatedPost.publishedAt ? formatBlogDate(relatedPost.publishedAt, 'short') : 'Not published'}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <Clock className="w-3 h-3" />

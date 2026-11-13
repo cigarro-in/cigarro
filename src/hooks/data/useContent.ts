@@ -22,6 +22,7 @@ export interface BlogListPost {
   metaTitle?: string;
   metaDescription?: string;
   publishedAt?: number;
+  updatedAt?: number;
   // compat aliases for Supabase-shaped consumers (removed as callers migrate)
   featured_image?: string | null;
   author?: { name: string };

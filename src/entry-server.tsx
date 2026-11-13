@@ -50,6 +50,8 @@ export interface SsrRoute {
   id: string;
   match(pathname: string): Record<string, string> | null;
   preloadRequests(params: Record<string, string>, org: OrgInfo): PreloadRequest[];
+  /** Reads that depend on a first-stage result (e.g. related posts need the post's category). */
+  followUpRequests?(preload: PreloadMap, params: Record<string, string>, org: OrgInfo): PreloadRequest[];
   trimPreload(preload: PreloadMap, params: Record<string, string>): PreloadMap;
 }
 
@@ -147,7 +149,46 @@ const TRIM_CATEGORY: Record<string, string[]> = {
 };
 
 export function trimCategoryPreload(preload: PreloadMap): PreloadMap {
-  const out = trimCatalogBundles(preload, TRIM_CATEGORY);
+  return trimListingPreload(preload, TRIM_CATEGORY);
+}
+
+// Brand page: the brand's own copy (description, heritage, meta, logo) is read,
+// so only the internal ids and timestamps are dropped from brands.
+const TRIM_BRAND: Record<string, string[]> = {
+  products: TRIM_CATEGORY.products,
+  variants: TRIM_CATEGORY.variants,
+  brands: ['_id', 'createdAt', 'updatedAt'],
+  categories: TRIM_CATEGORY.categories,
+};
+
+export function trimBrandPreload(preload: PreloadMap): PreloadMap {
+  return trimListingPreload(preload, TRIM_BRAND);
+}
+
+// Blog post: the post row is read whole (body, meta, author, dates). Related rows
+// show title, excerpt, image, author and date only. The shell keeps product
+// descriptions (header search).
+const TRIM_BLOG: Record<string, string[]> = {
+  products: TRIM_FULLCATALOG.products,
+  variants: TRIM_CATEGORY.variants,
+  brands: ['_id', 'createdAt', 'updatedAt', 'heritage', 'metaDescription', 'metaTitle', 'description'],
+  categories: TRIM_CATEGORY.categories,
+};
+
+export function trimBlogPreload(preload: PreloadMap): PreloadMap {
+  const out = trimListingPreload(preload, TRIM_BLOG);
+  for (const key of Object.keys(out)) {
+    const value = out[key];
+    if (!key.startsWith('content:listRelatedPosts:') || !Array.isArray(value)) continue;
+    out[key] = value.map((row) => without(row, ['content', 'metaTitle', 'metaDescription']));
+  }
+  return out;
+}
+
+// Shared listing trim: catalog bundles minus the listed fields, each variant
+// reduced to its first image.
+function trimListingPreload(preload: PreloadMap, drop: Record<string, string[] | undefined>): PreloadMap {
+  const out = trimCatalogBundles(preload, drop);
   for (const key of Object.keys(out)) {
     const bundle = out[key] as { variants?: unknown } | null;
     if (!key.startsWith('catalog:fullCatalog:') || !bundle || !Array.isArray(bundle.variants)) continue;
@@ -204,6 +245,7 @@ const productRoute: SsrRoute = {
 // shell and head, and the full catalog for the rows. No Convex calls beyond that.
 const CATEGORY_PATH = /^\/category\/([^/]+)\/?$/;
 const CATEGORY_BRAND_PATH = /^\/category\/([^/]+)\/([^/]+)\/?$/;
+const BRAND_PATH = /^\/brand\/([^/]+)\/?$/;
 
 function categoryPreloadRequests(org: OrgInfo): PreloadRequest[] {
   const orgSlug = org.slug;
@@ -223,6 +265,16 @@ const categoryRoute: SsrRoute = {
   trimPreload: (preload) => trimCategoryPreload(preload),
 };
 
+const brandRoute: SsrRoute = {
+  id: 'brand',
+  match(pathname) {
+    const m = BRAND_PATH.exec(pathname);
+    return m ? { slug: safeDecode(m[1]) } : null;
+  },
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload) => trimBrandPreload(preload),
+};
+
 const categoryBrandRoute: SsrRoute = {
   id: 'category-brand',
   match(pathname) {
@@ -233,7 +285,38 @@ const categoryBrandRoute: SsrRoute = {
   trimPreload: (preload) => trimCategoryPreload(preload),
 };
 
-const SSR_ROUTES: SsrRoute[] = [homeRoute, productRoute, categoryRoute, categoryBrandRoute];
+// Blog post (/blog/:slug). Related posts are keyed by the post's own category, so
+// they are a second stage, built from the post row. Args mirror useRelatedPosts.
+const BLOG_PATH = /^\/blog\/([^/]+)\/?$/;
+const blogRoute: SsrRoute = {
+  id: 'blog',
+  match(pathname) {
+    const m = BLOG_PATH.exec(pathname);
+    return m ? { slug: safeDecode(m[1]) } : null;
+  },
+  preloadRequests({ slug }, org) {
+    const orgSlug = org.slug;
+    return [
+      { fnName: 'content:getSiteSettings', args: { orgSlug } },
+      { fnName: 'catalog:fullCatalog', args: { orgSlug } },
+      { fnName: 'content:getBlogPostBySlug', args: { slug, orgSlug } },
+    ];
+  },
+  followUpRequests(preload, { slug }, org) {
+    const orgSlug = org.slug;
+    const post = preload[preloadKey('content:getBlogPostBySlug', { slug, orgSlug })] as
+      | { categorySlug?: string | null; slug?: string }
+      | null
+      | undefined;
+    if (!post) return [];
+    const categorySlug = post.categorySlug || undefined;
+    const excludeSlug = post.slug;
+    return [{ fnName: 'content:listRelatedPosts', args: { ...(categorySlug ? { categorySlug } : {}), excludeSlug, limit: 3, orgSlug } }];
+  },
+  trimPreload: (preload) => trimBlogPreload(preload),
+};
+
+const SSR_ROUTES: SsrRoute[] = [homeRoute, productRoute, categoryRoute, categoryBrandRoute, brandRoute, blogRoute];
 
 // Route that serves a pathname, with its params. Null when no SSR route matches.
 export function matchSsrRoute(pathname: string): { route: SsrRoute; params: Record<string, string> } | null {
@@ -252,6 +335,7 @@ export function planSsrRoute(pathname: string, org: OrgInfo) {
   return {
     id: route.id,
     requests: route.preloadRequests(params, org),
+    followUpRequests: (preload: PreloadMap) => route.followUpRequests?.(preload, params, org) ?? [],
     trimPreload: (preload: PreloadMap) => route.trimPreload(preload, params),
   };
 }

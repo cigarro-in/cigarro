@@ -57,7 +57,7 @@ function ProductPage() {
   const { settings: storeSettings } = useStoreSettings();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -113,8 +113,19 @@ function ProductPage() {
     variants.find((v) => v.id === pickedVariantId) ??
     variantFromUrl ??
     getDefaultVariant<ProductVariant>(variants);
-  const setSelectedVariant = (variant: ProductVariant) =>
+  const setSelectedVariant = (variant: ProductVariant) => {
     setPicked({ slug: slug ?? '', variantId: variant.id });
+    // Replace, not push: the variant is part of the page's address, not a history step.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        const key = getVariantKey(variant);
+        if (key) next.set('variant', key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   // GA4 view_item: once per product slug, with the offered variant's price.
   // NOTE: this hook must live here with the other hooks — never after the

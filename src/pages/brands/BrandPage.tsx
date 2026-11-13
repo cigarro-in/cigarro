@@ -1,98 +1,39 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useMemo, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { BreadcrumbNav } from '../../components/layout/BreadcrumbNav';
+import { useBrandDetail } from '../../hooks/data/useCatalog';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ArrowLeft, ExternalLink, Package, Calendar, MapPin, User, Globe } from 'lucide-react';
 import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
 import { trackViewItemList } from '../../lib/analytics/ga';
 import { Button } from '../../components/ui/button';
-import { siteConfig } from '../../config/site';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { brandSeo } from '../../lib/seo/listingSeo';
 
-interface Brand {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  website_url: string | null;
-  is_active: boolean;
-  is_featured: boolean;
-  sort_order: number;
-  meta_title: string | null;
-  meta_description: string | null;
-  heritage: {
-    founded_year?: string;
-    origin_country?: string;
-    founder?: string;
-    story?: string;
-  } | null;
-  created_at: string;
-  updated_at: string;
+export interface BrandPageProps {
+  /** Set by the route (/brand/:slug). */
+  brandSlug?: string;
 }
 
-export function BrandPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { settings: store } = useStoreSettings();
+// Brand page (classic). Derived state only: brand and rows come from
+// useBrandDetail on the first render, so the server render is the full page.
+export function BrandPage({ brandSlug }: BrandPageProps) {
   const location = useLocation();
-  const [brand, setBrand] = useState<Brand | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { settings: store } = useStoreSettings();
+  const { primaryHost } = useOrgInfo();
   const { addToCart, isLoading: cartLoading } = useCart();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-  // Brand + products resolve from the Convex catalog. No API hop.
-  const { products: catalogProducts, brands: catalogBrands, loading: catalogLoading } =
-    useFullCatalog();
+  const detail = useBrandDetail(brandSlug);
+  const brand = detail.brand;
+  const products = useMemo(() => (detail.products ?? []) as unknown as Product[], [detail.products]);
+  const isLoading = detail.status === 'loading';
 
-  useEffect(() => {
-    if (!slug || catalogLoading) return;
-    try {
-      setIsLoading(true);
-      const brandData = (catalogBrands as any[]).find(
-        (b: any) => b.slug === slug && b.isActive,
-      );
-      if (!brandData) {
-        setBrand(null);
-        setIsLoading(false);
-        return;
-      }
-      setBrand({
-        id: brandData.supabaseId,
-        name: brandData.name,
-        slug: brandData.slug,
-        description: brandData.description ?? null,
-        logo_url: brandData.logoUrl ?? null,
-        website_url: brandData.websiteUrl ?? null,
-        is_active: brandData.isActive,
-        is_featured: false,
-        sort_order: brandData.sortOrder ?? 0,
-        meta_title: brandData.metaTitle ?? null,
-        meta_description: brandData.metaDescription ?? null,
-        heritage: brandData.heritage ?? null,
-        created_at: brandData.createdAt
-          ? new Date(brandData.createdAt).toISOString()
-          : '',
-        updated_at: brandData.updatedAt
-          ? new Date(brandData.updatedAt).toISOString()
-          : '',
-      });
-      setProducts(
-        catalogProducts
-          .filter((p: any) => p.brand_id === brandData.supabaseId && p.is_active)
-          .sort(
-            (a: any, b: any) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-          ) as Product[],
-      );
-    } catch (error) {
-      console.error('Error fetching brand data:', error);
-      setOpError('Failed to load brand information');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [slug, catalogLoading]);
+  const seo = brand
+    ? brandSeo({ brand, products, siteName: store.name, primaryHost })
+    : null;
 
   const handleAddToCart = async (product: Product) => {
     try {
@@ -113,7 +54,7 @@ export function BrandPage() {
     trackViewItemList(products, brand.name);
   }, [products, brand, isLoading]);
 
-  if (isLoading) {
+  if (isLoading || !brand || !seo) {
     return (
       <div className="min-h-screen bg-creme flex items-center justify-center">
         <div className="text-center">
@@ -124,33 +65,29 @@ export function BrandPage() {
     );
   }
 
-  if (!brand) {
-    return (
-      <div className="min-h-screen bg-creme flex items-center justify-center">
-        <div className="text-center">
-          <Package className="w-16 h-16 mx-auto mb-4 text-coyote" />
-          <h3 className="text-2xl font-serif text-dark mb-4">Brand not found</h3>
-          <p className="text-dark/80 mb-8">The brand you're looking for doesn't exist.</p>
-          <Link to="/brands">
-            <Button variant="outline">Back to Brands</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const heritage = brand.heritage as {
+    founded_year?: string;
+    origin_country?: string;
+    founder?: string;
+    story?: string;
+  } | null;
 
   return (
     <>
       <SEOHead
-        title={brand.meta_title || `${brand.name} - Premium Cigarettes | ${store.name}`}
-        description={brand.meta_description || `${brand.name} premium cigarettes and tobacco products. Discover our exclusive collection from ${brand.name}.`}
-        url={`${siteConfig.url}${location.pathname}`}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
+        url={location.pathname}
         type="website"
         brand={brand.name}
         keywords={[brand.name, 'premium cigarettes', 'tobacco products', `${brand.name} cigarettes`, 'authentic tobacco']}
+        extraJsonLd={seo.extraJsonLd}
       />
 
       <div className="min-h-screen bg-creme">
+        <BreadcrumbNav customBreadcrumbs={seo.visibleCrumbs} />
+
         {/* Hero Section */}
         <div className="bg-creme-light border-b border-coyote/10">
           <div className="main-container">
@@ -169,9 +106,9 @@ export function BrandPage() {
             <div className="py-12 md:py-20">
               <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
                 {/* Logo */}
-                {brand.logo_url ? (
+                {brand.logoUrl ? (
                   <div className="w-28 h-28 md:w-36 md:h-36 bg-white rounded-2xl shadow-sm p-5 flex-shrink-0 flex items-center justify-center border border-coyote/20">
-                    <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
+                    <img src={brand.logoUrl} alt={brand.name} className="w-full h-full object-contain" />
                   </div>
                 ) : (
                   <div className="w-28 h-28 md:w-36 md:h-36 bg-white rounded-2xl shadow-sm flex-shrink-0 flex items-center justify-center border border-coyote/20">
@@ -186,24 +123,24 @@ export function BrandPage() {
                   </h1>
 
                   {/* Heritage Tags */}
-                  {brand.heritage && (
+                  {heritage && (
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-6">
-                      {brand.heritage.founded_year && (
+                      {heritage.founded_year && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-full text-xs font-medium text-dark/70 border border-coyote/20">
                           <Calendar className="w-3.5 h-3.5 text-canyon" />
-                          Est. {brand.heritage.founded_year}
+                          Est. {heritage.founded_year}
                         </span>
                       )}
-                      {brand.heritage.origin_country && (
+                      {heritage.origin_country && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-full text-xs font-medium text-dark/70 border border-coyote/20">
                           <MapPin className="w-3.5 h-3.5 text-canyon" />
-                          {brand.heritage.origin_country}
+                          {heritage.origin_country}
                         </span>
                       )}
-                      {brand.heritage.founder && (
+                      {heritage.founder && (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-full text-xs font-medium text-dark/70 border border-coyote/20">
                           <User className="w-3.5 h-3.5 text-canyon" />
-                          {brand.heritage.founder}
+                          {heritage.founder}
                         </span>
                       )}
                     </div>
@@ -217,9 +154,9 @@ export function BrandPage() {
                   )}
 
                   {/* Website Link */}
-                  {brand.website_url && (
+                  {brand.websiteUrl && (
                     <a
-                      href={brand.website_url}
+                      href={brand.websiteUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 text-sm font-medium text-canyon hover:text-dark transition-colors"
@@ -236,13 +173,13 @@ export function BrandPage() {
         </div>
 
         {/* Story Section */}
-        {brand.heritage?.story && (
+        {heritage?.story && (
           <div className="bg-white border-b border-coyote/10">
             <div className="main-container py-12 md:py-16">
               <div className="max-w-3xl mx-auto">
                 <h2 className="font-serif text-xl text-canyon mb-4 text-center">Our Heritage</h2>
                 <p className="text-dark/70 font-sans text-base leading-relaxed text-center">
-                  {brand.heritage.story}
+                  {heritage.story}
                 </p>
               </div>
             </div>
