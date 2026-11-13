@@ -184,9 +184,6 @@ html.admin-root [data-variant="floating"] [data-slot="sidebar-inner"] {
   border-color: var(--admin-border);
   box-shadow: var(--admin-shadow-island);
 }
-html.admin-root [data-variant="floating"][data-collapsible="icon"] [data-slot="sidebar-gap"] {
-  width: calc(var(--sidebar-width-icon) + 1.5rem + 2px);
-}
 
 /* Transient elevation for popovers, menus and dialogs. */
 html.admin-root [data-slot="dropdown-menu-content"],

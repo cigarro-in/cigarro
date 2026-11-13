@@ -23,7 +23,7 @@ function getInitial(value?: string | null) {
 /** Store icon: logo/favicon from site settings, else the first letter. */
 export function StoreIcon({ name, iconUrl, size = 'md' }: { name: string; iconUrl?: string; size?: 'sm' | 'md' }) {
   const [broken, setBroken] = useState(false);
-  const box = size === 'sm' ? 'size-6 text-xs rounded-[5px]' : 'size-8 text-sm rounded-[7px]';
+  const box = size === 'sm' ? 'size-6 text-xs rounded-[5px]' : 'size-9 text-base rounded-[8px]';
   if (iconUrl && !broken) {
     return (
       <img
@@ -74,13 +74,13 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton size="lg" tooltip={storeName} aria-label="Store and account menu" className="h-12 gap-2.5">
+              <SidebarMenuButton size="lg" aria-label="Store and account menu" className="h-16 gap-3 px-3 text-[15px]">
                 <StoreIcon name={storeName} iconUrl={iconUrl} />
-                <span className="grid min-w-0 flex-1 text-left leading-tight">
-                  <span className="truncate text-sm font-semibold">{storeName}</span>
-                  <span className="truncate text-xs text-[var(--admin-text-muted)]">{adminLabel}</span>
+                <span className="grid min-w-0 flex-1 text-left leading-snug">
+                  <span className="truncate text-base font-semibold">{storeName}</span>
+                  <span className="truncate text-sm text-[var(--admin-text-muted)]">{adminLabel}</span>
                 </span>
-                <ChevronsUpDown className="ml-auto size-4 text-[var(--admin-text-muted)]" aria-hidden />
+                <ChevronsUpDown className="ml-auto size-5 text-[var(--admin-text-muted)]" aria-hidden />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="bottom" align="start" className="w-[17rem] p-1">

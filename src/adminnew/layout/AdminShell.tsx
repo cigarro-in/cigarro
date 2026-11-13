@@ -6,6 +6,8 @@ import { AdminSidebar } from './AdminSidebar';
 import { GmailBanner } from './GmailBanner';
 import { StoreIcon } from './AdminStoreMenu';
 
+const noop = () => {};
+
 /**
  * Admin shell: persistent sidebar (drawer on phones), a slim mobile top bar,
  * the Gmail connection banner, and the routed page. The shell stays mounted
@@ -15,8 +17,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { settings: store } = useStoreSettings();
   const org = useOrg();
   const name = org?.name || store.name;
+  // The desktop sidebar is not collapsible: pin it open and ignore toggles
+  // (Ctrl/Cmd+B, rail). The phone drawer still opens through openMobile.
   return (
-    <SidebarProvider data-admin-shell>
+    <SidebarProvider data-admin-shell open onOpenChange={noop}>
       <AdminSidebar />
       <SidebarInset className="flex min-h-svh min-w-0 flex-col bg-[var(--admin-bg)]">
         <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-[var(--admin-border)] bg-[var(--admin-surface)] px-2 md:hidden">

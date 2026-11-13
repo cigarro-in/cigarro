@@ -16,6 +16,21 @@
     </script>
     <style>html[data-ageok] .age-gate-overlay{display:none}</style>
 
+    <!-- Admin hosts (admin.<root>, and /sa): flag <html> before first paint so
+         the storefront cream body (index.css) never flashes behind the admin.
+         Storefront hosts take no action here. src/main.tsx clears the flag
+         when the resolved host is not the admin host. -->
+    <script>
+      try {
+        var adminHost = location.hostname.indexOf('admin.') === 0;
+        var adminPath = location.pathname === '/sa' || location.pathname.indexOf('/sa/') === 0;
+        if (adminHost || adminPath) document.documentElement.setAttribute('data-admin-boot', '');
+      } catch (e) {
+        // Unreadable location: the storefront defaults apply.
+      }
+    </script>
+    <style>html[data-admin-boot], html[data-admin-boot] body { background-color: #f4f4f5; }</style>
+
     <!-- DNS Prefetch for faster external connections -->
     <link rel="dns-prefetch" href="https://cdn.cigarro.in">
     <link rel="preconnect" href="https://cdn.cigarro.in" crossorigin>

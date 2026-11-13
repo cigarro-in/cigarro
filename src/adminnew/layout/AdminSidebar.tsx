@@ -26,7 +26,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarRail,
   useSidebar,
 } from '../../components/ui/sidebar';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
@@ -97,7 +96,7 @@ function matches(pathname: string, path: string) {
 
 function NavList({ items, pathname, onNavigate }: { items: NavItem[]; pathname: string; onNavigate: () => void }) {
   return (
-    <SidebarMenu className="gap-0.5">
+    <SidebarMenu className="gap-1">
       {items.map((item) => {
         const childPaths = item.children?.map((c) => c.path) ?? [];
         const ownActive = matches(pathname, item.path);
@@ -110,8 +109,7 @@ function NavList({ items, pathname, onNavigate }: { items: NavItem[]; pathname: 
             <SidebarMenuButton
               asChild
               isActive={ownActive && !childActive}
-              tooltip={item.label}
-              className="h-8 font-medium data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-semibold"
+              className="h-10 gap-3 px-3 text-[15px] font-medium [&>svg]:size-5 data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-semibold"
             >
               <NavLink to={item.path} end={item.path === '/'} onClick={onNavigate}>
                 <item.icon aria-hidden />
@@ -119,13 +117,13 @@ function NavList({ items, pathname, onNavigate }: { items: NavItem[]; pathname: 
               </NavLink>
             </SidebarMenuButton>
             {groupActive && subItems.length > 0 && (
-              <SidebarMenuSub className="mr-0 border-l-0 pr-0">
+              <SidebarMenuSub className="mr-0 border-l-0 pr-0 pb-1">
                 {subItems.map((child) => (
                   <SidebarMenuSubItem key={child.path}>
                     <SidebarMenuSubButton
                       asChild
                       isActive={matches(pathname, child.path)}
-                      className="data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-medium"
+                      className="h-9 text-[14px] data-[active=true]:bg-[var(--admin-sidebar-active)] data-[active=true]:font-medium"
                     >
                       <NavLink to={child.path} onClick={onNavigate}>
                         {child.label}
@@ -153,8 +151,10 @@ export function AdminSidebar() {
   const main = ADMIN_NAVIGATION.filter((s) => s.placement === 'main').flatMap((s) => s.items);
   const bottom = ADMIN_NAVIGATION.filter((s) => s.placement === 'bottom').flatMap((s) => s.items);
 
+  // Desktop sidebar is always expanded (AdminShell pins `open`). It is not
+  // collapsible; only the phone drawer (Sheet) opens and closes.
   return (
-    <Sidebar collapsible="icon" variant="floating" className="p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1.5rem+2px)]">
+    <Sidebar variant="floating" className="p-3" style={{ '--sidebar-width': '17rem' } as React.CSSProperties}>
       <SidebarHeader className="p-2">
         <AdminStoreMenu storeName={org?.name || store.name} iconUrl={store.brand.faviconUrl || store.brand.logoUrl || undefined} />
       </SidebarHeader>
@@ -168,7 +168,6 @@ export function AdminSidebar() {
       <SidebarFooter className="p-2">
         <NavList items={bottom} pathname={pathname} onNavigate={close} />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }
