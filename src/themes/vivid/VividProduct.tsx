@@ -45,7 +45,9 @@ export default function VividProduct() {
   // Product + variants from the Convex catalog (preload-aware: same data on the
   // server render and the first client render). Derived, not effect-synced.
   const { product: catalogProduct, loading: catalogLoading } = useCatalogProduct(slug);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk, clear: clearOpStatus } = useInlineStatus({
+    okAutoDismissMs: 3000,
+  });
 
   const data = catalogProduct && (catalogProduct as any).is_active !== false ? (catalogProduct as any) : null;
   const product = useMemo<Details | null>(
@@ -222,7 +224,7 @@ export default function VividProduct() {
             </div>
           )}
 
-          <div className="mb-3"><InlineStatus status={opStatus} /></div>
+          <div className="mb-3"><InlineStatus status={opStatus} onDismiss={clearOpStatus} /></div>
           <div className="flex items-center gap-3 mb-5">
             <div className="inline-flex items-center bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full overflow-hidden">
               <button

@@ -15,7 +15,9 @@ const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export function VividProductCard({ product, listName = 'products' }: Props) {
   const { addToCart } = useCart();
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const { status: opStatus, setError: setOpError, setOk: setOpOk, clear: clearOpStatus } = useInlineStatus({
+    okAutoDismissMs: 3000,
+  });
 
   const defaultVariant =
     product.product_variants?.find((v) => v.is_default) ||
@@ -42,7 +44,7 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
 
   return (
     <>
-      <InlineStatus status={opStatus} />
+      <InlineStatus status={opStatus} onDismiss={clearOpStatus} />
     <Link
       to={`/product/${product.slug}`}
       onClick={() => trackSelectItem(product, listName)}
