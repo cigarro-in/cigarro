@@ -11,23 +11,39 @@ import { BreadcrumbNav } from '../../components/layout/BreadcrumbNav';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
-import { siteConfig } from '../../config/site';
+import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+
+// Publish dates are shown in the store's timezone, so the server render and the
+// client's first render print the same day.
+const POST_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
 export function BlogsPage() {
-  const location = useLocation();
   // Wave 2: blog listing reads from Convex (realtime subscription).
   const { posts, loading } = useBlogPosts(50);
   const isLoading = loading;
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
+  const seo = hubSeo('/blogs', store.name);
+  const site = `https://${primaryHost}`;
 
   return (
     <>
       <SEOHead
-        title="Blog - Stories of Craftsmanship & Heritage"
-        description="Explore our collection of stories about premium tobacco craftsmanship, heritage brands, and the art of fine cigarettes."
-        url={`${siteConfig.url}${location.pathname}`}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
+        url="/blogs"
         type="website"
         keywords={['tobacco blog', 'cigarette stories', 'tobacco heritage', 'smoking culture', 'premium tobacco articles']}
+        extraJsonLd={[
+          hubItemListJsonLd(
+            seo.listName,
+            posts.map((p) => ({ name: p.title, url: `${site}/blog/${p.slug}` })),
+          ),
+        ]}
       />
+      <BreadcrumbSchema items={[{ name: 'Home', url: `${site}/` }, { name: seo.crumb, url: `${site}/blogs` }]} />
 
       <div className="min-h-screen bg-creme pt-24 pb-12">
         <div className="main-container">
@@ -95,7 +111,7 @@ export function BlogsPage() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <Calendar className="w-4 h-4" />
-                              <span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not published'}</span>
+                              <span>{post.published_at ? POST_DATE.format(new Date(post.published_at)) : 'Not published'}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <Clock className="w-4 h-4" />

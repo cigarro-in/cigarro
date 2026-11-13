@@ -49,6 +49,9 @@ interface SEOHeadProps {
   // Use title exactly as given (no site title template). Listing pages carry the
   // bot renderer's titles verbatim, which may omit the site name.
   titleVerbatim?: boolean;
+  // Emit <link rel="canonical"> even on a noindex page (a noindex,follow variant such as
+  // /products?q= points its canonical at the indexable page). 404s leave it off.
+  forceCanonical?: boolean;
 }
 
 export function SEOHead({
@@ -83,6 +86,7 @@ export function SEOHead({
   additionalOffers,
   imageAlt,
   titleVerbatim = false,
+  forceCanonical = false,
 }: SEOHeadProps) {
   // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
   // The 512px icon is a valid image for Organization/publisher logos (never a share image).
@@ -316,7 +320,7 @@ export function SEOHead({
       <meta name="description" content={optimizedDescription} />
       <meta name="keywords" content={keywords.join(', ')} />
       {/* noindex pages (404) carry no canonical, as the bot renderer's 404 does */}
-      {!robots.includes('noindex') && <link rel="canonical" href={canonicalUrl} />}
+      {(forceCanonical || !robots.includes('noindex')) && <link rel="canonical" href={canonicalUrl} />}
 
       {/* Open Graph / Facebook — og:type must be website/article, never "product" */}
       <meta property="og:type" content={ogType} />

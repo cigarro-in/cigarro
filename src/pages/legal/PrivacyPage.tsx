@@ -97,7 +97,7 @@ export function PrivacyPage() {
         description={`Learn what personal information ${store.name} collects, why it is used, when it may be shared and how to make a privacy request.`}
         url={location.pathname}
         type="website"
-        keywords={['privacy policy', 'data protection', 'user privacy', 'cigarro privacy']}
+        keywords={['privacy policy', 'data protection', 'user privacy', `${store.name} privacy`]}
       />
       
       <StaticPageBreadcrumbs path="/privacy" crumb="Privacy Policy" parent />
@@ -122,7 +122,7 @@ export function PrivacyPage() {
                 <div>
                   <h3 className="font-sans text-lg font-bold text-foreground mb-2">Your Privacy Matters</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    This policy explains what information Cigarro collects, why we use it, when it may
+                    This policy explains what information {store.name} collects, why we use it, when it may
                     be shared and how you can contact us about it.
                   </p>
                 </div>
@@ -158,7 +158,7 @@ export function PrivacyPage() {
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Privacy Questions?</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { title: "Privacy and data requests", email: "support@cigarro.in", icon: Mail },
+                  { title: "Privacy and data requests", email: store.business.supportEmail, icon: Mail },
                   { title: "Last updated", email: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">

@@ -251,3 +251,69 @@ export function useBrandDetail(brandSlug: string | undefined) {
     return { status: 'ok' as ListingStatus, brand, products: rows };
   }, [brandSlug, products, brands, loading]);
 }
+
+// Brands hub (/brands): active brands with at least one active product, most
+// products first. Same rules as the bot renderer's brand list.
+export interface HubBrand {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  productCount: number;
+}
+
+export function useBrandsHub(): { brands: HubBrand[]; loading: boolean } {
+  const { products, brands, loading } = useFullCatalog();
+  return useMemo(() => {
+    if (loading) return { brands: [] as HubBrand[], loading: true };
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      if (!p.is_active || !p.brand_id) continue;
+      counts.set(p.brand_id, (counts.get(p.brand_id) || 0) + 1);
+    }
+    const list = (brands as any[])
+      .filter((b) => b.isActive)
+      .map((b) => ({
+        id: b.supabaseId as string,
+        name: b.name as string,
+        slug: b.slug as string,
+        description: (b.description ?? null) as string | null,
+        logoUrl: (b.logoUrl ?? null) as string | null,
+        productCount: counts.get(b.supabaseId) || 0,
+      }))
+      .filter((b) => b.productCount > 0)
+      .sort((a, b) => b.productCount - a.productCount);
+    return { brands: list, loading: false };
+  }, [products, brands, loading]);
+}
+
+// Categories hub (/categories): categories with at least one active product,
+// by name. Each carries its active products (listing order is the catalog's).
+export interface HubCategory {
+  id: string;
+  name: string;
+  slug: string;
+  products: LegacyProduct[];
+}
+
+export function useCategoriesHub(): { categories: HubCategory[]; loading: boolean } {
+  const { products, categories, productCategories, loading } = useFullCatalog();
+  return useMemo(() => {
+    if (loading) return { categories: [] as HubCategory[], loading: true };
+    const byId = new Map(products.map((p) => [p.id, p] as [string, LegacyProduct]));
+    const list = [...(categories as any[])]
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .map((cat) => ({
+        id: cat.supabaseId as string,
+        name: cat.name as string,
+        slug: cat.slug as string,
+        products: (productCategories as any[])
+          .filter((j) => j.categorySupabaseId === cat.supabaseId)
+          .map((j) => byId.get(j.productSupabaseId))
+          .filter((p): p is LegacyProduct => !!p && p.is_active),
+      }))
+      .filter((c) => c.products.length > 0);
+    return { categories: list, loading: false };
+  }, [products, categories, productCategories, loading]);
+}

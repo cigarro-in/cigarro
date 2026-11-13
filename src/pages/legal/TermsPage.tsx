@@ -16,7 +16,7 @@ export function TermsPage() {
         description={`Read the terms that apply when you browse, create an account or place an order with ${store.name}.`}
         url={location.pathname}
         type="website"
-        keywords={['terms of service', 'legal terms', 'user agreement', 'cigarro terms']}
+        keywords={['terms of service', 'legal terms', 'user agreement', `${store.name} terms`]}
       />
       
       <StaticPageBreadcrumbs path="/terms" crumb="Terms of Service" parent />
@@ -41,7 +41,7 @@ export function TermsPage() {
                 <div>
                   <h3 className="font-sans text-lg font-bold text-foreground mb-2">Age Verification Required</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    You must be 18 years or older to purchase tobacco products from Cigarro.
+                    You must be 18 years or older to purchase tobacco products from {store.name}.
                     By using our services, you confirm that you are of legal smoking age in your jurisdiction.
                   </p>
                 </div>
@@ -53,7 +53,7 @@ export function TermsPage() {
               {[
                 {
                   title: "1. Acceptance of Terms",
-                  content: "By accessing or using Cigarro, you agree to these terms. If you do not agree, please do not use the website or place an order."
+                  content: `By accessing or using ${store.name}, you agree to these terms. If you do not agree, please do not use the website or place an order.`
                 },
                 {
                   title: "2. Product Information",
@@ -74,7 +74,7 @@ export function TermsPage() {
                 },
                 {
                   title: "6. Limitation of Liability",
-                  content: "To the extent permitted by applicable law, Cigarro is not liable for indirect, incidental or consequential loss resulting from use of the website or products. Nothing in these terms excludes a right that cannot lawfully be excluded."
+                  content: `To the extent permitted by applicable law, ${store.name} is not liable for indirect, incidental or consequential loss resulting from use of the website or products. Nothing in these terms excludes a right that cannot lawfully be excluded.`
                 },
                 {
                   title: "7. Modifications to Terms",
@@ -97,7 +97,7 @@ export function TermsPage() {
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Questions?</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 {[
-                  { title: "Questions", email: "support@cigarro.in", icon: Mail },
+                  { title: "Questions", email: store.business.supportEmail, icon: Mail },
                   { title: "Last updated", email: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">

@@ -90,7 +90,7 @@ export function ReturnsPage() {
                 content: "If your order qualifies under section 1, here's the process:",
                 items: [
                   "Take clear photos of the issue within 48 hours of delivery",
-                  "Email support@cigarro.in with your order number and photos",
+                  `Email ${store.business.supportEmail} with your order number and photos`,
                   "Keep the item and its packaging while the claim is reviewed",
                   "Wait for support to confirm the available resolution",
                   "If a replacement ships, tracking information will be shared when available"
@@ -114,7 +114,7 @@ export function ReturnsPage() {
                 items: [
                   "Report the issue within 48 hours of delivery",
                   "Keep the item unused and in its original packaging",
-                  "Email support@cigarro.in with the order number and clear photos",
+                  `Email ${store.business.supportEmail} with the order number and clear photos`,
                   "Support will confirm whether a replacement, return or refund applies"
                 ]
               }
@@ -150,7 +150,7 @@ export function ReturnsPage() {
             <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Questions About Returns?</h3>
             <div className="grid md:grid-cols-2 gap-4">
               {[
-                { title: "Returns support", contact: "support@cigarro.in", icon: Mail },
+                { title: "Returns support", contact: store.business.supportEmail, icon: Mail },
                 { title: "Last updated", contact: "20 September 2026", icon: CalendarDays }
               ].map((item, i) => (
                 <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">

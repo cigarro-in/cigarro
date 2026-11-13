@@ -3,7 +3,6 @@ import { ArrowRight, Mail, MessageCircleQuestion, PackageSearch, RotateCcw } fro
 import { SEOHead } from '../../components/seo/SEOHead';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
-import { siteConfig } from '../../config/site';
 import { StaticPageBreadcrumbs, RelatedPages } from '../../components/seo/StaticPageNav';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
@@ -28,7 +27,7 @@ const helpTopics = [
 export function ContactPage() {
   const location = useLocation();
   const { settings: store } = useStoreSettings();
-  const supportEmail = siteConfig.email.support;
+  const supportEmail = store.business.supportEmail;
 
   return (
     <>
@@ -37,7 +36,7 @@ export function ContactPage() {
         description={`Contact ${store.name} for help with an order, a product listing, shipping or using the online store. Email ${supportEmail}.`}
         url={location.pathname}
         type="website"
-        keywords={['contact Cigarro', 'Cigarro support', 'Cigarro order help']}
+        keywords={[`contact ${store.name}`, `${store.name} support`, `${store.name} order help`]}
       />
 
       <StaticPageBreadcrumbs path="/contact" crumb="Contact" />
@@ -46,7 +45,7 @@ export function ContactPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
             <div className="max-w-4xl">
               <p className="mb-5 text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-canyon">
-                Contact Cigarro
+                Contact {store.name}
               </p>
               <h1 className="font-serif text-foreground text-4xl sm:text-6xl lg:text-7xl leading-[0.98] tracking-tight">
                 Tell us what you need help with.
@@ -73,7 +72,7 @@ export function ContactPage() {
                   Email us directly.
                 </h2>
                 <p className="text-muted-foreground leading-relaxed mb-7">
-                  Email is the current support channel for Cigarro. Send your question with the relevant
+                  Email is the current support channel for {store.name}. Send your question with the relevant
                   product link or order number and we will reply with the information available to us.
                 </p>
                 <Button asChild size="lg" className="w-full sm:w-auto bg-dark text-creme-light hover:bg-canyon">

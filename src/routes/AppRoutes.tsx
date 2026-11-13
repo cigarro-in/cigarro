@@ -11,11 +11,15 @@ import {
   AboutPage,
   AgentsPage,
   BlogRoute,
+  BlogsHubRoute,
   BrandRoute,
+  BrandsHubRoute,
+  CategoriesHubRoute,
   CategoryRoute,
   ContactPage,
   LegalPage,
   PrivacyPage,
+  ProductsHubRoute,
   ReturnsPage,
   ShippingPage,
   TermsPage,
@@ -27,14 +31,11 @@ import { Slot } from '../themes';
 const HomePage = () => <Slot name="Home" />;
 const CartPage = () => <Slot name="Cart" />;
 const ProductPage = () => <Slot name="Product" />;
-const ProductsPage = () => <Slot name="Products" />;
-const CategoriesPage = () => <Slot name="Categories" />;
 const ProfilePage = () => <Slot name="Profile" />;
 const ProfileSettingsPage = () => <Slot name="ProfileSettings" />;
 const OrdersPage = () => <Slot name="Orders" />;
 const WishlistPage = () => <Slot name="Wishlist" />;
 const AddressesPage = () => <Slot name="Addresses" />;
-const BrandsPage = () => <Slot name="Brands" />;
 
 // Shopping & Checkout
 // Note: checkout pages remain on classic for payment flow stability
@@ -51,8 +52,7 @@ const ReferralLandingPage = lazy(() => import('../pages/referral/ReferralLanding
 
 // Products & Categories
 
-// Blog
-const BlogsPage = lazy(() => import('../pages/blog/BlogsPage').then(m => ({ default: m.BlogsPage })));
+// Blog listing, products, categories and brands hubs: eager (eagerRoutes.tsx).
 // Company and legal pages are SSR'd, so they are imported eagerly (eagerRoutes.tsx).
 
 // Admin - New modular admin system
@@ -107,15 +107,15 @@ export const AppRoutes = ({ isAdminRoute = false, location }: AppRoutesProps) =>
 
       {/* Products & Categories */}
       <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductPage />} />
-      <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
-      <Route path={ROUTES.CATEGORIES} element={<CategoriesPage />} />
+      <Route path={ROUTES.PRODUCTS} element={<ProductsHubRoute />} />
+      <Route path={ROUTES.CATEGORIES} element={<CategoriesHubRoute />} />
       <Route path={ROUTES.CATEGORY} element={<CategoryRoute />} />
       <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryRoute />} />
-      <Route path={ROUTES.BRANDS} element={<BrandsPage />} />
+      <Route path={ROUTES.BRANDS} element={<BrandsHubRoute />} />
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
 
       {/* Content */}
-      <Route path={ROUTES.BLOGS} element={<BlogsPage />} />
+      <Route path={ROUTES.BLOGS} element={<BlogsHubRoute />} />
       <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
       <Route path={ROUTES.ABOUT} element={<AboutPage />} />
       <Route path={ROUTES.CONTACT} element={<ContactPage />} />

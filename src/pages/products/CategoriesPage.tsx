@@ -1,60 +1,26 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useCategoriesHub } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { Product } from '../../hooks/useCart';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
-import { Button } from '../../components/ui/button';
-import { ShoppingCart, Star, Plus } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { SEOHead } from '../../components/seo/SEOHead';
+import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 
-interface CategoryWithProducts {
-  category_id: string;
-  category_name: string;
-  category_slug: string;
-  category_description: string;
-  category_image: string;
-  products: Product[];
-}
-
+// Categories hub (classic theme). Derived from the catalog on the first render,
+// so the server render lists every category with products.
 export function CategoriesPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [categories, setCategories] = useState<CategoryWithProducts[]>([]);
   const { addToCart, isLoading } = useCart();
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-  // Wave 3: categories + join + products from the Convex catalog.
-  const { products, categories: catalogCategories, productCategories, loading } =
-    useFullCatalog();
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
+  const { categories, loading } = useCategoriesHub();
+  const seo = hubSeo('/categories', store.name);
+  const site = `https://${primaryHost}`;
 
-  useEffect(() => {
-    if (loading) return;
-    try {
-      const byId = new Map(products.map((p: any) => [p.id, p]));
-      const transformedCategories = (catalogCategories as any[])
-        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
-        .map((cat: any) => ({
-          category_id: cat.supabaseId,
-          category_name: cat.name,
-          category_slug: cat.slug,
-          category_description: cat.description,
-          category_image: cat.image,
-          products: (productCategories as any[])
-            .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
-            .map((j: any) => byId.get(j.productSupabaseId))
-            .filter((p: any) => p && p.is_active),
-        }))
-        .filter((cat: any) => cat.products.length > 0);
-      setCategories(transformedCategories);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      setOpError('Failed to load categories.');
-    }
-  }, [loading, products, catalogCategories, productCategories]);
-
-  const handleAddToCart = async (e: React.MouseEvent, product: Product) => {
-    e.stopPropagation(); // Prevent click from bubbling up to the parent link
+  const handleAddToCart = async (product: Product) => {
     try {
       await addToCart(product);
       setOpOk(`${product.name} added to cart`);
@@ -65,12 +31,20 @@ export function CategoriesPage() {
 
   return (
     <>
-      <SEOHead 
-        title="Product Categories - Browse by Category"
-        description="Explore our organized categories of premium cigarettes, cigars, and tobacco products. Find exactly what you're looking for by browsing our curated categories."
+      <SEOHead
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
         url="/categories"
+        extraJsonLd={[
+          hubItemListJsonLd(
+            seo.listName,
+            categories.map((c) => ({ name: c.name, url: `${site}/category/${c.slug}` })),
+          ),
+        ]}
       />
-      
+      <BreadcrumbSchema items={[{ name: 'Home', url: `${site}/` }, { name: seo.crumb, url: `${site}/categories` }]} />
+
       <div className="py-12 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -84,21 +58,18 @@ export function CategoriesPage() {
           </div>
 
         <div className="space-y-16">
-          {categories.map(category => (
-            <section key={category.category_id}>
-              <h2 className="font-serif-premium text-2xl sm:text-3xl text-foreground mb-4 sm:mb-6">{category.category_name}</h2>
+          {loading
+            ? null
+            : categories.map(category => (
+            <section key={category.id}>
+              <h2 className="font-serif-premium text-2xl sm:text-3xl text-foreground mb-4 sm:mb-6">{category.name}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-8">
                 {category.products.map((product, index) => (
                   <ProductCard
                     key={product.id}
-                    product={product}
+                    product={product as unknown as Product}
                     variant="default"
-                    onAddToCart={(product) => {
-                      const syntheticEvent = {
-                        stopPropagation: () => {}
-                      } as React.MouseEvent;
-                      handleAddToCart(syntheticEvent, product);
-                    }}
+                    onAddToCart={(p) => handleAddToCart(p)}
                     isLoading={isLoading}
                     index={index}
                   />

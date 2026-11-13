@@ -203,6 +203,43 @@ function trimListingPreload(preload: PreloadMap, drop: Record<string, string[] |
   return out;
 }
 
+// Hub pages (P5-SSR slice 8). /products keeps the description (the query search
+// reads it, so the server and client filter the same rows) and the product's
+// createdAt (newest-first order); the rest follows the listing trims.
+const TRIM_PRODUCTS_HUB: Record<string, string[] | undefined> = {
+  products: ['_id', 'updatedAt', 'shortDescription', 'specifications', 'metaDescription', 'metaTitle', 'origin'],
+  variants: TRIM_CATEGORY.variants,
+  brands: TRIM_CATEGORY.brands,
+  categories: TRIM_CATEGORY.categories,
+};
+
+// Search (?q= or ?search=) matches product descriptions, so they stay in the
+// preload only then. The default view never reads them (about 20KB of the payload).
+const TRIM_PRODUCTS_HUB_NO_DESCRIPTION: Record<string, string[] | undefined> = {
+  ...TRIM_PRODUCTS_HUB,
+  products: [...(TRIM_PRODUCTS_HUB.products ?? []), 'description'],
+};
+
+function hasSearchQuery(search: string | undefined): boolean {
+  const params = new URLSearchParams(search ?? '');
+  return !!(params.get('q') || params.get('search'));
+}
+
+export function trimProductsHubPreload(preload: PreloadMap, withDescriptions = false): PreloadMap {
+  return trimListingPreload(preload, withDescriptions ? TRIM_PRODUCTS_HUB : TRIM_PRODUCTS_HUB_NO_DESCRIPTION);
+}
+
+// Blog listing: the cards show title, excerpt, image, author, date and category.
+export function trimBlogsHubPreload(preload: PreloadMap): PreloadMap {
+  const out = trimSiteSettingsOnly(preload);
+  for (const key of Object.keys(preload)) {
+    const value = preload[key];
+    if (!key.startsWith('content:listBlogPosts:') || !Array.isArray(value)) continue;
+    out[key] = value.map((row) => without(row, ['content', 'metaTitle', 'metaDescription']));
+  }
+  return out;
+}
+
 const PRODUCT_PATH = /^\/product\/([^/]+)\/?$/;
 
 function safeDecode(value: string): string {
@@ -347,6 +384,36 @@ const STATIC_PAGE_ROUTES: SsrRoute[] = [
   staticPageRoute('returns', '/returns'),
 ];
 
+// Hub routes: exact paths. Products, categories and brands read the full catalog
+// (same args as the hooks: orgSlug only). Blogs read the first 50 posts, the same
+// args as useBlogPosts(50) on BlogsPage.
+function exactRoute(id: string, path: string, route: Omit<SsrRoute, 'id' | 'match'>): SsrRoute {
+  return { id, match: (pathname) => (pathname === path || pathname === `${path}/` ? {} : null), ...route };
+}
+
+const productsHubRoute = exactRoute('products', '/products', {
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload, params) => trimProductsHubPreload(preload, hasSearchQuery(params.search)),
+});
+
+const categoriesHubRoute = exactRoute('categories', '/categories', {
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload) => trimCategoryPreload(preload),
+});
+
+const brandsHubRoute = exactRoute('brands', '/brands', {
+  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  trimPreload: (preload) => trimBrandPreload(preload),
+});
+
+const blogsHubRoute = exactRoute('blogs', '/blogs', {
+  preloadRequests: (_params, org) => [
+    { fnName: 'content:getSiteSettings', args: { orgSlug: org.slug } },
+    { fnName: 'content:listBlogPosts', args: { limit: 50, orgSlug: org.slug } },
+  ],
+  trimPreload: (preload) => trimBlogsHubPreload(preload),
+});
+
 const SSR_ROUTES: SsrRoute[] = [
   homeRoute,
   productRoute,
@@ -354,6 +421,10 @@ const SSR_ROUTES: SsrRoute[] = [
   categoryBrandRoute,
   brandRoute,
   blogRoute,
+  productsHubRoute,
+  categoriesHubRoute,
+  brandsHubRoute,
+  blogsHubRoute,
   ...STATIC_PAGE_ROUTES,
 ];
 
@@ -367,10 +438,12 @@ export function matchSsrRoute(pathname: string): { route: SsrRoute; params: Reco
 }
 
 // Preload plan for a pathname: the Convex reads to run and the trim to apply.
-export function planSsrRoute(pathname: string, org: OrgInfo) {
+export function planSsrRoute(pathname: string, org: OrgInfo, search = '') {
   const hit = matchSsrRoute(pathname);
   if (!hit) return null;
-  const { route, params } = hit;
+  // The query string travels with the route params (routes that read it: /products).
+  const { route } = hit;
+  const params = { ...hit.params, search };
   return {
     id: route.id,
     requests: route.preloadRequests(params, org),

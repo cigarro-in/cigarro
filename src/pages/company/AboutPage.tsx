@@ -41,7 +41,7 @@ export function AboutPage() {
         description={`Learn how ${store.name} helps adult customers in India browse cigarette brands, compare pack options and find clear product information online.`}
         url={location.pathname}
         type="website"
-        keywords={['about Cigarro', 'online cigarette store India', 'cigarette brands India']}
+        keywords={[`about ${store.name}`, 'online cigarette store India', 'cigarette brands India']}
       />
 
       <StaticPageBreadcrumbs path="/about" crumb="About" />
@@ -50,13 +50,13 @@ export function AboutPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-28">
             <div className="max-w-5xl">
               <p className="mb-5 text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-canyon">
-                About Cigarro
+                {store.name}
               </p>
               <h1 className="font-serif text-foreground text-4xl sm:text-6xl lg:text-7xl leading-[0.98] tracking-tight max-w-4xl">
                 Buying cigarettes online should not feel confusing.
               </h1>
               <p className="mt-7 max-w-2xl text-lg sm:text-xl leading-relaxed text-muted-foreground">
-                Cigarro is an online cigarette store for adult customers in India. We bring brands,
+                {store.name} is an online cigarette store for adult customers in India. We bring brands,
                 variants, pack details and pricing together so you can find what you are looking for
                 without working through vague listings.
               </p>
@@ -78,7 +78,7 @@ export function AboutPage() {
           <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-20 items-start">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-canyon mb-4">
-                Why Cigarro exists
+                Why {store.name} exists
               </p>
               <h2 className="font-serif text-3xl sm:text-5xl leading-tight text-foreground">
                 Clear information makes choosing simpler.
@@ -90,12 +90,12 @@ export function AboutPage() {
                 is often incomplete, and availability is not always obvious.
               </p>
               <p>
-                We built Cigarro to make that experience more straightforward. Products are organised
+                We built {store.name} to make that experience more straightforward. Products are organised
                 by brand and category, while each listing is designed to show the variant, format,
                 quantity and current price before you place an order.
               </p>
               <p>
-                Cigarro is still improving. Our focus is practical: clearer product information, a
+                {store.name} is still improving. Our focus is practical: clearer product information, a
                 better-organised catalogue and support that is easy to reach when something is unclear.
               </p>
             </div>
@@ -138,14 +138,14 @@ export function AboutPage() {
               </p>
               <h2 className="font-serif text-3xl sm:text-4xl mb-4">Tobacco is not an ordinary product.</h2>
               <p className="text-creme-light/75 leading-relaxed">
-                Cigarro is intended only for adults of legal smoking age. Tobacco and nicotine products
+                {store.name} is intended only for adults of legal smoking age. Tobacco and nicotine products
                 carry serious health risks and can be addictive. We do not encourage anyone who does not
                 already use tobacco to begin.
               </p>
               <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm">
                 <Link to="/terms" className="underline underline-offset-4 hover:text-canyon-light">Terms of service</Link>
                 <Link to="/privacy" className="underline underline-offset-4 hover:text-canyon-light">Privacy policy</Link>
-                <Link to="/contact" className="underline underline-offset-4 hover:text-canyon-light">Contact Cigarro</Link>
+                <Link to="/contact" className="underline underline-offset-4 hover:text-canyon-light">Contact {store.name}</Link>
               </div>
             </div>
           </div>

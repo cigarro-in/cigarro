@@ -21,11 +21,15 @@ import {
   AboutPage,
   AgentsPage,
   BlogRoute,
+  BlogsHubRoute,
   BrandRoute,
+  BrandsHubRoute,
+  CategoriesHubRoute,
   CategoryRoute,
   ContactPage,
   LegalPage,
   PrivacyPage,
+  ProductsHubRoute,
   ReturnsPage,
   ShippingPage,
   TermsPage,
@@ -80,7 +84,11 @@ export function SsrRoutes({ location }: SsrRoutesProps) {
       <Route path={ROUTES.PRODUCT_DETAIL} element={<SsrProduct />} />
       <Route path={ROUTES.CATEGORY} element={<CategoryRoute />} />
       <Route path={ROUTES.CATEGORY_BRAND} element={<CategoryRoute />} />
+      <Route path={ROUTES.PRODUCTS} element={<ProductsHubRoute />} />
+      <Route path={ROUTES.CATEGORIES} element={<CategoriesHubRoute />} />
+      <Route path={ROUTES.BRANDS} element={<BrandsHubRoute />} />
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
+      <Route path={ROUTES.BLOGS} element={<BlogsHubRoute />} />
       <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
       <Route path={ROUTES.ABOUT} element={<AboutPage />} />
       <Route path={ROUTES.CONTACT} element={<ContactPage />} />

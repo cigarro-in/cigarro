@@ -163,7 +163,7 @@ function renderPathFor(url) {
 // Full server render (Convex preload, React, shell injection). Throws on failure.
 async function renderPage(context, url, orgInfo, org, orgScript) {
   const { env } = context;
-  const plan = planSsrRoute(url.pathname, orgInfo);
+  const plan = planSsrRoute(url.pathname, orgInfo, url.search);
   if (!plan) throw new Error(`no SSR route for ${url.pathname}`);
   const convexUrl = requiredConvexUrl(env);
   let raw = await fetchPreload(convexUrl, plan.requests, { timeoutMs: PRELOAD_TIMEOUT_MS });

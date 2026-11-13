@@ -58,7 +58,7 @@ export function LegalPage() {
             </h1>
             <p className="mt-6 max-w-2xl text-lg sm:text-xl leading-relaxed text-muted-foreground">
               Start with the policy that matches your question. Each page explains the current position
-              and how to contact Cigarro when you need help.
+              and how to contact {store.name} when you need help.
             </p>
           </div>
         </section>

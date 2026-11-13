@@ -1,70 +1,25 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useBrandsHub } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { ArrowRight, Star, Package } from 'lucide-react';
+import { ArrowRight, Package } from 'lucide-react';
 import { SEOHead } from '../../components/seo/SEOHead';
-import { siteConfig } from '../../config/site';
+import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 
-interface Brand {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  logo_url: string | null;
-  is_active: boolean;
-  is_featured: boolean;
-  product_count?: number;
-}
-
+// Brands hub (classic theme). Derived from the catalog on the first render, so
+// the server render lists every brand with products (no effect-driven state).
 export function BrandsPage() {
-  const location = useLocation();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { status: opStatus, setError: setOpError } = useInlineStatus();
-  // Wave 3: brands + counts from the Convex catalog (same shapes).
-  const { products, brands: catalogBrands, loading } = useFullCatalog();
+  const { status: opStatus } = useInlineStatus();
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
+  const { brands, loading } = useBrandsHub();
+  const seo = hubSeo('/brands', store.name);
+  const site = `https://${primaryHost}`;
 
-  useEffect(() => {
-    if (loading) return;
-    try {
-      setIsLoading(true);
-      const counts = new Map<string, number>();
-      for (const p of products as any[]) {
-        if (!p.is_active || !p.brand_id) continue;
-        counts.set(p.brand_id, (counts.get(p.brand_id) || 0) + 1);
-      }
-      const brandsWithCounts = (catalogBrands as any[])
-        .filter((b: any) => b.isActive)
-        .map((brand: any) => ({
-          id: brand.supabaseId,
-          name: brand.name,
-          slug: brand.slug,
-          description: brand.description ?? null,
-          logo_url: brand.logoUrl ?? null,
-          is_active: brand.isActive,
-          is_featured: false,
-          product_count: counts.get(brand.supabaseId) || 0,
-        }));
-      // Filter out brands with no products and sort by featured, then product count
-      const filteredBrands = brandsWithCounts
-        .filter((b: Brand) => b.product_count && b.product_count > 0)
-        .sort((a: Brand, b: Brand) => {
-          if (a.is_featured && !b.is_featured) return -1;
-          if (!a.is_featured && b.is_featured) return 1;
-          return (b.product_count || 0) - (a.product_count || 0);
-        });
-      setBrands(filteredBrands);
-    } catch (error) {
-      console.error('Error fetching brands:', error);
-      setOpError('Failed to load brands');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loading, products, catalogBrands]);
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-creme flex items-center justify-center">
         <div className="text-center">
@@ -78,18 +33,26 @@ export function BrandsPage() {
   return (
     <>
       <SEOHead
-        title="Our Premium Brands"
-        description="Discover our collection of premium cigarette brands from world-renowned manufacturers. Shop authentic tobacco products from the world's finest brands."
-        url={`${siteConfig.url}${location.pathname}`}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
+        url="/brands"
         type="website"
         keywords={['premium brands', 'cigarette brands', 'tobacco brands', 'luxury cigarettes']}
+        extraJsonLd={[
+          hubItemListJsonLd(
+            seo.listName,
+            brands.map((b) => ({ name: b.name, url: `${site}/brand/${b.slug}` })),
+          ),
+        ]}
       />
+      <BreadcrumbSchema items={[{ name: 'Home', url: `${site}/` }, { name: seo.crumb, url: `${site}/brands` }]} />
 
       <div className="min-h-screen bg-creme">
         {/* Hero Section */}
         <div className="main-container">
           <div className="text-center py-16">
-            <motion.h1 
+            <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
@@ -103,7 +66,7 @@ export function BrandsPage() {
               transition={{ delay: 0.2, duration: 0.6 }}
               className="w-24 h-1 bg-canyon mx-auto mb-6"
             ></motion.div>
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
@@ -121,7 +84,7 @@ export function BrandsPage() {
             <InlineStatus status={opStatus} />
           </div>
           {brands.length === 0 ? (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-center py-20"
@@ -150,9 +113,9 @@ export function BrandsPage() {
                   >
                     {/* Brand Logo */}
                     <div className="aspect-[3/2] bg-creme-light flex items-center justify-center p-8 relative overflow-hidden">
-                      {brand.logo_url ? (
+                      {brand.logoUrl ? (
                         <img
-                          src={brand.logo_url}
+                          src={brand.logoUrl}
                           alt={brand.name}
                           className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                         />
@@ -163,11 +126,6 @@ export function BrandsPage() {
                           </span>
                         </div>
                       )}
-                      {brand.is_featured && (
-                        <div className="absolute top-4 right-4 bg-canyon text-creme-light px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wide">
-                          Featured
-                        </div>
-                      )}
                     </div>
 
                     {/* Brand Info */}
@@ -175,7 +133,7 @@ export function BrandsPage() {
                       <h3 className="text-xl font-serif font-bold text-dark group-hover:text-canyon transition-colors mb-2">
                         {brand.name}
                       </h3>
-                      
+
                       {brand.description && (
                         <p className="text-dark/70 font-sans text-sm leading-relaxed mb-4 line-clamp-2">
                           {brand.description}
@@ -184,7 +142,7 @@ export function BrandsPage() {
 
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-dark/60 font-sans">
-                          {brand.product_count} product{brand.product_count !== 1 ? 's' : ''}
+                          {brand.productCount} product{brand.productCount !== 1 ? 's' : ''}
                         </span>
                         <ArrowRight className="w-5 h-5 text-canyon group-hover:translate-x-2 transition-transform duration-300" />
                       </div>
@@ -199,7 +157,7 @@ export function BrandsPage() {
         {/* Call to Action */}
         <div className="bg-dark text-creme-light py-20">
           <div className="main-container text-center">
-            <motion.h2 
+            <motion.h2
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -207,7 +165,7 @@ export function BrandsPage() {
             >
               Looking for a Specific Brand?
             </motion.h2>
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}

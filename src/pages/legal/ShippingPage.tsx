@@ -137,7 +137,7 @@ export function ShippingPage() {
                 {
                   icon: Globe,
                   title: "6. International Shipping",
-                  content: "Cigarro does not currently offer international shipping.",
+                  content: `${store.name} does not currently offer international shipping.`,
                   items: [
                     "Orders require an Indian delivery address",
                     "International forwarding is not supported",
@@ -153,7 +153,7 @@ export function ShippingPage() {
                     "A dispatch update when the order leaves for delivery",
                     "A tracking number or link when supplied by the delivery partner",
                     "Carrier updates and an estimated arrival date where available",
-                    "Order status in your Cigarro account"
+                    `Order status in your ${store.name} account`
                   ]
                 }
               ].map((section, index) => (
@@ -189,7 +189,7 @@ export function ShippingPage() {
               <h3 className="font-sans text-2xl text-foreground mb-6 text-center">Shipping Questions?</h3>
             <div className="grid md:grid-cols-2 gap-4">
               {[
-                  { title: "Shipping support", contact: "support@cigarro.in", icon: Mail },
+                  { title: "Shipping support", contact: store.business.supportEmail, icon: Mail },
                   { title: "Last updated", contact: "20 September 2026", icon: CalendarDays }
                 ].map((item, i) => (
                   <div key={i} className="text-center p-4 rounded-lg bg-muted/20 border border-border/20">

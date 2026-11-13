@@ -1,74 +1,96 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { ProductCard } from '../../components/products/ProductCard';
-import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
 import { trackViewItemList } from '../../lib/analytics/ga';
-import { Heart, ShoppingCart, Star, ChevronDown, ChevronUp, Grid3X3, Grid2X2, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Grid3X3, Grid2X2, ShoppingCart } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
-import { useWishlist } from '../../hooks/useWishlist';
-import { formatINR } from '../../utils/currency';
 import { Product } from '../../hooks/useCart';
-import { siteConfig } from '../../config/site';
+import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
+import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+
+// Products hub (/products, classic theme). The page state lives in the URL, so
+// the server render and the client's first render are the same tree:
+//   ?category=<slug>[,<slug>]  category facet (multi)
+//   ?brand=<slug>[,<slug>]     brand facet (multi)
+//   ?price=<0-4>[,<0-4>]       price range index (multi, see PRICE_RANGES)
+//   ?sort=name|price-low|price-high|newest   (default name)
+//   ?q= (or the legacy ?search=)            search text
+// Filter changes replace the history entry, so Back leaves the catalog.
+
+const PRICE_RANGES = ['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', '₹2000 - ₹5000', 'Above ₹5000'];
+const SORT_KEYS = ['name', 'price-low', 'price-high', 'newest'] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+
+const FACET_PARAM: Record<string, string> = {
+  categories: 'category',
+  brands: 'brand',
+  'price-range': 'price',
+};
+
+interface FacetItem {
+  label: string;
+  value: string;
+}
 
 interface FilterSection {
   id: string;
   name: string;
-  items: string[];
-  isExpanded: boolean;
+  items: FacetItem[];
 }
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
+function listParam(params: URLSearchParams, key: string): string[] {
+  const raw = params.get(key);
+  return raw ? raw.split(',').filter(Boolean) : [];
 }
 
-interface Brand {
-  brand: string;
-  count: number;
+function priceInRange(price: number, index: number): boolean {
+  switch (index) {
+    case 0:
+      return price < 500;
+    case 1:
+      return price >= 500 && price < 1000;
+    case 2:
+      return price >= 1000 && price < 2000;
+    case 3:
+      return price >= 2000 && price < 5000;
+    case 4:
+      return price >= 5000;
+    default:
+      return true;
+  }
+}
+
+// Default-variant price (rupees): the is_default variant, else the first.
+function defaultVariantOf(product: any): { price: number } | undefined {
+  const variants: any[] = product.product_variants || [];
+  return variants.find((v) => v.is_default) || variants[0];
+}
+
+function getProductPrice(product: Product): number {
+  const variants = (product as any).product_variants as { price: number; is_default?: boolean }[] | undefined;
+  if (variants && variants.length > 0) {
+    const def = variants.find((v) => v.is_default) || variants[0];
+    return def?.price ?? 0;
+  }
+  return (product as any).price ?? 0;
 }
 
 export function ProductsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  // Removed pagination - using lazy loading instead
-  const [sortBy, setSortBy] = useState('name');
-  const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [origins, setOrigins] = useState<string[]>([]);
-  const [strengths, setStrengths] = useState<string[]>([]);
-  const [packSizes, setPackSizes] = useState<string[]>([]);
-  
-  // Filter states
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [selectedOrigins, setSelectedOrigins] = useState<string[]>([]);
-  const [selectedStrengths, setSelectedStrengths] = useState<string[]>([]);
-  const [selectedPackSizes, setSelectedPackSizes] = useState<string[]>([]);
-  const [selectedPriceRange, setSelectedPriceRange] = useState<string[]>([]);
-  
-  // Loading states
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
-  // Drag to dismiss states
-  const [dragStartY, setDragStartY] = useState(0);
-  const [dragCurrentY, setDragCurrentY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  
+  const { primaryHost } = useOrgInfo();
+  const { settings: store } = useStoreSettings();
   const { addToCart, isLoading: cartLoading } = useCart();
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
+  const { status: opStatus, setOk: setOpOk, setError: setOpError } = useInlineStatus();
 
-  // Products + filter facets from the Convex catalog. Filtering stays client-side.
+  // Products + filter facets from the Convex catalog. Filtering is local.
   const {
     products: catalogProducts,
     brands: catalogBrands,
@@ -76,216 +98,117 @@ export function ProductsPage() {
     loading: catalogLoading,
   } = useFullCatalog();
 
-  // Removed productsPerPage - showing all products for lazy loading
-  
-  // Dynamic filter sections based on database data
-  const [filterSections, setFilterSections] = useState<FilterSection[]>([]);
+  // URL state. Read on every render, so the URL is the single source of truth.
+  const params = new URLSearchParams(location.search);
+  const q = (params.get('q') || params.get('search') || '').trim();
+  const selCategories = listParam(params, 'category');
+  const selBrands = listParam(params, 'brand');
+  const selPriceRange = listParam(params, 'price').filter((v) => /^[0-4]$/.test(v));
+  const sortParam = params.get('sort');
+  const sortBy: SortKey = (SORT_KEYS as readonly string[]).includes(sortParam ?? '') ? (sortParam as SortKey) : 'name';
 
-  // Get search query from URL parameters
-  const searchParams = new URLSearchParams(location.search);
-  const urlSearchQuery = searchParams.get('search') || '';
+  // UI-only state (not part of the URL).
+  const [viewMode, setViewMode] = useState<'grid' | 'two-col'>('grid');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Drag to dismiss states
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragCurrentY, setDragCurrentY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Helper: get price from default variant (or first), fallback to legacy product.price if present
-  const getProductPrice = (product: Product): number => {
-    if ((product as any).product_variants && (product as any).product_variants.length > 0) {
-      const variants = (product as any).product_variants as { price: number; is_default?: boolean }[];
-      const def = variants.find(v => v.is_default) || variants[0];
-      return def?.price ?? 0;
-    }
-    return (product as any).price ?? 0;
-  };
+  // Filter sections from the catalog (sections without items are not shown).
+  const filterSections: FilterSection[] = useMemo(() => {
+    const categoryItems = (catalogCategories as any[]).map((c) => ({ label: c.name, value: c.slug }));
+    const brandItems = (catalogBrands as any[])
+      .filter((b) => b.isActive)
+      .map((b) => ({ label: b.name, value: b.slug }));
+    const priceItems = PRICE_RANGES.map((label, i) => ({ label, value: String(i) }));
+    return [
+      { id: 'categories', name: 'CATEGORIES', items: categoryItems },
+      { id: 'brands', name: 'BRANDS', items: brandItems },
+      { id: 'price-range', name: 'PRICE RANGE', items: priceItems },
+    ].filter((section) => section.items.length > 0);
+  }, [catalogCategories, catalogBrands]);
 
-  useEffect(() => {
-    if (!isInitialLoad || catalogLoading) return; // Prevent multiple initial loads
+  const isExpanded = (sectionId: string) => expanded[sectionId] ?? sectionId === 'categories';
 
-    const loadData = async () => {
-      try {
-        applyFilters(catalogProducts as any[]);
-        setCategories(
-          (catalogCategories as any[]).map((c: any) => ({ id: c.supabaseId, name: c.name, slug: c.slug })),
-        );
-        setBrands(
-          (catalogBrands as any[])
-            .filter((b: any) => b.isActive)
-            .map((brand: any) => ({ brand: brand.name, count: 1 })),
-        );
-        // No origins/strengths/pack-size facets in the catalog (same as before).
-        setOrigins([]);
-        setStrengths([]);
-        setPackSizes([]);
-        setIsInitialLoad(false);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        setIsLoading(false);
-        setIsInitialLoad(false);
-      }
-    };
-
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (isLoading) {
-        console.error('Loading timeout - setting loading to false');
-        setIsLoading(false);
-        setIsInitialLoad(false);
-        setOpError('Loading timeout. Please refresh the page.');
-      }
-    }, 10000); // 10 second timeout
-
-    loadData();
-
-    return () => clearTimeout(timeoutId);
-  }, [urlSearchQuery, isInitialLoad, catalogLoading]);
-
-  // Refetch products when filters change (with debounce)
-  useEffect(() => {
-    if (isInitialLoad || catalogLoading) return; // Don't refetch during initial load
-
-    const timeoutId = setTimeout(() => {
-      applyFilters(catalogProducts as any[]);
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [selectedCategories, selectedBrands, selectedOrigins, selectedStrengths, selectedPackSizes, selectedPriceRange, isInitialLoad]);
-
-  // Update filter sections when data is loaded (preserve expanded state) - Matching Luminaire Authentik structure
-  useEffect(() => {
-    const sections: FilterSection[] = [
-      {
-        id: 'categories',
-        name: 'CATEGORIES',
-        items: categories.map(c => c.name),
-        isExpanded: filterSections.find(s => s.id === 'categories')?.isExpanded ?? true
-      },
-      {
-        id: 'brands',
-        name: 'BRANDS',
-        items: brands.map(b => b.brand),
-        isExpanded: filterSections.find(s => s.id === 'brands')?.isExpanded ?? false
-      },
-      {
-        id: 'origins',
-        name: 'ORIGINS',
-        items: origins,
-        isExpanded: filterSections.find(s => s.id === 'origins')?.isExpanded ?? false
-      },
-      {
-        id: 'strengths',
-        name: 'STRENGTHS',
-        items: strengths,
-        isExpanded: filterSections.find(s => s.id === 'strengths')?.isExpanded ?? false
-      },
-      {
-        id: 'pack-sizes',
-        name: 'PACK SIZES',
-        items: packSizes,
-        isExpanded: filterSections.find(s => s.id === 'pack-sizes')?.isExpanded ?? false
-      },
-      {
-        id: 'price-range',
-        name: 'PRICE RANGE',
-        items: ['Under ₹500', '₹500 - ₹1000', '₹1000 - ₹2000', '₹2000 - ₹5000', 'Above ₹5000'],
-        isExpanded: filterSections.find(s => s.id === 'price-range')?.isExpanded ?? false
-      }
-    ].filter(section => section.items.length > 0); // Only show sections with items
-    
-    setFilterSections(sections);
-  }, [categories, brands, origins, strengths, packSizes]);
-
-  // Filter the Convex catalog locally: active only, search, category/brand
-  // facets, price ranges
-  // against the default-variant price in rupees, newest first).
-  const priceInRange = (price: number, range: string): boolean => {
-    switch (range) {
-      case 'Under ₹500':
-        return price < 500;
-      case '₹500 - ₹1000':
-        return price >= 500 && price < 1000;
-      case '₹1000 - ₹2000':
-        return price >= 1000 && price < 2000;
-      case '₹2000 - ₹5000':
-        return price >= 2000 && price < 5000;
-      case 'Above ₹5000':
-        return price >= 5000;
+  const selectedFor = (sectionId: string): string[] => {
+    switch (sectionId) {
+      case 'categories':
+        return selCategories;
+      case 'brands':
+        return selBrands;
+      case 'price-range':
+        return selPriceRange;
       default:
-        return true;
+        return [];
     }
   };
 
-  const applyFilters = (rows: any[]) => {
-    try {
-      let list = (rows || []).filter((p: any) => p.is_active);
+  // Filter, sort and shape the catalog rows. Pure function of the catalog and the URL.
+  const displayedProducts: Product[] = useMemo(() => {
+    let list = (catalogProducts as any[]).filter((p) => p.is_active);
 
-      // Apply search filter
-      const q = urlSearchQuery.trim().toLowerCase();
-      if (q) {
-        list = list.filter(
-          (p: any) =>
-            String(p.name || '').toLowerCase().includes(q) ||
-            String(p.brand?.name || '').toLowerCase().includes(q) ||
-            String(p.description || '').toLowerCase().includes(q),
-        );
-      }
-
-      // Apply category filter
-      if (selectedCategories.length > 0) {
-        const set = new Set(selectedCategories);
-        list = list.filter((p: any) =>
-          (p.categories || []).some((c: any) => set.has(c.name)),
-        );
-      }
-
-      // Apply brand filter
-      if (selectedBrands.length > 0) {
-        const set = new Set(selectedBrands);
-        list = list.filter((p: any) => set.has(p.brand?.name));
-      }
-
-      // Apply price range filter (default-variant price, rupees)
-      if (selectedPriceRange.length > 0) {
-        list = list.filter((p: any) => {
-          const variants = p.product_variants || [];
-          const def = variants.find((v: any) => v.is_default) || variants[0];
-          const price = Number(def?.price ?? 0);
-          return selectedPriceRange.some((range) => priceInRange(price, range));
-        });
-      }
-
-      list = [...list].sort(
-        (a: any, b: any) =>
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    if (q) {
+      const needle = q.toLowerCase();
+      list = list.filter(
+        (p) =>
+          String(p.name || '').toLowerCase().includes(needle) ||
+          String(p.brand?.name || '').toLowerCase().includes(needle) ||
+          String(p.description || '').toLowerCase().includes(needle),
       );
-
-      // Transform the data to match expected Product type
-      const products = list.map((product: any) => {
-        // Extract brand - handle both array and object formats
-        const brandData = product.brand;
-        let brand: { id: string; name: string };
-        if (Array.isArray(brandData)) {
-          brand = brandData[0] || { id: 'unknown', name: 'Premium' };
-        } else if (brandData && typeof brandData === 'object') {
-          brand = brandData as { id: string; name: string };
-        } else {
-          brand = { id: 'unknown', name: 'Premium' };
-        }
-
-        return {
-          ...product,
-          brand,
-          product_variants:
-            product.product_variants?.map((variant: any) => ({
-              ...variant,
-              images: variant.images || [],
-            })) || [],
-        };
-      });
-
-      setProducts(products);
-    } catch (error) {
-      console.error('Error filtering products:', error);
-      setOpError('Failed to load products');
-    } finally {
-      setIsLoading(false); // Add this line to fix the loading issue
     }
+    if (selCategories.length > 0) {
+      const set = new Set(selCategories);
+      list = list.filter((p) => (p.categories || []).some((c: any) => set.has(c.slug)));
+    }
+    if (selBrands.length > 0) {
+      const set = new Set(selBrands);
+      list = list.filter((p) => !!p.brand && set.has(p.brand.slug));
+    }
+    if (selPriceRange.length > 0) {
+      list = list.filter((p) => {
+        const price = Number(defaultVariantOf(p)?.price ?? 0);
+        return selPriceRange.some((i) => priceInRange(price, Number(i)));
+      });
+    }
+
+    // Newest first, then the chosen sort (stable, so ties keep this order).
+    list = [...list].sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+    );
+    const rows = list.map((product) => ({
+      ...product,
+      brand: product.brand ?? { id: 'unknown', name: 'Premium' },
+      product_variants: (product.product_variants || []).map((variant: any) => ({
+        ...variant,
+        images: variant.images || [],
+      })),
+    })) as unknown as Product[];
+
+    return rows.sort((a, b) => {
+      switch (sortBy) {
+        case 'price-low':
+          return getProductPrice(a) - getProductPrice(b);
+        case 'price-high':
+          return getProductPrice(b) - getProductPrice(a);
+        case 'newest':
+          return new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime();
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogProducts, q, selCategories.join(','), selBrands.join(','), selPriceRange.join(','), sortBy]);
+
+  const listName = q ? 'search_results' : 'all_products';
+
+  // Writes the URL. Replaces the history entry: one filter tap is not a page view.
+  const writeParams = (mutate: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(location.search);
+    mutate(next);
+    const search = next.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
   };
 
   const handleAddToCart = async (product: Product) => {
@@ -298,60 +221,28 @@ export function ProductsPage() {
   };
 
   const toggleFilterSection = (sectionId: string) => {
-    setFilterSections(prev => 
-      prev.map(section => 
-        section.id === sectionId 
-          ? { ...section, isExpanded: !section.isExpanded }
-          : section
-      )
-    );
+    setExpanded((prev) => ({ ...prev, [sectionId]: !isExpanded(sectionId) }));
   };
 
-  const handleFilterChange = (filterType: string, value: string, checked: boolean) => {
-    switch (filterType) {
-      case 'categories':
-        setSelectedCategories(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'brands':
-        setSelectedBrands(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'origins':
-        setSelectedOrigins(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'strengths':
-        setSelectedStrengths(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'pack-sizes':
-        setSelectedPackSizes(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      case 'price-range':
-        setSelectedPriceRange(prev => 
-          checked ? [...prev, value] : prev.filter(item => item !== value)
-        );
-        break;
-      default:
-        break;
-    }
+  const handleFilterChange = (sectionId: string, value: string, checked: boolean) => {
+    const key = FACET_PARAM[sectionId];
+    if (!key) return;
+    const current = selectedFor(sectionId);
+    const next = checked
+      ? current.includes(value) ? current : [...current, value]
+      : current.filter((item) => item !== value);
+    writeParams((p) => {
+      if (next.length > 0) p.set(key, next.join(','));
+      else p.delete(key);
+    });
   };
 
   const resetAllFilters = () => {
-    setSelectedCategories([]);
-    setSelectedBrands([]);
-    setSelectedOrigins([]);
-    setSelectedStrengths([]);
-    setSelectedPackSizes([]);
-    setSelectedPriceRange([]);
-    setSearchQuery('');
+    writeParams((p) => {
+      p.delete('category');
+      p.delete('brand');
+      p.delete('price');
+    });
   };
 
   // Drag to dismiss handlers
@@ -382,44 +273,18 @@ export function ProductsPage() {
     setDragCurrentY(0);
   };
 
-  const sortedProducts = [...products].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low': {
-        const aPrice = getProductPrice(a);
-        const bPrice = getProductPrice(b);
-        return aPrice - bPrice;
-      }
-      case 'price-high': {
-        const aPrice = getProductPrice(a);
-        const bPrice = getProductPrice(b);
-        return bPrice - aPrice;
-      }
-      case 'rating':
-        // Rating column was removed, sort by name instead
-        return a.name.localeCompare(b.name);
-      case 'newest':
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      default: // name
-        return a.name.localeCompare(b.name);
-    }
-  });
-
-  // Show all products - lazy loading will be implemented
-  const displayedProducts = sortedProducts;
-  const listName = urlSearchQuery ? 'search_results' : 'all_products';
-
   // GA4 view_item_list: once per distinct result set (refires on
   // filter/search change, not on every render).
   const listSentRef = useRef<string | null>(null);
   useEffect(() => {
-    if (isLoading || displayedProducts.length === 0) return;
+    if (catalogLoading || displayedProducts.length === 0) return;
     const key = `${listName}:${displayedProducts.map((p) => p.id).join(',')}`;
     if (listSentRef.current === key) return;
     listSentRef.current = key;
     trackViewItemList(displayedProducts, listName);
-  }, [displayedProducts, isLoading, listName]);
+  }, [displayedProducts, catalogLoading, listName]);
 
-  if (isLoading) {
+  if (catalogLoading) {
     return (
       <div className="min-h-screen bg-creme flex items-center justify-center">
         <div className="text-center">
@@ -431,21 +296,35 @@ export function ProductsPage() {
     );
   }
 
+  const seo = hubSeo('/products', store.name);
+  const site = `https://${primaryHost}`;
+  const activeFilterCount = selCategories.length + selBrands.length + selPriceRange.length;
+
   return (
     <>
       <SEOHead
-        title="All Products - Premium Cigarettes & Tobacco"
-        description="Discover our complete collection of premium cigarettes, cigars, and tobacco products from world-renowned brands. Shop authentic products with secure delivery."
-        url={`${siteConfig.url}${location.pathname}`}
+        title={seo.title}
+        titleVerbatim
+        description={seo.description}
+        url="/products"
         type="website"
         keywords={['premium cigarettes', 'buy cigarettes online', 'tobacco products', 'cigars online', 'cigarette shop', 'premium tobacco India']}
+        robots={q ? 'noindex, follow' : undefined}
+        forceCanonical
+        extraJsonLd={[
+          hubItemListJsonLd(
+            seo.listName,
+            displayedProducts.map((p) => ({ name: p.name, url: `${site}/product/${p.slug}` })),
+          ),
+        ]}
       />
+      <BreadcrumbSchema items={[{ name: 'Home', url: `${site}/` }, { name: seo.crumb, url: `${site}/products` }]} />
 
       <div className="min-h-screen bg-background md:bg-creme pb-24 md:pb-16">
-        {/* Mobile Header */}
+        {/* Mobile Header (one h1 per page: the desktop title below) */}
         <div className="md:hidden px-4 bg-background">
           <div className="text-center">
-            <h1 className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">Products</h1>
+            <p className="medium-title leading-tight text-2xl sm:text-3xl lg:text-4xl xl:text-5xl">Products</p>
           </div>
         </div>
 
@@ -498,13 +377,13 @@ export function ProductsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
                 <span>Filters</span>
-                {(selectedCategories.length + selectedBrands.length + selectedPriceRange.length) > 0 && (
+                {activeFilterCount > 0 && (
                   <span className="px-2 py-0.5 bg-canyon text-creme-light rounded-full text-xs font-bold">
-                    {selectedCategories.length + selectedBrands.length + selectedPriceRange.length}
+                    {activeFilterCount}
                   </span>
                 )}
               </button>
-              
+
               <button
                 onClick={resetAllFilters}
                 className="px-4 py-3 bg-creme-light border border-coyote text-dark rounded-xl font-medium text-sm transition-all active:scale-95"
@@ -525,49 +404,32 @@ export function ProductsPage() {
                       className="flex items-center justify-between w-full text-left text-dark font-sans font-medium text-lg uppercase tracking-wide mb-2"
                     >
                       <span>{section.name}</span>
-                      {section.isExpanded ? (
+                      {isExpanded(section.id) ? (
                         <ChevronUp className="w-5 h-5" />
                       ) : (
                         <ChevronDown className="w-5 h-5" />
                       )}
                     </button>
-                    
-                    {section.isExpanded && (
+
+                    {isExpanded(section.id) && (
                       <div className="space-y-1 pb-3">
                         {section.items.map((item, itemIndex) => {
-                          const isChecked = (() => {
-                            switch (section.id) {
-                              case 'categories':
-                                return selectedCategories.includes(item);
-                              case 'brands':
-                                return selectedBrands.includes(item);
-                              case 'origins':
-                                return selectedOrigins.includes(item);
-                              case 'strengths':
-                                return selectedStrengths.includes(item);
-                              case 'pack-sizes':
-                                return selectedPackSizes.includes(item);
-                              case 'price-range':
-                                return selectedPriceRange.includes(item);
-                              default:
-                                return false;
-                            }
-                          })();
+                          const isChecked = selectedFor(section.id).includes(item.value);
 
                           return (
-                            <label 
-                              key={itemIndex} 
+                            <label
+                              key={itemIndex}
                               htmlFor={`${section.id}-${itemIndex}`}
                               className="flex items-center space-x-3 cursor-pointer hover:bg-creme/30 rounded-md p-1 -m-1 transition-colors"
                             >
                               <Checkbox
                                 id={`${section.id}-${itemIndex}`}
                                 checked={isChecked}
-                                onCheckedChange={(checked: boolean) => handleFilterChange(section.id, item, !!checked)}
+                                onCheckedChange={(checked: boolean) => handleFilterChange(section.id, item.value, !!checked)}
                                 className="border-coyote/30 data-[state=checked]:bg-canyon data-[state=checked]:border-canyon"
                               />
                               <span className="text-dark font-sans text-base">
-                                {item}
+                                {item.label}
                               </span>
                             </label>
                           );
@@ -583,20 +445,20 @@ export function ProductsPage() {
             {showMobileFilters && (
               <>
                 {/* Backdrop */}
-                <div 
+                <div
                   className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in"
                   onClick={() => setShowMobileFilters(false)}
                 />
-                
+
                 {/* Drawer */}
-                <div 
+                <div
                   className="lg:hidden fixed inset-x-0 bottom-0 z-50 bg-creme rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col animate-slide-up-smooth transition-transform duration-200"
                   style={{
                     transform: isDragging ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` : 'translateY(0)'
                   }}
                 >
                   {/* Handle Bar - Draggable */}
-                  <div 
+                  <div
                     className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing"
                     onTouchStart={handleDragStart}
                     onTouchMove={handleDragMove}
@@ -608,19 +470,19 @@ export function ProductsPage() {
                   >
                     <div className="w-12 h-1.5 bg-coyote/30 rounded-full" />
                   </div>
-                  
+
                   {/* Header */}
                   <div className="flex items-center justify-between px-6 py-4 border-b border-coyote/20">
                     <div>
                       <h2 className="text-xl font-serif text-dark">Filters</h2>
                       <p className="text-sm text-dark/60 font-sans mt-0.5">
-                        {(selectedCategories.length + selectedBrands.length + selectedPriceRange.length) > 0 
-                          ? `${selectedCategories.length + selectedBrands.length + selectedPriceRange.length} active`
+                        {activeFilterCount > 0
+                          ? `${activeFilterCount} active`
                           : 'Select filters'}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Scrollable Content */}
                   <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
                     <div className="space-y-6 pb-6">
@@ -634,63 +496,42 @@ export function ProductsPage() {
                               {section.name}
                             </span>
                             <div className="flex items-center gap-2">
-                              {(() => {
-                                let count = 0;
-                                switch (section.id) {
-                                  case 'categories': count = selectedCategories.length; break;
-                                  case 'brands': count = selectedBrands.length; break;
-                                  case 'origins': count = selectedOrigins.length; break;
-                                  case 'strengths': count = selectedStrengths.length; break;
-                                  case 'pack-sizes': count = selectedPackSizes.length; break;
-                                  case 'price-range': count = selectedPriceRange.length; break;
-                                }
-                                return count > 0 ? (
-                                  <span className="px-2 py-0.5 bg-canyon text-creme-light rounded-full text-xs font-bold">
-                                    {count}
-                                  </span>
-                                ) : null;
-                              })()}
-                              {section.isExpanded ? (
+                              {selectedFor(section.id).length > 0 ? (
+                                <span className="px-2 py-0.5 bg-canyon text-creme-light rounded-full text-xs font-bold">
+                                  {selectedFor(section.id).length}
+                                </span>
+                              ) : null}
+                              {isExpanded(section.id) ? (
                                 <ChevronUp className="w-5 h-5 text-dark transition-transform" />
                               ) : (
                                 <ChevronDown className="w-5 h-5 text-dark transition-transform" />
                               )}
                             </div>
                           </button>
-                          
-                          {section.isExpanded && (
+
+                          {isExpanded(section.id) && (
                             <div className="space-y-2 pl-1">
                               {section.items.map((item, itemIndex) => {
-                                const isChecked = (() => {
-                                  switch (section.id) {
-                                    case 'categories': return selectedCategories.includes(item);
-                                    case 'brands': return selectedBrands.includes(item);
-                                    case 'origins': return selectedOrigins.includes(item);
-                                    case 'strengths': return selectedStrengths.includes(item);
-                                    case 'pack-sizes': return selectedPackSizes.includes(item);
-                                    case 'price-range': return selectedPriceRange.includes(item);
-                                    default: return false;
-                                  }
-                                })();
+                                const isChecked = selectedFor(section.id).includes(item.value);
 
                                 return (
-                                  <label 
-                                    key={itemIndex} 
+                                  <label
+                                    key={itemIndex}
                                     htmlFor={`mobile-${section.id}-${itemIndex}`}
                                     className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
-                                      isChecked 
-                                        ? 'bg-canyon/10 border-2 border-canyon' 
+                                      isChecked
+                                        ? 'bg-canyon/10 border-2 border-canyon'
                                         : 'bg-creme-light border-2 border-transparent hover:border-coyote/30'
                                     }`}
                                   >
                                     <span className={`text-sm font-medium ${
                                       isChecked ? 'text-canyon' : 'text-dark'
                                     }`}>
-                                      {item}
+                                      {item.label}
                                     </span>
                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                      isChecked 
-                                        ? 'bg-canyon border-canyon' 
+                                      isChecked
+                                        ? 'bg-canyon border-canyon'
                                         : 'border-coyote bg-white'
                                     }`}>
                                       {isChecked && (
@@ -703,7 +544,7 @@ export function ProductsPage() {
                                       type="checkbox"
                                       id={`mobile-${section.id}-${itemIndex}`}
                                       checked={isChecked}
-                                      onChange={(e) => handleFilterChange(section.id, item, e.target.checked)}
+                                      onChange={(e) => handleFilterChange(section.id, item.value, e.target.checked)}
                                       className="sr-only"
                                     />
                                   </label>
@@ -715,7 +556,7 @@ export function ProductsPage() {
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Footer Actions */}
                   <div className="flex-shrink-0 px-6 py-4 border-t border-coyote/20 bg-creme/95 backdrop-blur-sm">
                     <div className="flex gap-3">
@@ -732,7 +573,7 @@ export function ProductsPage() {
                         onClick={() => setShowMobileFilters(false)}
                         className="flex-1 px-4 py-3 bg-dark text-creme-light rounded-xl font-semibold text-sm transition-all active:scale-95 shadow-lg"
                       >
-                        Show {sortedProducts.length} Products
+                        Show {displayedProducts.length} Products
                       </button>
                     </div>
                   </div>
@@ -754,13 +595,13 @@ export function ProductsPage() {
               </div>
             ) : (
               <AnimatePresence mode="wait">
-                <motion.div 
+                <motion.div
                   className={`${viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6' : 'grid grid-cols-1 sm:grid-cols-2 gap-6'}`}
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -30 }}
                   transition={{ duration: 0.4, ease: "easeInOut" }}
-                  key={`products-${selectedCategories.join(',')}-${selectedBrands.join(',')}-${selectedOrigins.join(',')}-${selectedStrengths.join(',')}-${selectedPackSizes.join(',')}-${selectedPriceRange.join(',')}-${searchQuery}`}
+                  key={`products-${selCategories.join(',')}-${selBrands.join(',')}-${selPriceRange.join(',')}-${sortBy}-${q}`}
                 >
                   {displayedProducts.map((product, index) => (
                     <motion.div
@@ -768,8 +609,8 @@ export function ProductsPage() {
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -30 }}
-                      transition={{ 
-                        duration: 0.4, 
+                      transition={{
+                        duration: 0.4,
                         delay: index * 0.08,
                         ease: "easeInOut"
                       }}
@@ -787,8 +628,6 @@ export function ProductsPage() {
                 </motion.div>
               </AnimatePresence>
             )}
-              
-              {/* Pagination removed - using lazy loading */}
             </div>
           </div>
         </div>

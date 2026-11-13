@@ -18,11 +18,15 @@ import { PrivacyPage } from '../pages/legal/PrivacyPage';
 import { ShippingPage } from '../pages/legal/ShippingPage';
 import { ReturnsPage } from '../pages/legal/ReturnsPage';
 import { VividProductList } from '../themes/vivid/VividProductList';
-import { useBrandDetail, useCategoryListing } from '../hooks/data/useCatalog';
-import { useBlogPost } from '../hooks/data/useContent';
+import { useBrandDetail, useBrandsHub, useCategoriesHub, useCategoryListing, useFullCatalog } from '../hooks/data/useCatalog';
+import { useBlogPost, useBlogPosts } from '../hooks/data/useContent';
 import { IS_SERVER } from '../lib/ssr/preload';
 import { useSetRenderStatus } from '../lib/ssr/renderStatus';
-import { useTheme } from '../themes';
+import { Slot, useTheme, type ThemeSlotName } from '../themes';
+import { ProductsPage } from '../pages/products/ProductsPage';
+import { CategoriesPage } from '../pages/products/CategoriesPage';
+import { BrandsPage } from '../pages/brands/BrandsPage';
+import { BlogsPage } from '../pages/blog/BlogsPage';
 
 // Category listing component per theme. Theme ids outside this map fall back to classic.
 const EAGER_CATEGORY: Record<string, ComponentType<CategoryPageProps>> = {
@@ -85,6 +89,53 @@ export function BlogRoute() {
     return <NotFoundPage />;
   }
   return <BlogPost />;
+}
+
+// Hub pages (P5-SSR slice 8: /products, /categories, /brands, /blogs). The
+// classic theme uses the eager components on the server AND the client, so the
+// hydrating render matches. Other themes keep their Slot view on the client;
+// the server throws for them, and the edge serves the bot renderer / SPA.
+function HubRoute({
+  slot,
+  label,
+  loading,
+  View,
+}: {
+  slot: ThemeSlotName;
+  label: string;
+  loading: boolean;
+  View: ComponentType;
+}) {
+  const { themeId } = useTheme();
+  if (IS_SERVER) {
+    if (loading) throw new Error(`SSR ${label} preload missing`);
+    if (themeId !== 'classic') throw new Error(`No SSR ${label} page for theme "${themeId}"`);
+    return <View />;
+  }
+  if (themeId !== 'classic') return <Slot name={slot} />;
+  return <View />;
+}
+
+export function ProductsHubRoute() {
+  const { loading } = useFullCatalog();
+  return <HubRoute slot="Products" label="products" loading={loading} View={ProductsPage} />;
+}
+
+export function CategoriesHubRoute() {
+  const { loading } = useCategoriesHub();
+  return <HubRoute slot="Categories" label="categories" loading={loading} View={CategoriesPage} />;
+}
+
+export function BrandsHubRoute() {
+  const { loading } = useBrandsHub();
+  return <HubRoute slot="Brands" label="brands" loading={loading} View={BrandsPage} />;
+}
+
+// Blog listing is not themed (one view for every theme), so no theme check.
+export function BlogsHubRoute() {
+  const { loading } = useBlogPosts(50);
+  if (loading && IS_SERVER) throw new Error('SSR blogs preload missing');
+  return <BlogsPage />;
 }
 
 // Company and policy pages (P5-SSR slice 8). Re-exported so the server route
