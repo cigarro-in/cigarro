@@ -1804,5 +1804,47 @@
     "key": "asset_images/orgs/smokeshop/hero_images/home-12.webp",
     "bytesBefore": 803017,
     "bytesAfter": 42978
+  },
+  {
+    "sourceUrl": "https://api.mydukaan.io/static/images/category-def.jpg",
+    "key": "asset_images/orgs/smokeshop/category_images/category-default-1.webp",
+    "bytesBefore": 30989,
+    "bytesAfter": 1364
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/192bf4bb-1a79-43be-a140-a0178abf309e.png",
+    "key": "asset_images/orgs/smokeshop/page_images/bestseller-1.webp",
+    "bytesBefore": 104233,
+    "bytesAfter": 22450
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/874f39f7-9846-4cf1-9a7b-9e7044464093.png",
+    "key": "asset_images/orgs/smokeshop/page_images/bestseller-2.webp",
+    "bytesBefore": 2515,
+    "bytesAfter": 2062
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/bdd3dea5-7e00-41cc-9509-0317a685514b.jpg",
+    "key": "asset_images/orgs/smokeshop/page_images/bestseller-3.webp",
+    "bytesBefore": 52753,
+    "bytesAfter": 12000
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/20c72ca1-d22a-48af-ab65-b3d0bd55e6dd.jpg",
+    "key": "asset_images/orgs/smokeshop/page_images/about-us-1.webp",
+    "bytesBefore": 38623,
+    "bytesAfter": 9144
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/3aac7735-f259-4a5d-94c1-5a6d6180f414.jpeg",
+    "key": "asset_images/orgs/smokeshop/category_images/esse-body-1.webp",
+    "bytesBefore": 27424,
+    "bytesAfter": 12454
+  },
+  {
+    "sourceUrl": "https://dms.mydukaan.io/original/webp/media/88a8d05a-ce94-4a30-9fac-c0635b0739aa.png",
+    "key": "asset_images/orgs/smokeshop/category_images/dunhill-body-1.webp",
+    "bytesBefore": 2515,
+    "bytesAfter": 2062
   }
 ]
