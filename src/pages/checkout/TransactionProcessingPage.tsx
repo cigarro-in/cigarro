@@ -432,7 +432,15 @@ export function TransactionProcessingPage() {
         </motion.div>
 
         <div className="space-y-3">
-          {order.upiUrl && <UpiPayControls upiUrl={order.upiUrl} orgSlug={orgSlug} />}
+          {order.upiUrl && (
+            <UpiPayControls
+              upiUrl={order.upiUrl}
+              orgSlug={orgSlug}
+              qrDataUrl={qrCode || undefined}
+              qrFilename={qrFilename}
+              title={`Pay order ${orderLabel}`}
+            />
+          )}
 
           {qrCode && (
             <div>

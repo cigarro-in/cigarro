@@ -8,9 +8,11 @@ import {
   findUpiApp,
   isAndroid,
   isUpiAppAvailable,
+  isUpiAppOffered,
   type UpiApp,
   type UpiAppId,
 } from './upiApps';
+import { QrShareButton } from './QrShareButton';
 
 const storageKey = (orgSlug: string) => `cigarro:upi-app:${orgSlug}`;
 
@@ -36,6 +38,10 @@ function writeRemembered(orgSlug: string, id: UpiAppId) {
 interface UpiPayControlsProps {
   upiUrl: string;
   orgSlug: string;
+  /** Needed for the iOS "Other app?" share footer. */
+  qrDataUrl?: string;
+  qrFilename?: string;
+  title?: string;
 }
 
 /**
@@ -43,15 +49,18 @@ interface UpiPayControlsProps {
  * After a choice is remembered (per store), Pay launches that app directly and
  * "Pay with another app" reopens the picker.
  */
-export function UpiPayControls({ upiUrl, orgSlug }: UpiPayControlsProps) {
+export function UpiPayControls({ upiUrl, orgSlug, qrDataUrl, qrFilename, title }: UpiPayControlsProps) {
   const android = isAndroid();
   const [remembered, setRemembered] = useState<UpiAppId | null>(() => readRemembered(orgSlug));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const rememberedApp = remembered ? findUpiApp(remembered) : undefined;
+  const primaryApps = PRIMARY_UPI_APPS.filter((a) => isUpiAppOffered(a, android));
+  const moreApps = MORE_UPI_APPS.filter((a) => isUpiAppOffered(a, android));
 
   const launch = (app: UpiApp) => {
-    window.location.href = buildUpiAppUrl(app, upiUrl, android);
+    const url = buildUpiAppUrl(app, upiUrl, android);
+    if (url) window.location.href = url;
   };
 
   const pick = (app: UpiApp) => {
@@ -112,9 +121,21 @@ export function UpiPayControls({ upiUrl, orgSlug }: UpiPayControlsProps) {
       {showPicker && (
         <div className="bg-white/60 border border-coyote/20 rounded-2xl p-3 text-left space-y-3">
           <p className="text-xs text-coyote uppercase tracking-widest font-bold">Choose a UPI app</p>
-          <div className="grid grid-cols-3 gap-2">{PRIMARY_UPI_APPS.map(appButton)}</div>
+          <div className="grid grid-cols-3 gap-2">{primaryApps.map(appButton)}</div>
 
-          {showMore && <div className="grid grid-cols-3 gap-2">{MORE_UPI_APPS.map(appButton)}</div>}
+          {showMore && (
+            <div className="space-y-3">
+              {moreApps.length > 0 && <div className="grid grid-cols-3 gap-2">{moreApps.map(appButton)}</div>}
+              {!android && qrDataUrl && qrFilename && title && (
+                <div className="pt-2 border-t border-coyote/20 space-y-2">
+                  <p className="text-xs text-coyote leading-relaxed">
+                    Other app? Share or save the QR and pay from your app.
+                  </p>
+                  <QrShareButton qrDataUrl={qrDataUrl} filename={qrFilename} upiUrl={upiUrl} title={title} />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <button

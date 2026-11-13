@@ -19,7 +19,8 @@
  *   BHIM         bhim://upi/pay?...                                      UNVERIFIED on iOS
  *   Amazon Pay   amazonpay://upi/pay?...                                 UNVERIFIED
  *   WhatsApp, MobiKwik, Navi, Airtel Thanks, Jupiter: no iOS scheme we could
- *   verify. On iOS these fall back to the generic upi:// link.
+ *   verify. On iOS they are hidden: upi:// is never used on iOS, because iOS
+ *   hands it to whichever app claimed the scheme (usually WhatsApp).
  *
  * Android targeting a specific app:
  *   intent://pay?<query>#Intent;scheme=upi;package=<android package>;end
@@ -77,7 +78,7 @@ export interface UpiApp {
   logo?: string;
   /** Android package for an intent:// link. Omit to use the generic chooser. */
   androidPackage?: string;
-  /** iOS scheme prefix, query string is appended. Omit to use upi://. */
+  /** iOS scheme prefix, query string is appended. Omit = not offered on iOS. */
   iosScheme?: string;
 }
 
@@ -108,14 +109,12 @@ export const PRIMARY_UPI_APPS: UpiApp[] = [
     id: 'bhim',
     label: 'BHIM',
     androidPackage: 'in.org.npci.upiapp',
-    iosScheme: 'bhim://upi/pay',
   },
   {
     id: 'amazonpay',
     label: 'Amazon Pay',
     logo: amazonPayLogo,
     androidPackage: 'in.amazon.mShop.android.shopping',
-    iosScheme: 'amazonpay://upi/pay',
   },
   {
     id: 'cred',
@@ -153,17 +152,29 @@ export function findUpiApp(id: UpiAppId): UpiApp | undefined {
   return [...PRIMARY_UPI_APPS, ...MORE_UPI_APPS].find((a) => a.id === id);
 }
 
-/** The "any" option only exists on Android. */
+/**
+ * Android: every app is offered (generic upi:// covers the rest).
+ * iOS: only apps with a verified app scheme. upi:// is never used on iOS
+ * because the OS hands it to whichever app claimed it (usually WhatsApp).
+ * "Any UPI app" exists on Android only.
+ */
+export function isUpiAppOffered(app: UpiApp, android: boolean): boolean {
+  if (app.id === 'any') return android;
+  return android || !!app.iosScheme;
+}
+
 export function isUpiAppAvailable(id: UpiAppId, android: boolean): boolean {
-  return id !== 'any' || android;
+  const app = findUpiApp(id);
+  return !!app && isUpiAppOffered(app, android);
 }
 
 /**
  * Build the launch URL for one app from the server-generated upiUrl.
  * The query string is reused exactly (amount, paise and order fingerprint
- * untouched); only the scheme / intent wrapper changes.
+ * untouched); only the scheme / intent wrapper changes. Returns null on iOS
+ * for apps without a verified scheme.
  */
-export function buildUpiAppUrl(app: UpiApp, upiUrl: string, android: boolean): string {
+export function buildUpiAppUrl(app: UpiApp, upiUrl: string, android: boolean): string | null {
   const query = upiUrl.split('?')[1] ?? '';
   if (android) {
     if (app.androidPackage) {
@@ -172,5 +183,5 @@ export function buildUpiAppUrl(app: UpiApp, upiUrl: string, android: boolean): s
     return `upi://pay?${query}`;
   }
   if (app.iosScheme) return `${app.iosScheme}?${query}`;
-  return `upi://pay?${query}`;
+  return null;
 }
