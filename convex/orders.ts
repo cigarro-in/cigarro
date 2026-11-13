@@ -15,6 +15,7 @@ import { buildUpiUrl } from "./lib/upi";
 import { buildOrderPollOffsets } from "./lib/pollSchedule";
 import { addressV, orderItemV, orderKind } from "./schema";
 import { creditWallet, debitWallet } from "./wallet";
+import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
 import { isLegacyOrg } from "./lib/legacyOrg";
 
@@ -602,6 +603,14 @@ export const createOrder = mutation({
       await ctx.db.patch(orderId, { orderNumber });
       const paidOrder = await ctx.db.get(orderId);
       if (paidOrder) await commitOrderInventory(ctx, paidOrder, `user:${userId}`);
+      // Refer & earn: wallet-only orders pay in full from the wallet, so the
+      // qualifying amount is the cart total, not the (zero) UPI amount.
+      if (paidOrder)
+        await rewardPaidReferral(
+          ctx,
+          { ...paidOrder, finalAmountPaise: paidOrder.cartTotalPaise },
+          `user:${userId}`,
+        );
       // Link ledger debit to order
       await linkLatestDebitToOrder(ctx, args.orgId, userId, orderId);
       return {

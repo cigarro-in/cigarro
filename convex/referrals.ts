@@ -256,6 +256,7 @@ type ReferralOrder = {
   _id: any;
   kind?: string;
   finalAmountPaise?: number;
+  status?: string;
 };
 
 // Pay both sides exactly once, for the referred customer's first qualifying
@@ -277,6 +278,15 @@ async function rewardReferralForOrder(
   if (order.kind && order.kind !== "purchase") return false;
   const orderPaise = Math.max(0, order.finalAmountPaise ?? 0);
   if (orderPaise < rules.minOrderPaise) return false;
+
+  // Idempotency: one order credits at most once, however many paths call us.
+  const paidCredits = await ctx.db
+    .query("walletLedger")
+    .withIndex("by_org_order", (q: any) =>
+      q.eq("orgId", order.orgId).eq("relatedOrderId", order._id),
+    )
+    .collect();
+  if (paidCredits.some((r: any) => r.reason === "referral_reward")) return false;
 
   const orgRef = { _id: org._id, slug: org.slug };
   const mine = await ctx.db

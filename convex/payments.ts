@@ -7,6 +7,7 @@ import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
 import { RECONCILE_OFFSETS_MS } from "./lib/pollSchedule";
 import { creditWallet } from "./wallet";
+import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory } from "./lib/inventory";
 
 // ---------- Scheduled cleanups ----------
@@ -453,6 +454,9 @@ async function markOrderPaid(
   }
 
   if (order.slotId) await freeSlot(ctx, order.slotId);
+
+  // Refer & earn: every email-matched payment (ingest + Gmail path) lands here.
+  await rewardPaidReferral(ctx, { ...order, status: newStatus }, "system");
 
   await ctx.db.patch(emailId, {
     status: "matched",
