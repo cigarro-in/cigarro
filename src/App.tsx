@@ -1,4 +1,4 @@
-import { readStoredPreference } from './lib/browserStorage';
+import { readStoredPreference, writeStoredPreference } from './lib/browserStorage';
 import { useState, useEffect, useLayoutEffect, useRef, Suspense, startTransition } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider, type HelmetServerState } from 'react-helmet-async';
@@ -179,7 +179,16 @@ function AppContent({ helmetContext }: AppContentProps) {
   const [legacyConsentNeeded, setLegacyConsentNeeded] = useState(false);
   const appRootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const verified = readStoredPreference('ageVerified') === 'true';
+    // Verified if either store (localStorage or the one-year cookie) says so.
+    // The other store is then filled in, so both stay in step.
+    const inStorage = readStoredPreference('ageVerified') === 'true';
+    const inCookie = /(?:^|;\s*)ageVerified=true(?:;|$)/.test(document.cookie);
+    const verified = inStorage || inCookie;
+    if (verified && !inStorage) writeStoredPreference('ageVerified', 'true');
+    if (verified && !inCookie) {
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `ageVerified=true; Max-Age=${60 * 60 * 24 * 365}; Path=/; SameSite=Lax${secure}`;
+    }
     // startTransition: this effect runs right after hydration starts. A plain
     // update here would reach Suspense boundaries that are still dehydrated
     // (React #421). A transition lets hydration finish first.
@@ -278,16 +287,8 @@ function AppContent({ helmetContext }: AppContentProps) {
         <title>{store.metaTitle}</title>
         <meta name="description" content={store.metaDescription} />
 
-        {/* Favicon: the store's own when set, else the static icons from /icons/ */}
-        {store.brand.faviconUrl ? (
-          <link rel="icon" href={store.brand.faviconUrl} />
-        ) : (
-          <>
-            <link rel="icon" type="image/x-icon" href="/icons/favicon.ico" />
-            <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-          </>
-        )}
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        {/* Icons are not set here: the edge injects the store's own favicon and
+            apple-touch icon, and client-side tags would override them. */}
       </Helmet>
         <div ref={appRootRef}>
 {isUserPage ? (
