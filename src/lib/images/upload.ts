@@ -90,7 +90,7 @@ export async function uploadImageToR2(
 ): Promise<R2UploadResult> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
-  const webp = await convertToWebp(input, opts.keepOriginalResolution ? Infinity : MAX_DIM, WEBP_QUALITY, !opts.keepOriginalResolution);
+  const webp = await convertToWebp(input, opts.keepOriginalResolution ? 2400 : MAX_DIM, WEBP_QUALITY, !opts.keepOriginalResolution);
   const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');

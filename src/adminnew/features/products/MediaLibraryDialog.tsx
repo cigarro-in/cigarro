@@ -53,6 +53,7 @@ export function MediaLibraryDialog({
   multiple = true,
   uploadSlug,
   defaultFolder = 'product_images',
+  keepShape,
   title = 'Select images',
   initialFiles,
 }: {
@@ -64,6 +65,8 @@ export function MediaLibraryDialog({
   /** SEO filename stem for uploads (e.g. the product title). */
   uploadSlug?: string;
   defaultFolder?: string;
+  /** Keep each upload's shape (banners). Default: square crop for catalog tiles. */
+  keepShape?: boolean;
   title?: string;
   /** Files dropped elsewhere (e.g. on the product media card): uploaded as soon as the dialog opens. */
   initialFiles?: File[];
@@ -79,7 +82,7 @@ export function MediaLibraryDialog({
   const [picked, setPicked] = useState<string[]>([]);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
-  const [keepOriginal, setKeepOriginal] = useState(false);
+  const [keepOriginal, setKeepOriginal] = useState(keepShape ?? false);
   const [dragOver, setDragOver] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -314,7 +317,7 @@ export function MediaLibraryDialog({
           </div>
           <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-[var(--admin-text-muted)]">
             <input type="checkbox" checked={keepOriginal} onChange={(e) => setKeepOriginal(e.target.checked)} />
-            Keep original size and shape for uploads (default: square, max 1600px)
+            Keep original shape (off: square crop for product tiles)
           </label>
         </div>
 

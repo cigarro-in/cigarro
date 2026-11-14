@@ -88,6 +88,7 @@ export function ImageField({
         multiple={false}
         title={label}
         defaultFolder="homepage"
+        keepShape
         uploadSlug={uploadSlug}
         onConfirm={(urls) => {
           if (urls[0]) onChange(urls[0]);
