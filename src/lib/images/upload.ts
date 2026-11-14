@@ -84,13 +84,16 @@ export async function uploadImageToR2(
     slug?: string;
     /** Internal source marker stored as metadata, never exposed in the key. */
     pipelineSource?: string;
-    /** Keep source width, height and aspect ratio (still encode as WebP). */
+    /** Skip the centre square crop; keep the source aspect ratio (still encode as WebP). */
     keepOriginalResolution?: boolean;
+    /** Long-edge cap in px. Defaults to 1600, or 2400 with keepOriginalResolution. */
+    maxDim?: number;
   } = {},
 ): Promise<R2UploadResult> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
-  const webp = await convertToWebp(input, opts.keepOriginalResolution ? 2400 : MAX_DIM, WEBP_QUALITY, !opts.keepOriginalResolution);
+  const maxDim = opts.maxDim ?? (opts.keepOriginalResolution ? 2400 : MAX_DIM);
+  const webp = await convertToWebp(input, maxDim, WEBP_QUALITY, !opts.keepOriginalResolution);
   const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');

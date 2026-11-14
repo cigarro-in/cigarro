@@ -8,7 +8,18 @@ import {
 } from '../../../components/ui/dialog';
 import { cn } from '../../../components/ui/utils';
 import { listR2Images, uploadImageToR2 } from '../../../lib/images/upload';
-import { Banner, Button, ErrorBanner, FilterSelect, Skeleton, toActionError, type ActionError } from '../../ui';
+import {
+  Banner,
+  Button,
+  ErrorBanner,
+  FilterSelect,
+  Skeleton,
+  toActionError,
+  useImageCrop,
+  type ActionError,
+  type CropPreset,
+  type CropRatio,
+} from '../../ui';
 
 interface LibraryImage {
   key: string;
@@ -53,7 +64,9 @@ export function MediaLibraryDialog({
   multiple = true,
   uploadSlug,
   defaultFolder = 'product_images',
-  keepShape,
+  cropRatio = 1,
+  cropPresets,
+  maxDim = 1600,
   title = 'Select images',
   initialFiles,
 }: {
@@ -65,8 +78,12 @@ export function MediaLibraryDialog({
   /** SEO filename stem for uploads (e.g. the product title). */
   uploadSlug?: string;
   defaultFolder?: string;
-  /** Keep each upload's shape (banners). Default: square crop for catalog tiles. */
-  keepShape?: boolean;
+  /** Crop frame each upload opens with. Default: square (catalog tiles). */
+  cropRatio?: CropRatio;
+  /** Aspect choices in the cropper. Default: Square 1:1 and Original. */
+  cropPresets?: CropPreset[];
+  /** Long-edge cap for uploads, in px. */
+  maxDim?: number;
   title?: string;
   /** Files dropped elsewhere (e.g. on the product media card): uploaded as soon as the dialog opens. */
   initialFiles?: File[];
@@ -82,13 +99,13 @@ export function MediaLibraryDialog({
   const [picked, setPicked] = useState<string[]>([]);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
-  const [keepOriginal, setKeepOriginal] = useState(keepShape ?? false);
   const [dragOver, setDragOver] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef(0);
+  const crop = useImageCrop({ presets: cropPresets, defaultRatio: cropRatio, maxDim, title: 'Crop image' });
   const previewsRef = useRef<string[]>([]);
 
   const existingSet = useMemo(() => new Set(existing), [existing]);
@@ -199,10 +216,13 @@ export function MediaLibraryDialog({
     });
     if (rejected.length) setUploadNote(`Skipped ${rejected.join(', ')}: use JPEG, PNG, WebP, GIF or AVIF up to 15 MB.`);
     if (!valid.length) return;
-    const batch: UploadItem[] = valid.map((f, i) => ({
-      id: `${Date.now()}-${i}-${f.name}`,
-      name: f.name,
-      preview: URL.createObjectURL(f),
+    // The admin frames each image first; cancelling uploads nothing.
+    const cropped = await crop.cropAll(valid);
+    if (!cropped?.length) return;
+    const batch: UploadItem[] = cropped.map((c, i) => ({
+      id: `${Date.now()}-${i}-${c.file.name}`,
+      name: c.file.name,
+      preview: URL.createObjectURL(c.blob),
       status: 'queued',
     }));
     previewsRef.current.push(...batch.map((b) => b.preview));
@@ -219,10 +239,12 @@ export function MediaLibraryDialog({
         const item = batch[idx];
         patch(item.id, { status: 'uploading' });
         try {
-          const res = await uploadImageToR2(valid[idx], {
+          const res = await uploadImageToR2(cropped[idx].blob, {
             folder: target || undefined,
             slug: uploadSlug || undefined,
-            keepOriginalResolution: keepOriginal,
+            filename: cropped[idx].file.name,
+            keepOriginalResolution: true,
+            maxDim,
           });
           patch(item.id, { status: 'done', url: res.url });
           setImages((prev) => [
@@ -275,6 +297,7 @@ export function MediaLibraryDialog({
   ];
 
   return (
+    <>
     <DialogRoot open={open} onOpenChange={(o) => !inFlight && onOpenChange(o)}>
       <DialogContent
         className="flex h-[min(88vh,780px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-[var(--admin-radius)] border-[var(--admin-border)] bg-[var(--admin-surface)] p-0 sm:max-w-4xl md:max-w-4xl lg:max-w-4xl"
@@ -315,10 +338,6 @@ export function MediaLibraryDialog({
               }}
             />
           </div>
-          <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-[var(--admin-text-muted)]">
-            <input type="checkbox" checked={keepOriginal} onChange={(e) => setKeepOriginal(e.target.checked)} />
-            Keep original shape (off: square crop for product tiles)
-          </label>
         </div>
 
         {uploads.length > 0 && (
@@ -466,5 +485,7 @@ export function MediaLibraryDialog({
         </div>
       </DialogContent>
     </DialogRoot>
+    {crop.dialog}
+    </>
   );
 }

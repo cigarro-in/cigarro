@@ -74,6 +74,7 @@ export function StoreDetailsSection({ live }: SectionProps) {
                 value={draft.brand.logoUrl || null}
                 onChange={(url) => setBrand({ logoUrl: url || '' })}
                 searchHint={draft.name ? `${draft.name} logo` : undefined}
+                cropRatio={1}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -82,6 +83,7 @@ export function StoreDetailsSection({ live }: SectionProps) {
                 value={draft.brand.faviconUrl || null}
                 onChange={(url) => setBrand({ faviconUrl: url || '' })}
                 searchHint={draft.name ? `${draft.name} icon` : undefined}
+                cropRatio={1}
               />
               <p className="text-xs text-muted-foreground">32 x 32 or 64 x 64 px, PNG or ICO.</p>
             </div>

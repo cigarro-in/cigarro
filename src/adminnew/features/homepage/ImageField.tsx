@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
-import { Banner, Button, Label } from '../../ui';
+import { Banner, Button, Label, type CropPreset, type CropRatio } from '../../ui';
 import { MediaLibraryDialog } from '../products/MediaLibraryDialog';
 import { sizeText, ratioLabel, type ImageSpec } from './imageSpecs';
 
@@ -45,6 +45,11 @@ export function ImageField({
 }) {
   const [open, setOpen] = useState(false);
   const size = useNaturalSize(value);
+  // The slot's own shape opens first in the cropper; Original is always offered.
+  const cropRatio: CropRatio = spec ? spec.width / spec.height : 'original';
+  const cropPresets: CropPreset[] = spec
+    ? [{ label: `Slot ${ratioLabel(spec)}`, ratio: spec.width / spec.height }, { label: 'Original', ratio: 'original' }]
+    : [{ label: 'Original', ratio: 'original' }, { label: 'Square 1:1', ratio: 1 }];
 
   let warning: string | null = null;
   if (spec && size) {
@@ -88,7 +93,9 @@ export function ImageField({
         multiple={false}
         title={label}
         defaultFolder="homepage"
-        keepShape
+        cropRatio={cropRatio}
+        cropPresets={cropPresets}
+        maxDim={2400}
         uploadSlug={uploadSlug}
         onConfirm={(urls) => {
           if (urls[0]) onChange(urls[0]);

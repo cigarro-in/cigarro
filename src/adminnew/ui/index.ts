@@ -35,6 +35,16 @@ export { DataTable, Pagination, paginate, Checkbox, useRowSelection, type Column
 export { Menu, type MenuItem, type MenuSection } from './Menu';
 export { Dialog, ConfirmDialog, Sheet } from './Overlay';
 export { OtpInput } from './OtpInput';
+// Image crop before upload. The cropper itself (react-easy-crop) is lazy-loaded
+// on first use; see useImageCrop.tsx.
+export {
+  useImageCrop,
+  DEFAULT_CROP_PRESETS,
+  type CropPreset,
+  type CropRatio,
+  type CropResult,
+  type ImageCropOptions,
+} from './useImageCrop';
 
 // Form controls: the shared shadcn inputs already follow the admin tokens.
 export { Input } from '../../components/ui/input';

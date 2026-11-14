@@ -18,7 +18,8 @@ import { Badge } from '../../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useInlineStatus, InlineStatus } from '../../../components/common/InlineStatus';
 import { cn } from '../../../components/ui/utils';
-import { uploadImageToR2, importRemoteImageToR2, listR2Images, deleteR2Image } from '../../../lib/images/upload';
+import { uploadImageToR2, fetchRemoteBytes, listR2Images, deleteR2Image } from '../../../lib/images/upload';
+import { useImageCrop, type CropPreset, type CropRatio } from '../../ui/useImageCrop';
 import { confirmImageDelete } from '../../../lib/images/guard';
 import { useConvex } from 'convex/react';
 
@@ -69,8 +70,10 @@ export interface ImagePickerProps {
   className?: string;
   /** Hint for web search (e.g., product name) */
   searchHint?: string;
-  /** Initial choice for preserving source dimensions. */
-  keepOriginalResolution?: boolean;
+  /** Crop frame the cropper opens with. Default: original shape. */
+  cropRatio?: CropRatio;
+  /** Aspect choices in the cropper. Default: Square 1:1 and Original. */
+  cropPresets?: CropPreset[];
 }
 
 // ============================================================================
@@ -118,7 +121,8 @@ export function ImagePicker({
   disabled = false,
   className,
   searchHint = '',
-  keepOriginalResolution: defaultKeepOriginalResolution = false
+  cropRatio = 'original',
+  cropPresets,
 }: ImagePickerProps) {
   // State
   const [internalOpen, setInternalOpen] = useState(false);
@@ -134,7 +138,7 @@ export function ImagePicker({
   const [webSearchQuery, setWebSearchQuery] = useState('');
   const [webSearchResults, setWebSearchResults] = useState<{ url: string; thumbnail: string; title?: string }[]>([]);
   const [webSearchLoading, setWebSearchLoading] = useState(false);
-  const [keepOriginalResolution, setKeepOriginalResolution] = useState(defaultKeepOriginalResolution);
+  const crop = useImageCrop({ presets: cropPresets, defaultRatio: cropRatio, maxDim: 2400, title: 'Crop image' });
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -242,29 +246,35 @@ export function ImagePicker({
 
     if (validFiles.length === 0) return;
 
+    // The admin frames each image first; cancelling uploads nothing.
+    const cropped = await crop.cropAll(validFiles);
+    if (!cropped?.length) return;
+
     setUploading(true);
     setUploadProgress(0);
 
     const uploadedUrls: string[] = [];
 
     try {
-      for (let i = 0; i < validFiles.length; i++) {
-        const file = validFiles[i];
+      for (let i = 0; i < cropped.length; i++) {
+        const { file, blob } = cropped[i];
         try {
-          // Browser pipeline: WebP + square-crop + metadata stripped +
-          // compressed, then R2. searchHint (e.g. product name) becomes the
-          // SEO filename when set.
-          const uploaded = await uploadImageToR2(file, {
+          // Browser pipeline: WebP + metadata stripped + compressed, then R2.
+          // The crop above already framed the image. searchHint (e.g. product
+          // name) becomes the SEO filename when set.
+          const uploaded = await uploadImageToR2(blob, {
             folder: folder || undefined,
             slug: searchHint || undefined,
-            keepOriginalResolution,
+            filename: file.name,
+            keepOriginalResolution: true,
+            maxDim: 2400,
           });
           uploadedUrls.push(uploaded.url);
         } catch {
           setOpError(`Failed to upload ${file.name}`);
           continue;
         }
-        setUploadProgress(((i + 1) / validFiles.length) * 100);
+        setUploadProgress(((i + 1) / cropped.length) * 100);
       }
 
       if (uploadedUrls.length > 0) {
@@ -382,21 +392,42 @@ export function ImagePicker({
       setUploadProgress(10);
 
       try {
-        const uploadedUrls: string[] = [];
-        for (let i = 0; i < externalUrls.length; i++) {
+        // Fetch the web-search picks through the admin proxy, then frame each
+        // one in the cropper like a local upload.
+        const fetched: { url: string; file: File }[] = [];
+        for (const url of externalUrls) {
           try {
-            const uploaded = await importRemoteImageToR2(externalUrls[i], {
+            const bytes = await fetchRemoteBytes(url);
+            const name = url.split('/').pop()?.split('?')[0] || 'image.jpg';
+            fetched.push({ url, file: new File([bytes], name, { type: bytes.type }) });
+          } catch (err) {
+            console.warn('[ImagePicker] Remote fetch failed:', url, err);
+            failedUrls.push(url);
+          }
+        }
+        const cropped = fetched.length ? await crop.cropAll(fetched.map((f) => f.file)) : [];
+        // Cancelled: keep the modal open and add nothing from the web.
+        if (cropped === null) return;
+
+        const uploadedUrls: string[] = [];
+        for (let i = 0; i < cropped.length; i++) {
+          const { file, blob } = cropped[i];
+          const source = fetched.find((f) => f.file === file)?.url ?? file.name;
+          try {
+            const uploaded = await uploadImageToR2(blob, {
               folder: folder || undefined,
               slug: searchHint || undefined,
               alt: searchHint || undefined,
-              keepOriginalResolution,
+              filename: file.name,
+              keepOriginalResolution: true,
+              maxDim: 2400,
             });
             uploadedUrls.push(uploaded.url);
           } catch (err) {
-            console.warn('[ImagePicker] Remote import failed:', externalUrls[i], err);
-            failedUrls.push(externalUrls[i]);
+            console.warn('[ImagePicker] Remote import failed:', source, err);
+            failedUrls.push(source);
           }
-          setUploadProgress(10 + Math.round(((i + 1) / externalUrls.length) * 90));
+          setUploadProgress(10 + Math.round(((i + 1) / cropped.length) * 90));
         }
         finalUrls = [...localUrls, ...uploadedUrls];
         if (failedUrls.length > 0) {
@@ -800,10 +831,6 @@ export function ImagePicker({
   const renderContent = () => (
     <div className="space-y-3">
     <InlineStatus status={opStatus} />
-    <label className="flex items-center gap-2 text-sm text-foreground">
-      <input type="checkbox" checked={keepOriginalResolution} onChange={(e) => setKeepOriginalResolution(e.target.checked)} />
-      Keep original dimensions (skip square crop and resize)
-    </label>
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'library' | 'upload' | 'search')}>
       <TabsList className="grid w-full grid-cols-3 mb-4">
         <TabsTrigger value="library" className="flex items-center gap-2">
@@ -904,6 +931,7 @@ export function ImagePicker({
             </div>
           </div>
         )}
+        {crop.dialog}
       </div>
     );
   }
@@ -964,6 +992,7 @@ export function ImagePicker({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {crop.dialog}
     </>
   );
 }
@@ -984,7 +1013,9 @@ export interface SingleImagePickerProps {
   className?: string;
   /** Context for web search + SEO filename (e.g., brand/category/hero name) */
   searchHint?: string;
-  keepOriginalResolution?: boolean;
+  /** Crop frame the cropper opens with (for example 1 for square logos). */
+  cropRatio?: CropRatio;
+  cropPresets?: CropPreset[];
 }
 
 export function SingleImagePicker({
@@ -995,7 +1026,8 @@ export function SingleImagePicker({
   disabled,
   className,
   searchHint = '',
-  keepOriginalResolution = false
+  cropRatio,
+  cropPresets,
 }: SingleImagePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -1055,7 +1087,8 @@ export function SingleImagePicker({
         disabled={disabled}
         trigger={<></>}
         searchHint={searchHint}
-        keepOriginalResolution={keepOriginalResolution}
+        cropRatio={cropRatio}
+        cropPresets={cropPresets}
       />
     </>
   );
@@ -1074,7 +1107,8 @@ export interface MultipleImagePickerProps {
   className?: string;
   /** Hint for web search (e.g., product name) */
   searchHint?: string;
-  keepOriginalResolution?: boolean;
+  cropRatio?: CropRatio;
+  cropPresets?: CropPreset[];
 }
 
 export function MultipleImagePicker({
@@ -1086,7 +1120,8 @@ export function MultipleImagePicker({
   disabled,
   className,
   searchHint = '',
-  keepOriginalResolution = false
+  cropRatio,
+  cropPresets,
 }: MultipleImagePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -1177,7 +1212,8 @@ export function MultipleImagePicker({
         disabled={disabled}
         trigger={<></>}
         searchHint={searchHint}
-        keepOriginalResolution={keepOriginalResolution}
+        cropRatio={cropRatio}
+        cropPresets={cropPresets}
       />
     </>
   );

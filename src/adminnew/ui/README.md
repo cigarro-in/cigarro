@@ -85,6 +85,7 @@ const save = useButtonFeedback();
 - `Banner({ tone, title?, action?, onDismiss? })`, `ErrorBanner({ error })`.
 - `EmptyState({ icon?, title, description?, action? })`.
 - `Menu({ trigger, items | sections, header?, align? })`. Items: `{ label, onSelect?, href?, external?, icon?, tone?: 'critical', disabled?, suffix? }`. The trigger must be a ref-forwarding element (a `Button`, or a native button). Never wrap `SidebarMenuButton` (not forwardRef): Radix then cannot anchor the menu and it renders off-screen.
+- `useImageCrop({ presets?, defaultRatio?, maxDim? })` returns `{ cropAll(files), dialog }`. Render `dialog` once; `await cropAll(files)` opens the cropper per file (aspect presets, zoom, rotate, "Use full image", "Skip cropping for the rest") and resolves to `{ file, blob }[]`, or `null` on cancel. Pass each `blob` to `uploadImageToR2(blob, { keepOriginalResolution: true, maxDim })`. The cropper loads lazily. Free-form aspect is not offered (react-easy-crop locks the ratio).
 - `EmptyState({ icon?, title, description?, action? })`: write a short, plain sentence for `description` that says what will appear here and how.
 - `Dialog`, `Sheet`, `ConfirmDialog`, `OtpInput`, `Checkbox` (with indeterminate), plus re-exported `Input`, `Textarea`, `Label`, `Switch`, `Select*`.
 

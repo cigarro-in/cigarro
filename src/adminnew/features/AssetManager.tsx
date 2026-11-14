@@ -21,6 +21,7 @@ import {
   paginate,
   toActionError,
   useButtonFeedback,
+  useImageCrop,
   useRowSelection,
   type BannerTone,
 } from '../ui';
@@ -136,7 +137,8 @@ export function AssetManager() {
 
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [keepOriginal, setKeepOriginal] = useState(false);
+  // Images are framed in the cropper first. Original is the default shape for a general asset library.
+  const crop = useImageCrop({ defaultRatio: 'original', maxDim: 2400, title: 'Crop image' });
 
   const [preview, setPreview] = useState<R2Image | null>(null);
   const [previewDims, setPreviewDims] = useState<{ w: number; h: number } | null>(null);
@@ -208,6 +210,11 @@ export function AssetManager() {
   const uploadFiles = async (files: File[]) => {
     if (files.length === 0 || uploading) return;
     const folder = currentFolder.replace(/\/$/, '') || undefined;
+    // Each image is framed first; cancelling the batch uploads nothing.
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    const cropped = imageFiles.length ? await crop.cropAll(imageFiles) : [];
+    if (cropped === null) return;
+    const croppedBlobs = new Map(cropped.map((c) => [c.file, c.blob]));
     const items: UploadItem[] = files.map((f, i) => ({ id: `${Date.now()}-${i}`, name: f.name, state: 'queued' }));
     setUploads(items);
     setUploading(true);
@@ -221,8 +228,9 @@ export function AssetManager() {
         const id = items[idx].id;
         setItem(id, { state: 'uploading' });
         try {
-          if (file.type.startsWith('image/')) {
-            await uploadImageToR2(file, { folder, slug: file.name, keepOriginalResolution: keepOriginal });
+          const blob = croppedBlobs.get(file);
+          if (blob) {
+            await uploadImageToR2(blob, { folder, slug: file.name, filename: file.name, keepOriginalResolution: true, maxDim: 2400 });
           } else {
             await uploadRawToR2(file, { folder });
           }
@@ -726,6 +734,7 @@ export function AssetManager() {
         confirmLabel="Reprocess"
         onConfirm={confirmReprocess}
       />
+      {crop.dialog}
     </Page>
   );
 }

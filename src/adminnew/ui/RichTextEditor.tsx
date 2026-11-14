@@ -334,7 +334,7 @@ export default function RichTextEditor({
         open={imageOpen}
         onOpenChange={setImageOpen}
         onConfirm={insertImages}
-        keepShape
+        cropRatio="original"
         uploadSlug={uploadSlug}
         title="Insert image"
       />
