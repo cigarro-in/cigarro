@@ -12,6 +12,7 @@ import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { personNameError } from '../../lib/profile/personName';
 
 export function ProfileSettingsPage() {
   const navigate = useNavigate();
@@ -44,9 +45,14 @@ export function ProfileSettingsPage() {
     try {
       // Display name/phone live in Convex users (cutover complete).
       if (!org) throw new Error('Store not ready — try again');
+      const nameProblem = personNameError(formData.fullName);
+      if (nameProblem) {
+        setOpError(nameProblem);
+        return;
+      }
       await convexUpsertUser({
         orgId: org._id,
-        name: formData.fullName,
+        name: formData.fullName.trim(),
         phone: formData.phone || undefined,
       });
 

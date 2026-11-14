@@ -68,7 +68,7 @@ export const listMembersRef = makeFunctionReference<
 >('platform:listMembers');
 export const addStoreAdminRef = makeFunctionReference<
   'mutation',
-  { saToken: string; orgId: Id<'organizations'>; phone: string; role: Role },
+  { saToken: string; orgId: Id<'organizations'>; phone: string; name: string; role: Role },
   { membershipId: Id<'memberships'>; userId: string }
 >('platform:addStoreAdmin');
 export const removeMemberRef = makeFunctionReference<

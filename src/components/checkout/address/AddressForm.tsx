@@ -7,6 +7,7 @@ import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { Address } from './AddressCard';
 import { cn } from '../../ui/utils';
+import { cleanPersonName, personNameError, realNameOrEmpty } from '../../../lib/profile/personName';
 
 interface AddressFormProps {
   initialData?: Address | null;
@@ -31,7 +32,8 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState<Address>({
-    full_name: defaultValues?.full_name || '',
+    // Prefill only with a real saved name; placeholders such as "Customer" start empty.
+    full_name: realNameOrEmpty(defaultValues?.full_name),
     phone: defaultValues?.phone || '',
     address: '',
     pincode: '',
@@ -61,7 +63,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     } else if (defaultValues) {
       setFormData(prev => ({
         ...prev,
-        full_name: prev.full_name || defaultValues.full_name || prev.full_name,
+        full_name: prev.full_name || realNameOrEmpty(defaultValues.full_name) || prev.full_name,
         phone: prev.phone || defaultValues.phone || prev.phone
       }));
     }
@@ -69,7 +71,8 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.full_name.trim()) newErrors.full_name = 'Full name is required';
+    const nameProblem = personNameError(formData.full_name);
+    if (nameProblem) newErrors.full_name = nameProblem;
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
     if (!formData.phone.match(/^\d{10}$/)) newErrors.phone = 'Enter a valid 10-digit number';
     if (!formData.address.trim()) newErrors.address = 'Address is required';
@@ -96,6 +99,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
       await onSave({
         ...formData,
+        full_name: cleanPersonName(formData.full_name),
         label: finalLabel
       });
     } catch (error) {
@@ -183,8 +187,14 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
           <Label>Full Name</Label>
           <Input 
             value={formData.full_name}
-            onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+            onChange={e => {
+              setFormData({ ...formData, full_name: e.target.value });
+              if (errors.full_name) setErrors(prev => ({ ...prev, full_name: '' }));
+            }}
             placeholder="Enter your full name"
+            maxLength={60}
+            required
+            aria-invalid={!!errors.full_name}
             className={cn("mt-1.5 bg-creme-light/50", errors.full_name && "border-red-500")}
           />
           {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}

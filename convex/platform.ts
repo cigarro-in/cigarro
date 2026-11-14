@@ -6,6 +6,10 @@ import type { Doc } from "./_generated/dataModel";
 import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { normalizePhoneE164 } from "./lib/phone";
+import {
+  cleanPersonName,
+  requireRealPersonName,
+} from "./lib/personName";
 import { role } from "./schema";
 import { insertOrganization } from "./organizations";
 import { pickUniqueBankAlias } from "./lib/bankAlias";
@@ -219,14 +223,19 @@ export const addStoreAdmin = mutation({
     saToken: v.string(),
     orgId: v.id("organizations"),
     phone: v.string(),
+    name: v.string(),
     role,
   },
-  handler: async (ctx, { saToken, orgId, phone, role: memberRole }) => {
+  handler: async (
+    ctx,
+    { saToken, orgId, phone, name, role: memberRole },
+  ) => {
     const sa = await requireSaWrite(ctx, saToken);
     const org = await ctx.db.get(orgId);
     if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
     const e164 = normalizePhoneE164(phone);
     if (!e164) throw new ConvexError({ code: "INVALID_PHONE" });
+    const adminName = requireRealPersonName(name);
 
     const now = Date.now();
     let user = await ctx.db
@@ -239,10 +248,13 @@ export const addStoreAdmin = mutation({
         userId,
         orgId,
         phone: e164,
+        name: adminName,
         createdAt: now,
         updatedAt: now,
       });
       user = (await ctx.db.get(id))!;
+    } else if (cleanPersonName(user.name) !== adminName) {
+      await ctx.db.patch(user._id, { name: adminName, updatedAt: now });
     }
 
     const existing = await ctx.db

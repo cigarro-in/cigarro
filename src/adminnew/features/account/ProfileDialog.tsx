@@ -4,6 +4,7 @@ import { api } from '../../../../convex/_generated/api';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { Button, Dialog, ErrorBanner, Input, Label, useButtonFeedback } from '../../ui';
 import { maskPhone } from '../../lib/adminAuth';
+import { personNameError } from '../../../lib/profile/personName';
 import { roleLabel, type StoreRole } from './useStoreAccount';
 
 const MAX_NAME = 60;
@@ -40,7 +41,9 @@ export function ProfileDialog({
 
   const clean = draft.replace(/\s+/g, ' ').trim();
   const unchanged = clean === (name ?? '');
-  const invalid = clean.length < 1 || clean.length > MAX_NAME;
+  // A real person name is required (placeholders such as "Customer" are refused).
+  const nameProblem = personNameError(clean);
+  const invalid = nameProblem !== null;
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -62,9 +65,13 @@ export function ProfileDialog({
               setDraft(e.target.value);
               if (save.state !== 'idle') save.reset();
             }}
-            aria-invalid={invalid && draft.length > 0 ? true : undefined}
+            aria-invalid={invalid ? true : undefined}
           />
-          <p className="text-xs text-[var(--admin-text-subtle)]">Up to {MAX_NAME} characters.</p>
+          {invalid ? (
+            <p role="alert" className="text-xs text-destructive">{nameProblem}</p>
+          ) : (
+            <p className="text-xs text-[var(--admin-text-subtle)]">Your full name. Up to {MAX_NAME} characters.</p>
+          )}
         </div>
 
         <dl className="grid grid-cols-[6rem_1fr] gap-y-2 rounded-[var(--admin-radius-sm)] border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-3 text-sm">

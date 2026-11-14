@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { formatINR } from '../../utils/currency';
 import { AttentionRow, type AttentionItem } from '../features/overview/AttentionRow';
 import { CountUp } from '../features/overview/CountUp';
+import { isRealPersonName } from '../../lib/profile/personName';
 import { greetingTitle } from '../features/overview/greetings';
 import { SalesComparison } from '../features/overview/SalesComparison';
 import {
@@ -141,8 +142,8 @@ export function DashboardPage() {
   // Picked once per mount so the greeting does not change on every render.
   const [greetedAt] = useState(() => new Date());
   const { user } = useAuth();
-  // 'Customer' is the placeholder name for accounts without a name: no greeting name.
-  const adminName = user?.name && user.name !== 'Customer' ? user.name : null;
+  // Placeholder or missing names give no greeting name.
+  const adminName = isRealPersonName(user?.name) ? (user?.name ?? null) : null;
   const title = greetingTitle(greetedAt, adminName);
 
   const attention: AttentionItem[] = data

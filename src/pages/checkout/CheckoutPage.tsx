@@ -29,6 +29,7 @@ import { validateEmail, validatePhone, validateName, validatePincode, validateAd
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 import QRCode from 'qrcode';
+import { personNameError, realNameOrEmpty } from '../../lib/profile/personName';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -372,7 +373,7 @@ export function CheckoutPage() {
         if (primaryAddress && !hasInitializedForm && !formData.address) {
           setFormData((prev) => ({
             ...prev,
-            fullName: primaryAddress.full_name || prev.fullName,
+            fullName: realNameOrEmpty(primaryAddress.full_name) || prev.fullName,
             phone: primaryAddress.phone?.replace(/^\+91\s*/, '') || prev.phone,
             address: primaryAddress.address,
             city: primaryAddress.city,
@@ -414,7 +415,11 @@ export function CheckoutPage() {
 
   const validateForm = () => {
     const validationRules = {
-      fullName: (value: string) => validateName(value, 'Full name'),
+      fullName: (value: string) => {
+        // Real person name: placeholders such as "Customer" are rejected.
+        const problem = personNameError(value);
+        return problem ? { isValid: false, error: problem } : validateName(value, 'Full name');
+      },
       email: (value: string) => validateEmail(value),
       phone: (value: string) => validatePhone(value, countryCode),
       address: (value: string) => validateAddress(value),
@@ -962,6 +967,8 @@ export function CheckoutPage() {
       const msg =
         code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry shortly.'
+          : code === 'NAME_REQUIRED'
+          ? 'Add your full name to the delivery address before placing the order.'
           : code === 'ORG_INACTIVE'
           ? 'Store is currently unavailable.'
           : 'Failed to process order. Please try again.';

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useCurrentLocation } from '../../hooks/useCurrentLocation';
+import { cleanPersonName, personNameError, realNameOrEmpty } from '../../lib/profile/personName';
 import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 
 interface Address {
@@ -73,7 +74,7 @@ export function AddressManager({
   const { profileName, profilePhone10 } = useMyProfile();
   const { locate } = useCurrentLocation();
   const [addressForm, setAddressForm] = useState({
-    full_name: user?.name || '',
+    full_name: realNameOrEmpty(user?.name),
     phone: '',
     address: '',
     pincode: '',
@@ -241,7 +242,8 @@ export function AddressManager({
   const validateAddressForm = () => {
     const errors: {[key: string]: string} = {};
     
-    if (!addressForm.full_name.trim()) errors.full_name = 'Full name is required';
+    const nameProblem = personNameError(addressForm.full_name);
+    if (nameProblem) errors.full_name = nameProblem;
     if (!addressForm.phone.trim()) errors.phone = 'Phone number is required';
     if (!addressForm.address.trim()) errors.address = 'Address is required';
     if (!addressForm.pincode.trim()) errors.pincode = 'Pincode is required';
@@ -267,7 +269,7 @@ export function AddressManager({
       try {
         data = await storeSaveAddress({
           id: editingAddress?.id,
-          full_name: addressForm.full_name.trim(),
+          full_name: cleanPersonName(addressForm.full_name),
           phone: addressForm.phone.trim(),
           address: addressForm.address.trim(),
           pincode: addressForm.pincode.trim(),
@@ -571,7 +573,13 @@ export function AddressManager({
               <Input
                 id="full_name"
                 value={addressForm.full_name}
-                onChange={(e) => setAddressForm(prev => ({ ...prev, full_name: e.target.value }))}
+                onChange={(e) => {
+                  setAddressForm(prev => ({ ...prev, full_name: e.target.value }));
+                  if (addressErrors.full_name) setAddressErrors(prev => ({ ...prev, full_name: '' }));
+                }}
+                maxLength={60}
+                required
+                aria-invalid={!!addressErrors.full_name}
                 className={addressErrors.full_name ? 'border-red-500' : ''}
               />
               {addressErrors.full_name && (

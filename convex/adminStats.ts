@@ -4,6 +4,7 @@ import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { collectInOrg } from "./lib/org";
 import { isLegacyOrg } from "./lib/legacyOrg";
 import { orderNumberOf } from "./lib/ids";
+import { displayCustomerName } from "./lib/personName";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -113,7 +114,7 @@ export const getDashboardStats = query({
       id: o._id,
       display_order_id: o.displayOrderId,
       order_number: orderNumberOf(o),
-      shipping_name: o.address?.name ?? "Guest",
+      shipping_name: displayCustomerName(o.address?.name, o.address?.phone, "Guest"),
       total: rupees(o.finalAmountPaise),
       status: o.shippingStatus ?? o.status,
       // Raw lifecycles so views can derive one stage (src/lib/orders/orderStage.ts).
@@ -128,7 +129,7 @@ export const getDashboardStats = query({
       .slice(0, 5)
       .map((u) => ({
         id: u.userId,
-        name: u.name ?? "Unknown",
+        name: displayCustomerName(u.name, u.phone),
         phone: u.phone ?? "",
         created_at: u.createdAt,
       }));
@@ -200,7 +201,7 @@ export const listCustomersForAdmin = query({
         const role = roleByUser.get(u.userId);
         return {
           id: u.userId,
-          name: u.name ?? "Unknown",
+          name: displayCustomerName(u.name, u.phone),
           phone: u.phone ?? "",
           is_admin: role === "admin" || role === "owner",
           orderCount: mine.length,
@@ -243,7 +244,7 @@ export const getCustomerForAdmin = query({
 
     return {
       id: user.userId,
-      name: user.name ?? "Unknown",
+      name: displayCustomerName(user.name, user.phone),
       phone: user.phone ?? "",
       is_admin: membership?.role === "admin" || membership?.role === "owner",
       orderCount: orders.length,
@@ -372,7 +373,7 @@ export const getCustomerProfile = query({
 
     return {
       id: user.userId,
-      name: user.name ?? "Unknown",
+      name: displayCustomerName(user.name, user.phone),
       phone: user.phone ?? "",
       isAdmin: membership?.role === "admin" || membership?.role === "owner",
       createdAt: user.createdAt,
@@ -466,7 +467,7 @@ export const searchAdmin = query({
       orders.push({
         id: o._id,
         number,
-        customer: name || "Guest",
+        customer: displayCustomerName(name, o.address?.phone, "Guest"),
         paymentStatus: o.status,
         shippingStatus: o.shippingStatus ?? null,
         total: rupees(o.finalAmountPaise),
@@ -495,7 +496,7 @@ export const searchAdmin = query({
           (u.name ?? "").toLowerCase().includes(needle) || phoneMatches(u.phone),
       )
       .slice(0, SEARCH_LIMIT)
-      .map((u) => ({ id: u.userId, name: u.name ?? "", phone: u.phone ?? "" }));
+      .map((u) => ({ id: u.userId, name: displayCustomerName(u.name, u.phone, ""), phone: u.phone ?? "" }));
 
     return { orders, products, customers };
   },

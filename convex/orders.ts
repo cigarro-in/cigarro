@@ -14,6 +14,7 @@ import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
 import { buildOrderPollOffsets } from "./lib/pollSchedule";
 import { addressV, orderItemV, orderKind } from "./schema";
+import { requireRealPersonName } from "./lib/personName";
 import { creditWallet, debitWallet } from "./wallet";
 import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
@@ -487,11 +488,18 @@ export const createOrder = mutation({
         throw new ConvexError({ code: "EMPTY_CART" });
       if (!args.address)
         throw new ConvexError({ code: "ADDRESS_REQUIRED" });
+      // Orders need a real recipient name, not a legacy placeholder.
+      requireRealPersonName(args.address.name);
       orderItems = await pricePurchaseItems(ctx, org, args.items);
     } else if (args.kind === "wallet_load") {
       if (args.items.length !== 1 || args.items[0].qty !== 1) {
         throw new ConvexError({ code: "INVALID_WALLET_LOAD" });
       }
+      const profile = await ctx.db
+        .query("users")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      requireRealPersonName(profile?.name);
       if (!org.walletEnabled)
         throw new ConvexError({ code: "WALLET_DISABLED" });
       const loadPaise = args.items[0].unitPricePaise;

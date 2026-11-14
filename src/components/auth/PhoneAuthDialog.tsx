@@ -8,6 +8,7 @@ import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { useOTPWidget } from '../../hooks/useOTPWidget';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { setReloadBlocked } from '../../lib/reloadGuard';
+import { cleanPersonName, personNameError } from '../../lib/profile/personName';
 
 interface Props {
   open: boolean;
@@ -15,7 +16,7 @@ interface Props {
   onAuthSuccess?: () => void;
   // Replaces the default session sign-in after OTP (admin-host phone login
   // picks the store itself). Throw an AuthError to show the message inline.
-  onVerified?: (args: { phone: string; token: string; countryCode: string }) => Promise<{ isNewUser: boolean }>;
+  onVerified?: (args: { phone: string; token: string; countryCode: string }) => Promise<{ isNewUser: boolean; needsName?: boolean }>;
 }
 
 const OTP_LENGTH = 4;
@@ -132,6 +133,7 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified 
   const [authError, setAuthError] = useState<InlineError | null>(null);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<InlineError | null>(null);
+  const [nameProblem, setNameProblem] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const otpInputRef = useRef<HTMLInputElement | null>(null);
@@ -186,7 +188,9 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified 
         const result = onVerified
           ? await onVerified({ phone: phoneInput, token, countryCode })
           : await signInWithPhone({ phone: phoneInput, token, countryCode });
-        if (result.isNewUser) {
+        // New accounts and legacy accounts with no real name set it here,
+        // before they continue (checkout also requires it).
+        if (result.isNewUser || result.needsName) {
           setSubmitting(false);
           setStep('name');
           return;
@@ -335,14 +339,19 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified 
   };
 
   const saveNameNow = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || !user?.id || submitting) return;
+    const problem = personNameError(name);
+    if (problem) {
+      setNameProblem(problem);
+      return;
+    }
+    setNameProblem(null);
+    if (!user?.id || submitting) return;
     setSubmitting(true);
     setNameError(null);
     try {
       // Display name lives in Convex users. Failures stay inline with a
       // retry — never swallowed, never closing the dialog.
-      await updateDisplayName(trimmed);
+      await updateDisplayName(cleanPersonName(name));
       onOpenChange(false);
       onAuthSuccess?.();
     } catch (err) {
@@ -530,18 +539,26 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified 
       {step === 'name' && (
         <StepContainer key="name">
           <h2 className="text-[17px] font-bold text-[var(--vv-fg,#433c35)]">Your name</h2>
-          <form onSubmit={handleNameSubmit} className="space-y-3">
+          <p className="text-[13px] text-[var(--vv-fg-muted,#6f6259)] -mt-2">Your full name is needed for delivery and invoices.</p>
+          <form onSubmit={handleNameSubmit} className="space-y-3" noValidate>
             <input
               type="text"
-              placeholder="e.g. Rohan"
+              placeholder="e.g. Rohan Mehta"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameProblem) setNameProblem(null);
+              }}
+              aria-invalid={!!nameProblem}
               disabled={submitting}
               autoFocus={!isMobile}
               autoComplete="name"
               aria-label="Your name"
               className="w-full h-12 px-4 border border-[var(--vv-border,#ded3bf)] bg-[var(--vv-bg-elevated,#fff7e9)] text-[var(--vv-fg,#433c35)] rounded-xl text-[16px] focus:outline-none focus:border-[var(--vv-brand,#8c4630)] focus:ring-[3px] focus:ring-[var(--vv-brand,#8c4630)]/20 transition"
             />
+            {nameProblem && (
+              <p role="alert" className="text-[13px] font-medium text-[var(--vv-danger,#dc2626)]">{nameProblem}</p>
+            )}
             {nameError && (
               <InlineAuthError
                 error={nameError}
@@ -551,7 +568,7 @@ export function PhoneAuthDialog({ open, onOpenChange, onAuthSuccess, onVerified 
             )}
             <button
               type="submit"
-              disabled={submitting || !name.trim()}
+              disabled={submitting}
               className="w-full h-12 rounded-xl bg-[var(--vv-brand,#8c4630)] text-white font-semibold text-[15px] hover:bg-[var(--vv-brand-hover,#6e3524)] active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue'}

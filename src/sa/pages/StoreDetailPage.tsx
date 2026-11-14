@@ -30,6 +30,7 @@ import { paiseToRupees } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
 import { runSa, formatCount, formatDateTime, GmailBadge, KeyValues, ROLE_LABEL, StatTile, StoreStateBadge } from '../saUi';
 import { DomainList, PRIMARY_WARNING } from '../DomainList';
+import { cleanPersonName, customerDisplayName, isRealPersonName, personNameError } from '../../lib/profile/personName';
 import { storeAdminUrl, storeLiveUrl } from '../health';
 import {
   addDomainRef,
@@ -527,6 +528,8 @@ function TeamTab({
   const addAdmin = useMutation(addStoreAdminRef);
   const removeMember = useMutation(removeMemberRef);
   const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [role, setRole] = useState<Role>('admin');
   const fb = useButtonFeedback();
   const [notice, setNotice] = useState<string | null>(null);
@@ -534,12 +537,18 @@ function TeamTab({
 
   const onAdd = async (e: FormEvent) => {
     e.preventDefault();
+    // A real person name is required for every new admin row.
+    const nameProblem = personNameError(name);
+    setNameError(nameProblem);
+    if (nameProblem) return;
     const p = phone;
     const r = role;
-    const ok = await fb.run(() => runSa(() => addAdmin({ saToken: token, orgId, phone: p, role: r })));
+    const n = cleanPersonName(name);
+    const ok = await fb.run(() => runSa(() => addAdmin({ saToken: token, orgId, phone: p, name: n, role: r })));
     if (ok === undefined) return;
-    setNotice(`${p} is now ${ROLE_LABEL[r].toLowerCase()}. They sign in with this phone number.`);
+    setNotice(`${n} (${p}) is now ${ROLE_LABEL[r].toLowerCase()}. They sign in with this phone number.`);
     setPhone('');
+    setName('');
   };
 
   const columns: Column<MemberRow>[] = [
@@ -548,8 +557,8 @@ function TeamTab({
       header: 'Person',
       cell: (m) => (
         <div className="min-w-0">
-          <p className="truncate text-sm text-[var(--admin-text)]">{m.name ?? m.phone ?? '-'}</p>
-          {m.name && <p className="truncate font-mono text-xs text-[var(--admin-text-muted)]">{m.phone ?? ''}</p>}
+          <p className="truncate text-sm text-[var(--admin-text)]">{customerDisplayName(m.name, m.phone)}</p>
+          {isRealPersonName(m.name) && <p className="truncate font-mono text-xs text-[var(--admin-text-muted)]">{m.phone ?? ''}</p>}
         </div>
       ),
     },
@@ -594,6 +603,23 @@ function TeamTab({
           <Card title="Add a person">
             <form onSubmit={onAdd} className="flex flex-col gap-3">
               <div className="grid gap-1.5">
+                <Label htmlFor="sa-name">Full name</Label>
+                <Input
+                  id="sa-name"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameError) setNameError(null);
+                  }}
+                  placeholder="e.g. Rohan Mehta"
+                  autoComplete="off"
+                  required
+                  aria-invalid={!!nameError}
+                  disabled={!writeOpen || fb.busy}
+                />
+                {nameError && <p role="alert" className="text-xs text-destructive">{nameError}</p>}
+              </div>
+              <div className="grid gap-1.5">
                 <Label htmlFor="sa-phone">Phone number</Label>
                 <Input
                   id="sa-phone"
@@ -636,7 +662,7 @@ function TeamTab({
         onOpenChange={(o) => {
           if (!o) setToRemove(null);
         }}
-        title={`Remove ${toRemove?.name ?? toRemove?.phone ?? 'this person'}?`}
+        title={`Remove ${toRemove ? customerDisplayName(toRemove.name, toRemove.phone, 'this person') : 'this person'}?`}
         description="They can no longer open the store admin. Their customer account is kept."
         confirmLabel="Remove access"
         critical

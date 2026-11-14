@@ -25,6 +25,7 @@ import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
+import { cleanPersonName, isRealPersonName } from '../../lib/profile/personName';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -78,7 +79,7 @@ export function MobileCheckoutPage() {
   const defaultUserName =
     profileName ||
     normalizeString(user?.name) ||
-    (user?.email ? user.email.split('@')[0] : 'Customer');
+    '';
 
   const defaultUserPhone =
     profilePhone10 ||
@@ -490,6 +491,11 @@ export function MobileCheckoutPage() {
       setShowAddressDialog(true);
       return;
     }
+    if (!isRealPersonName(selectedAddress.full_name)) {
+      setOpError('Add your full name to the delivery address before placing the order.');
+      setShowAddressDialog(true);
+      return;
+    }
     if (!user) {
       setOpError('Please sign in to continue');
       return;
@@ -514,7 +520,7 @@ export function MobileCheckoutPage() {
         city: selectedAddress.city,
         state: selectedAddress.state,
         pincode: selectedAddress.pincode,
-        name: selectedAddress.full_name || defaultUserName || 'Customer',
+        name: cleanPersonName(selectedAddress.full_name || defaultUserName),
         phone: selectedAddress.phone || defaultUserPhone || '',
       };
 
@@ -567,6 +573,8 @@ export function MobileCheckoutPage() {
       const msg =
         code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry in a few minutes.'
+          : code === 'NAME_REQUIRED'
+          ? 'Add your full name to the delivery address before placing the order.'
           : code === 'WALLET_INSUFFICIENT'
           ? 'Wallet balance is insufficient.'
           : code === 'ORG_INACTIVE'

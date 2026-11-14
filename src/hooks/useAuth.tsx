@@ -6,11 +6,13 @@ import { getSession, storeSession, clearSession, notifyAuthChanged } from '../li
 import { useOrgInfo } from '../lib/org/OrgContext';
 import { transferGuestDataToUser, shouldTransferGuestData } from '../utils/userDataTransfer';
 import { logger } from '../utils/logger';
+import { isRealPersonName, realNameOrEmpty } from '../lib/profile/personName';
 
 interface User {
   id: string;
   email: string | null;
   phone: string | null;
+  // Real name only: '' when the account has none (never a placeholder).
   name: string;
   isAdmin: boolean;
 }
@@ -24,6 +26,9 @@ interface PhoneSignInArgs {
 
 interface PhoneSignInResult {
   isNewUser: boolean;
+  // True when the account still has no real name (new user, or a legacy
+  // placeholder). The OTP dialog asks for it before the customer continues.
+  needsName: boolean;
 }
 
 interface AuthContextType {
@@ -79,7 +84,7 @@ async function loadConvexUser(client: ConvexHttpClient): Promise<User> {
     id: profile.userId,
     email: null,
     phone: profile.phone,
-    name: profile.name || 'Customer',
+    name: realNameOrEmpty(profile.name),
     isAdmin: profile.isAdmin,
   };
 }
@@ -183,12 +188,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // still holds the pre-login (empty) auth on its live socket, so these
       // calls would go out unauthenticated until it re-auths (hence the
       // login-then-refresh dance).
+      let needsName = false;
       try {
         const u = await establishCustomerSession(data.cigarro_token, orgSlug, {
           phone: phone || undefined,
           name: args.name || undefined,
         });
         setUser(u);
+        needsName = !isRealPersonName(u.name);
         // Wake the reactive client only after the customer profile and
         // membership are ready, so mounted queries cannot race the bootstrap.
         notifyAuthChanged();
@@ -205,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         logger.error('Guest data transfer error', e);
       }
-      return { isNewUser: !!data.is_new_user };
+      return { isNewUser: !!data.is_new_user, needsName };
     }
   };
 

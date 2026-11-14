@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useActionFeedback } from './useActionFeedback';
+import { personNameError, realNameOrEmpty } from '../../lib/profile/personName';
 
 export function VividProfileSettings() {
   const { user } = useAuth();
@@ -20,16 +21,21 @@ export function VividProfileSettings() {
       navigate('/');
       return;
     }
-    setName(user.name || '');
+    setName(realNameOrEmpty(user.name));
     setEmail(user.email || '');
   }, [user, navigate]);
+
+  const [nameProblem, setNameProblem] = useState<string | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || saving) return;
+    const problem = personNameError(name);
+    setNameProblem(problem);
+    if (problem) return;
     // Display name lives in Convex (Phase 1 spine) via useMyProfile. Email is read-only here (contact
     // support to change), mirroring the classic settings page.
-    void save.run(() => updateDisplayName(name || undefined), 'Could not save. Try again.');
+    void save.run(() => updateDisplayName(name.trim()), 'Could not save. Try again.');
   };
 
   return (
@@ -48,11 +54,18 @@ export function VividProfileSettings() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameProblem) setNameProblem(null);
+              }}
               disabled={saving}
               className="vv-input"
-              placeholder="Your name"
+              placeholder="Your full name"
+              aria-invalid={!!nameProblem}
             />
+            {nameProblem && (
+              <p role="alert" className="mt-1.5 text-sm text-[var(--vv-danger)]">{nameProblem}</p>
+            )}
           </div>
 
           <div>

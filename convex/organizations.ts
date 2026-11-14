@@ -7,6 +7,7 @@ import { LEGACY_ORG_SLUG, PRE_RENAME_LEGACY_SLUG } from "./lib/legacyOrg";
 import { role } from "./schema";
 import { adminStoresForPhone } from "./lib/adminStores";
 import { MAX_BANK_SENDERS, normalizeBankSenders } from "./lib/bankSenders";
+import { requireRealPersonName } from "./lib/personName";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
 const DEFAULT_QUARANTINE_MS = 20 * 60 * 1000; // 20 min — grace for late UPI arrivals
@@ -370,10 +371,7 @@ export const updateMyName = mutation({
     const { identity } = await requireMember(ctx, orgId);
     const org = await ctx.db.get(orgId);
     if (!org) throw new ConvexError({ code: "ORG_NOT_FOUND" });
-    const clean = name.replace(/\s+/g, " ").trim();
-    if (clean.length < 1 || clean.length > 60) {
-      throw new ConvexError({ code: "INVALID_NAME" });
-    }
+    const clean = requireRealPersonName(name);
     const row = await myUserRow(ctx, org, identity.subject);
     if (!row) throw new ConvexError({ code: "NO_USER_ROW" });
     await ctx.db.patch(row._id, { name: clean, updatedAt: Date.now() });

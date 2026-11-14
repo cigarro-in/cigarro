@@ -11,6 +11,7 @@ import { AddressList } from './AddressList';
 import { AddressForm } from './AddressForm';
 import { Address } from './AddressCard';
 import { useAddresses } from '../../../lib/convex/useAddresses';
+import { realNameOrEmpty } from '../../../lib/profile/personName';
 import { useMyProfile } from '../../../hooks/data/useMyProfile';
 import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
 import { Button } from '../../ui/button';
@@ -45,8 +46,8 @@ export const AddressDrawer = memo(function AddressDrawer({
   const { profileName, profilePhone10 } = useMyProfile();
   const newAddressDefaults = useMemo(
     () => ({
-      full_name:
-        profileName || user?.email?.split('@')[0] || '',
+      // Real saved name only. Never derive a name from the email address.
+      full_name: realNameOrEmpty(profileName),
       phone: profilePhone10 || '',
     }),
     [profileName, profilePhone10, user?.email]

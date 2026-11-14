@@ -14,6 +14,11 @@ import {
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { isLegacyOrg } from "./lib/legacyOrg";
+import {
+  cleanPersonName,
+  isRealPersonName,
+  requireRealPersonName,
+} from "./lib/personName";
 
 // ---------- Phase 1: user state (cart, wishlist, profiles, addresses) ----------
 // Identity: identity.subject (Supabase sub today; stable string carried
@@ -63,7 +68,8 @@ export const getMyProfile = query({
     return {
       userId: identity.subject,
       phone: user?.phone ?? null,
-      name: user?.name ?? null,
+      // Placeholder names come back as null so clients ask for a real name.
+      name: isRealPersonName(user?.name) ? cleanPersonName(user?.name) : null,
       isAdmin,
     };
   },
@@ -100,6 +106,11 @@ export const ensureMyProfile = mutation({
     // Normalize on write: a raw client phone must never overwrite the E.164
     // form, or the next by_org_phone lookup forks a second users row.
     const profilePhone = normalizePhoneE164(args.phone);
+    // Placeholder or too-short names are never stored. The client asks for a
+    // real name at sign-up and before checkout; this handshake only keeps one.
+    const profileName = isRealPersonName(args.name)
+      ? cleanPersonName(args.name)
+      : undefined;
     let userId = existing?._id;
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -108,7 +119,7 @@ export const ensureMyProfile = mutation({
           ? { orgId: org._id }
           : {}),
         ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
-        ...(args.name !== undefined ? { name: args.name } : {}),
+        ...(profileName !== undefined ? { name: profileName } : {}),
         updatedAt: now,
       });
     } else {
@@ -116,7 +127,7 @@ export const ensureMyProfile = mutation({
         userId: identity.subject,
         orgId: org._id,
         phone: profilePhone,
-        name: args.name,
+        name: profileName,
         createdAt: now,
         updatedAt: now,
       });
@@ -172,9 +183,14 @@ export const resolvePhoneIdentity = internalMutation({
         await ctx.db.patch(existing._id, { orgId: org._id });
       }
     }
+    // No "Customer" default: a missing or placeholder name stays unset and the
+    // customer is asked for their name before checkout.
+    const loginName = isRealPersonName(args.name)
+      ? cleanPersonName(args.name)
+      : undefined;
     if (existing) {
       await ctx.db.patch(existing._id, {
-        ...(args.name !== undefined ? { name: args.name } : {}),
+        ...(loginName !== undefined ? { name: loginName } : {}),
         updatedAt: now,
       });
       return { userId: existing.userId, isNewUser: false };
@@ -184,7 +200,7 @@ export const resolvePhoneIdentity = internalMutation({
       userId,
       orgId: org._id,
       phone,
-      name: args.name ?? "Customer",
+      name: loginName,
       createdAt: now,
       updatedAt: now,
     });
@@ -210,10 +226,12 @@ export const upsertUser = mutation({
       .unique();
     const now = Date.now();
     const profilePhone = normalizePhoneE164(args.phone);
+    const profileName =
+      args.name !== undefined ? requireRealPersonName(args.name) : undefined;
     if (existing) {
       await ctx.db.patch(existing._id, {
         ...(profilePhone !== undefined ? { phone: profilePhone } : {}),
-        ...(args.name !== undefined ? { name: args.name } : {}),
+        ...(profileName !== undefined ? { name: profileName } : {}),
         updatedAt: now,
       });
       return existing._id;
@@ -221,7 +239,7 @@ export const upsertUser = mutation({
     return await ctx.db.insert("users", {
       userId,
       phone: profilePhone,
-      name: args.name,
+      name: profileName,
       createdAt: now,
       updatedAt: now,
     });
@@ -530,6 +548,7 @@ export const addAddress = mutation({
   args: addressArgs,
   handler: async (ctx, args) => {
     const { userId } = await requireMember(ctx, args.orgId);
+    const addressName = requireRealPersonName(args.name);
     const now = Date.now();
     const existingCount = (
       await ctx.db
@@ -564,7 +583,7 @@ export const addAddress = mutation({
         city: args.city,
         state: args.state,
         pincode: args.pincode,
-        name: args.name,
+        name: addressName,
         phone: args.phone,
         latitude: args.latitude,
         longitude: args.longitude,
@@ -667,6 +686,7 @@ export const updateAddress = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireMember(ctx, args.orgId);
+    const addressName = requireRealPersonName(args.name);
     const row = await ctx.db.get(args.addressId);
     if (!row || row.userId !== userId || row.orgId !== args.orgId) {
       throw new ConvexError({ code: "NOT_FOUND" });
@@ -692,7 +712,7 @@ export const updateAddress = mutation({
         city: args.city,
         state: args.state,
         pincode: args.pincode,
-        name: args.name,
+        name: addressName,
         phone: args.phone,
         latitude: args.latitude,
         longitude: args.longitude,
