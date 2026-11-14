@@ -1,94 +1,12 @@
 @import "tailwindcss";
+@import "./styles/theme.css";
+@import "./styles/admin-utility-classes.css";
 
-/* Tailwind v4 Theme Configuration */
-@theme {
-  /* Custom Colors - Inspiration Website Palette */
-  --color-creme: #e8e0d2;
-  --color-creme-light: #fff7e9;
-  --color-coyote: #c3af9f;
-  --color-canyon: #8c4630;
-  --color-dark: #433c35;
-  --color-sunflower: #dea138;
-  
-  /* Font Families */
-  --font-family-sans: 'DM-Sans', 'DM-Sans-fallback', system-ui, sans-serif;
-  --font-family-serif: 'PP-Editorial-New', Georgia, serif;
-  
-  /* Design System Variables (Legacy - kept for compatibility) */
-  --default-w: 1440;
-  --mobile-w: 375;
-  --padding-inline: calc(100vw * 10 / var(--default-w));
-  --gutter: max(10px, var(--padding-inline));
-  --radius: 0.5rem;
-
-  /* Responsive Spacing Scale (Mobile → Desktop) */
-  --space-xs: clamp(0.25rem, 0.5vw, 0.5rem);
-  --space-sm: clamp(0.5rem, 1vw, 0.75rem);
-  --space-md: clamp(0.75rem, 1.5vw, 1rem);
-  --space-lg: clamp(1rem, 2vw, 1.5rem);
-  --space-xl: clamp(1.5rem, 3vw, 2rem);
-  --space-2xl: clamp(2rem, 4vw, 3rem);
-  --space-3xl: clamp(3rem, 6vw, 4rem);
-  --space-4xl: clamp(4rem, 8vw, 6rem);
-  --space-5xl: clamp(6rem, 10vw, 8rem);
-  
-  /* Touch Target Sizes (WCAG 2.1 AA Compliant) */
-  --touch-target-min: 44px;
-  --touch-target-comfortable: 48px;
-  
-  /* Responsive Typography Scale */
-  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
-  --text-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
-  --text-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
-  --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem);
-  --text-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
-  --text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2rem);
-  --text-3xl: clamp(1.875rem, 1.5rem + 1.875vw, 2.5rem);
-  --text-4xl: clamp(2.25rem, 1.8rem + 2.25vw, 3rem);
-  --text-5xl: clamp(3rem, 2.4rem + 3vw, 4rem);
-
-  /* Extend Tailwind Colors */
-  --color-background: var(--color-creme);
-  --color-card: var(--color-creme-light);
-  --color-card-foreground: var(--color-dark);
-  --color-popover: var(--color-creme-light);
-  --color-popover-foreground: var(--color-dark);
-  --color-destructive: #b42318;
-  --color-destructive-foreground: #ffffff;
-  --color-success: #166534;
-  --color-success-muted: #e8f5ec;
-  --color-warning: #854d0e;
-  --color-warning-muted: #fff4d6;
-  --color-info: #1e40af;
-  --color-info-muted: #eaf0ff;
-  --color-foreground: var(--color-dark);
-  --color-primary: var(--color-dark);
-  --color-primary-foreground: var(--color-creme-light);
-  --color-secondary: var(--color-coyote);
-  --color-secondary-foreground: var(--color-dark);
-  --color-accent: var(--color-canyon);
-  --color-accent-foreground: var(--color-creme-light);
-  --color-muted: var(--color-coyote);
-  --color-muted-foreground: var(--color-dark);
-  --color-border: var(--color-coyote);
-  --color-input: var(--color-creme-light);
-  --color-input-background: var(--color-creme-light);
-  --color-ring: var(--color-canyon);
-
-  /* Sidebar (used by admin Sidebar component from shadcn) */
-  --color-sidebar: var(--color-creme-light);
-  --color-sidebar-foreground: var(--color-dark);
-  --color-sidebar-primary: var(--color-canyon);
-  --color-sidebar-primary-foreground: var(--color-creme-light);
-  --color-sidebar-accent: var(--color-creme);
-  --color-sidebar-accent-foreground: var(--color-dark);
-  --color-sidebar-border: var(--color-coyote);
-  --color-sidebar-ring: var(--color-canyon);
-}
-
-@utility admin-dialog-height {
-  max-height: calc(100dvh - 2rem);
-}
+/* Admin and super-admin utilities are compiled separately (src/adminnew/styles/
+   admin-utilities.css, loaded only by the admin bundles). Keep them out of the
+   storefront stylesheet. */
+@source not "./adminnew";
+@source not "./sa";
 
 /* Utility Classes */
 .scrollbar-hide {
@@ -938,29 +856,3 @@ html {
   line-height: inherit;
 }
 
-/* Admin editor surface. Same typography as the storefront, plus placeholder and selection. */
-.rich-text-editor {
-  min-height: inherit;
-  position: relative;
-}
-.rich-text-editor p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-  color: var(--admin-text-muted, #7a7a7a);
-}
-.rich-text-editor .tableWrapper {
-  overflow-x: auto;
-}
-.rich-text-editor .selectedCell::after {
-  background: color-mix(in srgb, currentColor 12%, transparent);
-}
-.rich-text-editor table {
-  margin: 1em 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .rich-text-editor * {
-    transition: none !important;
-  }
-}

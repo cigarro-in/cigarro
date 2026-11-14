@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -140,7 +140,7 @@ export default function RichTextEditor({
     content: sanitizeBlogBody(plainTextToHtml(value), { imgPrefix }),
     editorProps: {
       attributes: {
-        class: cn('rich-text rich-text-editor outline-none', full && 'mx-auto max-w-2xl'),
+        class: cn('rich-text admin-rich-text-editor outline-none', full && 'mx-auto max-w-2xl'),
         ...(id ? { id } : {}),
         role: 'textbox',
         'aria-multiline': 'true',
@@ -326,7 +326,10 @@ export default function RichTextEditor({
         </form>
       )}
 
-      <div className="px-4 py-3 sm:px-5" style={minHeight ? { minHeight } : undefined}>
+      <div
+        className="px-4 py-3 sm:px-5 min-h-[var(--editor-min-h)]"
+        style={minHeight ? ({ '--editor-min-h': `${minHeight}px` } as CSSProperties) : undefined}
+      >
         <EditorContent editor={editor} className="text-foreground" />
       </div>
 

@@ -119,6 +119,8 @@ export interface CollectionInfo {
 
 export interface HomepageData {
   sectionsEnabled?: Record<string, boolean>;
+  /** Section keys in display order for the active theme (hero first by default). */
+  sectionOrder: string[];
   heroSlides: HeroSlide[];
   featuredProducts: HomepageProduct[];
   categories: Category[];

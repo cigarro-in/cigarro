@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   CreditCard,
@@ -132,7 +133,9 @@ function NavList({ items, pathname, onNavigate }: { items: NavItem[]; pathname: 
         <span
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[var(--nav-pill-h)] translate-y-[var(--nav-pill-y)] rounded-[8px] bg-[var(--admin-sidebar-active)] transition-[transform,height] duration-200 ease-out motion-reduce:transition-none"
-          style={{ ['--nav-pill-y' as string]: `${pill.top}px`, ['--nav-pill-h' as string]: `${pill.height}px` }}
+          style={
+            { '--nav-pill-y': `${pill.top}px`, '--nav-pill-h': `${pill.height}px` } as CSSProperties
+          }
         />
       )}
       <SidebarMenu className="relative z-10 gap-1">

@@ -1,10 +1,12 @@
-// What each store theme's home page renders, in the order it renders it.
-// Classic: src/pages/home/HomePage.tsx. Vivid: src/themes/vivid/VividHome.tsx.
-// The editor shows only the controls the active theme actually uses.
+// What each store theme's home page renders. Classic: src/pages/home/HomePage.tsx.
+// Vivid: src/themes/vivid/VividHome.tsx. The editor shows only the controls the
+// active theme actually uses. Display order is stored per store, not here.
 
 export type HomepageSectionKey =
   | 'hero_section'
   | 'categories_section'
+  | 'category_showcases'
+  | 'categories_grid'
   | 'featured_products'
   | 'product_showcase'
   | 'brands_section'
@@ -31,8 +33,8 @@ const CLASSIC: HomepageSectionDef[] = [
   },
   {
     key: 'categories_section',
-    label: 'Categories',
-    description: 'A category strip, a showcase for each category, and a category grid.',
+    label: 'Category strip',
+    description: 'A row of category tiles. Its heading also titles the category grid.',
     hasHeading: true,
     collectionLink: false,
   },
@@ -51,11 +53,25 @@ const CLASSIC: HomepageSectionDef[] = [
     collectionLink: false,
   },
   {
+    key: 'category_showcases',
+    label: 'Category showcases',
+    description: 'A product row for each category.',
+    hasHeading: false,
+    collectionLink: false,
+  },
+  {
     key: 'product_showcase',
     label: 'Product showcase',
     description: 'A highlighted block of products from a collection.',
     hasHeading: true,
     collectionLink: true,
+  },
+  {
+    key: 'categories_grid',
+    label: 'Category grid',
+    description: 'A grid of all categories near the bottom of the page.',
+    hasHeading: false,
+    collectionLink: false,
   },
   {
     key: 'blog_section',
@@ -111,6 +127,8 @@ const VIVID: HomepageSectionDef[] = [
   },
 ];
 
+// Defs in the theme's default order. The editor re-sorts them by the store's
+// saved order (resolveSectionOrder in src/lib/homepage/sectionOrder.ts).
 export function homepageSectionsFor(themeId: string): HomepageSectionDef[] {
   return themeId === 'vivid' ? VIVID : CLASSIC;
 }

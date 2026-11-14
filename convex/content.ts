@@ -294,6 +294,7 @@ export const getSiteSettings = query({
       referral: resolveReferralProgram(found),
       seo: found.seo ?? null,
       socials: found.socials ?? null,
+      homepageSectionOrder: found.homepageSectionOrder ?? null,
       updatedAt: found.updatedAt,
     };
   },

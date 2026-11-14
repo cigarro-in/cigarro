@@ -11,6 +11,12 @@ import { useFullCatalog } from './data/useCatalog';
 import { usePreloadedOrLive } from '../lib/ssr/preload';
 import { api } from '../../convex/_generated/api';
 import { useOrgInfo } from '../lib/org/OrgContext';
+import { useTheme } from '../themes/ThemeContext';
+import {
+  DEFAULT_SECTION_ORDER,
+  isHomepageSectionEnabled,
+  resolveSectionOrder,
+} from '../lib/homepage/sectionOrder';
 
 // Wave 3: homepage composes entirely from Convex hooks (catalog + content).
 // No API hop. Shapes match the HomepageData contract; money stays rupees.
@@ -21,6 +27,7 @@ import { useOrgInfo } from '../lib/org/OrgContext';
 // Unlinked sections fall back to the legacy derived lists + sectionConfigs.
 export function useHomepageData() {
   const { slug: orgSlug } = useOrgInfo();
+  const { themeId } = useTheme();
   const {
     products: catalogProducts,
     brands: catalogBrands,
@@ -43,8 +50,11 @@ export function useHomepageData() {
     useSectionConfig('categories_section');
   const { posts: convexPosts, loading: blogLoading } = useBlogPosts(6);
   const homepageComponents = usePreloadedOrLive(api.content.listHomepageComponents, { orgSlug: orgSlug });
+  // Store-wide homepage order (absent = the theme default). Preloaded on SSR with the home route.
+  const siteRow = usePreloadedOrLive(api.content.getSiteSettings, { orgSlug: orgSlug });
 
   const isLoading =
+    siteRow === undefined ||
     catalogLoading ||
     slidesLoading ||
     featuredLoading ||
@@ -125,19 +135,15 @@ export function useHomepageData() {
     : showcaseCfg;
 
   // Admin on/off toggles (absent row = enabled, so existing installs keep rendering).
-  const compEnabled = (name: string) =>
-    (homepageComponents || []).find((c: any) => c.componentName === name)?.isEnabled !== false;
-  const sectionsEnabled: Record<string, boolean> = {
-    hero_section: compEnabled('hero_section'),
-    featured_products: compEnabled('featured_products'),
-    product_showcase: compEnabled('product_showcase'),
-    brands_section: compEnabled('brands_section'),
-    categories_section: compEnabled('categories_section'),
-    blog_section: compEnabled('blog_section'),
-  };
+  const sectionsEnabled: Record<string, boolean> = {};
+  for (const key of new Set([...DEFAULT_SECTION_ORDER.classic, ...DEFAULT_SECTION_ORDER.vivid])) {
+    sectionsEnabled[key] = isHomepageSectionEnabled(homepageComponents, key);
+  }
+  const sectionOrder = resolveSectionOrder(themeId, siteRow?.homepageSectionOrder);
 
   const data: HomepageData = {
     sectionsEnabled,
+    sectionOrder,
     featuredProducts,
     categories: categories.slice(0, 20).map((c: any) => ({
       id: c.supabaseId,

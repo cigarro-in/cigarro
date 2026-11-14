@@ -7,6 +7,7 @@ import { useOrg } from '../../../lib/convex/useOrg';
 import { useTheme } from '../../../themes';
 import { invalidateStorefront } from '../../../lib/cache/invalidateStorefront';
 import { homepageSectionsFor, type HomepageSectionKey } from './sections';
+import { isHomepageSectionEnabled, resolveSectionOrder } from '../../../lib/homepage/sectionOrder';
 
 // Single source for the homepage editor: live reads plus the write handlers.
 // Every write purges the storefront cache once it lands.
@@ -18,23 +19,46 @@ export function useHomepageAdmin() {
   const componentRows = useQuery(api.content.listHomepageComponents, { orgSlug: slug });
   const slideRows = useQuery(api.adminCatalog.listHeroSlidesForAdmin, { orgSlug: slug });
   const collections = useQuery(api.catalog.listCollections, { orgSlug: slug });
+  const siteSettings = useQuery(api.content.getSiteSettings, { orgSlug: slug });
 
   const setComponent = useMutation(api.adminCatalog.saveHomepageComponent);
+  const saveSiteSettings = useMutation(api.adminCatalog.saveSiteSettings);
   const saveSectionConfig = useMutation(api.adminCatalog.saveSectionConfig);
   const saveSlide = useMutation(api.adminCatalog.saveHeroSlide);
   const deleteSlide = useMutation(api.adminCatalog.deleteHeroSlide);
 
+  const order = useMemo(
+    () => resolveSectionOrder(themeId, siteSettings?.homepageSectionOrder),
+    [siteSettings, themeId],
+  );
+
+  // Sections in the order the storefront renders them (store order, theme defaults).
   const sections = useMemo(() => {
-    return homepageSectionsFor(themeId).map((def) => {
+    const defs = homepageSectionsFor(themeId);
+    return order.flatMap((key) => {
+      const def = defs.find((d) => d.key === key);
+      if (!def) return [];
       const row = (componentRows ?? []).find((c) => c.componentName === def.key);
-      return {
-        def,
-        // Absent row = shown (the storefront treats a missing row as enabled).
-        enabled: row?.isEnabled !== false,
-        collectionId: row?.sectionId ?? null,
-      };
+      return [
+        {
+          def,
+          // Absent row = shown (same rule as the storefront).
+          enabled: isHomepageSectionEnabled(componentRows, key),
+          collectionId: row?.sectionId ?? null,
+          // Vivid always draws the hero first, so its position cannot change.
+          movable: !(themeId === 'vivid' && key === 'hero_section'),
+          // Sections with nothing to configure get no Edit button.
+          editable: def.key === 'hero_section' || def.hasHeading || def.collectionLink,
+        },
+      ];
     });
-  }, [componentRows, themeId]);
+  }, [componentRows, themeId, order]);
+
+  // Writes the whole order list for the store. Keys are validated by the mutation.
+  const setSectionOrder = async (keys: HomepageSectionKey[]) => {
+    await saveSiteSettings({ orgSlug: slug, homepageSectionOrder: keys });
+    void invalidateStorefront();
+  };
 
   const setSectionEnabled = async (key: HomepageSectionKey, enabled: boolean) => {
     await setComponent({ orgSlug: slug, componentName: key, patch: { isEnabled: enabled } });
@@ -82,8 +106,10 @@ export function useHomepageAdmin() {
     slug,
     themeId,
     storeId: org?._id,
-    loading: componentRows === undefined || slideRows === undefined || collections === undefined,
+    loading:
+      componentRows === undefined || slideRows === undefined || collections === undefined || siteSettings === undefined,
     sections,
+    setSectionOrder,
     slides: slideRows ?? [],
     collections: collections ?? [],
     saveSlide,

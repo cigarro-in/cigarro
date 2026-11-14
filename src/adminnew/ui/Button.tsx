@@ -105,7 +105,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={classes}
       {...props}
     >
-      <span className="grid items-center justify-items-center" style={{ gap: 'inherit' }}>
+      <span className="grid items-center justify-items-center gap-[inherit]">
         {layer(
           effective === 'idle',
           <>

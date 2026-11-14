@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ArrowDown, ArrowUp, ExternalLink } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -22,9 +22,9 @@ import type { HomepageSectionKey } from './homepage/sections';
 
 const THEME_NAME: Record<string, string> = { classic: 'Classic', vivid: 'Vivid' };
 
-// Homepage editor: sections in the order the active theme renders them.
-// Hero slides open in a sheet; product and category sections open in a sheet
-// for their heading and collection.
+// Homepage editor: sections in the order the storefront renders them. Arrows
+// change the order for the whole store. Hero slides open in a sheet; product
+// and category sections open in a sheet for their heading and collection.
 export function HomepageManager() {
   const navigate = useNavigate();
   const home = useHomepageAdmin();
@@ -39,6 +39,16 @@ export function HomepageManager() {
     } catch (err) {
       setError(toActionError(err, fallback));
     }
+  };
+
+  const move = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    const from = home.sections[index];
+    const to = home.sections[target];
+    if (!from || !to || !from.movable || !to.movable) return;
+    const keys = home.sections.map((s) => s.def.key);
+    [keys[index], keys[target]] = [keys[target], keys[index]];
+    return attempt(() => home.setSectionOrder(keys), 'Could not save the new order.');
   };
 
   const open = home.sections.find((s) => s.def.key === openKey) ?? null;
@@ -69,8 +79,10 @@ export function HomepageManager() {
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {home.sections.map(({ def, enabled }) => {
+                {home.sections.map(({ def, enabled, movable, editable }, index) => {
                   const isHero = def.key === 'hero_section';
+                  const neighbourUp = home.sections[index - 1];
+                  const neighbourDown = home.sections[index + 1];
                   const summary = isHero
                     ? home.slides.length === 0
                       ? 'No slides yet'
@@ -85,6 +97,26 @@ export function HomepageManager() {
                         </div>
                         <p className="mt-0.5 text-sm text-muted-foreground">{summary}</p>
                       </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          aria-label={`Move ${def.label} up`}
+                          disabled={!movable || !neighbourUp?.movable}
+                          onClick={() => void move(index, -1)}
+                        >
+                          <ArrowUp aria-hidden />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          aria-label={`Move ${def.label} down`}
+                          disabled={!movable || !neighbourDown?.movable}
+                          onClick={() => void move(index, 1)}
+                        >
+                          <ArrowDown aria-hidden />
+                        </Button>
+                      </div>
                       <Switch
                         aria-label={`Show ${def.label}`}
                         checked={enabled}
@@ -92,9 +124,11 @@ export function HomepageManager() {
                           void attempt(() => home.setSectionEnabled(def.key, v), 'Could not update this section.')
                         }
                       />
-                      <Button variant="secondary" size="sm" onClick={() => setOpenKey(def.key)}>
-                        {isHero ? 'Manage slides' : 'Edit'}
-                      </Button>
+                      {editable && (
+                        <Button variant="secondary" size="sm" onClick={() => setOpenKey(def.key)}>
+                          {isHero ? 'Manage slides' : 'Edit'}
+                        </Button>
+                      )}
                     </li>
                   );
                 })}
@@ -109,7 +143,8 @@ export function HomepageManager() {
                 This store uses the <strong className="font-semibold">{themeName}</strong> theme.
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Only the settings this theme shows are listed. The order of sections is set by the theme.
+                Only the settings this theme shows are listed. Use the arrows to change the order of sections on the
+                storefront. {home.themeId === 'vivid' ? 'Vivid always shows the hero banners first.' : ''}
               </p>
             </Card>
             <Card title="Live address">

@@ -52,7 +52,7 @@ export function Menu({
   footer?: ReactNode;
   align?: 'start' | 'center' | 'end';
   side?: 'top' | 'right' | 'bottom' | 'left';
-  width?: string;
+  width?: 'w-44' | 'w-56';
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -60,7 +60,7 @@ export function Menu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align={align} side={side} className={cn(width, 'p-1')}>
+      <DropdownMenuContent align={align} side={side} className={width === 'w-44' ? 'w-44 p-1' : 'w-56 p-1'}>
         {header}
         {groups.map((group, gi) => (
           <div key={gi}>

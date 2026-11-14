@@ -130,7 +130,7 @@ export function ImageCropDialog({
           </p>
         )}
 
-        <div className="relative h-[min(50vh,420px)] w-full overflow-hidden rounded-[var(--admin-radius)] bg-neutral-900">
+        <div className="relative h-[min(50vh,420px)] w-full overflow-hidden rounded-[var(--admin-radius)] bg-foreground">
           {url && (
             <Cropper
               image={url}

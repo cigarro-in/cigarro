@@ -1,0 +1,22 @@
+/* Admin-only utility classes. Imported by src/index.css (so the design lint can
+   check the names against the storefront theme file) and by
+   src/adminnew/styles/admin-utilities.css (which generates the CSS). Tailwind emits
+   a utility only where a class is used, so the storefront ships none of these. */
+@utility admin-dialog-height {
+  max-height: calc(100dvh - 2rem);
+}
+
+@utility admin-skeleton {
+  background: linear-gradient(90deg, #ececef 25%, #f5f5f7 37%, #ececef 63%);
+  background-size: 400% 100%;
+  animation: admin-shimmer 1.4s ease infinite;
+}
+
+@utility admin-bulk-bar {
+  animation: admin-bar-in 160ms ease-out;
+}
+
+@utility admin-rich-text-editor {
+  min-height: inherit;
+  position: relative;
+}

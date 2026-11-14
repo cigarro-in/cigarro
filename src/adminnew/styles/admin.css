@@ -16,6 +16,8 @@
    No storefront theme (classic / vivid) tokens apply inside the admin.
    ========================================================================= */
 
+@import "./admin-utilities.css";
+
 html.admin-root {
   /* -------- Surfaces -------- */
   --admin-bg: #f4f4f5;
@@ -203,19 +205,11 @@ html.admin-root :where(a, button, [role="button"], input, select, textarea):focu
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
-html.admin-root .admin-skeleton {
-  background: linear-gradient(90deg, #ececef 25%, #f5f5f7 37%, #ececef 63%);
-  background-size: 400% 100%;
-  animation: admin-shimmer 1.4s ease infinite;
-}
 
 /* Bulk action bar slide-in. */
 @keyframes admin-bar-in {
   from { transform: translate(-50%, 12px); opacity: 0; }
   to { transform: translate(-50%, 0); opacity: 1; }
-}
-html.admin-root .admin-bulk-bar {
-  animation: admin-bar-in 160ms ease-out;
 }
 
 /* Comfortable touch targets on phones. */
@@ -230,5 +224,29 @@ html.admin-root .admin-bulk-bar {
   html.admin-root .admin-skeleton,
   html.admin-root .admin-bulk-bar {
     animation: none;
+  }
+}
+
+/* Rich text editor (admin only). Base .rich-text styles stay in src/index.css. */
+/* Admin editor surface. Same typography as the storefront, plus placeholder and selection. */
+.admin-rich-text-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--admin-text-muted, #7a7a7a);
+}
+.admin-rich-text-editor .tableWrapper {
+  overflow-x: auto;
+}
+.admin-rich-text-editor .selectedCell::after {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.admin-rich-text-editor table {
+  margin: 1em 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-rich-text-editor * {
+    transition: none !important;
   }
 }

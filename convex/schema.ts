@@ -824,6 +824,9 @@ export default defineSchema({
     referral: v.optional(storeReferralV), // Refer & earn program rules
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
+    // Homepage section keys in display order (see src/lib/homepage/sectionOrder.ts).
+    // Absent = the theme's default order.
+    homepageSectionOrder: v.optional(v.array(v.string())),
     updatedAt: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
   })

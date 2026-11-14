@@ -1,0 +1,10 @@
+/* Admin and super-admin utilities. Compiled into the admin bundles only (imported
+   by src/adminnew/styles/admin.css, which AdminRoot loads). Scans only the admin
+   and super-admin folders: every other class the admin uses is already generated
+   by the storefront stylesheet (src/index.css), which the admin host also loads.
+   Tokens come from src/styles/theme.css. */
+@import "tailwindcss" source(none);
+@import "../../styles/theme.css";
+@import "../../styles/admin-utility-classes.css";
+@source "../";
+@source "../../sa";

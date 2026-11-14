@@ -1,10 +1,11 @@
-import { Suspense } from 'react';
+import { Fragment, Suspense, type ReactNode } from 'react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import Hero from './Hero';
 import { CategoriesScroller } from './CategoriesScroller';
 import { useHomepageData } from '../../hooks/useHomepageData';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { DEFAULT_SECTION_ORDER } from '../../lib/homepage/sectionOrder';
 
 // The page's only h1 (logos in the headers are not headings). Visually hidden:
 // the store tagline above the fold is decorative, the SEO title carries the topic.
@@ -49,6 +50,72 @@ export function HomePage() {
       }
     : null;
 
+  // Each block is one section key from the store's homepage order (sectionOrder.ts).
+  // Spacers sit inside their block so they move with it.
+  const blocks: Record<string, ReactNode> = {
+    hero_section: on('hero_section') ? <Hero slides={data?.heroSlides} isLoading={isLoading} /> : null,
+    categories_section: on('categories_section') ? (
+      <>
+        <CategoriesScroller categories={data?.categories} config={data?.categoriesSectionConfig} isLoading={isLoading} />
+        <div className="h-0 md:h-12"></div>
+      </>
+    ) : null,
+    featured_products: on('featured_products') ? (
+      <Suspense fallback={<SectionFallback height="h-[500px]" />}>
+        <FeaturedProducts
+          products={data?.featuredProducts}
+          config={data?.featuredSectionConfig}
+          isLoading={isLoading}
+        />
+      </Suspense>
+    ) : null,
+    brands_section: on('brands_section') ? (
+      <Suspense fallback={<SectionFallback height="h-32" />}>
+        <BrandsScroller brands={data?.brands} config={data?.brandsSectionConfig} isLoading={isLoading} />
+      </Suspense>
+    ) : null,
+    category_showcases: on('category_showcases') ? (
+      <Suspense fallback={<SectionFallback height="h-[800px]" />}>
+        <CategoryShowcases categoriesWithProducts={data?.categoriesWithProducts} isLoading={isLoading} />
+      </Suspense>
+    ) : null,
+    product_showcase: on('product_showcase') ? (
+      <>
+        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+          <ProductShowcase
+            products={data?.showcaseProducts}
+            config={data?.showcaseConfig}
+            collection={data?.showcaseCollection}
+            isLoading={isLoading}
+          />
+        </Suspense>
+        <div className="h-8 md:h-12"></div>
+      </>
+    ) : null,
+    categories_grid: on('categories_grid') ? (
+      <>
+        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
+          <CategoriesGrid
+            categories={data?.categories}
+            config={data?.categoriesSectionConfig}
+            isLoading={isLoading}
+          />
+        </Suspense>
+        <div className="h-8 md:h-12"></div>
+      </>
+    ) : null,
+    blog_section: on('blog_section') ? (
+      <Suspense fallback={<SectionFallback height="h-[400px]" />}>
+        <BlogSection
+          posts={data?.blogPosts}
+          config={data?.blogSectionConfig}
+          isLoading={isLoading}
+        />
+      </Suspense>
+    ) : null,
+  };
+  const order = data?.sectionOrder ?? DEFAULT_SECTION_ORDER.classic;
+
   return (
     <>
       <SEOHead
@@ -61,72 +128,9 @@ export function HomePage() {
         extraJsonLd={latestItemList ? [latestItemList] : undefined}
       />
       <h1 className="sr-only">{homeTitle}</h1>
-      {on('hero_section') && <Hero slides={data?.heroSlides} isLoading={isLoading} />}
-
-      {/* Same sections on mobile + desktop (each section is responsive) */}
-      {on('categories_section') && (
-        <CategoriesScroller categories={data?.categories} config={data?.categoriesSectionConfig} isLoading={isLoading} />
-      )}
-
-      <div className="h-0 md:h-12"></div>
-
-      {on('featured_products') && (
-        <Suspense fallback={<SectionFallback height="h-[500px]" />}>
-          <FeaturedProducts
-            products={data?.featuredProducts}
-            config={data?.featuredSectionConfig}
-            isLoading={isLoading}
-          />
-        </Suspense>
-      )}
-
-      {on('brands_section') && (
-        <Suspense fallback={<SectionFallback height="h-32" />}>
-          <BrandsScroller brands={data?.brands} config={data?.brandsSectionConfig} isLoading={isLoading} />
-        </Suspense>
-      )}
-
-      {on('categories_section') && (
-        <Suspense fallback={<SectionFallback height="h-[800px]" />}>
-          <CategoryShowcases
-            categoriesWithProducts={data?.categoriesWithProducts}
-            isLoading={isLoading}
-          />
-        </Suspense>
-      )}
-
-      {on('product_showcase') && (
-        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-          <ProductShowcase
-            products={data?.showcaseProducts}
-            config={data?.showcaseConfig}
-            collection={data?.showcaseCollection}
-            isLoading={isLoading}
-          />
-        </Suspense>
-      )}
-      <div className="h-8 md:h-12"></div>
-
-      {on('categories_section') && (
-        <Suspense fallback={<SectionFallback height="h-[600px]" />}>
-          <CategoriesGrid
-            categories={data?.categories}
-            config={data?.categoriesSectionConfig}
-            isLoading={isLoading}
-          />
-        </Suspense>
-      )}
-
-      <div className="h-8 md:h-12"></div>
-      {on('blog_section') && (
-        <Suspense fallback={<SectionFallback height="h-[400px]" />}>
-          <BlogSection
-            posts={data?.blogPosts}
-            config={data?.blogSectionConfig}
-            isLoading={isLoading}
-          />
-        </Suspense>
-      )}
+      {order.map((key) => (
+        <Fragment key={key}>{blocks[key] ?? null}</Fragment>
+      ))}
     </>
   );
 }

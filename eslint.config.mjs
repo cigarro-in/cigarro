@@ -29,4 +29,14 @@ export default [
       "shadcn/require-static-classes": "error",
     },
   },
+  {
+    // Admin and super-admin styling is built on the --admin-* tokens in
+    // src/adminnew/styles/admin.css, applied as Tailwind arbitrary values
+    // (e.g. bg-[var(--admin-surface)]). Those are intentional here, so the
+    // arbitrary-values rule is off for both admin hosts. Other rules still apply.
+    files: ["src/adminnew/**/*.tsx", "src/sa/**/*.tsx"],
+    rules: {
+      "shadcn/no-arbitrary-values": "off",
+    },
+  },
 ];

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type CSSProperties } from 'react';
 import type { RichTextEditorProps } from './RichTextEditor';
 
 // TipTap is its own chunk, loaded when a form that uses the editor renders.
@@ -11,8 +11,12 @@ export function LazyRichTextEditor(props: RichTextEditorProps) {
         <div
           aria-busy="true"
           aria-label="Loading editor"
-          className="rounded-md border border-input bg-background"
-          style={{ minHeight: props.minHeight ?? (props.variant === 'full' ? 420 : 160) }}
+          className="rounded-md border border-input bg-background min-h-[var(--editor-min-h)]"
+          style={
+            {
+              '--editor-min-h': `${props.minHeight ?? (props.variant === 'full' ? 420 : 160)}px`,
+            } as CSSProperties
+          }
         />
       }
     >

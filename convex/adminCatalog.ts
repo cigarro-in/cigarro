@@ -1749,10 +1749,20 @@ export const saveSiteSettings = mutation({
     referral: v.optional(storeReferralV),
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
+    homepageSectionOrder: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const { org, orgId, identity } = await requireOrgAdminBySlug(ctx, args.orgSlug);
     const { orgSlug: _drop, ...rest } = args;
+    if (rest.homepageSectionOrder) {
+      const keys = rest.homepageSectionOrder;
+      if (
+        keys.length > 20 ||
+        new Set(keys).size !== keys.length ||
+        keys.some((k) => !/^[a-z_]{1,40}$/.test(k))
+      )
+        throw new ConvexError({ code: "INVALID_SECTION_ORDER" });
+    }
     if (rest.brand?.brandColor && !/^#[0-9a-fA-F]{6}$/.test(rest.brand.brandColor))
       throw new ConvexError({ code: "INVALID_BRAND_COLOR" });
     if (rest.ageGate) {

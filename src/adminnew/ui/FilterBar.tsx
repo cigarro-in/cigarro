@@ -51,7 +51,6 @@ function SearchField({
     if (!debounceMs || local === value) return;
     const t = setTimeout(() => onChange(local), debounceMs);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local, debounceMs]);
 
   const update = (next: string) => {
