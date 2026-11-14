@@ -35,6 +35,7 @@ export function VividCartButton({
     <button
       type="button"
       onClick={onClick}
+      data-cart-target
       className="vv-icon-btn"
       aria-label={label}
       aria-haspopup={controls ? 'dialog' : undefined}

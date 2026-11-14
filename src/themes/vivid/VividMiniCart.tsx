@@ -5,6 +5,7 @@ import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { VividCartButton } from './VividHeaderParts';
 import { useVividCartActions } from './useVividCartActions';
+import { useLandedCartCount } from './cartFlight';
 
 const PANEL_ID = 'vv-mini-cart';
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
@@ -19,6 +20,8 @@ export function VividMiniCart() {
   const close = useCallback(() => setOpen(false), []);
   const { items, totalItems, totalPrice, getCartItemPrice, user, opError, proceed, changeQty, remove } =
     useVividCartActions(close);
+  // The badge counts up when a product drop lands, not when the click happens.
+  const badgeCount = useLandedCartCount(totalItems);
 
   useEffect(() => {
     if (!open) return;
@@ -41,7 +44,7 @@ export function VividMiniCart() {
   return (
     <div ref={wrapRef} className="relative">
       <VividCartButton
-        count={totalItems}
+        count={badgeCount}
         onClick={() => setOpen((o) => !o)}
         expanded={open}
         controls={PANEL_ID}

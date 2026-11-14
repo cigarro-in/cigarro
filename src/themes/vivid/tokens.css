@@ -347,6 +347,9 @@
   0% { transform: scale(0.5); }
   100% { transform: scale(1); }
 }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="vivid"] .vv-bump { animation: none; }
+}
 
 /* Inline error under a control (no popups) */
 [data-theme="vivid"] .vv-inline-error {

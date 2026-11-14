@@ -6,6 +6,7 @@ import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { Product as CartProduct } from '../../hooks/useCart';
 import { Product as DBProduct, ProductVariant } from '../../types/product';
+import { spawnFlyingImage } from '../../lib/cart/flyingImage';
 
 // Extended product type that includes variants
 type ProductWithVariants = CartProduct & {
@@ -100,27 +101,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       const darkOutline = resolveDarkColor();
 
       // Create circle with product image fill
-      const circle = document.createElement('div');
-      // Get image from default variant or fall back to first variant
       const primaryVariant = product.product_variants?.find((v: any) => v.is_default) || product.product_variants?.[0];
       const variantImages = primaryVariant?.images;
       const imgUrl = !imageError ? getProductImageUrl(variantImages?.[0]) : getProductImageUrl();
-      circle.style.position = 'fixed';
-      circle.style.left = `${startLeft}px`;
-      circle.style.top = `${startTop}px`;
-      circle.style.width = `${width}px`;
-      circle.style.height = `${height}px`;
-      circle.style.borderRadius = '9999px';
-      circle.style.backgroundColor = darkOutline;
-      circle.style.backgroundImage = `url(${imgUrl})`;
-      circle.style.backgroundSize = 'cover';
-      circle.style.backgroundPosition = 'center';
-      circle.style.outline = `2px solid ${darkOutline}`;
-      circle.style.boxShadow = '0 6px 20px rgba(0,0,0,0.18)';
-      circle.style.zIndex = '2147483647';
-      circle.style.transform = 'translate3d(0,0,0)';
-      circle.style.pointerEvents = 'none'; // Allow clicks to pass through
-      document.body.appendChild(circle);
+      const circle = spawnFlyingImage({
+        imageUrl: imgUrl,
+        left: startLeft,
+        top: startTop,
+        width,
+        height,
+        style: {
+          borderRadius: '9999px',
+          backgroundColor: darkOutline,
+          outline: `2px solid ${darkOutline}`,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+        },
+      });
 
       const drop = circle.animate(
         [

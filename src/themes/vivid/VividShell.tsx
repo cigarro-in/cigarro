@@ -8,6 +8,7 @@ import { VividDesktopHeader } from './VividDesktopHeader';
 import { VividSearchBar } from './VividSearchBar';
 import { VividNavDrawer } from './VividNavDrawer';
 import { VividCartDrawer } from './VividCartDrawer';
+import { useLandedCartCount } from './cartFlight';
 
 interface Props {
   children: ReactNode;
@@ -35,6 +36,8 @@ export function vividBrandStyle(brandColor: string | undefined): Record<string, 
 
 export function VividShell({ children, storeName, logoUrl, legalName, brandColor }: Props) {
   const { totalItems } = useCart();
+  // Bottom-bar badge: counts up when a product drop lands (see cartFlight.ts).
+  const cartCount = useLandedCartCount(totalItems);
   const { user } = useAuth();
   const location = useLocation();
   const { requestAuth } = useAuthDialog();
@@ -126,8 +129,8 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
           <div className="grid grid-cols-5 h-16">
             <BottomLink to="/" icon={<Home className="w-5 h-5" />} label="Home" active={location.pathname === '/'} />
             <BottomLink to="/categories" icon={<Grid3X3 className="w-5 h-5" />} label="Categories" active={location.pathname.startsWith('/categor')} />
+            <BottomCart count={cartCount} onClick={openCart} expanded={cartOpen} />
             <BottomButton onClick={toggleSearch} icon={<Search className="w-5 h-5" />} label="Search" active={searchOpen} expanded={searchOpen} controls="vv-search-bar" />
-            <BottomButton onClick={openCart} icon={<ShoppingCart className="w-5 h-5" />} label="Cart" badge={totalItems} expanded={cartOpen} controls="vv-cart-sheet" />
             {user ? (
               <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Account" active={location.pathname.startsWith('/profile')} />
             ) : (
@@ -139,6 +142,41 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
 
       {/* Auth dialog is hosted once in AppContent via the shared controller. */}
     </div>
+  );
+}
+
+/**
+ * Cart tab, centred in the bottom bar. A raised primary disc with the count, so
+ * it reads as the main action. data-cart-target is where product drops land.
+ */
+function BottomCart({ count, onClick, expanded }: { count: number; onClick: () => void; expanded: boolean }) {
+  const label = count > 0 ? `Open cart, ${count} item${count === 1 ? '' : 's'}` : 'Open cart';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={expanded}
+      aria-controls="vv-cart-sheet"
+      className="min-h-[44px] flex flex-col items-center justify-end gap-0.5 text-[10px] font-semibold text-[var(--color-foreground)]"
+    >
+      <span
+        data-cart-target
+        className="relative -mt-5 w-14 h-14 rounded-full bg-[var(--color-primary)] text-white grid place-items-center shadow-[var(--vv-shadow-md)] ring-4 ring-[var(--color-surface)]"
+      >
+        <ShoppingCart className="w-6 h-6" strokeWidth={1.75} />
+        {count > 0 && (
+          <span
+            key={count}
+            className="vv-bump absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-white text-[var(--color-primary)] text-[10px] font-bold leading-5 text-center ring-2 ring-[var(--color-surface)]"
+            aria-hidden="true"
+          >
+            {count > 99 ? '99+' : count}
+          </span>
+        )}
+      </span>
+      Cart
+    </button>
   );
 }
 

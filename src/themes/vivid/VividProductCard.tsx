@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Check, Loader2, Plus } from 'lucide-react';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackSelectItem } from '../../lib/analytics/ga';
 import { useCart } from '../../hooks/useCart';
 import type { HomepageProduct } from '../../types/home';
-import { useActionFeedback } from './useActionFeedback';
+import { VividAddToCart } from './VividAddToCart';
 
 interface Props {
   product: HomepageProduct;
@@ -15,7 +14,6 @@ const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 export function VividProductCard({ product, listName = 'products' }: Props) {
   const { addToCart } = useCart();
-  const add = useActionFeedback();
 
   const defaultVariant =
     product.product_variants?.find((v) => v.is_default) ||
@@ -28,17 +26,6 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
     comparePrice && comparePrice > price
       ? Math.round(((comparePrice - price) / comparePrice) * 100)
       : 0;
-
-  const handleAdd = (e: React.MouseEvent) => {
-    // The whole card is a link: the add button must not navigate.
-    e.preventDefault();
-    e.stopPropagation();
-    if (add.busy) return;
-    void add.run(() => addToCart(product as any, 1, defaultVariant?.id), 'Could not add');
-  };
-
-  const label =
-    add.state === 'pending' ? 'Adding' : add.state === 'done' ? 'Added' : add.state === 'error' ? 'Retry' : 'Add';
 
   return (
     <Link
@@ -77,26 +64,12 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-1 flex-shrink-0 max-w-[104px]">
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={add.busy}
-          aria-live="polite"
-          data-state={add.state}
-          className={`vv-btn-add ${add.state === 'done' ? 'vv-btn-add--done' : ''} ${add.state === 'error' ? 'vv-btn-add--error' : ''}`}
-        >
-          {add.state === 'pending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {add.state === 'done' && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
-          {(add.state === 'idle' || add.state === 'error') && <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />}
-          {label}
-        </button>
-        {add.error && (
-          <span role="alert" className="text-[11px] leading-tight text-[var(--vv-danger)] text-right">
-            {add.error}
-          </span>
-        )}
-      </div>
+      <VividAddToCart
+        productId={product.id}
+        variantId={defaultVariant?.id}
+        imageUrl={getProductImageUrl(image)}
+        onAdd={() => addToCart(product as any, 1, defaultVariant?.id)}
+      />
     </Link>
   );
 }
