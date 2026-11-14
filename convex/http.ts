@@ -6,6 +6,7 @@ import { encryptSecret } from "./lib/crypto";
 import { gmailRedirectUri } from "./gmail";
 import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
 import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
+import { SMS_PATH_PREFIX, SMS_TOKEN_RE, sha256Hex } from "./smsRelay";
 
 const http = httpRouter();
 
@@ -178,6 +179,65 @@ http.route({
     });
 
     return jsonResponse({ ok: true, ...result });
+  }),
+});
+
+// ---------- Bank SMS relay (Android app or iPhone Shortcut) ----------
+//
+// POST /receiveBankSms/<token> with JSON {"sender": "...", "body": "...",
+// "receivedAt": <epoch ms or ISO string, optional>}. The token is the store's
+// secret (convex/smsRelay.ts). Only its SHA-256 is compared, via an index lookup.
+http.route({
+  pathPrefix: SMS_PATH_PREFIX,
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.slice(SMS_PATH_PREFIX.length).replace(/\/$/, "");
+    if (!SMS_TOKEN_RE.test(token)) {
+      return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    }
+
+    const raw = await req.text();
+    if (raw.length > 8000) return jsonResponse({ ok: false, error: "too large" }, 413);
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return jsonResponse({ ok: false, error: "bad json" }, 400);
+    }
+
+    const sender = typeof body?.sender === "string" ? body.sender.trim().toUpperCase() : "";
+    const text = typeof body?.body === "string" ? body.body.trim() : "";
+    if (!sender || sender.length > 40 || !text || text.length > 2000) {
+      return jsonResponse({ ok: false, error: "missing sender or body" }, 400);
+    }
+
+    // Phone-reported time is used for dedupe; anything implausible falls back to now.
+    const now = Date.now();
+    const rawTime = typeof body.receivedAt === "string" && /^\d+$/.test(body.receivedAt)
+      ? Number(body.receivedAt)
+      : typeof body.receivedAt === "string" ? Date.parse(body.receivedAt) : body.receivedAt;
+    const receivedAt =
+      typeof rawTime === "number" &&
+      Number.isFinite(rawTime) &&
+      rawTime >= now - 24 * 60 * 60 * 1000 &&
+      rawTime <= now + 5 * 60 * 1000
+        ? rawTime
+        : now;
+
+    const res = await ctx.runMutation(internal.smsRelay.ingest, {
+      tokenHash: await sha256Hex(token),
+      sender,
+      body: text,
+      receivedAt,
+    });
+    if (res.status === 401) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    if (res.status === 429) {
+      return new Response(JSON.stringify({ ok: false, error: "rate limited" }), {
+        status: 429,
+        headers: { "content-type": "application/json", "retry-after": "60" },
+      });
+    }
+    return jsonResponse({ ok: true, ...res.result });
   }),
 });
 

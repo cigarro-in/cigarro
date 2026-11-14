@@ -132,126 +132,166 @@ export const ingestBankEmail = internalMutation({
     }
     if (!orgId) return { orgNotFound: true };
 
-    // 3) Assemble the body text for parsing
-    const body =
-      args.textBody ||
-      args.htmlBody ||
-      args.rawBody ||
-      "";
-
-    // 3a) Store sender allowlist: a non-empty list ignores every other sender.
-    //     Stored as ignored (not dropped) so the message-id dedupe still holds.
+    // 3) Store sender allowlist: a non-empty list ignores every other sender.
     const storeOrg = await ctx.db.get(orgId);
-    if (!isBankSenderAllowed(args.from, storeOrg?.allowedBankSenders)) {
-      const ignoredId = await ctx.db.insert("bankEmails", {
-        orgId,
-        gmailMessageId: args.messageId,
-        receivedAt: Date.now(),
-        amountPaise: 0,
-        senderEmail: args.from,
-        toAlias: toLower || undefined,
-        subject: args.subject,
-        rawBody: body,
-        status: "ignored",
-        adminNote: "sender not in store allowlist",
-      });
-      return { ignored: true, reason: "sender_not_allowed", emailId: ignoredId };
-    }
-
-    // 4) Pick templates and attempt extraction
-    const orgTemplates = await ctx.db
-      .query("bankEmailTemplates")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-    const systemTemplates = await ctx.db
-      .query("bankEmailTemplates")
-      .withIndex("by_org", (q) => q.eq("orgId", undefined))
-      .collect();
-    const templates = [...orgTemplates, ...systemTemplates];
-
-    const parsed =
-      templates.length > 0
-        ? parseWithTemplates(
-            { from: args.from, subject: args.subject, body },
-            templates.map((t) => ({
-              _id: t._id,
-              bankKey: t.bankKey,
-              label: t.label,
-              senderRegex: t.senderRegex,
-              subjectRegex: t.subjectRegex,
-              amountRegex: t.amountRegex,
-              refRegex: t.refRegex,
-              payerVpaRegex: t.payerVpaRegex,
-              payerNameRegex: t.payerNameRegex,
-              creditOnly: t.creditOnly,
-              debitGuardRegex: t.debitGuardRegex,
-              priority: t.priority,
-              active: t.active,
-            })),
-          )
-        : parseBankEmail(body);
-
-    // 5) Persist the raw email for audit/reconciliation regardless of outcome
-    const emailId = await ctx.db.insert("bankEmails", {
+    return await processBankMessage(ctx, {
       orgId,
-      gmailMessageId: args.messageId,
-      receivedAt: Date.now(),
-      amountPaise: parsed?.amountPaise ?? 0,
-      senderEmail: args.from,
-      toAlias: toLower || undefined,
-      bankKey: parsed?.bankKey,
-      templateId: (parsed?.templateId as Id<"bankEmailTemplates"> | undefined) ?? undefined,
-      upiRef: parsed?.upiRef,
-      payerVpa: parsed?.payerVpa,
-      payerName: parsed?.payerName,
+      messageId: args.messageId,
+      channel: "email",
+      from: args.from,
       subject: args.subject,
-      rawBody: body,
-      status: parsed ? "unmatched" : "parse_failed",
+      body: args.textBody || args.htmlBody || args.rawBody || "",
+      toAlias: toLower || undefined,
+      senderAllowed: isBankSenderAllowed(args.from, storeOrg?.allowedBankSenders),
+      ignoredNote: "sender not in store allowlist",
     });
-
-    if (!parsed) {
-      // Re-check: this row may be a re-ingest of an email that already
-      // errored. But a row with amountPaise > 0 / upiRef / amount-like text
-      // is a TEMPLATE gap, not junk — keep it visible as unmatched so the
-      // admin tab + seed-sync can act on it instead of silently ignoring.
-      const looksPayable =
-        /rs\.?\s*[0-9]|inr\s*[0-9]|₹\s*[0-9]|credited|upi\s+ref/i.test(body);
-      if (looksPayable) {
-        await ctx.db.patch(emailId, { status: "unmatched" });
-        return await matchEmailToOrder(ctx, emailId, orgId, {
-          amountPaise: 0,
-          upiRef: undefined,
-          payerVpa: undefined,
-          payerName: undefined,
-        });
-      }
-      // No amount could be extracted at all (e.g. marketing mail). Mark
-      // separately so the admin Unmatched tab isn't flooded with statements
-      // and promos — those were never payable candidates.
-      await ctx.db.patch(emailId, { status: "ignored" });
-      return { parsed: false, emailId };
-    }
-
-    // 6) Duplicate-by-UPI-ref check — same reference already processed
-    if (parsed.upiRef) {
-      const prior = await ctx.db
-        .query("bankEmails")
-        .withIndex("by_upi_ref", (q) => q.eq("upiRef", parsed.upiRef!))
-        .filter((q) => q.neq(q.field("_id"), emailId))
-        .first();
-      if (prior) {
-        await ctx.db.patch(emailId, {
-          status: "duplicate",
-          duplicateOfEmailId: prior._id,
-        });
-        return { duplicate: true, emailId, priorEmailId: prior._id };
-      }
-    }
-
-    // 7) Try to match the credit to an order
-    return await matchEmailToOrder(ctx, emailId, orgId, parsed);
   },
 });
+
+// ---------- Shared credit processing (email + SMS relay) ----------
+
+export interface BankMessageInput {
+  orgId: Id<"organizations">;
+  messageId: string;
+  channel: "email" | "sms";
+  from: string;
+  subject?: string;
+  body: string;
+  toAlias?: string;
+  /** Caller decided whether the sender is allowed for this channel. */
+  senderAllowed: boolean;
+  ignoredNote: string;
+}
+
+// SMS fallback parser guard: a bare "Rs 500" fallback must never turn a debit
+// alert into a payment. Only credit wording passes, debit wording vetoes.
+const SMS_CREDIT_RE = /\b(credited|received|credit)\b/i;
+const SMS_DEBIT_RE = /\b(debited|debit|sent|paid to|withdrawn|spent)\b/i;
+
+/**
+ * Parse, dedupe, persist and match one incoming bank message. Used by the
+ * Gmail/email path (ingestBankEmail) and the SMS relay (smsRelay.ingest).
+ * Every message is stored in bankEmails (status shows what happened).
+ */
+export async function processBankMessage(ctx: MutationCtx, input: BankMessageInput) {
+  const { orgId, messageId, from, subject, body, toAlias, channel } = input;
+
+  // Not allowed: stored as ignored (not dropped) so the message-id dedupe still holds.
+  if (!input.senderAllowed) {
+    const ignoredId = await ctx.db.insert("bankEmails", {
+      orgId,
+      gmailMessageId: messageId,
+      receivedAt: Date.now(),
+      amountPaise: 0,
+      senderEmail: from,
+      toAlias,
+      subject,
+      rawBody: body,
+      status: "ignored",
+      adminNote: input.ignoredNote,
+      channel,
+    });
+    return { ignored: true, reason: "sender_not_allowed", emailId: ignoredId };
+  }
+
+  // Pick templates and attempt extraction
+  const orgTemplates = await ctx.db
+    .query("bankEmailTemplates")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+  const systemTemplates = await ctx.db
+    .query("bankEmailTemplates")
+    .withIndex("by_org", (q) => q.eq("orgId", undefined))
+    .collect();
+  const templates = [...orgTemplates, ...systemTemplates];
+
+  let parsed: ParsedForMatch & { bankKey?: string; templateId?: string } | null = null;
+  if (templates.length > 0) {
+    parsed = parseWithTemplates(
+      { from, subject, body },
+      templates.map((t) => ({
+        _id: t._id,
+        bankKey: t.bankKey,
+        label: t.label,
+        senderRegex: t.senderRegex,
+        subjectRegex: t.subjectRegex,
+        amountRegex: t.amountRegex,
+        refRegex: t.refRegex,
+        payerVpaRegex: t.payerVpaRegex,
+        payerNameRegex: t.payerNameRegex,
+        creditOnly: t.creditOnly,
+        debitGuardRegex: t.debitGuardRegex,
+        priority: t.priority,
+        active: t.active,
+      })),
+    );
+  } else if (channel === "email") {
+    parsed = parseBankEmail(body);
+  }
+  // SMS with no template hit: the generic amount parser, but only for text
+  // that reads as a credit and not as a debit.
+  if (!parsed && channel === "sms" && SMS_CREDIT_RE.test(body) && !SMS_DEBIT_RE.test(body)) {
+    parsed = parseBankEmail(body);
+  }
+
+  // Persist the raw message for audit/reconciliation regardless of outcome
+  const emailId = await ctx.db.insert("bankEmails", {
+    orgId,
+    gmailMessageId: messageId,
+    receivedAt: Date.now(),
+    amountPaise: parsed?.amountPaise ?? 0,
+    senderEmail: from,
+    toAlias,
+    bankKey: parsed?.bankKey,
+    templateId: (parsed?.templateId as Id<"bankEmailTemplates"> | undefined) ?? undefined,
+    upiRef: parsed?.upiRef,
+    payerVpa: parsed?.payerVpa,
+    payerName: parsed?.payerName,
+    subject,
+    rawBody: body,
+    status: parsed ? "unmatched" : "parse_failed",
+    channel,
+  });
+
+  if (!parsed) {
+    // A row with amount-like text is a TEMPLATE gap, not junk: keep it visible
+    // as unmatched so the admin tab + seed-sync can act on it.
+    const looksPayable =
+      /rs\.?\s*[0-9]|inr\s*[0-9]|₹\s*[0-9]|credited|upi\s+ref/i.test(body);
+    if (looksPayable) {
+      await ctx.db.patch(emailId, { status: "unmatched" });
+      return await matchEmailToOrder(ctx, emailId, orgId, {
+        amountPaise: 0,
+        upiRef: undefined,
+        payerVpa: undefined,
+        payerName: undefined,
+      });
+    }
+    // No amount could be extracted at all (e.g. marketing mail). Mark
+    // separately so the admin Unmatched tab isn't flooded with promos.
+    await ctx.db.patch(emailId, { status: "ignored" });
+    return { parsed: false, emailId };
+  }
+
+  // Duplicate-by-UPI-ref check: same reference already processed
+  if (parsed.upiRef) {
+    const prior = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_upi_ref", (q) => q.eq("upiRef", parsed.upiRef!))
+      .filter((q) => q.neq(q.field("_id"), emailId))
+      .first();
+    if (prior) {
+      await ctx.db.patch(emailId, {
+        status: "duplicate",
+        duplicateOfEmailId: prior._id,
+      });
+      return { duplicate: true, emailId, priorEmailId: prior._id };
+    }
+  }
+
+  // Try to match the credit to an order
+  return await matchEmailToOrder(ctx, emailId, orgId, parsed);
+}
 
 // ---------- Matching logic ----------
 

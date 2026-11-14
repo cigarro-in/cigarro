@@ -180,6 +180,9 @@ export default defineSchema({
     // Bank/UPI alert senders whose emails count as payment confirmations.
     // Empty or absent = no filter. See convex/lib/bankSenders.ts.
     allowedBankSenders: v.optional(v.array(v.string())),
+    // Bank SMS sender IDs (e.g. "HDFCBK" or "VM-HDFCBK") for the SMS relay.
+    // Empty or absent = SMS relay accepts nothing. See convex/lib/smsSenders.ts.
+    allowedSmsSenders: v.optional(v.array(v.string())),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
@@ -354,12 +357,32 @@ export default defineSchema({
     matchedOrderId: v.optional(v.id("orders")),
     duplicateOfEmailId: v.optional(v.id("bankEmails")),
     adminNote: v.optional(v.string()),
+    // Where the message came from. Absent = email (rows written before the SMS relay).
+    channel: v.optional(v.union(v.literal("email"), v.literal("sms"))),
   })
     .index("by_message_id", ["gmailMessageId"])
     .index("by_org_amount_status", ["orgId", "amountPaise", "status"])
     .index("by_org_status", ["orgId", "status", "receivedAt"])
     .index("by_matched_order", ["matchedOrderId"])
     .index("by_upi_ref", ["upiRef"]),
+
+  // Android/iPhone SMS relay: one row per store. Only the SHA-256 of the
+  // webhook token is stored; the full URL is shown once at generation.
+  smsRelays: defineTable({
+    orgId: v.id("organizations"),
+    tokenHash: v.string(),
+    tokenLast4: v.string(),
+    active: v.boolean(),
+    createdAt: v.number(),
+    rotatedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    lastSmsAt: v.optional(v.number()),
+    // Fixed-window rate limit per token (requests per minute).
+    rateWindowStart: v.optional(v.number()),
+    rateCount: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_token_hash", ["tokenHash"]),
 
   // Multiple UPI VPAs per org for rotation / failover.
   paymentVpas: defineTable({

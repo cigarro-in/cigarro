@@ -2,10 +2,11 @@ import { useOrg } from '../../../lib/convex/useOrg';
 import { AdvancedCard } from './AdvancedCard';
 import { BankSendersCard } from './BankSendersCard';
 import { GoogleCard } from './GoogleCard';
+import { SmsRelayCard } from './SmsRelayCard';
 import { StoreOptionsCard } from './StoreOptionsCard';
 import { UpiIdsCard } from './UpiIdsCard';
 
-/** Payments settings: UPI IDs, Google, bank senders, options, advanced. */
+/** Payments settings: UPI IDs, Google, bank senders, SMS relay, options, advanced. */
 export function SettingsTab() {
   const org = useOrg();
   const orgId = org?._id;
@@ -14,6 +15,7 @@ export function SettingsTab() {
       <UpiIdsCard orgId={orgId} />
       <GoogleCard orgId={orgId} />
       <BankSendersCard orgId={orgId} />
+      <SmsRelayCard orgId={orgId} />
       <StoreOptionsCard orgId={orgId} />
       <AdvancedCard orgId={orgId} />
     </div>
