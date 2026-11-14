@@ -8,6 +8,8 @@ export {
   Button,
   useButtonFeedback,
   toActionError,
+  isStaleClientError,
+  STALE_CLIENT_MESSAGE,
   type ButtonProps,
   type ButtonVariant,
   type ButtonSize,

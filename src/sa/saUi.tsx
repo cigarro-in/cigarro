@@ -1,7 +1,7 @@
 // Shared super-admin UI helpers. Built on the admin primitives (src/adminnew/ui)
 // so /sa and the store admin look identical. Imports only; never edits them.
 import type { ReactNode } from 'react';
-import { Badge, type BadgeTone } from '../adminnew/ui';
+import { Badge, isStaleClientError, STALE_CLIENT_MESSAGE, type BadgeTone } from '../adminnew/ui';
 import { saErrorMessage } from './session';
 import type { DomainStatus, Role } from './refs';
 
@@ -9,6 +9,10 @@ import type { DomainStatus, Role } from './refs';
 // server code, so Button feedback (useButtonFeedback) shows both.
 export function saError(err: unknown): Error {
   const code = (err as { data?: { code?: string } })?.data?.code;
+  if (isStaleClientError(err)) {
+    console.error('[stale client] Convex call failed; the deployed function may have changed.', err);
+    return Object.assign(new Error(STALE_CLIENT_MESSAGE), { code });
+  }
   return Object.assign(new Error(saErrorMessage(err)), { code });
 }
 

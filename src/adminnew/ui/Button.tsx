@@ -139,8 +139,27 @@ export interface ActionError {
   code?: string;
 }
 
+export const STALE_CLIENT_MESSAGE = 'Something changed on our side. Refresh the page and try again.';
+
+// A Convex call fails with no ConvexError code when the deployed function's args
+// or name changed under an open page (ArgumentValidationError, "Server Error",
+// "Could not find public function"). The raw text carries a Request ID, which
+// users cannot act on.
+const STALE_CLIENT_PATTERN = /ArgumentValidationError|Could not find public function|Server Error|Called by client|\[Request ID:/i;
+
+export function isStaleClientError(err: unknown): boolean {
+  const anyErr = err as { data?: unknown; message?: unknown } | null;
+  if (!anyErr || typeof anyErr !== 'object') return false;
+  if (anyErr.data && typeof anyErr.data === 'object' && (anyErr.data as { code?: unknown }).code) return false;
+  return typeof anyErr.message === 'string' && STALE_CLIENT_PATTERN.test(anyErr.message);
+}
+
 /** Turns any thrown value (Convex, fetch, Error) into { message, code }. */
 export function toActionError(err: unknown, fallback = 'Something went wrong. Try again.'): ActionError {
+  if (isStaleClientError(err)) {
+    console.error('[stale client] Convex call failed; the deployed function may have changed.', err);
+    return { message: STALE_CLIENT_MESSAGE };
+  }
   const anyErr = err as { data?: { code?: string; message?: string } | string; message?: string; code?: string } | null;
   const data = anyErr && typeof anyErr.data === 'object' ? anyErr.data : undefined;
   const code = data?.code ?? anyErr?.code;

@@ -3,8 +3,9 @@
 //   tablets. The phone image is used below 768px. From 1024px the image sits in
 //   half of the slide, so it is cropped at the sides; keep the subject centred.
 // - Vivid banner (src/themes/vivid/tokens.css, .vv-banner): aspect-ratio 16/7 at
-//   every width. VividHeroBanners shows the phone image at every width too, so it
-//   replaces the banner image wherever it is set.
+//   every width. VividHeroBanners shows the banner image from 768px up and the
+//   phone image below that (src/themes/vivid/VividHeroBanners.tsx). Both sit in
+//   the same 16:7 box, so both use 16:7 sizes.
 // - Classic showcase (src/pages/home/ProductShowcase.tsx): the left column is 2/5
 //   of the 1280px container and at least 500px tall, roughly 5:6.
 
@@ -19,6 +20,8 @@ const HERO_BANNER: Record<'classic' | 'vivid', ImageSpec> = {
 };
 
 export const HERO_PHONE_SPEC: ImageSpec = { width: 800, height: 450 };
+// Vivid phone banner: same 16:7 box as the desktop banner, at half size.
+export const HERO_PHONE_VIVID_SPEC: ImageSpec = { width: 800, height: 350 };
 export const SHOWCASE_IMAGE_SPEC: ImageSpec = { width: 1000, height: 1200 };
 // Classic hero product card: aspect-square inside the card (Hero.tsx).
 export const HERO_PRODUCT_SPEC: ImageSpec = { width: 600, height: 600 };
@@ -27,6 +30,9 @@ export function heroBannerSpec(themeId: string): ImageSpec {
   return themeId === 'vivid' ? HERO_BANNER.vivid : HERO_BANNER.classic;
 }
 
+export function heroPhoneSpec(themeId: string): ImageSpec {
+  return themeId === 'vivid' ? HERO_PHONE_VIVID_SPEC : HERO_PHONE_SPEC;
+}
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
 }
