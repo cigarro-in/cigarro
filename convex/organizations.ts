@@ -332,6 +332,29 @@ export const storeHostname = query({
   },
 });
 
+// Every active public hostname of a store (primary, aliases, managed subdomain),
+// by slug. The edge uses this to purge the storefront cache on each host after an
+// admin save. Hostnames are public routing data, so no sign-in is needed.
+// Returns [] for an unknown or inactive store.
+export const activeHostnamesBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!org || !org.active) return [];
+    const rows = await ctx.db
+      .query("orgDomains")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .collect();
+    return rows
+      .filter((r) => r.status === "active")
+      .map((r) => r.hostname)
+      .sort();
+  },
+});
+
 // The admin's row for this store. users is per store (orgId), so the subject
 // alone can match another store's row; inOrg keeps this store's row only.
 async function myUserRow(

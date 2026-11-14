@@ -1,5 +1,6 @@
 import { invalidatePrefix, invalidate } from './swrCache';
 import { getAccessToken } from '../auth/session';
+import { ORG_SLUG } from '../convex/org';
 
 /**
  * Invalidate storefront caches after admin edits.
@@ -24,14 +25,18 @@ export async function invalidateStorefront() {
   if (isLocal) return;
 
   try {
+    // On the admin host the store comes from the admin path (ORG_SLUG). X-Store names
+    // it so the edge purges that store's hostnames and checks membership in it.
     const token = getAccessToken();
-    await fetch('/api/invalidate-cache', {
+    const res = await fetch('/api/invalidate-cache', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(ORG_SLUG ? { 'X-Store': ORG_SLUG } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+    if (!res.ok) console.warn('[invalidateStorefront] edge purge returned', res.status);
   } catch (err) {
     console.warn('[invalidateStorefront] Cloudflare purge failed:', err);
   }
