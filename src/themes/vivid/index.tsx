@@ -3,6 +3,7 @@ import type { ThemeManifest } from '../types';
 import './tokens.css';
 import { VividHome } from './VividHome';
 import VividProductPage from './VividProduct';
+import { VividBlogToc } from './VividBlogToc';
 
 // Eager: server-rendered home/product must not suspend during hydration (React #421).
 const Home = VividHome;
@@ -42,5 +43,6 @@ export const vividTheme: ThemeManifest = {
     Wishlist: VividWishlist,
     Addresses: VividAddresses,
     Brands: VividBrands,
+    BlogToc: VividBlogToc,
   },
 };

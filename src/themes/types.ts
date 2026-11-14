@@ -16,6 +16,7 @@ export type ThemeSlotName =
   | 'Wishlist'
   | 'Addresses'
   | 'Brands'
+  | 'BlogToc'
   | 'Header'
   | 'Footer'
   | 'ProductCard';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { motion } from 'framer-motion';
 import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
@@ -13,6 +13,8 @@ import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
 import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
+import { buildToc, TOC_MIN_ITEMS } from '../../lib/content/toc';
+import { Slot } from '../../themes';
 
 // Publish dates are shown in the store's timezone, so the server render and the
 // client's first render print the same day.
@@ -188,6 +190,10 @@ export function BlogPost() {
   const isLoading = loading;
   const { settings: store } = useStoreSettings();
   const { primaryHost } = useOrgInfo();
+  // Sanitize, then index h2/h3 and set their ids. Runs in the SSR render too, so the
+  // heading ids are in the server HTML.
+  const body = useMemo(() => buildToc(sanitizeBlogBody(post?.content)), [post?.content]);
+  const hasToc = body.items.length >= TOC_MIN_ITEMS;
 
   if (isLoading) {
     return (
@@ -295,10 +301,18 @@ export function BlogPost() {
           </div>
 
           {/* Article Content */}
-          <div className="max-w-3xl mx-auto">
+          <div
+            className={
+              hasToc
+                ? 'max-w-5xl mx-auto lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-12'
+                : 'max-w-3xl mx-auto'
+            }
+          >
+          <div className="min-w-0 w-full max-w-3xl mx-auto lg:mx-0">
+            {hasToc && <Slot name="BlogToc" variant="mobile" items={body.items} />}
             <div
-              className="prose prose-lg max-w-none text-dark leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: sanitizeBlogBody(post.content) }}
+              className="blog-article-body prose prose-lg max-w-none text-dark leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: body.html }}
             />
 
             {/* Tags */}
@@ -315,6 +329,12 @@ export function BlogPost() {
                 ))}
               </div>
             </div>
+          </div>
+          {hasToc && (
+            <aside className="hidden lg:block sticky top-28 self-start">
+              <Slot name="BlogToc" variant="desktop" items={body.items} />
+            </aside>
+          )}
           </div>
 
           {/* Related Articles */}

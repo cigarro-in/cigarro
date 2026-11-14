@@ -56,7 +56,14 @@ function parseAttrs(source: string): Record<string, string> {
   return out;
 }
 
+// id on h2/h3 only (anchor target for the in-article table of contents).
+const HEADING_ID_RE = /^[\p{L}\p{N}_-]{1,100}$/u;
+
 function renderTag(tag: string, attrs: Record<string, string>, imgPrefix?: string): string {
+  if (tag === 'h2' || tag === 'h3') {
+    const id = attrs.id !== undefined && HEADING_ID_RE.test(attrs.id.trim()) ? attrs.id.trim() : null;
+    return `<${tag}${id ? ` id="${id}"` : ''}>`;
+  }
   const allowed = ATTRS_BY_TAG[tag];
   if (!allowed) return `<${tag}>`;
   const parts: string[] = [];
@@ -84,7 +91,7 @@ function renderTag(tag: string, attrs: Record<string, string>, imgPrefix?: strin
 // Blog body sanitizer, ALLOWLIST. Pure string code (no DOM), so the server render
 // and the browser produce the same markup. Only the tags below survive; each one
 // keeps only its allowed attributes (a: href, title; img: https src, alt, size,
-// loading). Everything else is dropped: all on* handlers, style, script/iframe
+// loading; h2/h3: id). Everything else is dropped: all on* handlers, style, script/iframe
 // (with their content), comments and unknown tags. Text is kept, with a stray "<"
 // escaped.
 // opts.imgPrefix: when set, an <img> is kept only if its src starts with this

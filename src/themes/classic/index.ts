@@ -4,6 +4,7 @@ import './tokens.css';
 import { ClassicShell } from './ClassicShell';
 import { HomePage } from '../../pages/home/HomePage';
 import ProductPage from '../../pages/products/ProductPage';
+import { ClassicBlogToc } from './ClassicBlogToc';
 
 // Home and Product are eager: they are server-rendered (P5-SSR) and must not
 // suspend during hydration (React #421). Everything else stays lazy.
@@ -38,5 +39,6 @@ export const classicTheme: ThemeManifest = {
     Wishlist,
     Addresses,
     Brands,
+    BlogToc: ClassicBlogToc,
   },
 };
