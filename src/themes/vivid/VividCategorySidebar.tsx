@@ -20,7 +20,7 @@ export function VividCategorySidebar({ categories = [], categoriesWithProducts =
   if (visible.length === 0) return null;
 
   return (
-    <aside className="vv-card overflow-hidden sticky top-20">
+    <aside aria-label="Categories" className="vv-card overflow-hidden sticky top-20">
       <div className="py-2">
         {visible.map((cat) => {
           const active = cat.slug === activeSlug;

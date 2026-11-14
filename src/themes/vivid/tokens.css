@@ -18,6 +18,7 @@
   --vv-accent-hover:  #e63d27;
   --vv-accent-soft:   #fff1ee;
   --vv-accent-on:     #ffffff;
+  --vv-accent-strong: #d42d17; /* text-bearing accent fills: 4.8:1 with white */
 
   /* -------- Color · Surfaces -------- */
   --vv-bg:            #f7f7f8;
@@ -28,7 +29,7 @@
   /* -------- Color · Foreground -------- */
   --vv-fg:            #0f0f12;
   --vv-fg-muted:      #585966;
-  --vv-fg-subtle:     #8a8b95;
+  --vv-fg-subtle:     #6b6c76; /* 5.2:1 on white (WCAG AA for small text) */
   --vv-fg-on-brand:   #ffffff;
 
   /* -------- Color · Borders -------- */
@@ -47,8 +48,8 @@
   --vv-info-soft:     #ecfeff;
 
   /* -------- Typography -------- */
-  --vv-font-sans:     'DM-Sans', system-ui, -apple-system, sans-serif;
-  --vv-font-display:  'DM-Sans', system-ui, sans-serif;
+  --vv-font-sans:     'DM-Sans', 'DM-Sans-fallback', system-ui, -apple-system, sans-serif;
+  --vv-font-display:  'DM-Sans', 'DM-Sans-fallback', system-ui, sans-serif;
   --vv-font-mono:     ui-monospace, 'SF Mono', monospace;
 
   --vv-text-xs:       0.75rem;      /* 12 */
@@ -479,7 +480,7 @@
   position: absolute;
   left: 0;
   bottom: 8px;
-  background: var(--vv-accent);
+  background: var(--vv-accent-strong);
   color: var(--vv-accent-on);
   font-size: var(--vv-text-xs);
   font-weight: 700;

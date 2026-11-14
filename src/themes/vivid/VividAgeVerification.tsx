@@ -87,11 +87,11 @@ export function VividAgeVerification({
             </button>
           </div>
 
-          <div className="mt-6 pt-5 border-t border-[#e7e8ec] flex items-center justify-center gap-2 text-[11px] text-[#8a8b95]">
+          <div className="mt-6 pt-5 border-t border-[#e7e8ec] flex items-center justify-center gap-2 text-[11px] text-[#5f6068]">
             <ShieldCheck className="w-3.5 h-3.5" />
             Your answer is remembered on this device for a year
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-[#8a8b95]">
+          <p className="mt-3 text-[11px] leading-relaxed text-[#5f6068]">
             Continuing confirms you are {ageGate.minAge}+ and accept our use of cookies.{' '}
             <a href="/privacy" className="underline underline-offset-2">Privacy</a>
           </p>

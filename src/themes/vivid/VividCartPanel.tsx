@@ -12,7 +12,7 @@ export function VividCartPanel() {
   const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   return (
-    <aside className="vv-card sticky top-20 overflow-hidden">
+    <aside aria-label="Cart summary" className="vv-card sticky top-20 overflow-hidden">
       <div className="px-4 py-3 border-b border-[var(--color-border)]">
         <h3 className="text-[var(--color-foreground)] font-bold text-base">Cart {totalItems > 0 && `(${totalItems})`}</h3>
       </div>

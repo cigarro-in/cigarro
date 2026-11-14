@@ -7,7 +7,7 @@ export function VividBrandMark({ storeName, logoUrl, className = '' }: { storeNa
   return (
     <span className={`flex items-center gap-2.5 min-w-0 ${className}`}>
       {logoUrl ? (
-        <img src={logoUrl} alt={storeName} width={36} height={36} className="h-9 w-9 flex-shrink-0 object-contain" />
+        <img src={logoUrl} alt="" width={36} height={36} className="h-9 w-9 flex-shrink-0 object-contain" />
       ) : (
         <span className="w-9 h-9 flex-shrink-0 rounded-full bg-[var(--color-foreground)] text-[var(--color-surface)] grid place-items-center text-sm font-black">
           {storeName.charAt(0).toUpperCase()}
