@@ -57,6 +57,8 @@ import type * as orders from "../orders.js";
 import type * as organizations from "../organizations.js";
 import type * as payments from "../payments.js";
 import type * as platform from "../platform.js";
+import type * as push from "../push.js";
+import type * as pushNode from "../pushNode.js";
 import type * as redirects from "../redirects.js";
 import type * as referrals from "../referrals.js";
 import type * as reviews from "../reviews.js";
@@ -123,6 +125,8 @@ declare const fullApi: ApiFromModules<{
   organizations: typeof organizations;
   payments: typeof payments;
   platform: typeof platform;
+  push: typeof push;
+  pushNode: typeof pushNode;
   redirects: typeof redirects;
   referrals: typeof referrals;
   reviews: typeof reviews;

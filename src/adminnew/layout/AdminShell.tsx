@@ -4,6 +4,7 @@ import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrg } from '../../lib/convex/useOrg';
 import { AdminSidebar } from './AdminSidebar';
 import { GmailBanner } from './GmailBanner';
+import '../features/overview/installPrompt';
 import { StoreIcon } from './AdminStoreMenu';
 
 const noop = () => {};

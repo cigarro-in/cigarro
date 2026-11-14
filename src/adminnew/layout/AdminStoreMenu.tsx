@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronsUpDown, ExternalLink, Keyboard, LogOut, Settings, UserRound } from 'lucide-react';
+import { Bell, Check, ChevronsUpDown, ExternalLink, Keyboard, LogOut, Settings, UserRound } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,8 @@ import { useOrg } from '../../lib/convex/useOrg';
 import { adminPath } from '../lib/paths';
 import { maskPhone, signOutOfAdmin, switchAdminStore } from '../lib/adminAuth';
 import { useAdminStores } from '../hooks/useAdminStores';
-import { ErrorBanner, toActionError, type ActionError } from '../ui';
+import { ErrorBanner, Switch, toActionError, type ActionError } from '../ui';
+import { usePushNotifications } from '../features/notifications/usePushNotifications';
 import { ProfileDialog } from '../features/account/ProfileDialog';
 import { ShortcutsDialog } from '../features/account/ShortcutsDialog';
 import { roleLabel, useMyStoreProfile, useStoreHostname } from '../features/account/useStoreAccount';
@@ -68,6 +69,9 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
   const [switchError, setSwitchError] = useState<ActionError | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const notifications = usePushNotifications();
+  const notificationsOn = notifications.state === 'on';
+  const notificationsToggleable = notifications.state === 'on' || notifications.state === 'off';
 
   const adminName = profile?.name || user?.name || maskPhone(user?.phone) || 'Admin';
   const role = profile?.role;
@@ -143,6 +147,33 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
                     </span>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  className={ROW}
+                  disabled={!notificationsToggleable || notifications.busy}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    notifications.toggle();
+                  }}
+                >
+                  <Bell className={ICON} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    Order notifications
+                    <span className="block truncate text-xs text-[var(--admin-text-muted)]">
+                      {notifications.state === 'ios-install'
+                        ? 'Add to Home Screen first'
+                        : notifications.state === 'not-configured'
+                          ? 'Not configured'
+                          : notifications.state === 'denied'
+                            ? 'Blocked in browser settings'
+                            : notifications.state === 'unsupported'
+                              ? 'Not supported here'
+                              : notificationsOn
+                                ? 'On for this device'
+                                : 'Off for this device'}
+                    </span>
+                  </span>
+                  <Switch checked={notificationsOn} tabIndex={-1} aria-hidden className="pointer-events-none" />
+                </DropdownMenuItem>
                 <DropdownMenuItem className={ROW} onSelect={() => setShortcutsOpen(true)}>
                   <Keyboard className={ICON} aria-hidden />
                   Keyboard shortcuts
@@ -182,6 +213,12 @@ export function AdminStoreMenu({ storeName, iconUrl }: { storeName: string; icon
                     </div>
                   )}
                 </>
+              )}
+
+              {notifications.error && (
+                <div className="p-1">
+                  <ErrorBanner error={notifications.error} />
+                </div>
               )}
 
               <DropdownMenuSeparator />

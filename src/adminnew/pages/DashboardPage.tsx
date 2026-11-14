@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { formatINR } from '../../utils/currency';
 import { AttentionRow, type AttentionItem } from '../features/overview/AttentionRow';
 import { CountUp } from '../features/overview/CountUp';
+import { InstallAppCard } from '../features/overview/InstallAppCard';
 import { isRealPersonName } from '../../lib/profile/personName';
 import { greetingTitle } from '../features/overview/greetings';
 import { SalesComparison } from '../features/overview/SalesComparison';
@@ -173,6 +174,7 @@ export function DashboardPage() {
 
   return (
     <Page title={title} primaryAction={{ label: 'Add product', to: '/products/new' }}>
+      <InstallAppCard />
       {data === undefined ? (
         <OverviewSkeleton />
       ) : (

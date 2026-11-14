@@ -10,6 +10,7 @@ import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
 import { RECONCILE_OFFSETS_MS } from "./lib/pollSchedule";
 import { creditWallet } from "./wallet";
+import { schedulePaidOrderPush } from "./push";
 import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory } from "./lib/inventory";
 
@@ -462,6 +463,7 @@ async function markOrderPaid(
     payerVpa: extras.payerVpa,
     payerName: extras.payerName,
   });
+  await schedulePaidOrderPush(ctx, order._id);
   await commitOrderInventory(ctx, order, "system");
 
   if (order.kind === "wallet_load") {

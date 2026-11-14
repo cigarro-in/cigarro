@@ -4,6 +4,7 @@ import { ArrowRight, CreditCard } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { adminPath } from '../lib/paths';
 import { Button, Card, Page, Skeleton } from '../ui';
+import { NotificationsCard } from './notifications/NotificationsCard';
 import { cn } from '../../components/ui/utils';
 import { SETTINGS_SECTIONS, type SectionProps, type SettingsSectionId } from './settings/sections';
 import { useLiveStoreSettings } from './settings/useSettingsDraft';
@@ -64,6 +65,8 @@ export function SettingsManager({ section }: { section: SettingsSectionId | null
               ))}
             </nav>
           </Card>
+
+          <NotificationsCard />
 
           <Card title="Payments">
             <div className="flex flex-col gap-3">

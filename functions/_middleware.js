@@ -4,7 +4,7 @@
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
-import { buildAdminManifest, fetchStoreBrandColor, storeManifestPath } from './lib/admin-pwa.js';
+import { buildAdminManifest, storeManifestPath } from './lib/admin-pwa.js';
 import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
 import { applyRedirect } from './lib/redirects.js';
 import { isSsrEnabledFor, ssrRender } from './ssr-render.js';
@@ -123,8 +123,8 @@ async function handleRequest(context) {
 
   // Per-store admin manifest (the store is the path segment, validated above).
   if (org.storePath && url.pathname === storeManifestPath(org.slug)) {
-    const brandColor = await fetchStoreBrandColor(context.env, org.slug);
-    return withNoindex(new Response(JSON.stringify(buildAdminManifest(org, brandColor)), {
+    const brand = await resolveStoreBrand(context.env, org);
+    return withNoindex(new Response(JSON.stringify(buildAdminManifest(org, brand)), {
       headers: {
         'Content-Type': 'application/manifest+json; charset=utf-8',
         'Cache-Control': 'public, max-age=300',

@@ -10,6 +10,7 @@ import {
   resolveOrg,
 } from "./lib/org";
 import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf } from "./lib/ids";
+import { schedulePaidOrderPush } from "./push";
 import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
 import { buildOrderPollOffsets } from "./lib/pollSchedule";
@@ -619,6 +620,7 @@ export const createOrder = mutation({
       await ctx.db.patch(orderId, { orderNumber });
       const paidOrder = await ctx.db.get(orderId);
       if (paidOrder) await commitOrderInventory(ctx, paidOrder, `user:${userId}`);
+      await schedulePaidOrderPush(ctx, orderId);
       // Refer & earn: wallet-only orders pay in full from the wallet, so the
       // qualifying amount is the cart total, not the (zero) UPI amount.
       if (paidOrder)

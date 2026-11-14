@@ -1197,6 +1197,18 @@ export default defineSchema({
     .index("by_org_from", ["orgId", "fromPath"])
     .index("by_org", ["orgId"]),
 
+  // Web Push subscriptions of store admin devices (convex/push.ts). One row per
+  // browser subscription per store. Rows the push service reports gone (404/410)
+  // are deleted on the next send.
+  pushSubscriptions: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    endpoint: v.string(),
+    keys: v.object({ p256dh: v.string(), auth: v.string() }),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_org_endpoint", ["orgId", "endpoint"]),
+
   // One row per one-time data migration (convex/migrations.ts). "done" rows are
   // never re-run; "failed" rows are retried until runs reaches the cap.
   migrations: defineTable({

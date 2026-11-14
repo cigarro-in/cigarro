@@ -7,6 +7,7 @@ import { orderStatus, shippingStatus } from "./schema";
 import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, returnOrderInventory } from "./lib/inventory";
 import { rewardDeliveredReferral, rewardPaidReferral } from "./referrals";
+import { schedulePaidOrderPush } from "./push";
 
 // ---------- Mark a pending order as paid manually ----------
 
@@ -31,6 +32,7 @@ export const markPaid = mutation({
       paidAt: Date.now(),
       verificationMethod: "admin_manual",
     });
+    await schedulePaidOrderPush(ctx, orderId);
     await commitOrderInventory(ctx, order, `admin:${identity.subject}`);
 
     if (order.slotId) await freeSlot(ctx, order.slotId);
