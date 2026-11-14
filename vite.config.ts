@@ -5,7 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 // The app shell chunk (src/boot.tsx, loaded by src/main.tsx) starts downloading
-// as soon as the HTML is parsed, not after main.js has run.
+// as soon as the HTML is parsed, not after main.js has run. Its CSS (and the CSS
+// of the chunks it imports statically) is linked as a render-blocking stylesheet
+// in <head>: injected by JS instead, the server-rendered page painted unstyled
+// first (a flash of bare HTML and a full-page layout shift).
 function bootModulePreload(): Plugin {
   return {
     name: 'boot-modulepreload',
@@ -16,8 +19,22 @@ function bootModulePreload(): Plugin {
         const boot = Object.values(ctx.bundle ?? {}).find(
           (c) => c.type === 'chunk' && c.name === 'boot',
         );
-        if (!boot) return;
-        return [{ tag: 'link', attrs: { rel: 'modulepreload', href: `/${boot.fileName}` }, injectTo: 'head' }];
+        if (!boot || boot.type !== 'chunk') return;
+        const css = new Set<string>();
+        const seen = new Set<string>();
+        const visit = (fileName: string) => {
+          if (seen.has(fileName)) return;
+          seen.add(fileName);
+          const chunk = ctx.bundle?.[fileName];
+          if (!chunk || chunk.type !== 'chunk') return;
+          chunk.viteMetadata?.importedCss.forEach((f) => css.add(f));
+          chunk.imports.forEach(visit);
+        };
+        visit(boot.fileName);
+        return [
+          ...[...css].map((href) => ({ tag: 'link', attrs: { rel: 'stylesheet', href: `/${href}` }, injectTo: 'head' as const })),
+          { tag: 'link', attrs: { rel: 'modulepreload', href: `/${boot.fileName}` }, injectTo: 'head' as const },
+        ];
       },
     },
   };
@@ -68,9 +85,10 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Radix dialog/dropdown are no longer forced into an eager chunk: they
+        // ship with the (lazy) surfaces that use them.
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu']
         }
       }
     }

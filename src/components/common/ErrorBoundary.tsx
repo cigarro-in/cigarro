@@ -37,11 +37,14 @@ export class ErrorBoundary extends Component<Props, State> {
       operation: `ErrorBoundary:${this.props.variant || 'page'}`,
     });
     // Log error details
-    logger.error('Error Boundary caught an error:', {
-      error: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack
-    });
+    // One readable line (message + Convex error code when present): logging a
+    // bare object prints "[object Object]" in many consoles and audit tools.
+    const code = (error as { data?: { code?: unknown } } | undefined)?.data?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(
+      `Error Boundary caught an error: ${message}${typeof code === 'string' ? ` [${code}]` : ''}`,
+      errorInfo.componentStack ?? '',
+    );
 
     // Log to audit system
     auditLogger.logError(error, {

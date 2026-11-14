@@ -5,21 +5,26 @@
 // there, and keep the lazy versions for the client build.
 import { CustomStorePageRoute, StorePageGate } from '../pages/storePages/StorePageGate';
 import { createContext, lazy, useContext, type ReactNode } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, matchPath } from 'react-router-dom';
 import { ROUTES } from '../config/routes';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import {
-  AgentsPage,
-  BlogRoute,
-  BlogsHubRoute,
-  BrandRoute,
-  BrandsHubRoute,
-  CategoriesHubRoute,
-  CategoryRoute,
-  ProductsHubRoute,
-} from './eagerRoutes';
-
+import { lazyPreload, preloadComponent } from '../lib/lazyPreload';
+import type { ThemeManifest } from '../themes/types';
 import { Slot } from '../themes';
+
+// Server-rendered storefront routes (src/routes/eagerRoutes.tsx). One chunk,
+// kept out of the boot bundle; src/boot.tsx preloads it before hydrating a page
+// that renders one of these routes (preloadRouteFor below), so hydration never
+// suspends (React #421).
+const eagerRoutes = () => import('./eagerRoutes');
+const AgentsPage = lazyPreload(() => eagerRoutes().then((m) => m.AgentsPage));
+const BlogRoute = lazyPreload(() => eagerRoutes().then((m) => m.BlogRoute));
+const BlogsHubRoute = lazyPreload(() => eagerRoutes().then((m) => m.BlogsHubRoute));
+const BrandRoute = lazyPreload(() => eagerRoutes().then((m) => m.BrandRoute));
+const BrandsHubRoute = lazyPreload(() => eagerRoutes().then((m) => m.BrandsHubRoute));
+const CategoriesHubRoute = lazyPreload(() => eagerRoutes().then((m) => m.CategoriesHubRoute));
+const CategoryRoute = lazyPreload(() => eagerRoutes().then((m) => m.CategoryRoute));
+const ProductsHubRoute = lazyPreload(() => eagerRoutes().then((m) => m.ProductsHubRoute));
 
 // Themed via Slot so each theme can provide its own variant
 const HomePage = () => <Slot name="Home" />;
@@ -54,6 +59,22 @@ const AdminRouter = lazy(() => import('../adminnew/AdminRouter').then(m => ({ de
 
 // 404 — unknown URLs render noindex NotFoundPage (audit T7), never HomePage
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+
+/**
+ * Loads the chunks the page at `pathname` renders on its first paint (theme
+ * shell, age gate, route component), so the client can hydrate server markup
+ * without any lazy component suspending. Never rejects.
+ */
+export function preloadRouteFor(pathname: string, theme: ThemeManifest): Promise<unknown> {
+  const jobs: Array<Promise<unknown> | undefined> = [
+    preloadComponent(theme.slots.Layout),
+    preloadComponent(theme.slots.AgeVerification),
+  ];
+  if (matchPath(ROUTES.HOME, pathname)) jobs.push(preloadComponent(theme.slots.Home));
+  else if (matchPath(ROUTES.PRODUCT_DETAIL, pathname)) jobs.push(preloadComponent(theme.slots.Product));
+  else jobs.push(eagerRoutes());
+  return Promise.all(jobs.map((job) => job?.catch(() => undefined)));
+}
 
 interface AppRoutesProps {
   isAdminRoute?: boolean;

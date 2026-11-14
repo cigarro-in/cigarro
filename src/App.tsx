@@ -4,13 +4,8 @@ import { useLocation, Navigate } from 'react-router-dom';
 import { Helmet, HelmetProvider, type HelmetServerState } from 'react-helmet-async';
 import { AgeVerification, AgeGateOverlay } from './components/auth/AgeVerification';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import Header from './components/layout/Header';
-import { MobileLayout } from './components/layout/MobileLayout';
-import { BreadcrumbNav } from './components/layout/BreadcrumbNav';
 import { PageTransition } from './components/layout/PageTransition';
-import Footer from './components/layout/Footer';
 import { AuthProvider, useAuth, useAuthDialog } from './hooks/useAuth';
-import { PhoneAuthDialog } from './components/auth/PhoneAuthDialog';
 import { ConvexAuthProvider } from './lib/convex/ConvexAuthProvider';
 import { CartProvider } from './hooks/useCart';
 import { WishlistProvider } from './hooks/useWishlist';
@@ -37,6 +32,9 @@ import { ThemeProvider, useTheme } from './themes';
 // their own styling (src/adminnew/styles/admin.css). They never wear a store theme.
 const AdminApp = lazy(() => import('./adminnew/AdminApp'));
 const SaApp = lazy(() => import('./sa/SaApp').then((m) => ({ default: m.SaApp })));
+// Login dialog: its chunk (drawer, animations) and the OTP provider scripts
+// (MSG91 + captcha) load only when a visitor first opens sign-in.
+const PhoneAuthDialog = lazy(() => import('./components/auth/PhoneAuthDialog').then((m) => ({ default: m.PhoneAuthDialog })));
 
 // Loading component - simplified to null for seamless transitions
 // The old page remains visible until the new chunk is ready (thanks to frozen routing)
@@ -52,15 +50,24 @@ function LoadingSpinner() {
 // renders on a separate host branch and is never co-mounted.)
 function StorefrontAuthHost() {
   const { open, onSuccess, closeAuthDialog } = useAuthDialog();
+  // Mounted on first open and kept mounted afterwards (the OTP widget is a
+  // page-lifetime singleton; the dialog keeps its own close animation).
+  const [requested, setRequested] = useState(false);
+  useEffect(() => {
+    if (open) setRequested(true);
+  }, [open]);
+  if (!open && !requested) return null;
   return (
     <ErrorBoundary variant="inline">
-      <PhoneAuthDialog
-        open={open}
-        onOpenChange={(o) => {
-          if (!o) closeAuthDialog();
-        }}
-        onAuthSuccess={onSuccess}
-      />
+      <Suspense fallback={null}>
+        <PhoneAuthDialog
+          open={open}
+          onOpenChange={(o) => {
+            if (!o) closeAuthDialog();
+          }}
+          onAuthSuccess={onSuccess}
+        />
+      </Suspense>
     </ErrorBoundary>
   );
 }
@@ -221,32 +228,15 @@ function AppContent({ helmetContext }: AppContentProps) {
             </ThemeLayout>
           </Suspense>
         ) : (
-          <div className="min-h-screen bg-creme font-sans">
-            {/* Desktop Layout - User Pages */}
-            <div className="hidden md:block">
-              <Header />
-              <BreadcrumbNav />
-              <main>
-                <PageTransition>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <AppRoutes isAdminRoute={false} location={location} />
-                  </Suspense>
-                </PageTransition>
-              </main>
-              <Footer />
-            </div>
-
-            {/* Mobile Layout - User Pages */}
-            <div className="md:hidden">
-              <MobileLayout>
-                <PageTransition>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <AppRoutes isAdminRoute={false} location={location} />
-                  </Suspense>
-                </PageTransition>
-              </MobileLayout>
-            </div>
-          </div>
+          // Every registered theme supplies a Layout; this bare fallback only
+          // guards a theme registered without one.
+          <main className="min-h-screen bg-creme font-sans">
+            <PageTransition>
+              <Suspense fallback={<LoadingSpinner />}>
+                <AppRoutes isAdminRoute={false} location={location} />
+              </Suspense>
+            </PageTransition>
+          </main>
         )
       ) : (
         /* Admin Layout - No wrapper div, no padding/margin */

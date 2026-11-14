@@ -1,7 +1,6 @@
 import { readStoredPreference, writeStoredPreference } from '../../lib/browserStorage';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '../ui/button';
-import { motion } from 'framer-motion';
 import { Shield, MapPin, FileText, AlertCircle, Crown } from 'lucide-react';
 import { DEFAULT_AGE_GATE, ageRuleLabel, type StoreSettings } from '../../lib/storeSettings';
 import { siteConfig } from '../../config/site';
@@ -119,18 +118,13 @@ export function AgeVerification({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isExiting ? 0 : 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-[100] bg-creme overflow-y-auto scrollbar-hide"
+    // Plain CSS fade on exit (opacity only, compositor-friendly). The gate is
+    // visible from the server markup on: no entrance animation to wait for.
+    <div
+      className={`fixed inset-0 z-[100] bg-creme overflow-y-auto scrollbar-hide transition-opacity duration-300 ${isExiting ? 'opacity-0' : 'opacity-100'}`}
     >
       <div className="min-h-full flex items-center justify-center p-4 md:p-8">
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+        <div
           className="w-full max-w-2xl bg-creme-light border border-coyote shadow-[0_2px_0_rgba(67,60,53,0.1)] rounded-xl overflow-hidden relative z-10"
         >
           {/* Header - Warning */}
@@ -218,7 +212,7 @@ export function AgeVerification({
                   Confirm and Proceed
               </Button>
           </div>
-        </motion.div>
+        </div>
       </div>
       
       {/* Background Elements */}
@@ -226,6 +220,6 @@ export function AgeVerification({
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-canyon/5 to-transparent" />
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-canyon/5 to-transparent" />
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState, startTransition } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
@@ -8,6 +8,8 @@ import { installCrashReporting } from './lib/crashReporting';
 import { isReloadBlocked } from './lib/reloadGuard';
 import { OrgProvider, getClientOrgInfo } from './lib/org/OrgContext';
 import { themeIdFromPreload } from './lib/ssr/themeFromPreload';
+import { getTheme, resolveThemeId } from './themes/registry';
+import { preloadRouteFor } from './routes/AppRoutes';
 
 installCrashReporting();
 
@@ -158,6 +160,28 @@ const UpdateSW = () => {
   return null
 }
 
+// Service worker registration is not needed for the first paint: start it once
+// the page has loaded and the main thread is idle.
+const DeferredUpdateSW = () => {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    const start = () => {
+      const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
+      const go = () => { if (!cancelled) startTransition(() => setReady(true)) }
+      if (idle) idle(go, { timeout: 5000 })
+      else setTimeout(go, 2000)
+    }
+    if (document.readyState === 'complete') start()
+    else window.addEventListener('load', start, { once: true })
+    return () => {
+      cancelled = true
+      window.removeEventListener('load', start)
+    }
+  }, [])
+  return ready ? <UpdateSW /> : null
+}
+
 // Client entry: the router lives here, not in App, so a server entry can render
 // the same <App /> inside <StaticRouter location={...}>. StaticRouter is exported
 // from 'react-router' and re-exported by 'react-router-dom' (react-router 7.9.1;
@@ -181,16 +205,24 @@ const appTree = (
   <React.StrictMode>
     <OrgProvider org={orgInfo}>
       {routedApp}
-      <UpdateSW />
+      <DeferredUpdateSW />
     </OrgProvider>
   </React.StrictMode>
 );
 
 // Hydrate only when the server shipped markup for this page (flag SSR_ROUTES).
 // Otherwise the SPA mounts from scratch as before.
+// Before hydrating, load every lazy chunk the server-rendered page shows (theme
+// shell, age gate, route component). A component that suspends mid-hydration
+// makes React drop the server markup and client-render (React #421): a blank
+// flash and a large layout shift.
 const rootEl = document.getElementById('root')!;
 if (window.__SSR__ === true && rootEl.hasChildNodes()) {
-  ReactDOM.hydrateRoot(rootEl, appTree);
+  const theme = getTheme(resolveThemeId(ssrThemeId));
+  const ready = theme ? preloadRouteFor(window.location.pathname.slice((orgInfo.basename || '').length) || '/', theme) : Promise.resolve();
+  void ready.then(() => {
+    ReactDOM.hydrateRoot(rootEl, appTree);
+  });
 } else {
   ReactDOM.createRoot(rootEl).render(appTree);
 }

@@ -1,15 +1,16 @@
 import { lazy } from 'react';
 import type { ThemeManifest } from '../types';
+import { lazyPreload } from '../../lib/lazyPreload';
 import './tokens.css';
-import { VividHome } from './VividHome';
-import VividProductPage from './VividProduct';
 import { VividBlogToc } from './VividBlogToc';
 
-// Eager: server-rendered home/product must not suspend during hydration (React #421).
-const Home = VividHome;
-const VividShell = lazy(() => import('./VividShell').then((m) => ({ default: m.VividShell })));
+// Server-rendered surfaces (shell, age gate, home, product) are preloadable:
+// src/boot.tsx loads the ones the current page needs before hydrating, so they
+// never suspend during hydration (React #421). Each is its own chunk.
+const Home = lazyPreload(() => import('./VividHome').then((m) => m.VividHome));
+const VividShell = lazyPreload(() => import('./VividShell').then((m) => m.VividShell));
 const VividList = lazy(() => import('./VividProductList').then((m) => ({ default: m.VividProductList })));
-const VividProduct = VividProductPage;
+const VividProduct = lazyPreload(() => import('./VividProduct').then((m) => m.default));
 const VividCart = lazy(() => import('./VividCart'));
 const VividProfile = lazy(() => import('./VividProfile').then((m) => ({ default: m.VividProfile })));
 const VividCategories = lazy(() => import('./VividCategories').then((m) => ({ default: m.VividCategories })));
@@ -18,7 +19,7 @@ const VividWishlist = lazy(() => import('./VividWishlist').then((m) => ({ defaul
 const VividAddresses = lazy(() => import('./VividAddresses').then((m) => ({ default: m.VividAddresses })));
 const VividProfileSettings = lazy(() => import('./VividProfileSettings').then((m) => ({ default: m.VividProfileSettings })));
 const VividBrands = lazy(() => import('./VividBrands').then((m) => ({ default: m.VividBrands })));
-const VividAgeVerification = lazy(() => import('./VividAgeVerification').then((m) => ({ default: m.VividAgeVerification })));
+const VividAgeVerification = lazyPreload(() => import('./VividAgeVerification').then((m) => m.VividAgeVerification));
 
 // Wrapper components so we can pass the `mode` prop into the same VividProductList
 const Products = () => <VividList mode="all" />;

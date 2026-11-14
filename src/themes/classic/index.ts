@@ -1,18 +1,18 @@
 import { lazy } from 'react';
 import type { ThemeManifest } from '../types';
 import './tokens.css';
-import { ClassicShell } from './ClassicShell';
-import { HomePage } from '../../pages/home/HomePage';
-import ProductPage from '../../pages/products/ProductPage';
+import { lazyPreload } from '../../lib/lazyPreload';
 import { ClassicBlogToc } from './ClassicBlogToc';
 
-// Home and Product are eager: they are server-rendered (P5-SSR) and must not
-// suspend during hydration (React #421). Everything else stays lazy.
-const Home = HomePage;
+// Shell, Home and Product are server-rendered (P5-SSR): preloadable, so
+// src/boot.tsx loads the ones the page needs before hydrating and they never
+// suspend during hydration (React #421). Everything else stays plain lazy.
+const ClassicShell = lazyPreload(() => import('./ClassicShell').then((m) => m.ClassicShell));
+const Home = lazyPreload(() => import('../../pages/home/HomePage').then((m) => m.HomePage));
 const Products = lazy(() => import('../../pages/products/ProductsPage').then((m) => ({ default: m.ProductsPage })));
 const Category = lazy(() => import('../../pages/products/CategoryPage').then((m) => ({ default: m.CategoryPage })));
 const Categories = lazy(() => import('../../pages/products/CategoriesPage').then((m) => ({ default: m.CategoriesPage })));
-const Product = ProductPage;
+const Product = lazyPreload(() => import('../../pages/products/ProductPage').then((m) => m.default));
 const Cart = lazy(() => import('../../pages/checkout/CartPage'));
 const Profile = lazy(() => import('../../pages/user/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const ProfileSettings = lazy(() => import('../../pages/user/ProfileSettingsPage').then((m) => ({ default: m.ProfileSettingsPage })));
