@@ -104,7 +104,9 @@ const Hero = memo(function Hero({
                   </picture>
                   
                   {/* Mobile Overlay Gradient */}
-                  <div className="md:hidden absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+                  {(currentSlideData.title || currentSlideData.suptitle || currentSlideData.description || currentSlideData.button_text) && (
+                    <div className="md:hidden absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+                  )}
                   
                   {/* Mobile Text Overlay */}
                   <div className="md:hidden absolute inset-0 flex flex-col justify-end p-[1.5rem] pb-[2rem]">
@@ -113,9 +115,11 @@ const Hero = memo(function Hero({
                           {currentSlideData.suptitle}
                         </p>
                       )}
-                      <h2 className="text-creme-light font-serif text-2xl leading-tight mb-[0.5rem] max-w-[85%]">
-                        {currentSlideData.title}
-                      </h2>
+                      {currentSlideData.title && (
+                        <h2 className="text-creme-light font-serif text-2xl leading-tight mb-[0.5rem] max-w-[85%]">
+                          {currentSlideData.title}
+                        </h2>
+                      )}
                       {currentSlideData.description && (
                         <p className="text-creme-light/80 text-sm leading-snug mb-[1rem] max-w-[85%] line-clamp-2">
                           {currentSlideData.description}
@@ -185,7 +189,9 @@ const Hero = memo(function Hero({
                       </div>
                     )}
                     <div className="mb-[1.5rem]">
-                      <h2 className="medium-title w-full leading-tight text-3xl lg:text-4xl xl:text-5xl">{currentSlideData.title}</h2>
+                      {currentSlideData.title && (
+                        <h2 className="medium-title w-full leading-tight text-3xl lg:text-4xl xl:text-5xl">{currentSlideData.title}</h2>
+                      )}
                       {currentSlideData.description && (
                         <p className="mt-3 text-base lg:text-lg text-dark/70 leading-relaxed max-w-xl">
                           {currentSlideData.description}

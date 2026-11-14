@@ -109,7 +109,6 @@ export function HeroSlideFormPage() {
 
   const onSave = async () => {
     if (!form) return;
-    if (!form.title.trim()) return setFormError({ message: 'Add a headline before saving.' });
     if (!form.imageUrl) return setFormError({ message: 'Choose a banner image before saving.' });
     const price = form.productPrice.trim() ? Number(form.productPrice) : undefined;
     if (price !== undefined && !Number.isFinite(price)) {
@@ -223,7 +222,7 @@ export function HeroSlideFormPage() {
                   <Input id="slide-suptitle" value={form.suptitle} onChange={(e) => set('suptitle', e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slide-title">Headline</Label>
+                  <Label htmlFor="slide-title">Headline (optional)</Label>
                   <Input id="slide-title" value={form.title} onChange={(e) => set('title', e.target.value)} />
                 </div>
                 {isClassic && (

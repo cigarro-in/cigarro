@@ -42,14 +42,14 @@ export function VividHeroBanners({ slides = [], isLoading }: Props) {
               {hasDesktopSource && <source media="(min-width: 768px)" srcSet={desktopSrc} />}
               <img
                 src={phoneSrc}
-                alt={s.title}
+                alt={s.title || ''}
                 className="w-full h-full object-cover"
                 loading={first ? 'eager' : 'lazy'}
                 fetchpriority={first ? 'high' : 'auto'}
                 decoding="async"
               />
             </picture>
-            {(s.title || s.button_text) && (
+            {(s.title || s.suptitle || s.button_text) && (
               <span className="absolute inset-x-0 bottom-0 p-3 bg-black/60 text-white">
                 {s.suptitle && <span className="block text-[11px] uppercase tracking-wider opacity-80">{s.suptitle}</span>}
                 {s.title && <span className="block font-serif text-lg leading-tight">{s.title}</span>}

@@ -14,12 +14,14 @@ export async function invalidateStorefront() {
   invalidate('homepage:v1');
   invalidatePrefix('products:');
 
-  // 2. Cloudflare edge cache (only meaningful in production)
-  // The edge injects the store's primary host; absent in dev, so dev never purges.
-  const primaryHost = typeof window !== 'undefined' ? window.__ORG__?.primaryHost : undefined;
-  const isProduction =
-    !!primaryHost && window.location.hostname === primaryHost.split(':')[0];
-  if (!isProduction) return;
+  // 2. Cloudflare edge cache. Admin runs on admin.<root>/<store>, not on the store's
+  // primary host, so the check must not compare hostnames: that skipped every purge.
+  // Only local development hosts skip it.
+  if (typeof window === 'undefined') return;
+  const host = window.location.hostname;
+  const isLocal =
+    host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost');
+  if (isLocal) return;
 
   try {
     const token = getAccessToken();
