@@ -2,12 +2,14 @@ import { Suspense } from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import type { Id } from '../../convex/_generated/dataModel';
 import { useAuth } from '../hooks/useAuth';
 import { useOrgInfo } from '../lib/org/OrgContext';
 import { AppRoutes } from '../routes/AppRoutes';
 import { AdminRoot } from './AdminRoot';
 import { AdminLogin } from './AdminLogin';
 import { StorePicker } from './StorePicker';
+import { useStoreHostname } from './features/account/useStoreAccount';
 import { Button } from './ui';
 
 /**
@@ -39,6 +41,9 @@ function AdminHostView() {
     api.userState.getMyProfile,
     user && adminPathStore ? { orgSlug: info.slug } : 'skip',
   );
+  // The store's live public address (same source as the admin store menu).
+  const storeAddress = useStoreHostname(info.id as Id<'organizations'> | undefined);
+  const storeHost = storeAddress?.hostname ?? null;
 
   // admin.<root>/ with no store in the path: sign in, then open a store.
   if (adminPathStore === null) return <StorePicker />;
@@ -56,12 +61,15 @@ function AdminHostView() {
         <div className="w-full max-w-[380px] rounded-[12px] border border-[var(--admin-border)] bg-[var(--admin-surface)] p-6 sm:p-7">
           <h1 className="text-xl font-semibold">No admin access</h1>
           <p className="mt-1 text-sm text-[var(--admin-text-muted)]">
-            {user.phone || 'This number'} is not an admin of this store. Use it on {info.primaryHost} for shopping.
+            {user.phone || 'This number'} is not an admin of this store.
+            {storeHost ? ` Use it on ${storeHost} for shopping.` : ''}
           </p>
           <div className="mt-5 flex gap-2">
-            <Button asChild variant="primary">
-              <a href={`https://${info.primaryHost}`}>Go to store</a>
-            </Button>
+            {storeAddress?.url ? (
+              <Button asChild variant="primary">
+                <a href={storeAddress.url}>Go to store</a>
+              </Button>
+            ) : null}
             <Button variant="secondary" onClick={() => void signOut()}>
               Sign out
             </Button>

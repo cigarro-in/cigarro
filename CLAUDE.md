@@ -23,7 +23,7 @@ Cigarro is a multi-store platform for regulated (tobacco) retail in India, paid 
 ## SSR and the edge
 
 - Storefront rendering is Vite SSR: entry `src/entry-server.tsx`, routes in `src/routes/ssrRoutes.tsx` and `src/routes/eagerRoutes.tsx`, preload helpers in `src/lib/ssr/`, build config `vite.ssr.config.ts`.
-- `SSR_ROUTES` lists which routes are server-rendered. Routes not on the list still use the bot-only renderer (`functions/ssr-middleware.js`, `functions/ssr-render.js`, `functions/_ssr/`) until cutover.
+- SSR is on by default for every route the server bundle supports (`matchSsrRoute` in `src/entry-server.tsx`). Nothing to set. The optional `SSR_ROUTES` env var on the edge overrides that: unset or empty = all supported routes; `off` = SSR disabled everywhere (kill switch, bots get the bot-only renderer); a comma list (`/`, `/product/*`, `*`) = only those paths. A route the bundle does not support is never SSR'd, whatever the env var says. Parsing lives in `functions/ssr-render.js`, used by `functions/_middleware.js`. If SSR throws for a request, that request falls back to the bot-only renderer or the SPA.
 - Responses carry `x-ssr` (diagnostic) and `x-ssr-cache` headers, useful when checking what was served.
 - Redirects are in `functions/lib/redirects.js` and `_redirects`. Headers are in `_headers`.
 - `*.pages.dev` is noindex.
@@ -104,6 +104,6 @@ Themes own:
 - Old images are still under `asset_images/` and not yet moved to `orgs/oldsmokeshop`.
 - No media table or srcset / responsive image variants yet.
 - Vivid hub pages are not server-rendered yet.
-- `functions/ssr-middleware.js` (bot-only renderer) is still in place; remove after every route is in `SSR_ROUTES`.
+- `functions/ssr-middleware.js` (bot-only renderer) is still in place. It now serves bots only when SSR is switched off (`SSR_ROUTES=off`) or fails on a route. Remove it once SSR has run without needing the kill switch.
 - No cache purge when admin edits content.
 - Environment variables are not consolidated; `VITE_ORG_SLUG` is still a fallback.

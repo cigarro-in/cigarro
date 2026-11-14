@@ -1,5 +1,5 @@
 // Server entry (Vite SSR build -> functions/_ssr). Runs in the Pages Functions
-// Worker: no Node APIs, no window/document. Flag-gated by SSR_ROUTES on the edge.
+// Worker: no Node APIs, no window/document. On by default for every route here; SSR_ROUTES on the edge can narrow it or set "off".
 import type { ReactNode } from 'react';
 import { renderToReadableStream } from 'react-dom/server.browser';
 import { StaticRouter } from 'react-router';

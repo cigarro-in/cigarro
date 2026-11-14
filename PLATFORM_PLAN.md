@@ -7,7 +7,7 @@ Status: updated 2026-11-13. Keep this file short; move detail into code comments
 - The store is resolved from the request hostname at the edge. Custom domains and managed `<slug>.cigarro.in` subdomains live in `orgDomains`.
 - Customer accounts are per store. Store admins use `admin.cigarro.in/<store>/`. Platform admin is Citadel SSO at `/sa` only.
 - Bank-email matching is per store: Gmail sign-in is primary, forwarding through `email-worker` is the fallback.
-- Rendering is Vite SSR on Pages Functions, flag-driven by `SSR_ROUTES`. Bot-only rendering stays until cutover.
+- Rendering is Vite SSR on Pages Functions, on by default for every supported route. `SSR_ROUTES` is only an optional override (`off` = kill switch).
 - SEO is non-negotiable: migrating merchants must keep or gain rankings.
 
 ## Shipped
@@ -28,7 +28,7 @@ Status: updated 2026-11-13. Keep this file short; move detail into code comments
 3. Move old images to `asset_images/orgs/oldsmokeshop`.
 4. Media table and srcset / responsive image variants.
 5. Vivid hub pages server-rendered (SSR).
-6. Remove the bot-only renderer `functions/ssr-middleware.js` once every route is in `SSR_ROUTES`.
+6. Remove the bot-only renderer `functions/ssr-middleware.js` once SSR has run everywhere without needing the `off` kill switch.
 7. Cache purge on admin edits.
 8. Environment consolidation (drop the `VITE_ORG_SLUG` fallback).
 9. Order id migration: backend uses the Convex `_id` for everything (links, payment matching, references); the frontend shows only the 5-digit order number. Retire the `ORD-YYMMDD-xxxxx` id (`convex/lib/ids.ts`) with a migration and redirects for old customer order links.

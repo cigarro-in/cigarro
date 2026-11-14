@@ -273,7 +273,7 @@ async function routeRequest(context) {
     return withNoindex(await next());
   }
 
-  // Full SSR for paths matched by SSR_ROUTES (flag, default off), every user agent:
+  // Full SSR for every route the server bundle supports (SSR_ROUTES can narrow it or set "off"), every user agent:
   // bots on an SSR'd route get the same HTML as humans, not the bot renderer.
   // Agent feeds (?format=json|md) keep their own response. Any SSR failure is
   // logged and falls through to the existing bot/SPA behaviour.

@@ -1,5 +1,5 @@
 // Server render of the SSR'd storefront routes (P5-SSR slice 6). Flag-gated by
-// SSR_ROUTES on the edge (functions/_middleware.js); the default is off.
+// SSR_ROUTES on the edge (functions/_middleware.js). Default: on for every supported route.
 //
 // Pipeline per request:
 //   1. preload the Convex queries the route's hooks read (fetchPreload)
@@ -36,17 +36,22 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
 };
 
-// SSR_ROUTES is a comma list of patterns: an exact path ("/") or a one-segment
-// wildcard ("/product/*"). Empty or unset = SSR off.
+// SSR_ROUTES (optional override, read here and in functions/_middleware.js):
+//   unset or empty  -> every route the server bundle supports is server-rendered
+//   "off"           -> SSR disabled everywhere (kill switch; bots get the old renderer)
+//   a comma list    -> only the listed paths: an exact path ("/"), a one-segment
+//                      wildcard ("/product/*"), or "*" for all supported routes
 export function ssrRoutesFromEnv(env) {
-  return String(env?.SSR_ROUTES || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const raw = String(env?.SSR_ROUTES || '').trim();
+  if (raw === '') return ['*'];
+  if (raw.toLowerCase() === 'off') return [];
+  const patterns = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return patterns.length > 0 ? patterns : ['*'];
 }
 
-// True when a flag pattern covers the path AND the server bundle has a route
-// for it (src/entry-server.tsx). A flag alone never enables an unported path.
+// True when the SSR override allows the path AND the server bundle has a route
+// for it (src/entry-server.tsx). The bundle's route table always decides which
+// paths can be rendered; the env var only narrows or switches that off.
 export function isSsrEnabledFor(pathname, env) {
   return ssrRoutesFromEnv(env).some((pattern) => flagCovers(pattern, pathname))
     && matchSsrRoute(pathname) !== null;

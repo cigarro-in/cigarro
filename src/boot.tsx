@@ -210,7 +210,7 @@ const appTree = (
   </React.StrictMode>
 );
 
-// Hydrate only when the server shipped markup for this page (flag SSR_ROUTES).
+// Hydrate only when the server shipped markup for this page (SSR on by default; the window.__SSR__ flag is set by the server).
 // Otherwise the SPA mounts from scratch as before.
 // Before hydrating, load every lazy chunk the server-rendered page shows (theme
 // shell, age gate, route component). A component that suspends mid-hydration
