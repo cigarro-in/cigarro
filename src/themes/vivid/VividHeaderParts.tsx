@@ -18,11 +18,29 @@ export function VividBrandMark({ storeName, logoUrl, className = '' }: { storeNa
   );
 }
 
-/** Cart icon with item count. Opens the cart drawer; the count bumps on every change. */
-export function VividCartButton({ count, onClick }: { count: number; onClick: () => void }) {
+/** Cart icon with item count. The count bumps on every change. */
+export function VividCartButton({
+  count,
+  onClick,
+  expanded,
+  controls,
+}: {
+  count: number;
+  onClick: () => void;
+  expanded?: boolean;
+  controls?: string;
+}) {
   const label = count > 0 ? `Open cart, ${count} item${count === 1 ? '' : 's'}` : 'Open cart';
   return (
-    <button type="button" onClick={onClick} className="vv-icon-btn" aria-label={label}>
+    <button
+      type="button"
+      onClick={onClick}
+      className="vv-icon-btn"
+      aria-label={label}
+      aria-haspopup={controls ? 'dialog' : undefined}
+      aria-expanded={expanded}
+      aria-controls={controls}
+    >
       <ShoppingCart className="w-5 h-5" strokeWidth={1.75} />
       {count > 0 && (
         <span

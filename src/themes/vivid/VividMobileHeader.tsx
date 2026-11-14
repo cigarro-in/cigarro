@@ -1,22 +1,20 @@
 import { Menu, Search } from 'lucide-react';
-import { VividBrandMark, VividCartButton, VividHeaderFrame, VividHomeLink } from './VividHeaderParts';
+import { VividBrandMark, VividHeaderFrame, VividHomeLink } from './VividHeaderParts';
 
 export interface VividHeaderProps {
   storeName: string;
   logoUrl: string;
-  cartCount: number;
   navOpen: boolean;
   searchOpen: boolean;
   onMenu: () => void;
   onSearch: () => void;
-  onCart: () => void;
 }
 
-/** Phone header: menu on the left, brand centred, search and cart on the right. */
-export function VividMobileHeader({ storeName, logoUrl, cartCount, navOpen, searchOpen, onMenu, onSearch, onCart }: VividHeaderProps) {
+/** Phone header: menu on the left, brand centred, search on the right. Cart lives in the bottom bar. */
+export function VividMobileHeader({ storeName, logoUrl, navOpen, searchOpen, onMenu, onSearch }: VividHeaderProps) {
   return (
     <VividHeaderFrame className="md:hidden">
-      <div className="h-14 px-2 grid grid-cols-[44px_minmax(0,1fr)_88px] items-center gap-1">
+      <div className="h-14 px-2 grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1">
         <button
           type="button"
           onClick={onMenu}
@@ -43,7 +41,6 @@ export function VividMobileHeader({ storeName, logoUrl, cartCount, navOpen, sear
           >
             <Search className="w-5 h-5" strokeWidth={1.75} />
           </button>
-          <VividCartButton count={cartCount} onClick={onCart} />
         </div>
       </div>
     </VividHeaderFrame>

@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Grid3X3, Home, Package, User } from 'lucide-react';
+import { Grid3X3, Home, Search, ShoppingCart, User } from 'lucide-react';
 import { useCart } from '../../hooks/useCart';
 import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { VividMobileHeader } from './VividMobileHeader';
@@ -39,6 +39,7 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
   const location = useLocation();
   const { requestAuth } = useAuthDialog();
   const [navOpen, setNavOpen] = useState(false);
+  // Mobile cart sheet. Desktop uses the header dropdown (VividMiniCart) instead.
   const [cartOpen, setCartOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -46,7 +47,9 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
   const closeCart = useCallback(() => setCartOpen(false), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   const toggleSearch = useCallback(() => setSearchOpen((open) => !open), []);
+  const openCart = useCallback(() => setCartOpen(true), []);
 
+  // Fullscreen payment flow: no bottom bar, so no bottom padding either.
   const hideBottomNav =
     location.pathname.startsWith('/checkout') ||
     location.pathname.startsWith('/mobile-checkout') ||
@@ -56,12 +59,10 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
   const headerProps = {
     storeName,
     logoUrl,
-    cartCount: totalItems,
     navOpen,
     searchOpen,
     onMenu: () => setNavOpen(true),
     onSearch: toggleSearch,
-    onCart: () => setCartOpen(true),
   };
 
   return (
@@ -76,7 +77,7 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
       <VividNavDrawer open={navOpen} onClose={closeNav} storeName={storeName} logoUrl={logoUrl} />
       <VividCartDrawer open={cartOpen} onClose={closeCart} />
 
-      <main className={`flex-1 ${hideBottomNav ? '' : 'pb-20 md:pb-0'}`}>{children}</main>
+      <main className={`flex-1 ${hideBottomNav ? '' : 'pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0'}`}>{children}</main>
 
       <footer className="hidden md:block mt-12 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="max-w-[1280px] mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
@@ -118,19 +119,19 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
       </footer>
 
       {!hideBottomNav && (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-surface)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-4 h-14">
+        <nav
+          aria-label="Shop navigation"
+          className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-surface)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)]"
+        >
+          <div className="grid grid-cols-5 h-16">
             <BottomLink to="/" icon={<Home className="w-5 h-5" />} label="Home" active={location.pathname === '/'} />
             <BottomLink to="/categories" icon={<Grid3X3 className="w-5 h-5" />} label="Categories" active={location.pathname.startsWith('/categor')} />
+            <BottomButton onClick={toggleSearch} icon={<Search className="w-5 h-5" />} label="Search" active={searchOpen} expanded={searchOpen} controls="vv-search-bar" />
+            <BottomButton onClick={openCart} icon={<ShoppingCart className="w-5 h-5" />} label="Cart" badge={totalItems} expanded={cartOpen} controls="vv-cart-sheet" />
             {user ? (
-              <BottomLink to="/orders" icon={<Package className="w-5 h-5" />} label="Orders" active={location.pathname.startsWith('/orders')} />
+              <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Account" active={location.pathname.startsWith('/profile')} />
             ) : (
-              <BottomButton onClick={() => requestAuth()} icon={<Package className="w-5 h-5" />} label="Orders" />
-            )}
-            {user ? (
-              <BottomLink to="/profile" icon={<User className="w-5 h-5" />} label="Me" active={location.pathname.startsWith('/profile')} />
-            ) : (
-              <BottomButton onClick={() => requestAuth()} icon={<User className="w-5 h-5" />} label="Sign in" />
+              <BottomButton onClick={() => requestAuth()} icon={<User className="w-5 h-5" />} label="Account" />
             )}
           </div>
         </nav>
@@ -141,16 +142,54 @@ export function VividShell({ children, storeName, logoUrl, legalName, brandColor
   );
 }
 
-function BottomButton({ onClick, icon, label }: { onClick: () => void; icon: ReactNode; label: string }) {
+function BottomButton({
+  onClick,
+  icon,
+  label,
+  active = false,
+  badge,
+  expanded,
+  controls,
+}: {
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  badge?: number;
+  expanded?: boolean;
+  controls?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)]"
+      aria-expanded={expanded}
+      aria-controls={controls}
+      className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[10px] ${
+        active ? 'text-[var(--color-primary)]' : 'text-[var(--color-muted-foreground)]'
+      }`}
     >
-      {icon}
+      <BottomIcon icon={icon} badge={badge} />
       {label}
     </button>
+  );
+}
+
+/** Bottom bar icon with an optional count badge (cart). */
+function BottomIcon({ icon, badge }: { icon: ReactNode; badge?: number }) {
+  return (
+    <span className="relative inline-flex">
+      {icon}
+      {badge !== undefined && badge > 0 && (
+        <span
+          key={badge}
+          className="vv-bump absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-primary)] text-white text-[10px] font-bold leading-[18px] text-center"
+          aria-hidden="true"
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+    </span>
   );
 }
 

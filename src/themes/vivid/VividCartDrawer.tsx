@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ShoppingBag, Trash2, X } from 'lucide-react';
-import { useCart } from '../../hooks/useCart';
-import { useAuth, useAuthDialog } from '../../hooks/useAuth';
 import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
+import { useVividCartActions } from './useVividCartActions';
 
 interface Props {
   open: boolean;
@@ -14,17 +13,13 @@ interface Props {
 const formatPrice = (n: number) => n.toLocaleString('en-IN');
 
 /**
- * Cart drawer from the header cart button. Same structure as the classic
- * MiniCart: title and count on top, lines in the middle, subtotal and
- * checkout at the bottom. Restyled with vivid tokens, and the cart's own
- * copy of the price logic is not repeated here (getCartItemPrice).
+ * Mobile cart sheet, opened from the Cart tab in the bottom bar. Same content
+ * as the desktop mini-cart: lines, subtotal and checkout. Cart state comes
+ * from useVividCartActions, shared with VividMiniCart.
  */
 export function VividCartDrawer({ open, onClose }: Props) {
-  const { items, totalPrice, totalItems, updateQuantity, removeFromCart, getCartItemPrice } = useCart();
-  const { user } = useAuth();
-  const { requestAuth } = useAuthDialog();
-  const navigate = useNavigate();
-  const [opError, setOpError] = useState<string | null>(null);
+  const { items, totalPrice, totalItems, getCartItemPrice, user, opError, proceed, changeQty, remove } =
+    useVividCartActions(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -40,25 +35,6 @@ export function VividCartDrawer({ open, onClose }: Props) {
     };
   }, [open, onClose]);
 
-  const proceed = () => {
-    onClose();
-    if (user) {
-      navigate('/checkout');
-    } else {
-      requestAuth({ onSuccess: () => navigate('/checkout') });
-    }
-  };
-
-  const changeQty = (productId: string, next: number, variantId?: string, comboId?: string) => {
-    setOpError(null);
-    updateQuantity(productId, next, variantId, comboId).catch(() => setOpError('Could not update quantity. Try again.'));
-  };
-
-  const remove = (productId: string, variantId?: string, comboId?: string) => {
-    setOpError(null);
-    removeFromCart(productId, variantId, comboId).catch(() => setOpError('Could not remove this item. Try again.'));
-  };
-
   return (
     <div className={`fixed inset-0 z-[70] ${open ? '' : 'invisible pointer-events-none'}`} aria-hidden={!open}>
       <div
@@ -67,6 +43,7 @@ export function VividCartDrawer({ open, onClose }: Props) {
       />
 
       <aside
+        id="vv-cart-sheet"
         role="dialog"
         aria-modal="true"
         aria-label="Shopping cart"

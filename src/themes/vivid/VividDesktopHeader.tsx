@@ -1,9 +1,10 @@
 import { Menu, Search } from 'lucide-react';
-import { VividBrandMark, VividCartButton, VividHeaderFrame, VividHomeLink } from './VividHeaderParts';
+import { VividBrandMark, VividHeaderFrame, VividHomeLink } from './VividHeaderParts';
+import { VividMiniCart } from './VividMiniCart';
 import type { VividHeaderProps } from './VividMobileHeader';
 
-/** Desktop header: menu and logo on the left, search and cart on the right. */
-export function VividDesktopHeader({ storeName, logoUrl, cartCount, navOpen, searchOpen, onMenu, onSearch, onCart }: VividHeaderProps) {
+/** Desktop header: menu and logo on the left, search and the mini-cart dropdown on the right. */
+export function VividDesktopHeader({ storeName, logoUrl, navOpen, searchOpen, onMenu, onSearch }: VividHeaderProps) {
   return (
     <VividHeaderFrame className="hidden md:block">
       <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-3">
@@ -35,7 +36,7 @@ export function VividDesktopHeader({ storeName, logoUrl, cartCount, navOpen, sea
         >
           <Search className="w-5 h-5" strokeWidth={1.75} />
         </button>
-        <VividCartButton count={cartCount} onClick={onCart} />
+        <VividMiniCart />
       </div>
     </VividHeaderFrame>
   );
