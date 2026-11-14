@@ -4,6 +4,7 @@ import { Users } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { CustomerAside } from '../features/customers/CustomerAside';
+import { CustomerConsent } from '../features/customers/CustomerConsent';
 import { CustomerOrders } from '../features/customers/CustomerOrders';
 import { CustomerSummaryStrip } from '../features/customers/CustomerSummaryStrip';
 import type { CustomerProfile } from '../features/customers/customerModel';
@@ -84,7 +85,12 @@ export function CustomerFormPage() {
     >
       <CustomerSummaryStrip profile={profile} />
       <PageLayout
-        main={<CustomerOrders orders={profile.orders} ordersCapped={profile.ordersCapped} />}
+        main={
+          <div className="flex flex-col gap-4">
+            <CustomerOrders orders={profile.orders} ordersCapped={profile.ordersCapped} />
+            {org && id ? <CustomerConsent orgId={org._id} userId={id} /> : null}
+          </div>
+        }
         aside={<CustomerAside profile={profile} />}
       />
     </Page>

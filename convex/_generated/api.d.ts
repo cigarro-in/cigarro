@@ -15,6 +15,7 @@ import type * as adminStats from "../adminStats.js";
 import type * as appConfig from "../appConfig.js";
 import type * as catalog from "../catalog.js";
 import type * as cloudflare from "../cloudflare.js";
+import type * as consent from "../consent.js";
 import type * as content from "../content.js";
 import type * as crashLogs from "../crashLogs.js";
 import type * as crons from "../crons.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   appConfig: typeof appConfig;
   catalog: typeof catalog;
   cloudflare: typeof cloudflare;
+  consent: typeof consent;
   content: typeof content;
   crashLogs: typeof crashLogs;
   crons: typeof crons;

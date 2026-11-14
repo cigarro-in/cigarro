@@ -13,6 +13,8 @@ import { useStoreSettings } from './hooks/data/useStoreSettings';
 import { AppRoutes } from './routes/AppRoutes';
 import { ReferralTracker } from './components/referral/ReferralTracker';
 import { ConsentBanner } from './components/consent/ConsentBanner';
+import { useConsent } from './hooks/data/useConsent';
+import { CONSENT_TEXT_VERSION } from './lib/consent/texts';
 import { initAnalytics, getConsent, setConsent, trackEvent, trackPageView } from './lib/analytics/ga';
 import { useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
@@ -89,7 +91,14 @@ function AppContent({ helmetContext }: AppContentProps) {
   const ThemeLayout = theme.slots.Layout;
   const org = useOrg();
   const upsertConvexUser = useMutation(api.userState.upsertUser);
+  const { recordAgeConfirmation, linkAnonymousConsent } = useConsent();
   const isAdminHost = info.isAdminHost;
+
+  // Signed in: attach this visitor's age-gate consent rows to the account (append-only copies).
+  useEffect(() => {
+    if (!user?.id || !org?._id || isAdminHost) return;
+    linkAnonymousConsent(org._id).catch(() => {});
+  }, [user?.id, org?._id, isAdminHost, linkAnonymousConsent]);
 
   // Phase 1: maintain the Convex user spine (lazy backfill — creates the row
   // on first seen session; isAdmin stays on Supabase profiles until Phase 2).
@@ -174,6 +183,7 @@ function AppContent({ helmetContext }: AppContentProps) {
     setAgeVerified(true);
     // Entering through the gate is the consent moment (stated on the gate).
     setConsent('granted');
+    recordAgeConfirmation(theme.id === 'vivid' ? CONSENT_TEXT_VERSION.ageGateVivid : CONSENT_TEXT_VERSION.ageGateClassic);
     trackEvent('age_gate_completed');
   };
 

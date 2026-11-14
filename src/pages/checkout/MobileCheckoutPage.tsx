@@ -23,6 +23,10 @@ import { api } from '../../../convex/_generated/api';
 import { convex } from '../../lib/convex/client';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useConsent } from '../../hooks/data/useConsent';
+import { CONSENT_TEXT_VERSION } from '../../lib/consent/texts';
+import { TermsConsent } from '../../components/checkout/TermsConsent';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 import { cleanPersonName, isRealPersonName } from '../../lib/profile/personName';
@@ -204,6 +208,9 @@ export function MobileCheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState('standard');
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const { settings: storeSettings } = useStoreSettings();
+  const { recordCheckoutConsent } = useConsent();
   const { status: opStatus, setError: setOpError } = useInlineStatus();
 
   // Wallet state
@@ -505,6 +512,11 @@ export function MobileCheckoutPage() {
       return;
     }
 
+    if (!termsAccepted) {
+      setOpError(`Confirm that you are ${storeSettings.ageGate.minAge} or older and accept the Terms to place this order.`);
+      return;
+    }
+
     const shouldClearCart = !isBuyNow && !isRetryPayment;
     setIsProcessing(true);
     setIsCompletingOrder(true);
@@ -528,6 +540,9 @@ export function MobileCheckoutPage() {
 
       const luckyPaise = rupeesToPaise(luckyDiscount);
       const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
+
+      // Age + terms record first; createOrder refuses purchases without it.
+      await recordCheckoutConsent(org._id, CONSENT_TEXT_VERSION.checkoutTerms);
 
       const result = await createConvexOrder({
         orgSlug: orgSlug,
@@ -571,7 +586,9 @@ export function MobileCheckoutPage() {
       console.error('❌ Payment error:', error);
       const code = error?.data?.code ?? error?.message;
       const msg =
-        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
+        code === 'CONSENT_REQUIRED'
+          ? `Confirm that you are ${storeSettings.ageGate.minAge} or older and accept the Terms to place this order.`
+        : code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry in a few minutes.'
           : code === 'NAME_REQUIRED'
           ? 'Add your full name to the delivery address before placing the order.'
@@ -825,6 +842,16 @@ export function MobileCheckoutPage() {
               {selectedAddress ? 'Change' : 'Add Address'}
             </Button>
           </div>
+        </div>
+
+        {/* Terms + age confirmation (required, enforced by createOrder) */}
+        <div className="px-4 pt-3">
+          <TermsConsent
+            id="checkout-terms-mobile"
+            checked={termsAccepted}
+            onCheckedChange={setTermsAccepted}
+            minAge={storeSettings.ageGate.minAge}
+          />
         </div>
 
         {/* Payment Row */}

@@ -20,6 +20,7 @@ import { creditWallet, debitWallet } from "./wallet";
 import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
 import { isLegacyOrg } from "./lib/legacyOrg";
+import { assertCheckoutConsent } from "./consent";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -439,6 +440,11 @@ export const createOrder = mutation({
     assertOrgMatch(args.orgId, org);
     const { userId } = await requireMember(ctx, org._id);
     if (!org.active) throw new ConvexError({ code: "ORG_INACTIVE" });
+    // Purchases need the customer's age + terms record (convex/consent.ts).
+    // Wallet loads are not tobacco sales and are not gated here.
+    if (args.kind === "purchase") {
+      await assertCheckoutConsent(ctx, args.orgId, userId);
+    }
 
     const retrySource = args.retryOfOrderId
       ? await ctx.db.get(args.retryOfOrderId)

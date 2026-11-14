@@ -21,6 +21,9 @@ import { useShippingMethods, usePaymentVpa } from '../../hooks/data/useContent';
 import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useConsent } from '../../hooks/data/useConsent';
+import { CONSENT_TEXT_VERSION } from '../../lib/consent/texts';
+import { TermsConsent } from '../../components/checkout/TermsConsent';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { rupeesToPaise } from '../../lib/convex/money';
 import { calculateDiscount, applyDiscountToCart, validateCouponCode } from '../../utils/discounts';
@@ -54,6 +57,7 @@ export function CheckoutPage() {
   const { vpa: paymentVpa } = usePaymentVpa((org as any)?._id);
   const payVpa = paymentVpa ?? '';
   const createConvexOrder = useMutation(api.orders.createOrder);
+  const { recordCheckoutConsent } = useConsent();
   const convexClient = useConvex();
   // Reuse the key if a response is lost after Convex committed the order.
   const paymentIdempotencyKeyRef = useRef<string | null>(null);
@@ -114,7 +118,8 @@ export function CheckoutPage() {
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [isAddressSectionCollapsed, setIsAddressSectionCollapsed] = useState(true);
   const [isOrderProcessing, setIsOrderProcessing] = useState(false);
-  const { status: opStatus, setError: setOpError } = useInlineStatus();
+  const { status: opStatus, setError: setOpError, clear: clearOpStatus } = useInlineStatus();
+  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // Discount-related state
   const [couponCode, setCouponCode] = useState('');
@@ -830,6 +835,10 @@ export function CheckoutPage() {
   // Don't auto-save at payment step, just generate QR code
   const handleStepChange = async (newStep: number) => {
     if (newStep === 3 && currentStep === 2) {
+      if (!termsAccepted) {
+        setOpError(`Confirm that you are ${store.ageGate.minAge} or older and accept the Terms to continue.`);
+        return;
+      }
       // Generate QR code for payment
       await generatePaymentQRCode();
     }
@@ -924,6 +933,14 @@ export function CheckoutPage() {
         // No status: prices refresh silently; the summary re-renders with them.
       }
 
+      if (!termsAccepted) {
+        setOpError(`Confirm that you are ${store.ageGate.minAge} or older and accept the Terms to place this order.`);
+        setIsProcessingPayment(false);
+        return;
+      }
+      // Age + terms record first; createOrder refuses purchases without it.
+      await recordCheckoutConsent(org._id, CONSENT_TEXT_VERSION.checkoutTerms);
+
       const result = await createConvexOrder({
         orgSlug: orgSlug,
         orgId: org._id,
@@ -965,7 +982,9 @@ export function CheckoutPage() {
       console.error('Failed to process order:', error);
       const code = error?.data?.code;
       const msg =
-        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
+        code === 'CONSENT_REQUIRED'
+          ? `Confirm that you are ${store.ageGate.minAge} or older and accept the Terms to place this order.`
+        : code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
           ? 'Too many pending orders at this price — please retry shortly.'
           : code === 'NAME_REQUIRED'
           ? 'Add your full name to the delivery address before placing the order.'
@@ -1571,6 +1590,13 @@ export function CheckoutPage() {
                       </div>
                     </div>
 
+                  <TermsConsent
+                    id="checkout-terms"
+                    checked={termsAccepted}
+                    onCheckedChange={(v) => { setTermsAccepted(v); if (v) clearOpStatus(); }}
+                    minAge={store.ageGate.minAge}
+                  />
+                  <div className="h-3" />
                   <div className="flex gap-3">
                     <Button 
                       variant="outline" 

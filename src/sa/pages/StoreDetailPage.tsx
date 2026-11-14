@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
 import {
   Badge,
@@ -30,6 +30,7 @@ import { paiseToRupees } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
 import { runSa, formatCount, formatDateTime, GmailBadge, KeyValues, ROLE_LABEL, StatTile, StoreStateBadge } from '../saUi';
 import { DomainList, PRIMARY_WARNING } from '../DomainList';
+import { downloadConsentCsv } from '../consentCsv';
 import { cleanPersonName, customerDisplayName, isRealPersonName, personNameError } from '../../lib/profile/personName';
 import { storeAdminUrl, storeLiveUrl } from '../health';
 import {
@@ -710,8 +711,11 @@ function ImportTab({ orgId, productCount }: { orgId: Id<'organizations'>; produc
 
 function SettingsTab({ store, token, writeOpen }: { store: StoreRow | undefined; token: string; writeOpen: boolean }) {
   const setActive = useMutation(setStoreActiveRef);
+  const convex = useConvex();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   return (
     <>
@@ -749,6 +753,35 @@ function SettingsTab({ store, token, writeOpen }: { store: StoreRow | undefined;
               />
             </div>
           )}
+        </Card>
+
+        <Card title="Consent log">
+          <p className="text-[13px] text-[var(--admin-text-muted)]">
+            Every age and terms decision recorded for this store, oldest first. Rows are append-only. The file holds IP addresses and phone numbers.
+          </p>
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!store || exporting}
+              onClick={async () => {
+                if (!store) return;
+                setExporting(true);
+                setExportError(null);
+                try {
+                  const rows = await downloadConsentCsv(convex, token, store._id, store.slug);
+                  setNotice(`Exported ${rows} consent ${rows === 1 ? 'row' : 'rows'} for ${store.name}.`);
+                } catch (error) {
+                  setExportError(error instanceof Error ? error.message : 'Export failed. Try again.');
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              {exporting ? 'Preparing CSV...' : 'Download CSV'}
+            </Button>
+            {exportError && <p className="mt-2 text-[13px] text-[var(--admin-critical)]">{exportError}</p>}
+          </div>
         </Card>
 
         <Card title="Danger zone" className="border-[var(--admin-critical-border)]">

@@ -3,6 +3,19 @@ import { v } from "convex/values";
 import { crashSource } from './lib/crashLog';
 import { storeAgeGateV, storeBrandV, storeBusinessV, storeReferralV, storeSeoV, storeSocialsV } from './lib/siteSettings';
 
+// Consent log (convex/consent.ts). Append-only: rows are inserted, never patched or deleted.
+export const consentKind = v.union(
+  v.literal("age_confirmation"),
+  v.literal("terms_acceptance"),
+  v.literal("privacy_acceptance"),
+  v.literal("marketing_optin"),
+);
+export const consentSource = v.union(
+  v.literal("age_gate"),
+  v.literal("signup"),
+  v.literal("checkout"),
+);
+
 export const orderStatus = v.union(
   v.literal("pending"),
   v.literal("paid"),
@@ -623,6 +636,28 @@ export default defineSchema({
     .index("by_org_created", ["orgId", "createdAt"])
     .index("by_org_number", ["orgId", "invoiceNumber"])
     .index("by_org_idempotency", ["orgId", "idempotencyKey"]),
+
+  // Append-only consent log. One row per recorded decision; a changed decision
+  // is a new row. userId is set for signed-in users; anonymousId ties visitor
+  // rows (age gate) to the user once they sign in (linkedFrom marks copies).
+  consentEvents: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.optional(v.string()),
+    anonymousId: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    kind: consentKind,
+    granted: v.boolean(),
+    textVersion: v.string(),
+    at: v.number(),
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    pagePath: v.optional(v.string()),
+    source: consentSource,
+    linkedFrom: v.optional(v.id("consentEvents")),
+  })
+    .index("by_org_user", ["orgId", "userId"])
+    .index("by_org_anonymous", ["orgId", "anonymousId"])
+    .index("by_org_at", ["orgId", "at"]),
 
   // ---- Phase 1: user state ----
   // userId is the stable user identity.
