@@ -11,7 +11,7 @@
   --color-sunflower: #dea138;
   
   /* Font Families */
-  --font-family-sans: 'DM-Sans', system-ui, sans-serif;
+  --font-family-sans: 'DM-Sans', 'DM-Sans-fallback', system-ui, sans-serif;
   --font-family-serif: 'PP-Editorial-New', Georgia, serif;
   
   /* Design System Variables (Legacy - kept for compatibility) */
@@ -180,6 +180,17 @@ input[type="number"]:placeholder-shown {
   font-weight: 700;
   font-style: normal;
   font-display: swap;
+}
+
+/* Metric-matched local fallback for DM Sans: text laid out before the web font
+   arrives keeps the same line boxes, so the font swap does not shift layout. */
+@font-face {
+  font-family: 'DM-Sans-fallback';
+  src: local('Arial'), local('Helvetica'), local('Roboto');
+  size-adjust: 104.5%;
+  ascent-override: 94%;
+  descent-override: 29%;
+  line-gap-override: 0%;
 }
 
 @font-face {

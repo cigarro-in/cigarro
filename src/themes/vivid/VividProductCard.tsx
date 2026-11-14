@@ -50,8 +50,13 @@ export function VividProductCard({ product, listName = 'products' }: Props) {
         <img
           src={getProductImageUrl(image)}
           alt={(defaultVariant as any)?.image_alt_text || product.name}
+          width={96}
+          height={96}
           className="w-full h-full object-cover"
           loading="lazy"
+          decoding="async"
+          // Thumbnails never compete with the hero (the page's LCP image) for bandwidth.
+          fetchpriority="low"
         />
         {discount > 0 && <span className="vv-badge-discount">{discount}% OFF</span>}
       </div>

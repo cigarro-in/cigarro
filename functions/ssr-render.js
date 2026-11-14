@@ -97,10 +97,13 @@ function injectIntoShell(shell, { html, head, htmlAttrs, org, preload, orgScript
   // The shell's <noscript> block (a static h1 and nav for no-JS clients) would
   // add a second <h1> to the SSR markup. The server render already has the page
   // content, so the fallback is dropped on this path.
+  // Helmet tags (title, meta, LCP image preload hints) go before the preload
+  // payload: that script can be hundreds of KB, and hints placed after it are
+  // discovered late by the browser's preload scanner.
   const inject = [
     `<script>window.__ORG__=${orgScript};window.__SSR__=true;</script>`,
-    serializePreload(preload),
     head,
+    serializePreload(preload),
   ].join('');
   let rewriter = new HTMLRewriter()
     .on('noscript', {
