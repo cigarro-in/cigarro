@@ -4,6 +4,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutDashboard,
+  LayoutTemplate,
   Package,
   Percent,
   Search,
@@ -55,7 +56,7 @@ export interface NavSection {
 /**
  * Sidebar navigation. Paths are router-relative (basename is /<store>).
  * Hidden from nav but still routed (see ADMIN_ROUTES): Invoices, Inventory,
- * Marketing, Homepage, Redirects.
+ * Marketing, Redirects.
  */
 export const ADMIN_NAVIGATION: NavSection[] = [
   {
@@ -76,6 +77,7 @@ export const ADMIN_NAVIGATION: NavSection[] = [
       { label: 'Customers', path: '/customers', icon: Users },
       { label: 'Discounts', path: '/discounts', icon: Percent },
       { label: 'Reviews', path: '/reviews', icon: Star },
+      { label: 'Homepage', path: '/homepage', icon: LayoutTemplate },
       { label: 'Content', path: '/blogs', icon: FileText, children: [{ label: 'Blogs', path: '/blogs' }, { label: 'Pages', path: '/pages' }] },
       { label: 'SEO', path: '/seo', icon: Search },
       { label: 'Assets', path: '/assets', icon: ImageIcon },

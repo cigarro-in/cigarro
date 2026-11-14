@@ -1,540 +1,312 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, Loader2, Trash2 } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Switch } from '../../components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Slider } from '../../components/ui/slider';
-import { AdminCard, AdminCardContent, AdminCardHeader, AdminCardTitle } from '../components/shared/AdminCard';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
-import { Req, ReqError, isBlank } from '../components/shared/requiredFields';
-import { PageHeader } from '../components/shared/PageHeader';
-
-/* Preview image/opacity values are data-driven at runtime. */
-/* eslint-disable shadcn/no-inline-styles */
-import { useQuery, useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { ORG_SLUG } from '../../lib/convex/org';
+import type { Id } from '../../../convex/_generated/dataModel';
+import { useOrgInfo } from '../../lib/org/OrgContext';
 import { invalidateStorefront } from '../../lib/cache/invalidateStorefront';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { useTheme } from '../../themes';
+import {
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Label,
+  Page,
+  PageLayout,
+  Skeleton,
+  Switch,
+  Textarea,
+  toActionError,
+  useButtonFeedback,
+  type ActionError,
+} from '../ui';
+import { ImageField } from '../features/homepage/ImageField';
+import { LinkPicker } from '../features/homepage/LinkPicker';
 
-interface HeroSlideFormData {
+interface SlideForm {
   title: string;
-  subtitle: string;
   suptitle: string;
   description: string;
-  image_url: string;
-  mobile_image_url: string;
-  button_text: string;
-  button_url: string;
-  button_style: string;
-  product_name: string;
-  product_price: string;
-  product_image_url: string;
-  text_position: 'left' | 'center' | 'right';
-  text_color: 'light' | 'dark';
-  overlay_opacity: number;
-  is_active: boolean;
-  sort_order: number;
+  imageUrl: string;
+  mobileImageUrl: string;
+  buttonText: string;
+  buttonUrl: string;
+  productName: string;
+  productPrice: string;
+  productImageUrl: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
-const initialFormData: HeroSlideFormData = {
+const EMPTY: SlideForm = {
   title: '',
-  subtitle: '',
   suptitle: '',
   description: '',
-  image_url: '',
-  mobile_image_url: '',
-  button_text: '',
-  button_url: '',
-  button_style: 'primary',
-  product_name: '',
-  product_price: '',
-  product_image_url: '',
-  text_position: 'left',
-  text_color: 'light',
-  overlay_opacity: 40,
-  is_active: true,
-  sort_order: 0
+  imageUrl: '',
+  mobileImageUrl: '',
+  buttonText: '',
+  buttonUrl: '',
+  productName: '',
+  productPrice: '',
+  productImageUrl: '',
+  isActive: true,
+  sortOrder: 0,
 };
 
+// Hero slide editor. Fields follow the active theme: Classic reads the
+// description and the product card; Vivid does not, so those are hidden there.
 export function HeroSlideFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const isEditMode = Boolean(id && id !== 'new');
+  const isEdit = Boolean(id && id !== 'new');
+  const { slug } = useOrgInfo();
+  const { themeId } = useTheme();
+  const isClassic = themeId !== 'vivid';
 
-  const [form, setForm] = useState<HeroSlideFormData>(initialFormData);
-  const [loading, setLoading] = useState(isEditMode);
-  const [saving, setSaving] = useState(false);
-  const [saveAttempted, setSaveAttempted] = useState(false);
-  const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
-  const populatedRef = useRef(false);
-
-  const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, { orgSlug: ORG_SLUG });
+  const slides = useQuery(api.adminCatalog.listHeroSlidesForAdmin, { orgSlug: slug });
   const saveSlide = useMutation(api.adminCatalog.saveHeroSlide);
   const removeSlide = useMutation(api.adminCatalog.deleteHeroSlide);
 
-  // Populate once / next sort order — both derive from the one list query.
+  const [form, setForm] = useState<SlideForm | null>(null);
+  const [formError, setFormError] = useState<ActionError | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const save = useButtonFeedback();
+  const remove = useButtonFeedback();
+
+  const existing = isEdit ? slides?.find((s) => s._id === id) : undefined;
+  const missing = isEdit && slides !== undefined && !existing;
+
+  // Fill the form once: from the stored slide, or with the next sort slot.
   useEffect(() => {
-    if (!slides || populatedRef.current) return;
-    populatedRef.current = true;
-    if (isEditMode && id) {
-      const data: any = slides.find((s: any) => s._id === id);
-      if (!data) {
-        setOpError('Slide not found');
-        navigate('/homepage');
-        return;
-      }
+    if (form || slides === undefined) return;
+    if (isEdit) {
+      if (!existing) return;
       setForm({
-        title: data.title || '',
-        subtitle: data.subtitle || '',
-        suptitle: data.suptitle || '',
-        description: data.description || '',
-        image_url: data.imageUrl || '',
-        mobile_image_url: data.mobileImageUrl || '',
-        button_text: data.buttonText || '',
-        button_url: data.buttonUrl || '',
-        button_style: data.buttonStyle || 'primary',
-        product_name: data.productName || '',
-        product_price: data.productPrice != null ? String(data.productPrice) : '',
-        product_image_url: data.productImageUrl || '',
-        text_position: data.textPosition || 'left',
-        text_color: data.textColor || 'light',
-        overlay_opacity: data.overlayOpacity ?? 40,
-        is_active: data.isActive ?? true,
-        sort_order: data.sortOrder ?? 0
+        title: existing.title ?? '',
+        suptitle: existing.suptitle ?? '',
+        description: existing.description ?? '',
+        imageUrl: existing.imageUrl ?? '',
+        mobileImageUrl: existing.mobileImageUrl ?? '',
+        buttonText: existing.buttonText ?? '',
+        buttonUrl: existing.buttonUrl ?? '',
+        productName: existing.productName ?? '',
+        productPrice: existing.productPrice != null ? String(existing.productPrice) : '',
+        productImageUrl: existing.productImageUrl ?? '',
+        isActive: existing.isActive,
+        sortOrder: existing.sortOrder,
       });
-      setLoading(false);
     } else {
-      const max = Math.max(-1, ...slides.map((s: any) => s.sortOrder ?? 0));
-      setForm((prev) => ({ ...prev, sort_order: max + 1 }));
+      const next = Math.max(-1, ...slides.map((s) => s.sortOrder)) + 1;
+      setForm({ ...EMPTY, sortOrder: next });
     }
-  }, [slides]);
+  }, [slides, form, isEdit, existing]);
 
-  const handleSave = async () => {
-    setSaveAttempted(true);
-    if (!form.title.trim()) {
-      setOpError('Title is required');
-      return;
-    }
-    if (!form.image_url) {
-      setOpError('Image is required');
-      return;
-    }
+  const set = <K extends keyof SlideForm>(key: K, value: SlideForm[K]) =>
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
 
-    setSaving(true);
-    try {
-      await saveSlide({
-        orgSlug: ORG_SLUG,
-        id: isEditMode && id ? (id as any) : undefined,
+  const onSave = async () => {
+    if (!form) return;
+    if (!form.title.trim()) return setFormError({ message: 'Add a headline before saving.' });
+    if (!form.imageUrl) return setFormError({ message: 'Choose a banner image before saving.' });
+    const price = form.productPrice.trim() ? Number(form.productPrice) : undefined;
+    if (price !== undefined && !Number.isFinite(price)) {
+      return setFormError({ message: 'The product price must be a number.' });
+    }
+    setFormError(null);
+
+    // Empty text is sent as "" so a cleared field really clears on the server.
+    const result = await save.run(() =>
+      saveSlide({
+        orgSlug: slug,
+        id: isEdit ? (id as Id<'heroSlides'>) : undefined,
         slide: {
           title: form.title.trim(),
-          subtitle: form.subtitle.trim() || undefined,
-          suptitle: form.suptitle.trim() || undefined,
-          description: form.description.trim() || undefined,
-          imageUrl: form.image_url,
-          mobileImageUrl: form.mobile_image_url || undefined,
-          buttonText: form.button_text.trim() || undefined,
-          buttonUrl: form.button_url.trim() || undefined,
-          buttonStyle: form.button_style,
-          productName: form.product_name.trim() || undefined,
-          productPrice: form.product_price.trim() ? Number(form.product_price) : undefined,
-          productImageUrl: form.product_image_url || undefined,
-          textPosition: form.text_position,
-          textColor: form.text_color,
-          overlayOpacity: form.overlay_opacity,
-          isActive: form.is_active,
-          sortOrder: form.sort_order,
+          suptitle: form.suptitle.trim(),
+          description: isClassic ? form.description.trim() : undefined,
+          imageUrl: form.imageUrl,
+          mobileImageUrl: form.mobileImageUrl,
+          buttonText: form.buttonText.trim(),
+          buttonUrl: form.buttonUrl.trim(),
+          productName: isClassic ? form.productName.trim() : undefined,
+          productPrice: isClassic ? price : undefined,
+          productImageUrl: isClassic ? form.productImageUrl : undefined,
+          isActive: form.isActive,
+          sortOrder: form.sortOrder,
         },
-      });
-      setOpOk(isEditMode ? 'Slide updated' : 'Slide created');
-
-      await invalidateStorefront();
+      }),
+    );
+    if (result) {
+      void invalidateStorefront();
       navigate('/homepage');
-    } catch (error: any) {
-      console.error('Error saving slide:', error);
-      setOpError(error?.data?.code === 'NOT_CATALOG_ADMIN' ? 'Admin access required' : 'Failed to save slide');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!isEditMode || !id) return;
-    if (!confirm('Delete this slide?')) return;
-
-    setSaving(true);
-    try {
-      await removeSlide({ id: id as any, orgSlug: ORG_SLUG });
-      setOpOk('Slide deleted');
-      await invalidateStorefront();
+  const onDelete = async () => {
+    if (!isEdit || !id) return;
+    const result = await remove.run(() => removeSlide({ orgSlug: slug, id: id as Id<'heroSlides'> }));
+    if (result) {
+      setConfirmDelete(false);
+      void invalidateStorefront();
       navigate('/homepage');
-    } catch (error: any) {
-      console.error('Error deleting slide:', error);
-      setOpError('Failed to delete slide');
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (loading) {
+  if (missing) {
     return (
-      <div className="flex items-center justify-center min-h-100">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
+      <Page title="Hero slide" backTo="/homepage">
+        <EmptyState
+          title="This slide no longer exists"
+          description="It may have been deleted. Go back to the homepage to pick another slide."
+        />
+      </Page>
+    );
+  }
+
+  if (!form) {
+    return (
+      <Page title={isEdit ? 'Edit slide' : 'New slide'} backTo="/homepage">
+        <Skeleton className="h-96 w-full" />
+      </Page>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <PageHeader
-        title={isEditMode ? 'Edit Slide' : 'New Slide'}
-        description={isEditMode ? 'Update hero slide details' : 'Create a new hero slide'}
-        backUrl="/homepage"
-      >
-        {isEditMode && (
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={saving}
-            className="bg-destructive hover:bg-destructive text-white"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Slide'}
-        </Button>
-      </PageHeader>
+    <Page
+      title={isEdit ? form.title || 'Edit slide' : 'New slide'}
+      backTo="/homepage"
+      primaryAction={{
+        label: isEdit ? 'Save slide' : 'Add slide',
+        onClick: () => void onSave(),
+        state: save.state,
+      }}
+      secondaryActions={
+        isEdit ? [{ label: 'Delete slide', critical: true, onClick: () => setConfirmDelete(true) }] : []
+      }
+    >
+      <ErrorBanner error={formError ?? save.error ?? remove.error} onDismiss={() => setFormError(null)} />
 
-      <div className="max-w-400 mx-auto px-4 sm:px-6">
-        <InlineStatus status={opStatus} />
-      </div>
-
-      <div className="max-w-400 mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        {/* Left Column - Main Content */}
-        <div className="space-y-4">
-          {/* Basic Info */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Slide Content</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="suptitle">Eyebrow (small text above title)</Label>
-                <Input
-                  id="suptitle"
-                  value={form.suptitle}
-                  onChange={(e) => setForm(prev => ({ ...prev, suptitle: e.target.value }))}
-                  placeholder="e.g. NEW ARRIVAL"
+      <PageLayout
+        main={
+          <div className="space-y-3">
+            <Card title="Image">
+              <div className="space-y-5">
+                <ImageField
+                  label="Banner image"
+                  value={form.imageUrl}
+                  onChange={(url) => set('imageUrl', url)}
+                  uploadSlug={form.title}
+                  hint="Wide image. Shown on desktop and tablet."
+                />
+                <ImageField
+                  label="Phone image (optional)"
+                  value={form.mobileImageUrl}
+                  onChange={(url) => set('mobileImageUrl', url)}
+                  uploadSlug={form.title}
+                  hint="Used on phones. Leave empty to use the banner image."
                 />
               </div>
+            </Card>
 
-              <div className="space-y-1">
-                <Label htmlFor="title">Title <Req /></Label>
-                <Input
-                  id="title"
-                  value={form.title}
-                  onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter slide title"
-                  aria-invalid={saveAttempted && isBlank(form.title)}
-                />
-                <ReqError show={saveAttempted && isBlank(form.title)} />
+            <Card title="Text">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slide-suptitle">Small text above the headline (optional)</Label>
+                  <Input id="slide-suptitle" value={form.suptitle} onChange={(e) => set('suptitle', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="slide-title">Headline</Label>
+                  <Input id="slide-title" value={form.title} onChange={(e) => set('title', e.target.value)} />
+                </div>
+                {isClassic && (
+                  <div className="space-y-2">
+                    <Label htmlFor="slide-description">Supporting text (optional)</Label>
+                    <Textarea
+                      id="slide-description"
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => set('description', e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
+            </Card>
 
-              <div className="space-y-1">
-                <Label htmlFor="subtitle">Subtitle</Label>
-                <Input
-                  id="subtitle"
-                  value={form.subtitle}
-                  onChange={(e) => setForm(prev => ({ ...prev, subtitle: e.target.value }))}
-                  placeholder="Enter subtitle (optional)"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={form.description}
-                  onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Shown under the title on the storefront (optional)"
-                  rows={3}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Button Settings */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Call to Action</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="button_text">Button Text</Label>
+            <Card title="Button">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slide-button-text">Button text (optional)</Label>
                   <Input
-                    id="button_text"
-                    value={form.button_text}
-                    onChange={(e) => setForm(prev => ({ ...prev, button_text: e.target.value }))}
-                    placeholder="e.g. Shop Now"
+                    id="slide-button-text"
+                    value={form.buttonText}
+                    onChange={(e) => set('buttonText', e.target.value)}
+                    placeholder="Shop now"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="button_url">Button URL</Label>
-                  <Input
-                    id="button_url"
-                    value={form.button_url}
-                    onChange={(e) => setForm(prev => ({ ...prev, button_url: e.target.value }))}
-                    placeholder="/products or https://..."
-                  />
+                <div className="space-y-2">
+                  <Label>Where the button goes</Label>
+                  {/* Mounted only after the stored link is loaded, so its initial kind is right. */}
+                  <LinkPicker key={isEdit ? `edit-${existing?._id}` : 'new'} value={form.buttonUrl} onChange={(url) => set('buttonUrl', url)} />
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <Label>Button Style</Label>
-                <Select
-                  value={form.button_style}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, button_style: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="primary">Primary</SelectItem>
-                    <SelectItem value="secondary">Secondary</SelectItem>
-                    <SelectItem value="outline">Outline</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Product Spotlight */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Product Spotlight (optional)</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Shows the floating product card on the slide. Leave empty to hide it.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="product_name">Product Name</Label>
-                  <Input
-                    id="product_name"
-                    value={form.product_name}
-                    onChange={(e) => setForm(prev => ({ ...prev, product_name: e.target.value }))}
-                    placeholder="e.g. Esse Change"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="product_price">Product Price (₹)</Label>
-                  <Input
-                    id="product_price"
-                    type="number"
-                    min={0}
-                    value={form.product_price}
-                    onChange={(e) => setForm(prev => ({ ...prev, product_price: e.target.value }))}
-                    placeholder="e.g. 350"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label>Product Image</Label>
-                <SingleImagePicker
-                  value={form.product_image_url || null}
-                  onChange={(url) => setForm(prev => ({ ...prev, product_image_url: url || '' }))}
-                  searchHint={form.product_name ? `${form.product_name} cigarette pack` : undefined}
-                />
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Display Settings */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Display Settings</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Text Position</Label>
-                  <Select
-                    value={form.text_position}
-                    onValueChange={(value: 'left' | 'center' | 'right') => 
-                      setForm(prev => ({ ...prev, text_position: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="left">Left</SelectItem>
-                      <SelectItem value="center">Center</SelectItem>
-                      <SelectItem value="right">Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Text Color</Label>
-                  <Select
-                    value={form.text_color}
-                    onValueChange={(value: 'light' | 'dark') => 
-                      setForm(prev => ({ ...prev, text_color: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light (White)</SelectItem>
-                      <SelectItem value="dark">Dark (Black)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Overlay Opacity: {form.overlay_opacity}%</Label>
-                <Slider
-                  value={[form.overlay_opacity]}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, overlay_opacity: value[0] }))}
-                  min={0}
-                  max={100}
-                  step={5}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Controls the darkness of the overlay on the image
-                </p>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-
-        {/* Right Column - Sidebar */}
-        <div className="space-y-4">
-          {/* Status */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Status</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Active</Label>
-                  <p className="text-xs text-muted-foreground">Show on homepage</p>
-                </div>
+            </Card>
+          </div>
+        }
+        aside={
+          <div className="space-y-3">
+            <Card title="Show on store">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-foreground">{form.isActive ? 'Shown' : 'Hidden'}</span>
                 <Switch
-                  checked={form.is_active}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, is_active: checked }))}
+                  aria-label="Show this slide"
+                  checked={form.isActive}
+                  onCheckedChange={(v) => set('isActive', v)}
                 />
               </div>
-              <div className="space-y-1">
-                <Label>Sort Order</Label>
-                <Input
-                  type="number"
-                  value={form.sort_order}
-                  onChange={(e) => setForm(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
-                  placeholder="0"
-                  min={0}
-                />
-                <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Desktop Image */}
-          <AdminCard className={saveAttempted && !form.image_url ? 'border-destructive' : undefined}>
-            <AdminCardHeader>
-              <AdminCardTitle>Desktop Image <Req /></AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <SingleImagePicker
-                value={form.image_url || null}
-                onChange={(url) => setForm(prev => ({ ...prev, image_url: url || '' }))}
-                searchHint={form.title ? `${form.title} hero banner` : undefined}
-                keepOriginalResolution
-              />
-              <ReqError show={saveAttempted && !form.image_url}>
-                A desktop image is required
-              </ReqError>
-              <p className="text-xs text-muted-foreground mt-2">
-                Recommended: 1920x800px
+              <p className="mt-2 text-xs text-muted-foreground">
+                Slides show in the order set on the Homepage page.
               </p>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Mobile Image */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Mobile Image</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <SingleImagePicker
-                value={form.mobile_image_url || null}
-                onChange={(url) => setForm(prev => ({ ...prev, mobile_image_url: url || '' }))}
-                searchHint={form.title ? `${form.title} hero banner mobile` : undefined}
-                keepOriginalResolution
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Optional. Recommended: 768x600px
-              </p>
-            </AdminCardContent>
-          </AdminCard>
-
-          {/* Preview */}
-          <AdminCard>
-            <AdminCardHeader>
-              <AdminCardTitle>Preview</AdminCardTitle>
-            </AdminCardHeader>
-            <AdminCardContent>
-              <div 
-                className="relative aspect-video rounded-lg overflow-hidden bg-muted"
-                style={{
-                  backgroundImage: form.image_url ? `url(${form.image_url})` : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                {/* Overlay */}
-                <div 
-                  className="absolute inset-0 bg-black"
-                  style={{ opacity: form.overlay_opacity / 100 }}
-                />
-                
-                {/* Content */}
-                <div 
-                  className={`absolute inset-0 flex flex-col justify-center p-4 ${
-                    form.text_position === 'center' ? 'items-center text-center' :
-                    form.text_position === 'right' ? 'items-end text-right' : 'items-start'
-                  }`}
-                >
-                  <h3 className={`text-sm font-bold ${form.text_color === 'light' ? 'text-white' : 'text-black'}`}>
-                    {form.title || 'Slide Title'}
-                  </h3>
-                  {form.subtitle && (
-                    <p className={`text-xs mt-1 ${form.text_color === 'light' ? 'text-white/80' : 'text-black/80'}`}>
-                      {form.subtitle}
-                    </p>
-                  )}
+            </Card>
+            {isClassic && (
+              <Card title="Product card (optional)">
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground">A small product shown beside the banner.</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="slide-product-name">Product name</Label>
+                    <Input id="slide-product-name" value={form.productName} onChange={(e) => set('productName', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="slide-product-price">Price (rupees)</Label>
+                    <Input
+                      id="slide-product-price"
+                      inputMode="decimal"
+                      value={form.productPrice}
+                      onChange={(e) => set('productPrice', e.target.value)}
+                    />
+                  </div>
+                  <ImageField
+                    label="Product image"
+                    value={form.productImageUrl}
+                    onChange={(url) => set('productImageUrl', url)}
+                    uploadSlug={form.productName || form.title}
+                  />
                 </div>
-              </div>
-            </AdminCardContent>
-          </AdminCard>
-        </div>
-      </div>
-    </div>
+              </Card>
+            )}
+          </div>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(false)}
+        title="Delete this slide?"
+        description="It is removed from the homepage. This cannot be undone."
+        confirmLabel="Delete slide"
+        critical
+        onConfirm={onDelete}
+      />
+    </Page>
   );
 }
