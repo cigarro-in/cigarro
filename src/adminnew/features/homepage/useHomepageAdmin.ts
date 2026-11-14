@@ -52,6 +52,12 @@ export function useHomepageAdmin() {
     void invalidateStorefront();
   };
 
+  // Side image of the product showcase (Classic). Empty string clears it.
+  const setSectionImage = async (key: HomepageSectionKey, backgroundImage: string) => {
+    await saveSectionConfig({ orgSlug: slug, sectionName: key, patch: { backgroundImage } });
+    void invalidateStorefront();
+  };
+
   const setSlideActive = async (slide: { _id: Id<'heroSlides'>; sortOrder: number }, isActive: boolean) => {
     await saveSlide({ orgSlug: slug, id: slide._id, slide: { isActive, sortOrder: slide.sortOrder } });
     void invalidateStorefront();
@@ -84,6 +90,7 @@ export function useHomepageAdmin() {
     setSectionEnabled,
     setSectionCollection,
     setSectionHeading,
+    setSectionImage,
     setSlideActive,
     setSlideOrder,
     removeSlide,

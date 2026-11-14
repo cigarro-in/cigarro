@@ -24,6 +24,7 @@ import {
 } from '../ui';
 import { ImageField } from '../features/homepage/ImageField';
 import { LinkPicker } from '../features/homepage/LinkPicker';
+import { HERO_PHONE_SPEC, HERO_PRODUCT_SPEC, heroBannerSpec } from '../features/homepage/imageSpecs';
 
 interface SlideForm {
   title: string;
@@ -193,18 +194,24 @@ export function HeroSlideFormPage() {
             <Card title="Image">
               <div className="space-y-5">
                 <ImageField
-                  label="Banner image"
+                  label={isClassic ? 'Banner image' : 'Banner image (every screen size)'}
                   value={form.imageUrl}
                   onChange={(url) => set('imageUrl', url)}
                   uploadSlug={form.title}
-                  hint="Wide image. Shown on desktop and tablet."
+                  spec={heroBannerSpec(themeId)}
+                  note={isClassic ? 'Shown on desktop and tablet. Phones use the phone image when one is set.' : undefined}
                 />
                 <ImageField
                   label="Phone image (optional)"
                   value={form.mobileImageUrl}
                   onChange={(url) => set('mobileImageUrl', url)}
                   uploadSlug={form.title}
-                  hint="Used on phones. Leave empty to use the banner image."
+                  spec={isClassic ? HERO_PHONE_SPEC : undefined}
+                  note={
+                    isClassic
+                      ? 'Used on phones. Leave empty to use the banner image.'
+                      : 'Vivid shows this image at every screen size, in place of the banner image. Leave it empty unless that is what you want.'
+                  }
                 />
               </div>
             </Card>
@@ -290,6 +297,7 @@ export function HeroSlideFormPage() {
                     value={form.productImageUrl}
                     onChange={(url) => set('productImageUrl', url)}
                     uploadSlug={form.productName || form.title}
+                    spec={HERO_PRODUCT_SPEC}
                   />
                 </div>
               </Card>

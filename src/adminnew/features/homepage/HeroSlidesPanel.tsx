@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
 import type { Id } from '../../../../convex/_generated/dataModel';
-import { Badge, Button, ConfirmDialog, EmptyState, ErrorBanner, Switch, toActionError, type ActionError } from '../../ui';
+import { Badge, Banner, Button, ConfirmDialog, EmptyState, ErrorBanner, Switch, toActionError, type ActionError } from '../../ui';
 
 export interface HeroSlideRow {
   _id: Id<'heroSlides'>;
@@ -16,6 +16,7 @@ export interface HeroSlideRow {
 // Sheet body for the hero section: slides in the order the store shows them.
 export function HeroSlidesPanel({
   slides,
+  themeId,
   onAdd,
   onEdit,
   onMove,
@@ -23,6 +24,7 @@ export function HeroSlidesPanel({
   onDelete,
 }: {
   slides: HeroSlideRow[];
+  themeId: string;
   onAdd: () => void;
   onEdit: (id: Id<'heroSlides'>) => void;
   onMove: (index: number, direction: -1 | 1) => Promise<void>;
@@ -60,6 +62,12 @@ export function HeroSlidesPanel({
           Add slide
         </Button>
       </div>
+
+      {themeId === 'vivid' && (
+        <Banner tone="info">
+          Vivid shows the first 3 slides that are shown, in this order. Hidden slides and any beyond the third are kept but not displayed.
+        </Banner>
+      )}
 
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 

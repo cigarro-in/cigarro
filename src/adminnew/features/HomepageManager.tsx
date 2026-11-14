@@ -135,6 +135,7 @@ export function HomepageManager() {
         {open?.def.key === 'hero_section' && (
           <HeroSlidesPanel
             slides={home.slides as HeroSlideRow[]}
+            themeId={home.themeId}
             onAdd={() => {
               setOpenKey(null);
               navigate('/hero-slides/new');
@@ -158,10 +159,12 @@ export function HomepageManager() {
             key={open.def.key}
             def={open.def}
             slug={home.slug}
+            themeId={home.themeId}
             collectionId={open.collectionId}
             collections={home.collections}
             onSetHeading={home.setSectionHeading}
             onSetCollection={home.setSectionCollection}
+            onSetImage={home.setSectionImage}
           />
         )}
       </Sheet>

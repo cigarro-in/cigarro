@@ -3,31 +3,50 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Banner, Button, ErrorBanner, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toActionError, useButtonFeedback, type ActionError } from '../../ui';
 import type { HomepageSectionDef, HomepageSectionKey } from './sections';
+import { ImageField } from './ImageField';
+import { SHOWCASE_IMAGE_SPEC } from './imageSpecs';
 
 // Sheet body for one product or category section: heading and collection link.
 // Only the controls the active theme reads are shown (see sections.ts).
 export function SectionSettingsPanel({
   def,
   slug,
+  themeId,
   collectionId,
   collections,
   onSetHeading,
   onSetCollection,
+  onSetImage,
 }: {
   def: HomepageSectionDef;
   slug: string;
+  themeId: string;
   collectionId: string | null;
-  collections: { supabaseId: string; title: string; isActive?: boolean }[];
+  collections: { supabaseId: string; title: string; isActive?: boolean; imageUrl?: string }[];
   onSetHeading: (key: HomepageSectionKey, title: string) => Promise<void>;
   onSetCollection: (key: HomepageSectionKey, collectionId: string | null) => Promise<void>;
+  onSetImage: (key: HomepageSectionKey, url: string) => Promise<void>;
 }) {
   const config = useQuery(api.content.getSectionConfig, { orgSlug: slug, name: def.key });
   const [draft, setDraft] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<ActionError | null>(null);
+  const [imageError, setImageError] = useState<ActionError | null>(null);
   const heading = useButtonFeedback();
 
   const linked = def.collectionLink && !!collectionId;
   const linkedCollection = linked ? collections.find((c) => c.supabaseId === collectionId) : undefined;
+  // Classic reads the linked collection's image first; the admin image is the fallback.
+  const showcaseImage = def.key === 'product_showcase' && themeId !== 'vivid';
+  const collectionHasImage = !!linkedCollection?.imageUrl;
+
+  const pickImage = async (url: string) => {
+    setImageError(null);
+    try {
+      await onSetImage(def.key, url);
+    } catch (err) {
+      setImageError(toActionError(err, 'Could not save the image. Try again.'));
+    }
+  };
   const current = draft ?? config?.title ?? '';
   const dirty = draft !== null && draft.trim() !== (config?.title ?? '');
 
@@ -93,6 +112,23 @@ export function SectionSettingsPanel({
             </Button>
           </div>
           <ErrorBanner error={heading.error} />
+        </div>
+      )}
+
+      {showcaseImage && (
+        <div className="space-y-2">
+          <ImageField
+            label="Side image"
+            value={config?.backgroundImage ?? ''}
+            onChange={(url) => void pickImage(url)}
+            spec={SHOWCASE_IMAGE_SPEC}
+            note={
+              collectionHasImage
+                ? 'The linked collection has its own image, and the store shows that one. This image is used only when the collection has none.'
+                : 'Shown beside the products. Set the collection image under Products, Collections to use that instead.'
+            }
+          />
+          <ErrorBanner error={imageError} onDismiss={() => setImageError(null)} />
         </div>
       )}
 

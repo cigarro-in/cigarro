@@ -1,24 +1,62 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
-import { Button, Label } from '../../ui';
+import { Banner, Button, Label } from '../../ui';
 import { MediaLibraryDialog } from '../products/MediaLibraryDialog';
+import { sizeText, ratioLabel, type ImageSpec } from './imageSpecs';
+
+// Natural pixel size of an image URL, or null until it has loaded.
+function useNaturalSize(url: string): { w: number; h: number } | null {
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    setSize(null);
+    if (!url) return;
+    let alive = true;
+    const img = new Image();
+    img.onload = () => {
+      if (alive) setSize({ w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.src = url;
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+  return size;
+}
 
 // One image chosen from the store's media library. Empty string = no image.
+// With `spec`, the field shows the recommended size and warns when the chosen
+// image's shape or width is far from the slot.
 export function ImageField({
   label,
   value,
   onChange,
   uploadSlug,
-  hint,
+  spec,
+  note,
 }: {
   label: string;
   value: string;
   onChange: (url: string) => void;
   /** SEO filename stem for an upload (usually the slide headline). */
   uploadSlug?: string;
-  hint?: string;
+  spec?: ImageSpec;
+  /** Extra plain-language line under the size (for example, what overrides this image). */
+  note?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const size = useNaturalSize(value);
+
+  let warning: string | null = null;
+  if (spec && size) {
+    const actual = size.w / size.h;
+    const target = spec.width / spec.height;
+    if (Math.abs(actual / target - 1) > 0.2) {
+      warning = `This image is ${size.w} × ${size.h} px. The slot is ${ratioLabel(spec)}, so parts of it will be cropped.`;
+    } else if (size.w < spec.width * 0.75) {
+      warning = `This image is ${size.w} px wide. Use at least ${spec.width} px so it stays sharp.`;
+    }
+  }
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -41,7 +79,9 @@ export function ImageField({
           )}
         </div>
       </div>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {spec && <p className="text-xs text-muted-foreground">Recommended {sizeText(spec)}.</p>}
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
+      {warning && <Banner tone="warning">{warning}</Banner>}
       <MediaLibraryDialog
         open={open}
         onOpenChange={setOpen}
