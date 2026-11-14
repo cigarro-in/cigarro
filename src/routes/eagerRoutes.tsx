@@ -9,14 +9,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 import { CategoryPage, type CategoryPageProps } from '../pages/products/CategoryPage';
 import { BrandPage } from '../pages/brands/BrandPage';
 import { BlogPost } from '../pages/blog/BlogsPage';
-import { AboutPage } from '../pages/company/AboutPage';
-import { ContactPage } from '../pages/company/ContactPage';
 import { AgentsPage } from '../pages/agents/AgentsPage';
-import { LegalPage } from '../pages/legal/LegalPage';
-import { TermsPage } from '../pages/legal/TermsPage';
-import { PrivacyPage } from '../pages/legal/PrivacyPage';
-import { ShippingPage } from '../pages/legal/ShippingPage';
-import { ReturnsPage } from '../pages/legal/ReturnsPage';
 import { VividProductList } from '../themes/vivid/VividProductList';
 import { useBrandDetail, useBrandsHub, useCategoriesHub, useCategoryListing, useFullCatalog } from '../hooks/data/useCatalog';
 import { useBlogPost, useBlogPosts } from '../hooks/data/useContent';
@@ -138,15 +131,8 @@ export function BlogsHubRoute() {
   return <BlogsPage />;
 }
 
-// Company and policy pages (P5-SSR slice 8). Re-exported so the server route
-// table and the client route table import the same eager components.
+// Re-exported so the server route table and the client route table import
+// the same eager components.
 export {
-  AboutPage,
-  ContactPage,
   AgentsPage,
-  LegalPage,
-  TermsPage,
-  PrivacyPage,
-  ShippingPage,
-  ReturnsPage,
 };

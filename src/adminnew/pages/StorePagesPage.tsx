@@ -4,6 +4,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { FileText } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
+import { builtInStorePage } from '../../lib/content/builtinPages';
 import { customPagePath, STORE_PAGES } from '../../lib/storePages/catalog';
 import {
   Badge,
@@ -23,36 +24,42 @@ import {
   type Column,
 } from '../ui';
 
-type PageState = 'published' | 'draft' | 'builtin';
+// live: published. default: built-in page with no saved version (storefront shows
+// the default text). draft: saved built-in version not published (default still live).
+// hidden: custom page not published (404 on the storefront).
+type PageState = 'live' | 'default' | 'draft' | 'hidden';
 
 interface PageRow {
   slug: string;
   title: string;
   path: string;
   state: PageState;
-  /** Custom pages exist only as rows; built-in pages fall back to code. */
+  /** Custom pages exist only as rows; built-in pages fall back to default text. */
   custom: boolean;
   hasRow: boolean;
   updatedAt: number | null;
 }
 
 const STATE_TONE: Record<PageState, BadgeTone> = {
-  published: 'success',
+  live: 'success',
+  default: 'neutral',
   draft: 'warning',
-  builtin: 'neutral',
+  hidden: 'neutral',
 };
 
 const STATE_LABEL: Record<PageState, string> = {
-  published: 'Published',
-  draft: 'Unpublished',
-  builtin: 'Built-in',
+  live: 'Live',
+  default: 'Live (default content)',
+  draft: 'Draft (unpublished changes)',
+  hidden: 'Hidden',
 };
 
 const STATE_FILTERS = [
   { value: 'all', label: 'All pages' },
-  { value: 'published', label: 'Published' },
-  { value: 'draft', label: 'Unpublished' },
-  { value: 'builtin', label: 'Built-in only' },
+  { value: 'live', label: 'Live' },
+  { value: 'default', label: 'Live (default content)' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'hidden', label: 'Hidden' },
 ];
 
 function formatDate(ms: number) {
@@ -61,7 +68,7 @@ function formatDate(ms: number) {
 
 /**
  * Store pages: the built-in pages (About, Contact, policies) plus custom pages.
- * "Built-in" means a built-in page has no custom version, so the storefront
+ * "Live (default content)" means a built-in page has no saved version, so the storefront
  * renders the default content.
  */
 export function StorePagesPage() {
@@ -73,18 +80,18 @@ export function StorePagesPage() {
   const sel = useRowSelection();
   const [query, setQuery] = useState('');
   const [state, setState] = useState('all');
-  const [confirm, setConfirm] = useState<null | 'revert' | 'delete'>(null);
+  const [confirm, setConfirm] = useState<null | 'reset' | 'delete'>(null);
   const publish = useButtonFeedback();
   const unpublish = useButtonFeedback();
 
   const pages: PageRow[] | undefined = useMemo(() => {
     if (rows === undefined) return undefined;
-    const builtIn = STORE_PAGES.map((def) => {
+    const builtIn = STORE_PAGES.map((def): PageRow => {
       const row = rows.find((r) => r.slug === def.slug);
-      const pageState: PageState = !row ? 'builtin' : row.published ? 'published' : 'draft';
+      const pageState: PageState = !row ? 'default' : row.published ? 'live' : 'draft';
       return {
         slug: def.slug,
-        title: row?.title ?? def.title,
+        title: row?.title ?? builtInStorePage(def.slug)?.title ?? def.slug,
         path: def.path,
         state: pageState,
         custom: false,
@@ -95,11 +102,11 @@ export function StorePagesPage() {
     const custom = rows
       .filter((r) => !STORE_PAGES.some((def) => def.slug === r.slug))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((r) => ({
+      .map((r): PageRow => ({
         slug: r.slug,
         title: r.title,
         path: customPagePath(r.slug),
-        state: (r.published ? 'published' : 'draft') as PageState,
+        state: r.published ? 'live' : 'hidden',
         custom: true,
         hasRow: true,
         updatedAt: r.updatedAt,
@@ -121,7 +128,7 @@ export function StorePagesPage() {
 
   const selected = (pages ?? []).filter((p) => sel.isSelected(p.slug));
   const selectedWithRows = selected.filter((p) => p.hasRow).map((p) => p.slug);
-  const revertTargets = selected.filter((p) => p.hasRow && !p.custom);
+  const resetTargets = selected.filter((p) => p.hasRow && !p.custom);
   const deleteTargets = selected.filter((p) => p.custom);
 
   const setBulkPublished = (fb: ReturnType<typeof useButtonFeedback>, published: boolean) =>
@@ -165,7 +172,7 @@ export function StorePagesPage() {
   ];
 
   const bulkError = publish.error || unpublish.error;
-  const confirmTargets = confirm === 'delete' ? deleteTargets : revertTargets;
+  const confirmTargets = confirm === 'delete' ? deleteTargets : resetTargets;
 
   return (
     <Page
@@ -207,8 +214,8 @@ export function StorePagesPage() {
             <Button size="sm" variant="secondary" state={unpublish.state} onClick={() => setBulkPublished(unpublish, false)}>
               Unpublish
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setConfirm('revert')} disabled={revertTargets.length === 0}>
-              Revert to built-in
+            <Button size="sm" variant="secondary" onClick={() => setConfirm('reset')} disabled={resetTargets.length === 0}>
+              Reset to default
             </Button>
             <Button size="sm" variant="critical" onClick={() => setConfirm('delete')} disabled={deleteTargets.length === 0}>
               Delete
@@ -223,14 +230,14 @@ export function StorePagesPage() {
         title={
           confirm === 'delete'
             ? `Delete ${confirmTargets.length} page(s)?`
-            : `Revert ${confirmTargets.length} page(s) to built-in?`
+            : `Reset ${confirmTargets.length} page(s) to default?`
         }
         description={
           confirm === 'delete'
             ? 'Deleted pages return 404 on the storefront. This cannot be undone.'
-            : 'The custom text is deleted and the storefront shows the default page again. This cannot be undone.'
+            : 'The saved version is deleted and the storefront shows the default content again. This cannot be undone.'
         }
-        confirmLabel={confirm === 'delete' ? 'Delete pages' : 'Revert and delete'}
+        confirmLabel={confirm === 'delete' ? 'Delete pages' : 'Reset to default'}
         critical
         onConfirm={async () => {
           for (const p of confirmTargets) {

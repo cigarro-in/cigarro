@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
+import { builtInStorePage } from '../../lib/content/builtinPages';
 import { customPagePath, CUSTOM_PAGE_SLUG_PATTERN, storePageBySlug } from '../../lib/storePages/catalog';
 import {
   Badge,
@@ -31,11 +32,6 @@ interface PageForm {
   metaDescription: string;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'published', label: 'Published' },
-  { value: 'draft', label: 'Unpublished' },
-];
-
 const SLUG_MESSAGES: Record<string, string> = {
   SLUG_TAKEN: 'Another page in this store already uses that URL. Choose a different one.',
   SLUG_RESERVED: 'That URL is reserved by the store. Choose a different one.',
@@ -46,8 +42,12 @@ const SLUG_MESSAGES: Record<string, string> = {
 const NEW_SLUG = 'new';
 const BLANK: PageForm = { title: '', slug: '', body: '', status: 'draft', metaTitle: '', metaDescription: '' };
 
+const DEFAULT_TOKEN_NOTE =
+  'Words in double braces, such as {{storeName}}, are filled in from Store settings on the storefront.';
+
 /**
- * Edit one store page. Built-in pages (About, Contact, policies) keep their URL.
+ * Edit one store page. Built-in pages (About, Contact, policies) keep their URL
+ * and open with their live text, so the editor always starts from what is shown.
  * Custom pages are created at /pages/new and live at /pages/<slug>.
  */
 export function StorePageFormPage() {
@@ -55,6 +55,7 @@ export function StorePageFormPage() {
   const { slug = '' } = useParams();
   const isNew = slug === NEW_SLUG;
   const builtIn = isNew ? null : storePageBySlug(slug);
+  const builtInDef = builtIn ? builtInStorePage(builtIn.slug) : null;
 
   const rows = useQuery(api.storePages.listStorePagesForAdmin, { orgSlug: ORG_SLUG });
   const savePage = useMutation(api.storePages.saveStorePage);
@@ -67,7 +68,7 @@ export function StorePageFormPage() {
   const [loaded, setLoaded] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [showTitleError, setShowTitleError] = useState(false);
-  const [revertOpen, setRevertOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const save = useButtonFeedback();
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function StorePageFormPage() {
     }
     const row = rows.find((r) => r.slug === slug);
     if (!builtIn && !row) return; // Not found: rendered below.
+    // A built-in page with no saved version starts from its live default text.
     const next: PageForm = row
       ? {
           title: row.title,
@@ -89,12 +91,19 @@ export function StorePageFormPage() {
           metaTitle: row.metaTitle ?? '',
           metaDescription: row.metaDescription ?? '',
         }
-      : { title: builtIn!.title, slug, body: '', status: 'draft', metaTitle: '', metaDescription: '' };
+      : {
+          title: builtInDef?.title ?? '',
+          slug,
+          body: builtInDef?.html ?? '',
+          status: 'draft',
+          metaTitle: '',
+          metaDescription: '',
+        };
     setForm(next);
     setSaved(snapshot(next));
     setHasRow(!!row);
     setLoaded(true);
-  }, [rows, loaded, builtIn, slug, isNew]);
+  }, [rows, loaded, builtIn, builtInDef, slug, isNew]);
 
   const notFound = !isNew && rows !== undefined && !builtIn && !rows.some((r) => r.slug === slug);
 
@@ -129,6 +138,10 @@ export function StorePageFormPage() {
   const published = form.status === 'published';
   const isCustom = !builtIn;
   const path = builtIn?.path ?? customPagePath(isNew ? slugify(form.slug || form.title) || 'new-page' : slug);
+  const statusOptions = [
+    { value: 'published', label: 'Live' },
+    { value: 'draft', label: isCustom ? 'Hidden' : 'Draft (unpublished changes)' },
+  ];
 
   const onSave = () => {
     if (!form.title.trim()) {
@@ -171,17 +184,17 @@ export function StorePageFormPage() {
 
   return (
     <Page
-      title={builtIn?.title ?? (form.title.trim() || 'New page')}
+      title={builtInDef?.title ?? (form.title.trim() || 'New page')}
       backTo="/pages"
       titleMeta={
         <div className="flex items-center gap-2">
           {isCustom ? (
-            <Badge tone={isNew ? 'neutral' : published ? 'success' : 'warning'}>
-              {isNew ? 'New' : published ? 'Published' : 'Unpublished'}
+            <Badge tone={isNew ? 'neutral' : published ? 'success' : 'neutral'}>
+              {isNew ? 'New' : published ? 'Live' : 'Hidden'}
             </Badge>
           ) : (
             <Badge tone={published ? 'success' : hasRow ? 'warning' : 'neutral'}>
-              {published ? 'Published' : hasRow ? 'Unpublished' : 'Built-in'}
+              {published ? 'Live' : hasRow ? 'Draft (unpublished changes)' : 'Live (default content)'}
             </Badge>
           )}
           {dirty && <Badge tone="attention">Unsaved changes</Badge>}
@@ -191,13 +204,19 @@ export function StorePageFormPage() {
       secondaryActions={
         isNew || !hasRow
           ? []
-          : [{ label: isCustom ? 'Delete page' : 'Revert to built-in', critical: true, onClick: () => setRevertOpen(true) }]
+          : [{ label: isCustom ? 'Delete page' : 'Reset to default', critical: true, onClick: () => setResetOpen(true) }]
       }
     >
       <ErrorBanner error={save.error} />
-      {builtIn && !hasRow && (
-        <Banner tone="info" title="The built-in page is live">
-          Write a custom version here and publish it to replace the default content. Until then, nothing changes on the storefront.
+      {builtIn && (
+        <Banner
+          tone="info"
+          title={hasRow ? 'Saved version of this page' : 'Editing the live default page'}
+        >
+          {hasRow
+            ? 'The storefront shows this version once it is Live. Until then the default content stays up. '
+            : 'Your edits start from the live text. Nothing changes on the storefront until you save with status Live. '}
+          {DEFAULT_TOKEN_NOTE}
         </Banner>
       )}
       <PageLayout
@@ -219,8 +238,14 @@ export function StorePageFormPage() {
           <ContentSidebar
             status={form.status}
             onStatusChange={(v) => update('status', v)}
-            statusOptions={STATUS_OPTIONS}
-            statusHint={published ? `Live at ${path}` : 'Only published pages appear on the storefront.'}
+            statusOptions={statusOptions}
+            statusHint={
+              published
+                ? `Live at ${path}${builtIn ? ', replacing the default content' : ''}.`
+                : isCustom
+                  ? 'Hidden. Only live pages appear on the storefront.'
+                  : 'Saved but not live. The storefront keeps showing the default content.'
+            }
             slug={isNew ? form.slug : slug}
             onSlugChange={(v) => {
               setSlugTouched(true);
@@ -230,7 +255,7 @@ export function StorePageFormPage() {
             slugReadOnly={!isNew}
             metaTitle={form.metaTitle}
             onMetaTitleChange={(v) => update('metaTitle', v)}
-            metaTitlePlaceholder={form.title || builtIn?.title || ''}
+            metaTitlePlaceholder={form.title || builtInDef?.title || ''}
             metaDescription={form.metaDescription}
             onMetaDescriptionChange={(v) => update('metaDescription', v)}
             metaDescriptionPlaceholder="Short summary for search results"
@@ -239,15 +264,15 @@ export function StorePageFormPage() {
       />
 
       <ConfirmDialog
-        open={revertOpen}
-        onOpenChange={setRevertOpen}
-        title={isCustom ? `Delete ${form.title || 'this page'}?` : `Revert ${builtIn?.title} to the built-in page?`}
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title={isCustom ? `Delete ${form.title || 'this page'}?` : `Reset ${builtInDef?.title} to default?`}
         description={
           isCustom
             ? `The page is removed and ${path} returns 404. This cannot be undone.`
-            : 'Your custom text is deleted. The storefront shows the default page again. This cannot be undone.'
+            : 'Your saved version is deleted. The storefront shows the default content again. This cannot be undone.'
         }
-        confirmLabel={isCustom ? 'Delete page' : 'Revert and delete'}
+        confirmLabel={isCustom ? 'Delete page' : 'Reset to default'}
         critical
         onConfirm={async () => {
           await deletePage({ orgSlug: ORG_SLUG, slug });

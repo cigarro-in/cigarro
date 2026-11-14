@@ -19,7 +19,6 @@ import { useCatalogProduct } from '../hooks/data/useCatalog';
 import { useSetRenderStatus } from '../lib/ssr/renderStatus';
 import { useTheme } from '../themes';
 import {
-  AboutPage,
   AgentsPage,
   BlogRoute,
   BlogsHubRoute,
@@ -27,13 +26,7 @@ import {
   BrandsHubRoute,
   CategoriesHubRoute,
   CategoryRoute,
-  ContactPage,
-  LegalPage,
-  PrivacyPage,
   ProductsHubRoute,
-  ReturnsPage,
-  ShippingPage,
-  TermsPage,
 } from './eagerRoutes';
 
 // Eager home component per theme. Theme ids outside this map fall back to classic.
@@ -91,14 +84,14 @@ export function SsrRoutes({ location }: SsrRoutesProps) {
       <Route path={ROUTES.BRAND_DETAIL} element={<BrandRoute />} />
       <Route path={ROUTES.BLOGS} element={<BlogsHubRoute />} />
       <Route path={ROUTES.BLOG_POST} element={<BlogRoute />} />
-      <Route path={ROUTES.ABOUT} element={<StorePageGate slug="about" fallback={<AboutPage />} />} />
-      <Route path={ROUTES.CONTACT} element={<StorePageGate slug="contact" fallback={<ContactPage />} />} />
+      <Route path={ROUTES.ABOUT} element={<StorePageGate slug="about" />} />
+      <Route path={ROUTES.CONTACT} element={<StorePageGate slug="contact" />} />
       <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
-      <Route path={ROUTES.LEGAL} element={<StorePageGate slug="legal" fallback={<LegalPage />} />} />
-      <Route path={ROUTES.TERMS} element={<StorePageGate slug="terms" fallback={<TermsPage />} />} />
-      <Route path={ROUTES.PRIVACY} element={<StorePageGate slug="privacy" fallback={<PrivacyPage />} />} />
-      <Route path={ROUTES.SHIPPING} element={<StorePageGate slug="shipping" fallback={<ShippingPage />} />} />
-      <Route path={ROUTES.RETURNS} element={<StorePageGate slug="returns" fallback={<ReturnsPage />} />} />
+      <Route path={ROUTES.LEGAL} element={<StorePageGate slug="legal" />} />
+      <Route path={ROUTES.TERMS} element={<StorePageGate slug="terms" />} />
+      <Route path={ROUTES.PRIVACY} element={<StorePageGate slug="privacy" />} />
+      <Route path={ROUTES.SHIPPING} element={<StorePageGate slug="shipping" />} />
+      <Route path={ROUTES.RETURNS} element={<StorePageGate slug="returns" />} />
       <Route path={ROUTES.STORE_PAGE} element={<CustomStorePageRoute />} />
       <Route path="*" element={null} />
     </Routes>
