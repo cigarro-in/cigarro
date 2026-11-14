@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/button';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { brandSeo } from '../../lib/seo/listingSeo';
+import { RichText } from '../../components/RichText';
 
 export interface BrandPageProps {
   /** Set by the route (/brand/:slug). */
@@ -148,9 +149,7 @@ export function BrandPage({ brandSlug }: BrandPageProps) {
 
                   {/* Description */}
                   {brand.description && (
-                    <p className="text-dark/70 font-sans text-base md:text-lg leading-relaxed max-w-2xl mb-6">
-                      {brand.description}
-                    </p>
+                    <RichText html={brand.description} className="text-dark/70 font-sans text-base md:text-lg leading-relaxed max-w-2xl mb-6" />
                   )}
 
                   {/* Website Link */}

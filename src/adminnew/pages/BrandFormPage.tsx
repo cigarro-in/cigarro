@@ -31,6 +31,7 @@ import {
   Textarea,
   useButtonFeedback,
 } from '../ui';
+import { LazyRichTextEditor } from '../ui/LazyRichTextEditor';
 
 const LIST = '/brands';
 
@@ -190,11 +191,13 @@ export function BrandFormPage() {
                     />
                   </Field>
                   <Field label="Description" htmlFor="brand-description">
-                    <Textarea
+                    <LazyRichTextEditor
                       id="brand-description"
-                      rows={3}
+                      variant="compact"
+                      ariaLabel="Description"
+                      minHeight={128}
                       value={form.description}
-                      onChange={(e) => patch({ description: e.target.value })}
+                      onChange={(description) => patch({ description })}
                       placeholder="Describe the brand"
                     />
                   </Field>

@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { RichText } from '../../components/RichText';
 
 export interface CategoryPageProps {
   /** Set by the route: /category/:slug, and the category half of /category/:category/:brand. */
@@ -123,9 +124,7 @@ export function CategoryPage({ categorySlug, brandSlug }: CategoryPageProps) {
             <div className="text-center max-w-3xl mx-auto">
               <h1 className="font-serif text-3xl md:text-5xl text-dark mb-4">{seo.heading}</h1>
               {category?.description && (
-                <p className="text-dark/70 font-sans text-base md:text-lg leading-relaxed">
-                  {category.description}
-                </p>
+                <RichText html={category.description} className="text-dark/70 font-sans text-base md:text-lg leading-relaxed" />
               )}
             </div>
           </div>

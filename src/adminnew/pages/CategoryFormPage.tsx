@@ -31,6 +31,7 @@ import {
   Textarea,
   useButtonFeedback,
 } from '../ui';
+import { LazyRichTextEditor } from '../ui/LazyRichTextEditor';
 
 const LIST = '/categories';
 
@@ -196,11 +197,13 @@ export function CategoryFormPage() {
                     />
                   </Field>
                   <Field label="Description" htmlFor="category-description">
-                    <Textarea
+                    <LazyRichTextEditor
                       id="category-description"
-                      rows={3}
+                      variant="compact"
+                      ariaLabel="Description"
+                      minHeight={128}
                       value={form.description}
-                      onChange={(e) => patch({ description: e.target.value })}
+                      onChange={(description) => patch({ description })}
                       placeholder="Describe the category"
                     />
                   </Field>

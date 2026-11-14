@@ -34,6 +34,7 @@ import {
   isVariantInStock,
   resolveProductCanonical,
 } from '../../lib/seo/productOffer';
+import { RichText } from '../../components/RichText';
 
 // Updated to match new schema - images now on variants, brand via brand_id
 interface ProductDetails {
@@ -813,9 +814,7 @@ function ProductPage() {
                 className="space-y-3 pt-6 border-t border-coyote/30"
               >
                 <h3 className="text-sm uppercase tracking-[0.2em] text-canyon font-semibold">Full Description</h3>
-                <p className="text-dark/70 text-sm leading-relaxed">
-                  {product.description}
-                </p>
+                <RichText html={product.description} className="text-dark/70 text-sm leading-relaxed" />
               </motion.div>
             )}
 

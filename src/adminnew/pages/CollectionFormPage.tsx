@@ -31,6 +31,7 @@ import {
   Skeleton,
   useButtonFeedback,
 } from '../ui';
+import { LazyRichTextEditor } from '../ui/LazyRichTextEditor';
 
 const LIST = '/collections';
 
@@ -196,11 +197,13 @@ export function CollectionFormPage() {
                     />
                   </Field>
                   <Field label="Description" htmlFor="collection-description">
-                    <Textarea
+                    <LazyRichTextEditor
                       id="collection-description"
-                      rows={4}
+                      variant="compact"
+                      ariaLabel="Description"
+                      minHeight={128}
                       value={form.description}
-                      onChange={(e) => patch({ description: e.target.value })}
+                      onChange={(description) => patch({ description })}
                       placeholder="Describe the collection"
                     />
                   </Field>

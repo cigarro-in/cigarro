@@ -36,6 +36,7 @@ import {
   useButtonFeedback,
   type ActionError,
 } from '../ui';
+import { LazyRichTextEditor } from '../ui/LazyRichTextEditor';
 import {
   BrandPicker,
   CategoryPicker,
@@ -519,13 +520,14 @@ export function ProductFormPage() {
                   />
                 </Field>
                 <Field label="Description" htmlFor="p-desc">
-                  <Textarea
+                  <LazyRichTextEditor
                     id="p-desc"
+                    variant="compact"
+                    ariaLabel="Description"
+                    minHeight={192}
                     value={form.description}
-                    onChange={(e) => patch({ description: e.target.value })}
+                    onChange={(description) => patch({ description })}
                     placeholder="Describe the product: taste, strength, pack details…"
-                    rows={8}
-                    className="min-h-40"
                   />
                 </Field>
                 <Field

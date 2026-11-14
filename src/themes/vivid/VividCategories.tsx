@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useHomepageData } from '../../hooks/useHomepageData';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { getProductImageUrl } from '../../lib/images/urls';
+import { richTextToPlain } from '../../lib/content/richText';
 
 export function VividCategories() {
   const { data, isLoading } = useHomepageData();
@@ -69,7 +70,7 @@ export function VividCategories() {
                   </p>
                   {cat.description && (
                     <p className="text-xs text-[var(--vv-fg-muted)] mt-1 line-clamp-2">
-                      {cat.description}
+                      {richTextToPlain(cat.description)}
                     </p>
                   )}
                 </div>

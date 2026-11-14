@@ -8,6 +8,7 @@ import { SEOHead } from '../../components/seo/SEOHead';
 import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
 import { BreadcrumbSchema } from '../../components/seo/BreadcrumbSchema';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { richTextToPlain } from '../../lib/content/richText';
 
 // Brands hub (classic theme). Derived from the catalog on the first render, so
 // the server render lists every brand with products (no effect-driven state).
@@ -136,7 +137,7 @@ export function BrandsPage() {
 
                       {brand.description && (
                         <p className="text-dark/70 font-sans text-sm leading-relaxed mb-4 line-clamp-2">
-                          {brand.description}
+                          {richTextToPlain(brand.description)}
                         </p>
                       )}
 

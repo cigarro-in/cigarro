@@ -4,6 +4,7 @@ import { ProductCard } from '../../components/products/ProductCard';
 import { useCart, Product } from '../../hooks/useCart';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { CategoryWithProducts } from '../../types/home';
+import { richTextToPlain } from '../../lib/content/richText';
 
 const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   cigarettes: Package,
@@ -83,7 +84,7 @@ function CategoryProductRow({
         {/* Category Tagline/Description */}
         {category.description && (
           <p className="text-dark/70 text-center text-sm mb-6 max-w-xs mx-auto">
-            {category.description}
+            {richTextToPlain(category.description)}
           </p>
         )}
 

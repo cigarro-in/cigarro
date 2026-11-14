@@ -10,6 +10,7 @@ import { listingSeo } from '../../lib/seo/listingSeo';
 import { VividProductCard } from './VividProductCard';
 import { VividCartPanel } from './VividCartPanel';
 import type { HomepageProduct } from '../../types/home';
+import { richTextToPlain } from '../../lib/content/richText';
 
 interface ListResult {
   products: HomepageProduct[];
@@ -50,7 +51,7 @@ export function VividProductList({ mode, categorySlug, brandSlug }: Props) {
       return {
         products: normalize(listing.products as any[]),
         categoryName: listing.category.name,
-        categoryDescription: listing.category.description || null,
+        categoryDescription: richTextToPlain(listing.category.description) || null,
       };
     }
     if (mode === 'all') {

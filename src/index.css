@@ -837,3 +837,119 @@ html {
   z-index: -1 !important;
 }
 
+
+/* Rich text: admin editor output and storefront descriptions, blog and page bodies.
+   Scoped to .rich-text so it never restyles the surrounding theme. Colours inherit,
+   so both themes (and the admin editor) pick up their own text colour. */
+.rich-text {
+  color: inherit;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.rich-text > * + * {
+  margin-top: 0.9em;
+}
+.rich-text p {
+  margin: 0;
+}
+.rich-text h2 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.6em;
+}
+.rich-text h3 {
+  font-size: 1.2rem;
+  line-height: 1.35;
+  font-weight: 600;
+  margin-top: 1.3em;
+}
+.rich-text strong,
+.rich-text b {
+  font-weight: 600;
+}
+.rich-text ul,
+.rich-text ol {
+  padding-left: 1.5em;
+}
+.rich-text ul {
+  list-style: disc;
+}
+.rich-text ol {
+  list-style: decimal;
+}
+.rich-text li + li {
+  margin-top: 0.35em;
+}
+.rich-text li > p {
+  display: inline;
+}
+.rich-text blockquote {
+  margin-left: 0;
+  padding-left: 1em;
+  border-left: 3px solid currentColor;
+  opacity: 0.85;
+  font-style: italic;
+}
+.rich-text a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.rich-text img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2em auto;
+  border-radius: 0.5rem;
+}
+.rich-text table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  overflow-wrap: normal;
+}
+.rich-text th,
+.rich-text td {
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+.rich-text th {
+  font-weight: 600;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.rich-text br {
+  line-height: inherit;
+}
+
+/* Admin editor surface. Same typography as the storefront, plus placeholder and selection. */
+.rich-text-editor {
+  min-height: inherit;
+  position: relative;
+}
+.rich-text-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--admin-text-muted, #7a7a7a);
+}
+.rich-text-editor .tableWrapper {
+  overflow-x: auto;
+}
+.rich-text-editor .selectedCell::after {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.rich-text-editor table {
+  margin: 1em 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rich-text-editor * {
+    transition: none !important;
+  }
+}

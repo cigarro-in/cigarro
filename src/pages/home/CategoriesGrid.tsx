@@ -7,6 +7,7 @@ import { useInlineStatus, InlineStatus } from '../../components/common/InlineSta
 import { ProductCard } from '../../components/products/ProductCard';
 
 import { Category as HomeCategory, BlogSectionConfig } from '../../types/home';
+import { richTextToPlain } from '../../lib/content/richText';
 
 interface Category extends HomeCategory {
   product_count?: number;
@@ -147,7 +148,7 @@ export function CategoriesGrid({
                           
                           {category.description && (
                             <p className="text-dark/70 text-sm leading-relaxed line-clamp-2">
-                              {category.description}
+                              {richTextToPlain(category.description)}
                             </p>
                           )}
                         </div>
