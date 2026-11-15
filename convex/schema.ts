@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { crashSource } from './lib/crashLog';
-import { storeAgeGateV, storeBrandV, storeBusinessV, storeReferralV, storeSeoV, storeSocialsV } from './lib/siteSettings';
+import { storeAgeGateV, storeAppIconsV, storeBrandV, storeBusinessV, storeReferralV, storeSeoV, storeSocialsV } from './lib/siteSettings';
 
 // Consent log (convex/consent.ts). Append-only: rows are inserted, never patched or deleted.
 export const consentKind = v.union(
@@ -882,6 +882,7 @@ export default defineSchema({
     referral: v.optional(storeReferralV), // Refer & earn program rules
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
+    appIcons: v.optional(storeAppIconsV), // generated home-screen / maskable / apple icons
     // Homepage section keys in display order (see src/lib/homepage/sectionOrder.ts).
     // Absent = the theme's default order.
     homepageSectionOrder: v.optional(v.array(v.string())),

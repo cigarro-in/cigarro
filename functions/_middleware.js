@@ -3,7 +3,7 @@
 // and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
-import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath } from './lib/org.js';
+import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath, brandName } from './lib/org.js';
 import { buildAdminManifest, storeManifestPath } from './lib/admin-pwa.js';
 import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
 import { applyRedirect } from './lib/redirects.js';
@@ -239,6 +239,19 @@ async function nextWithOrg(context) {
     rewriter = rewriter.on('link[rel="manifest"]', {
       element(el) { el.setAttribute('href', manifestHref); },
     });
+    // Home-screen icon and name for this store: its generated apple-touch icon and
+    // its own title (falls back to the platform icon when none was generated).
+    const brand = await resolveStoreBrand(context.env, org);
+    const appleHref = brand?.appIcons?.apple180 || '/icons/apple-touch-icon.png';
+    const appleTitle = brandName(org).slice(0, 12).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    rewriter = rewriter
+      .on('link[rel="apple-touch-icon"]', { element(el) { el.remove(); } })
+      .on('meta[name="apple-mobile-web-app-title"]', { element(el) { el.remove(); } })
+      .on('head', {
+        element(el) {
+          el.append(`<link rel="apple-touch-icon" href="${appleHref.replace(/"/g, '&quot;')}"><meta name="apple-mobile-web-app-title" content="${appleTitle}">`, { html: true });
+        },
+      });
   }
   // Marks a document that carries window.__ORG__. The service worker caches only these.
   return withHeader(rewriter.transform(res), 'X-Org-Injected', '1');

@@ -1,6 +1,10 @@
-import { Card, ErrorBanner, Input, Label } from '../../ui';
+import { useMutation } from 'convex/react';
+import { Button, Card, ErrorBanner, Input, Label, useButtonFeedback } from '../../ui';
 import { SingleImagePicker } from '../../components/shared/ImagePicker';
 import { siteConfig } from '../../../config/site';
+import { api } from '../../../../convex/_generated/api';
+import { ORG_SLUG } from '../../../lib/convex/org';
+import { appIconSource, generateAndUploadAppIcons, type AppIconUrls } from '../../../lib/images/appIcons';
 import type { SectionProps } from './sections';
 import { SaveBar } from './SaveBar';
 import { FieldGrid } from './FieldGrid';
@@ -11,6 +15,9 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 /** Store name, logo, site icon, brand colour, contact, address and social links. */
 export function StoreDetailsSection({ live }: SectionProps) {
   const { draft, update, dirty, discard, save, feedback } = useSettingsDraft(live);
+  const setAppIcons = useMutation(api.adminCatalog.saveSiteSettings);
+  // App icon generation and upload (home screen icon, maskable, apple touch).
+  const iconFeedback = useButtonFeedback();
   if (!draft) return null;
 
   const setBrand = (patch: Partial<typeof draft.brand>) =>
@@ -22,8 +29,14 @@ export function StoreDetailsSection({ live }: SectionProps) {
   const setSocial = (patch: Partial<typeof draft.socials>) =>
     update((d) => ({ ...d, socials: { ...d.socials, ...patch } }));
 
-  const onSave = () =>
-    save((d) => {
+  // Saving a new site icon or logo regenerates the app icons with the same save.
+  const onSave = async () => {
+    let appIcons: AppIconUrls | undefined;
+    const source = appIconSource(draft.brand);
+    if (source && source !== appIconSource(live.brand)) {
+      appIcons = await iconFeedback.run(() => generateAndUploadAppIcons(source, draft.brand.brandColor));
+    }
+    await save((d) => {
       const color = d.brand.brandColor.trim();
       if (color && !HEX.test(color)) throw new Error('Brand colour must be a hex value like #8B4513');
       return {
@@ -54,12 +67,26 @@ export function StoreDetailsSection({ live }: SectionProps) {
           youtube: d.socials.youtube.trim() || undefined,
           whatsapp: d.socials.whatsapp.trim() || undefined,
         },
+        ...(appIcons ? { appIcons } : {}),
       };
     });
+  };
+
+  // Rebuilds the app icons from the saved site icon (or logo), for stores that
+  // predate them or after a source change.
+  const liveSource = appIconSource(live.brand);
+  const onRegenerate = () => {
+    if (!liveSource) return;
+    void iconFeedback.run(async () => {
+      const urls = await generateAndUploadAppIcons(liveSource, live.brand.brandColor);
+      await setAppIcons({ orgSlug: ORG_SLUG, appIcons: urls });
+    });
+  };
 
   return (
     <div className="flex flex-col gap-3">
       <ErrorBanner error={feedback.error} />
+      <ErrorBanner error={iconFeedback.error} />
 
       <Card title="Store">
         <div className="flex flex-col gap-4">
@@ -106,6 +133,22 @@ export function StoreDetailsSection({ live }: SectionProps) {
               />
             </div>
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            state={iconFeedback.state}
+            disabled={!liveSource || iconFeedback.state === 'loading'}
+            onClick={onRegenerate}
+          >
+            Regenerate app icons
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            {liveSource
+              ? 'Home-screen and notification icons come from the saved site icon (or logo).'
+              : 'Set a site icon or logo first.'}
+          </p>
         </div>
       </Card>
 
@@ -181,7 +224,12 @@ export function StoreDetailsSection({ live }: SectionProps) {
         </FieldGrid>
       </Card>
 
-      <SaveBar dirty={dirty} state={feedback.state} onSave={() => void onSave()} onDiscard={discard} />
+      <SaveBar
+        dirty={dirty}
+        state={feedback.state === 'idle' && iconFeedback.state === 'loading' ? 'loading' : feedback.state}
+        onSave={() => void onSave()}
+        onDiscard={discard}
+      />
     </div>
   );
 }

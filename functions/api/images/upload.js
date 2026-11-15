@@ -5,7 +5,7 @@ import { requiredConvexUrl } from '../../lib/env.js';
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
  * - GET  /api/images/upload?prefix=asset_images/  → { images: [{name,key,url,size,uploaded}], folders: [..] }
- * - POST /api/images/upload (multipart: file, folder?) → { url, key, size }
+ * - POST /api/images/upload (multipart: file, folder?, png=true for generated app icons) → { url, key, size }
  * - DELETE /api/images/upload?key=asset_images/... → { success: true }
  *
  * Admin-gated: Authorization Bearer <own ES256 JWT (cigarro_token)>, verified against
@@ -177,23 +177,31 @@ export async function onRequest(context) {
     // raw=true stores non-image assets (video/pdf/zip) untouched under their
     // original extension. Images are expected pre-converted to WebP.
     const raw = String(form?.get('raw') || '') === 'true';
+    // png=true: a PNG generated in the browser (store app icons). Checked by its
+    // signature; stored as PNG under the same create-only rule.
+    const png = String(form?.get('png') || '') === 'true';
+    if (raw && png) return json({ error: 'Use either raw or png, not both' }, 400);
     if (!file || typeof file.arrayBuffer !== 'function')
       return json({ error: 'file (multipart) is required' }, 400);
     const mime = String(file.type || 'application/octet-stream');
     if (raw && mime.startsWith('image/'))
       return json({ error: 'Images must use the WebP upload flow' }, 400);
-    if (!raw && mime !== 'image/webp')
+    if (png && mime !== 'image/png')
+      return json({ error: 'PNG image required' }, 400);
+    if (!raw && !png && mime !== 'image/webp')
       return json({ error: 'Converted WebP image required' }, 400);
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length === 0 || bytes.length > MAX_BYTES)
       return json({ error: 'File empty or over 10MB' }, 400);
-    if (!raw && !(bytes.length >= 12 &&
+    if (!raw && !png && !(bytes.length >= 12 &&
       String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
       String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'))
       return json({ error: 'Invalid WebP image' }, 400);
+    if (png && !(bytes.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => bytes[i] === b)))
+      return json({ error: 'Invalid PNG image' }, 400);
     const ext = raw
       ? (String(file.name || 'bin').split('.').pop() || 'bin').toLowerCase().slice(0, 10)
-      : 'webp';
+      : png ? 'png' : 'webp';
     if (raw && /^(webp|jpe?g|png|gif|avif|svg)$/.test(ext))
       return json({ error: 'Images must use the WebP upload flow' }, 400);
     // SEO filename: item slug when the caller knows it, numeric suffix on
@@ -210,7 +218,7 @@ export async function onRequest(context) {
     if (pipelineSource) customMetadata.pipelineSource = pipelineSource;
     const meta = {
       httpMetadata: {
-        contentType: raw ? mime : 'image/webp',
+        contentType: raw ? mime : png ? 'image/png' : 'image/webp',
         cacheControl: 'public, max-age=31536000, immutable',
       },
       // Create-only: R2 returns null when the key already exists.

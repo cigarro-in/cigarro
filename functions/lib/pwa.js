@@ -32,6 +32,19 @@ function httpsUrl(raw) {
   return /^https:\/\/[^\s"'<>]+$/i.test(value) && value.length <= 2048 ? value : null;
 }
 
+// Generated app icons from siteSettings.appIcons (see the admin Store details page).
+// Returns { icon192, icon512, maskable512, apple180 } with each entry an https URL or null.
+function storeAppIcons(raw) {
+  const icons = raw && typeof raw === 'object' ? raw : {};
+  const out = {
+    icon192: httpsUrl(icons.icon192),
+    icon512: httpsUrl(icons.icon512),
+    maskable512: httpsUrl(icons.maskable512),
+    apple180: httpsUrl(icons.apple180),
+  };
+  return Object.values(out).some(Boolean) ? out : null;
+}
+
 function cleanText(raw, max) {
   return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 }
@@ -97,7 +110,7 @@ async function squarePngSizeCached(url, host) {
 
 // Brand facts for one store. Never throws: on a lookup failure returns the
 // platform defaults and does not cache, so the next request retries.
-// Returns { brandColor, description, faviconUrl, icon: {url, size} | null }.
+// Returns { brandColor, description, faviconUrl, icon: {url, size} | null, appIcons | null }.
 export async function resolveStoreBrand(env, org) {
   const host = org.primaryHost;
   const cache = globalThis.caches?.default;
@@ -122,7 +135,7 @@ export async function resolveStoreBrand(env, org) {
     settings = body.value ?? {};
   } catch (error) {
     console.error('PWA brand unavailable, using platform defaults:', error instanceof Error ? error.message : error);
-    return { brandColor: null, description: '', faviconUrl: null, icon: null };
+    return { brandColor: null, description: '', faviconUrl: null, icon: null, appIcons: null };
   }
 
   const faviconUrl = httpsUrl(settings.brand?.faviconUrl) || httpsUrl(settings.faviconUrl);
@@ -145,6 +158,7 @@ export async function resolveStoreBrand(env, org) {
     description: cleanText(settings.metaDescription, 300),
     faviconUrl,
     icon,
+    appIcons: storeAppIcons(settings.appIcons),
   };
   try {
     if (cache) {

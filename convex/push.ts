@@ -36,14 +36,22 @@ export interface PushPayload {
   icon?: string;
 }
 
-/** The store's logo as a notification icon, when it is an https URL. */
+const HTTPS_URL_RE = /^https:\/\/[^\s"'<>]+$/i;
+
+/**
+ * The store's notification icon: its generated 192px app icon when present, else
+ * the logo. Only https URLs; undefined means the admin default icon.
+ */
 async function storeLogoIcon(
   ctx: { db: Parameters<typeof readOrgSiteSettings>[0]["db"] },
   org: { _id: Id<"organizations">; slug: string },
 ): Promise<string | undefined> {
   const settings = await readOrgSiteSettings(ctx, org);
-  const logo = settings?.brand?.logoUrl?.trim();
-  return logo && /^https:\/\/[^\s"'<>]+$/i.test(logo) && logo.length <= 2048 ? logo : undefined;
+  const candidates = [settings?.appIcons?.icon192?.trim(), settings?.brand?.logoUrl?.trim()];
+  for (const url of candidates) {
+    if (url && HTTPS_URL_RE.test(url) && url.length <= 2048) return url;
+  }
+  return undefined;
 }
 
 export interface PushTarget {

@@ -117,6 +117,32 @@ export async function uploadImageToR2(
   };
 }
 
+/**
+ * Upload a PNG generated in the browser (store app icons) via the png=true path.
+ * The endpoint checks the PNG signature and keeps the create-only rule: a name
+ * already in R2 is never overwritten.
+ */
+export async function uploadPngToR2(
+  input: Blob,
+  opts: { folder: string; slug: string },
+): Promise<{ url: string; key: string; size: number }> {
+  const token = await sessionToken();
+  if (!token) throw new Error('Not signed in');
+  const form = new FormData();
+  form.append('file', input, `${opts.slug}.png`);
+  form.append('png', 'true');
+  form.append('folder', opts.folder);
+  form.append('slug', opts.slug);
+  const res = await fetch('/api/images/upload', {
+    method: 'POST',
+    headers: storeAuthHeaders(token),
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.url) throw new Error(body.error || 'Upload failed');
+  return { url: body.url, key: body.key, size: body.size ?? input.size };
+}
+
 /** Upload a non-image asset (video/pdf/zip) untouched via raw passthrough. */
 export async function uploadRawToR2(
   input: File,

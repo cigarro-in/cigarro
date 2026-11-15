@@ -12,7 +12,7 @@ export function storeManifestPath(slug) {
   return `/${slug}/manifest.webmanifest`;
 }
 
-// `brand` is resolveStoreBrand() from lib/pwa.js: { brandColor, icon: {url, size} | null }.
+// `brand` is resolveStoreBrand() from lib/pwa.js: { brandColor, icon: {url, size} | null, appIcons | null }.
 export function buildAdminManifest(store, brand) {
   const themeColor = brand?.brandColor || DEFAULT_THEME_COLOR;
   const base = `/${store.slug}/`;
@@ -29,14 +29,29 @@ export function buildAdminManifest(store, brand) {
     theme_color: themeColor,
     lang: 'en-IN',
     categories: ['business', 'shopping'],
-    icons: [
-      // The store's own square icon first (favicon or logo), when it has one.
-      ...(brand?.icon
-        ? [{ src: brand.icon.url, sizes: `${brand.icon.size}x${brand.icon.size}`, type: 'image/png', purpose: 'any' }]
-        : []),
-      { src: '/icons/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icons/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
+    icons: storeIcons(brand),
   };
+}
+
+// The store's generated app icons (siteSettings.appIcons) when it has them; else the
+// favicon/logo and the platform icons.
+function storeIcons(brand) {
+  const generated = brand?.appIcons;
+  if (generated) {
+    const list = [
+      generated.icon192 && { src: generated.icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      generated.icon512 && { src: generated.icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      generated.maskable512 && { src: generated.maskable512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ].filter(Boolean);
+    if (list.length) return list;
+  }
+  return [
+    // The store's own square icon first (favicon or logo), when it has one.
+    ...(brand?.icon
+      ? [{ src: brand.icon.url, sizes: `${brand.icon.size}x${brand.icon.size}`, type: 'image/png', purpose: 'any' }]
+      : []),
+    { src: '/icons/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+    { src: '/icons/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    { src: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+  ];
 }

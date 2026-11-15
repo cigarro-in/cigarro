@@ -14,7 +14,7 @@ import {
 } from "./lib/hosts";
 import { dropRedirectForLivePath, recordSlugChange } from "./redirects";
 import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } from "./lib/imageRefs";
-import { storeAgeGateV, storeBrandV, storeBusinessV, storeReferralV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
+import { storeAgeGateV, storeAppIconsV, storeBrandV, storeBusinessV, storeReferralV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 import { orderNumberOf } from "./lib/ids";
 
@@ -1749,6 +1749,7 @@ export const saveSiteSettings = mutation({
     referral: v.optional(storeReferralV),
     seo: v.optional(storeSeoV),
     socials: v.optional(storeSocialsV),
+    appIcons: v.optional(storeAppIconsV),
     homepageSectionOrder: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {

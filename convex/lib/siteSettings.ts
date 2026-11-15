@@ -44,6 +44,16 @@ export const storeSeoV = v.object({
   gaMeasurementId: v.optional(v.string()),
 });
 
+// Generated PWA icons (browser canvas, uploaded to R2 under app_icons/). Each URL
+// is an https CDN link; version is the suffix shared by this set of files.
+export const storeAppIconsV = v.object({
+  icon192: v.optional(v.string()),
+  icon512: v.optional(v.string()),
+  maskable512: v.optional(v.string()),
+  apple180: v.optional(v.string()),
+  version: v.optional(v.string()),
+});
+
 export const storeSocialsV = v.object({
   instagram: v.optional(v.string()),
   facebook: v.optional(v.string()),
