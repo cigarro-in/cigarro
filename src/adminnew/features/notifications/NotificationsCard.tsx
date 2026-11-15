@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Badge, Button, Card, ErrorBanner, useButtonFeedback } from '../../ui';
 import { usePushNotifications, type PushState } from './usePushNotifications';
 
@@ -13,6 +14,7 @@ const COPY: Partial<Record<PushState, string>> = {
 export function NotificationsCard() {
   const push = usePushNotifications();
   const test = useButtonFeedback();
+  const [note, setNote] = useState<string | null>(null);
   const { state } = push;
   const hint = COPY[state];
 
@@ -44,7 +46,13 @@ export function NotificationsCard() {
               state={test.state}
               successLabel="Sent"
               errorLabel="Failed"
-              onClick={() => void test.run(() => push.sendTest())}
+              onClick={() => {
+                setNote(null);
+                void test.run(async () => {
+                  const result = await push.sendTest();
+                  setNote(result.reconnected ? 'Re-connected this device, test sent.' : 'Test sent.');
+                });
+              }}
             >
               Send test notification
             </Button>
@@ -54,6 +62,9 @@ export function NotificationsCard() {
           </div>
         )}
 
+        {state === 'on' && note && !test.error && (
+          <p className="text-sm text-muted-foreground" role="status">{note}</p>
+        )}
         {state === 'on' && test.error && <ErrorBanner error={test.error} />}
         <ErrorBanner error={push.error} />
       </div>
