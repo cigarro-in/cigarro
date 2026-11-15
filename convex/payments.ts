@@ -5,7 +5,15 @@ import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, internalMutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { isBankSenderAllowed, senderAddress } from "./lib/bankSenders";
-import { parseWithTemplates, parseBankEmail } from "./lib/email";
+import { normalizeEmailBody, parseWithTemplates, parseBankEmail } from "./lib/email";
+import {
+  classifyCredit,
+  extractAmountPaise,
+  extractUpiRef,
+  type PipelineConfig,
+} from "./lib/bankMessage";
+import { parseSmsSender } from "./lib/smsSenders";
+import { loadPipelineConfig, recordPaymentMessage, type MessageOutcome } from "./pipeline";
 import { isValidOrderNumber } from "./lib/ids";
 import { freeSlot } from "./orders";
 import { RECONCILE_OFFSETS_MS } from "./lib/pollSchedule";
@@ -135,6 +143,7 @@ export const ingestBankEmail = internalMutation({
     // 3) Store sender allowlist: a non-empty list ignores every other sender.
     const storeOrg = await ctx.db.get(orgId);
     return await processBankMessage(ctx, {
+      config: await loadPipelineConfig(ctx, orgId),
       orgId,
       messageId: args.messageId,
       channel: "email",
@@ -161,12 +170,149 @@ export interface BankMessageInput {
   /** Caller decided whether the sender is allowed for this channel. */
   senderAllowed: boolean;
   ignoredNote: string;
+  /** Decision config (super-admin global + store override). */
+  config: PipelineConfig;
 }
 
-// SMS fallback parser guard: a bare "Rs 500" fallback must never turn a debit
-// alert into a payment. Only credit wording passes, debit wording vetoes.
-const SMS_CREDIT_RE = /\b(credited|received|credit)\b/i;
-const SMS_DEBIT_RE = /\b(debited|debit|sent|paid to|withdrawn|spent)\b/i;
+type Channel = "email" | "sms";
+const CHANNEL_LABEL: Record<Channel, string> = { email: "email", sms: "SMS" };
+
+const VIA_REASON: Record<string, string> = {
+  upi_ref: "Matched by UPI reference",
+  order_number: "Matched by the order number in the payment note",
+  pending: "Matched by exact amount",
+  auto_late: "Paid after the order expired, applied as a late payment",
+  late_wallet_credit: "Paid after the order expired, credited to the customer's wallet",
+};
+
+/**
+ * Writes the paymentMessages row (super-admin Messages view) for a message that
+ * went through processBankMessage, from the final bankEmails row.
+ */
+async function recordProcessed(
+  ctx: MutationCtx,
+  emailId: Id<"bankEmails">,
+  input: BankMessageInput,
+  result: Record<string, unknown>,
+) {
+  const row = await ctx.db.get(emailId);
+  if (!row) return;
+  const channel = input.channel;
+  let outcome: MessageOutcome;
+  let reason: string;
+  let orderId = row.matchedOrderId;
+  let duplicateOfChannel: Channel | undefined;
+  switch (row.status) {
+    case "matched":
+      outcome = "matched";
+      reason = VIA_REASON[String(result.via ?? "")] ?? "Confirmed the order";
+      break;
+    case "duplicate": {
+      outcome = "duplicate";
+      const prior = row.duplicateOfEmailId ? await ctx.db.get(row.duplicateOfEmailId) : null;
+      if (prior) {
+        duplicateOfChannel = prior.channel ?? "email";
+        orderId = orderId ?? prior.matchedOrderId;
+        const how =
+          result.dedupe === "upi_ref"
+            ? `UPI ref ${row.upiRef}`
+            : result.dedupe === "late_other_channel"
+              ? "same amount, that message already confirmed the order"
+              : "same amount, a few minutes apart";
+        reason = `Same payment already received by ${CHANNEL_LABEL[duplicateOfChannel]} (${how})`;
+      } else {
+        reason = "Second payment for an order that was already paid; credited to the customer's wallet";
+      }
+      break;
+    }
+    case "ignored":
+      outcome = "ignored";
+      reason = row.adminNote ?? (result.parsed === false ? "No amount in the message" : "Ignored");
+      break;
+    case "no_match":
+      outcome = "credit_unmatched";
+      reason = "No pending order with this exact amount (one is within ₹2)";
+      break;
+    case "no_candidate":
+      outcome = "credit_unmatched";
+      reason =
+        row.amountPaise > 0
+          ? "No pending order near this amount"
+          : "Amount could not be read (no bank template matched this message)";
+      break;
+    case "quarantine_late":
+      outcome = "credit_unmatched";
+      reason = "Held for review";
+      break;
+    default:
+      outcome = "credit_unmatched";
+      reason = row.amountPaise > 0 ? "Not matched" : "Amount could not be read";
+  }
+  const who = channel === "sms" ? parseSmsSender(input.from) : null;
+  await recordPaymentMessage(ctx, {
+    orgId: input.orgId,
+    channel,
+    at: row.receivedAt,
+    sender: input.from,
+    senderEntity: who?.entity,
+    suffix: who?.suffix,
+    subject: input.subject,
+    body: channel === "email" ? normalizeEmailBody(input.body) : input.body,
+    outcome,
+    reason,
+    amountPaise: row.amountPaise > 0 ? row.amountPaise : undefined,
+    upiRef: row.upiRef,
+    bankEmailId: row._id,
+    orderId,
+    duplicateOfEmailId: row.duplicateOfEmailId,
+    duplicateOfChannel,
+  });
+}
+
+/**
+ * Cross-channel dedupe. The same UPI credit can arrive by SMS and by email.
+ * Same payment when the UPI ref matches (any channel), or when the amount
+ * matches within the window on the other channel and the refs do not conflict
+ * (at least one side has none). Returns the first-arrived row.
+ */
+async function findChannelDuplicate(
+  ctx: MutationCtx,
+  self: Doc<"bankEmails">,
+  windowMs: number,
+): Promise<{ prior: Doc<"bankEmails">; by: "upi_ref" | "amount_time" } | null> {
+  const root = async (d: Doc<"bankEmails">) =>
+    d.status === "duplicate" && d.duplicateOfEmailId ? ((await ctx.db.get(d.duplicateOfEmailId)) ?? d) : d;
+
+  if (self.upiRef) {
+    const byRef = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_org_upi_ref", (q) => q.eq("orgId", self.orgId).eq("upiRef", self.upiRef))
+      .take(10);
+    const hit = byRef.find((d) => d._id !== self._id);
+    if (hit) return { prior: await root(hit), by: "upi_ref" };
+  }
+  if (self.amountPaise <= 0 || windowMs <= 0) return null;
+  const channel = self.channel ?? "email";
+  const near = await ctx.db
+    .query("bankEmails")
+    .withIndex("by_org_amount_received", (q) =>
+      q
+        .eq("orgId", self.orgId)
+        .eq("amountPaise", self.amountPaise)
+        .gte("receivedAt", self.receivedAt - windowMs)
+        .lte("receivedAt", self.receivedAt + windowMs),
+    )
+    .take(20);
+  const hit = near.find(
+    (d) =>
+      d._id !== self._id &&
+      (d.channel ?? "email") !== channel &&
+      d.status !== "ignored" &&
+      d.status !== "parse_failed" &&
+      !(d.upiRef && self.upiRef && d.upiRef !== self.upiRef),
+  );
+  return hit ? { prior: await root(hit), by: "amount_time" } : null;
+}
 
 /**
  * Parse, dedupe, persist and match one incoming bank message. Used by the
@@ -186,13 +332,14 @@ export async function processBankMessage(ctx: MutationCtx, input: BankMessageInp
       senderEmail: from,
       toAlias,
       subject,
-      // SMS bodies are never stored when ignored (privacy).
-      rawBody: channel === "sms" ? "" : body,
+      rawBody: body,
       status: "ignored",
       adminNote: input.ignoredNote,
       channel,
     });
-    return { ignored: true, reason: "sender_not_allowed", emailId: ignoredId };
+    const r = { ignored: true, reason: "sender_not_allowed", emailId: ignoredId };
+    await recordProcessed(ctx, ignoredId, input, r);
+    return r;
   }
 
   // Pick templates and attempt extraction
@@ -230,9 +377,16 @@ export async function processBankMessage(ctx: MutationCtx, input: BankMessageInp
     parsed = parseBankEmail(body);
   }
   // SMS with no template hit: the generic amount parser, but only for text
-  // that reads as a credit and not as a debit.
-  if (!parsed && channel === "sms" && SMS_CREDIT_RE.test(body) && !SMS_DEBIT_RE.test(body)) {
-    parsed = parseBankEmail(body);
+  // that reads as a credit and not as a debit (super-admin keyword rules).
+  if (!parsed && channel === "sms" && classifyCredit(body, input.config) === "credit") {
+    const amountPaise = extractAmountPaise(body);
+    if (amountPaise) parsed = { bankKey: "sms", amountPaise };
+  }
+  // 12-digit UPI reference (RRN) for cross-channel dedupe, when the template
+  // gave none or something else.
+  if (parsed && !(parsed.upiRef && /^\d{12}$/.test(parsed.upiRef))) {
+    const ref = extractUpiRef(channel === "email" ? normalizeEmailBody(body) : body);
+    if (ref) parsed.upiRef = ref;
   }
 
   // Persist the raw message for audit/reconciliation regardless of outcome
@@ -260,38 +414,80 @@ export async function processBankMessage(ctx: MutationCtx, input: BankMessageInp
     const looksPayable =
       /rs\.?\s*[0-9]|inr\s*[0-9]|₹\s*[0-9]|credited|upi\s+ref/i.test(body);
     if (looksPayable) {
+      // No template read it, but it may be the other-channel copy of a credit
+      // that was already parsed (e.g. an SMS-confirmed payment whose bank email
+      // has no template yet). Checked with a best-effort read; only a parsed
+      // first arrival counts, so a template gap never blocks a later match.
+      const text = channel === "email" ? normalizeEmailBody(body) : body;
+      const probeAmount = extractAmountPaise(text);
+      const gapRow = probeAmount ? await ctx.db.get(emailId) : null;
+      if (gapRow && probeAmount) {
+        const probeRef = extractUpiRef(text);
+        const dup = await findChannelDuplicate(
+          ctx,
+          { ...gapRow, amountPaise: probeAmount, upiRef: probeRef },
+          input.config.dedupeWindowMs,
+        );
+        if (dup) {
+          await ctx.db.patch(emailId, {
+            status: "duplicate",
+            amountPaise: probeAmount,
+            upiRef: probeRef,
+            duplicateOfEmailId: dup.prior._id,
+            matchedOrderId: dup.prior.matchedOrderId,
+          });
+          if (probeRef && !dup.prior.upiRef) await ctx.db.patch(dup.prior._id, { upiRef: probeRef });
+          const r = { duplicate: true, emailId, priorEmailId: dup.prior._id, dedupe: dup.by };
+          await recordProcessed(ctx, emailId, input, r);
+          return r;
+        }
+      }
       await ctx.db.patch(emailId, { status: "unmatched" });
-      return await matchEmailToOrder(ctx, emailId, orgId, {
+      const r = await matchEmailToOrder(ctx, emailId, orgId, {
         amountPaise: 0,
         upiRef: undefined,
         payerVpa: undefined,
         payerName: undefined,
       });
+      await recordProcessed(ctx, emailId, input, r);
+      return r;
     }
     // No amount could be extracted at all (e.g. marketing mail). Mark
     // separately so the admin Unmatched tab isn't flooded with promos.
     await ctx.db.patch(emailId, { status: "ignored" });
-    return { parsed: false, emailId };
+    const r = { parsed: false, emailId };
+    await recordProcessed(ctx, emailId, input, r);
+    return r;
   }
 
-  // Duplicate-by-UPI-ref check: same reference already processed
-  if (parsed.upiRef) {
-    const prior = await ctx.db
-      .query("bankEmails")
-      .withIndex("by_upi_ref", (q) => q.eq("upiRef", parsed.upiRef!))
-      .filter((q) => q.neq(q.field("_id"), emailId))
-      .first();
-    if (prior) {
-      await ctx.db.patch(emailId, {
-        status: "duplicate",
-        duplicateOfEmailId: prior._id,
-      });
-      return { duplicate: true, emailId, priorEmailId: prior._id };
-    }
+  // Same payment already received (by UPI ref, or by amount + time on the
+  // other channel). Never matched or credited twice: the duplicate only links
+  // to the first arrival.
+  const self = await ctx.db.get(emailId);
+  const dup = self ? await findChannelDuplicate(ctx, self, input.config.dedupeWindowMs) : null;
+  if (dup) {
+    await ctx.db.patch(emailId, {
+      status: "duplicate",
+      duplicateOfEmailId: dup.prior._id,
+      matchedOrderId: dup.prior.matchedOrderId,
+    });
+    // Learn the ref on the first arrival when only this copy carried it.
+    if (parsed.upiRef && !dup.prior.upiRef) await ctx.db.patch(dup.prior._id, { upiRef: parsed.upiRef });
+    const r = {
+      duplicate: true,
+      emailId,
+      priorEmailId: dup.prior._id,
+      dedupe: dup.by,
+      crossChannel: (dup.prior.channel ?? "email") !== channel,
+    };
+    await recordProcessed(ctx, emailId, input, r);
+    return r;
   }
 
   // Try to match the credit to an order
-  return await matchEmailToOrder(ctx, emailId, orgId, parsed);
+  const r = await matchEmailToOrder(ctx, emailId, orgId, parsed);
+  await recordProcessed(ctx, emailId, input, r);
+  return r;
 }
 
 // ---------- Matching logic ----------
@@ -445,6 +641,23 @@ async function matchEmailToOrder(
     recentPaid.paidAt &&
     recentPaid.paidAt >= Date.now() - 6 * 60 * 60 * 1000
   ) {
+    // The same payment on the other channel arriving after the dedupe window
+    // (e.g. a late bank email for an SMS-confirmed order) is not a second
+    // payment: link it, never credit the wallet for it.
+    const confirming = recentPaid.bankEmailId ? await ctx.db.get(recentPaid.bankEmailId) : null;
+    if (
+      confirming &&
+      confirming._id !== emailId &&
+      (confirming.channel ?? "email") !== (email?.channel ?? "email") &&
+      !(confirming.upiRef && upiRef && confirming.upiRef !== upiRef)
+    ) {
+      await ctx.db.patch(emailId, {
+        status: "duplicate",
+        duplicateOfEmailId: confirming._id,
+        matchedOrderId: recentPaid._id,
+      });
+      return { matched: false, duplicate: true, dedupe: "late_other_channel", priorEmailId: confirming._id };
+    }
     await ctx.db.patch(recentPaid._id, {
       extraCreditsPaise: (recentPaid.extraCreditsPaise ?? 0) + amountPaise,
     });

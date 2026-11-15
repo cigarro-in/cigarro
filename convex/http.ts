@@ -7,6 +7,7 @@ import { gmailRedirectUri } from "./gmail";
 import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
 import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 import { SMS_PATH_PREFIX, SMS_TOKEN_RE, sha256Hex } from "./smsRelay";
+import { detectSetupError, parseRelayPayload } from "./lib/bankMessage";
 
 const http = httpRouter();
 
@@ -182,11 +183,18 @@ http.route({
   }),
 });
 
-// ---------- Bank SMS relay (Android app or iPhone Shortcut) ----------
+// ---------- Bank SMS relay (MacroDroid or iPhone Shortcut) ----------
 //
-// POST /receiveBankSms/<token> with JSON {"sender": "...", "body": "...",
-// "receivedAt": <epoch ms or ISO string, optional>}. The token is the store's
-// secret (convex/smsRelay.ts). Only its SHA-256 is compared, via an index lookup.
+// POST /receiveBankSms/<token>. Two body shapes:
+// - text/plain (the generated MacroDroid file): first line = sender, the rest =
+//   the SMS text. Quotes and newlines in the SMS cannot break it.
+// - JSON {"sender": "...", "body": "...", "receivedAt": <epoch ms or ISO, optional>}
+//   (iPhone Shortcuts dictionary, older manual setups).
+// Old macros' JSON broken by a newline or quote in the SMS is repaired
+// (convex/lib/bankMessage.ts parseRelayPayload). Unreplaced magic text
+// ("{sms_number}", "<SENDER>") or an unreadable body is recorded as a setup
+// error for the store. The token is the store's secret (convex/smsRelay.ts);
+// only its SHA-256 is compared, via an index lookup.
 http.route({
   pathPrefix: SMS_PATH_PREFIX,
   method: "POST",
@@ -198,24 +206,19 @@ http.route({
 
     const raw = await req.text();
     if (raw.length > 8000) return jsonResponse({ ok: false, error: "too large" }, 413);
-    let body: any;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      return jsonResponse({ ok: false, error: "bad json" }, 400);
-    }
+    const payload = parseRelayPayload(raw, (req.headers.get("content-type") ?? "").toLowerCase());
+    const tokenHash = await sha256Hex(token);
 
-    const sender = typeof body?.sender === "string" ? body.sender.trim().toUpperCase() : "";
-    const text = typeof body?.body === "string" ? body.body.trim() : "";
-    if (!sender || sender.length > 40 || !text || text.length > 2000) {
-      return jsonResponse({ ok: false, error: "missing sender or body" }, 400);
-    }
+    const sender = (payload?.sender ?? "").trim().toUpperCase().slice(0, 60);
+    // Never dropped silently: an unreadable request keeps its raw text (2000
+    // chars) so the super admin and the merchant status can see it.
+    const text = payload ? payload.body.trim().slice(0, 4000) : raw.trim().slice(0, 2000);
+    const setupError = !payload ? "Setup error: unreadable payload" : detectSetupError(sender, text);
 
     // Phone-reported time is used for dedupe; anything implausible falls back to now.
     const now = Date.now();
-    const rawTime = typeof body.receivedAt === "string" && /^\d+$/.test(body.receivedAt)
-      ? Number(body.receivedAt)
-      : typeof body.receivedAt === "string" ? Date.parse(body.receivedAt) : body.receivedAt;
+    const rt = payload?.receivedAt;
+    const rawTime = typeof rt === "string" && /^\d+$/.test(rt) ? Number(rt) : typeof rt === "string" ? Date.parse(rt) : rt;
     const receivedAt =
       typeof rawTime === "number" &&
       Number.isFinite(rawTime) &&
@@ -225,10 +228,11 @@ http.route({
         : now;
 
     const res = await ctx.runMutation(internal.smsRelay.ingest, {
-      tokenHash: await sha256Hex(token),
+      tokenHash,
       sender,
       body: text,
       receivedAt,
+      setupError: setupError ?? undefined,
     });
     if (res.status === 401) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
     if (res.status === 429) {
@@ -237,6 +241,7 @@ http.route({
         headers: { "content-type": "application/json", "retry-after": "60" },
       });
     }
+    // 200 even for setup errors: a retry would not fix them. The store sees it.
     return jsonResponse({ ok: true, ...res.result });
   }),
 });

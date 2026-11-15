@@ -180,11 +180,11 @@ export default defineSchema({
     // Bank/UPI alert senders whose emails count as payment confirmations.
     // Empty or absent = no filter. See convex/lib/bankSenders.ts.
     allowedBankSenders: v.optional(v.array(v.string())),
-    // Bank SMS sender IDs (e.g. "HDFCBK" or "VM-HDFCBK") for the SMS relay.
-    // Empty or absent = SMS relay accepts nothing. See convex/lib/smsSenders.ts.
+    // Legacy: SMS sender allowlist set from the old merchant card. Still read as
+    // known senders (known-only) when the store has no super-admin override.
+    // New rules live in paymentPipelineSettings (convex/pipeline.ts).
     allowedSmsSenders: v.optional(v.array(v.string())),
-    // Entities (e.g. "ICICIT") seen on accepted, parsed bank credit SMS. Shown
-    // in the admin SMS relay card so the store can save them as the allowlist.
+    // Dormant: entities seen on parsed bank credit SMS (old merchant card). No longer written.
     detectedSmsSenders: v.optional(
       v.array(v.object({ entity: v.string(), count: v.number(), lastSeenAt: v.number() })),
     ),
@@ -326,6 +326,7 @@ export default defineSchema({
     .index("by_org_order_number", ["orgId", "orderNumber"])
     .index("by_retry_of", ["retryOfOrderId"])
     .index("by_org_status", ["orgId", "status", "createdAt"])
+    .index("by_org_created", ["orgId", "createdAt"])
     .index("by_org_user_idem", ["orgId", "userId", "idempotencyKey"])
     // Payment statement: email-matched credits by paid time, refunds by refund time.
     .index("by_org_method_paid", ["orgId", "verificationMethod", "paidAt"])
@@ -369,7 +370,11 @@ export default defineSchema({
     .index("by_org_amount_status", ["orgId", "amountPaise", "status"])
     .index("by_org_status", ["orgId", "status", "receivedAt"])
     .index("by_matched_order", ["matchedOrderId"])
-    .index("by_upi_ref", ["upiRef"]),
+    .index("by_upi_ref", ["upiRef"])
+    // Cross-channel dedupe (convex/payments.ts findChannelDuplicate).
+    .index("by_org_upi_ref", ["orgId", "upiRef"])
+    .index("by_org_amount_received", ["orgId", "amountPaise", "receivedAt"])
+    .index("by_duplicate_of", ["duplicateOfEmailId"]),
 
   // Android/iPhone SMS relay: one row per store. Only the SHA-256 of the
   // webhook token is stored; the full URL is shown once at generation.
@@ -382,6 +387,12 @@ export default defineSchema({
     rotatedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
     lastSmsAt: v.optional(v.number()),
+    // Last SMS that read as a bank credit, and the last one that confirmed an order.
+    lastCreditSmsAt: v.optional(v.number()),
+    lastConfirmedAt: v.optional(v.number()),
+    // Last time the phone sent template text instead of a real SMS (bad import).
+    lastSetupErrorAt: v.optional(v.number()),
+    lastSetupError: v.optional(v.string()),
     // Fixed-window rate limit per token (requests per minute).
     rateWindowStart: v.optional(v.number()),
     rateCount: v.optional(v.number()),
@@ -389,6 +400,64 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_token_hash", ["tokenHash"]),
 
+  // Every bank SMS and bank email the pipeline received, across stores, with the
+  // full text and the decision. Read by the super-admin Messages view and the SA
+  // order evidence. TEMPORARY: every SMS body is kept (non-credits included, OTP
+  // codes masked) so the owner can study real data. See docs/sms-relay.md.
+  paymentMessages: defineTable({
+    orgId: v.id("organizations"),
+    channel: v.union(v.literal("sms"), v.literal("email")),
+    at: v.number(),
+    sender: v.string(),
+    senderEntity: v.optional(v.string()),
+    suffix: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    body: v.string(),
+    outcome: v.union(
+      v.literal("matched"),
+      v.literal("credit_unmatched"),
+      v.literal("ignored"),
+      v.literal("duplicate"),
+      v.literal("setup_error"),
+    ),
+    reason: v.string(),
+    amountPaise: v.optional(v.number()),
+    upiRef: v.optional(v.string()),
+    bankEmailId: v.optional(v.id("bankEmails")),
+    orderId: v.optional(v.id("orders")),
+    duplicateOfEmailId: v.optional(v.id("bankEmails")),
+    duplicateOfChannel: v.optional(v.union(v.literal("sms"), v.literal("email"))),
+  })
+    .index("by_at", ["at"])
+    .index("by_org_at", ["orgId", "at"])
+    .index("by_outcome_at", ["outcome", "at"])
+    .index("by_org_outcome_at", ["orgId", "outcome", "at"])
+    .index("by_bank_email", ["bankEmailId"])
+    .index("by_order", ["orderId"])
+    .searchIndex("search_body", {
+      searchField: "body",
+      filterFields: ["orgId", "channel", "outcome"],
+    }),
+
+  // Payment decision rules. One global row (orgId absent) plus optional per-store
+  // overrides. Absent fields fall back to the global row, then to code defaults
+  // (convex/lib/bankMessage.ts DEFAULT_PIPELINE_CONFIG). Super admin only.
+  paymentPipelineSettings: defineTable({
+    orgId: v.optional(v.id("organizations")),
+    acceptedSuffixes: v.optional(v.array(v.string())),
+    // Global: the known bank list. Store: extra entities added to the global list.
+    bankSenders: v.optional(v.array(v.string())),
+    knownSendersOnly: v.optional(v.boolean()),
+    allowPhoneSenders: v.optional(v.boolean()),
+    creditKeywords: v.optional(v.array(v.string())),
+    debitKeywords: v.optional(v.array(v.string())),
+    dedupeWindowMs: v.optional(v.number()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  }).index("by_org", ["orgId"]),
+
+  // Dormant: the old merchant "Recent messages" card log. No longer written;
+  // paymentMessages replaces it. Kept so existing rows validate.
   // One metadata row per SMS the relay received (accepted, dropped or duplicate),
   // so the admin card can explain what happened. Never stores a body: accepted
   // credit text stays in bankEmails (via bankEmailId), dropped text is never kept.

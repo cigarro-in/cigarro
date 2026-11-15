@@ -8,14 +8,11 @@
 // Older headers may have no suffix ("HDFCBK") or no prefix ("HDFCBK-T").
 // Suffixes: T transactional, S service, P promotional, G government.
 //
-// Explicit allowlist (per store): entries are an entity ("HDFCBK"), a sender
-// with a prefix or suffix ("VM-HDFCBK", "HDFCBK-T", the prefix and suffix are
-// ignored when matching), or a phone number ("+919876543210"). Matching is on
-// the entity. Empty list: accept only T, S or suffix-less senders whose body
-// reads as a credit.
-//
-// Privacy: dropped SMS never store the body. Some are stored as metadata only
-// (sender, suffix, reason); OTP and promotional/government SMS are not stored.
+// The rules (accepted suffixes, known bank entities, credit/debit keywords,
+// phone-number senders) come from the super-admin pipeline config
+// (convex/pipeline.ts, convex/lib/bankMessage.ts). Merchants never see them.
+
+import { classifyCredit, type PipelineConfig, type SuffixRule } from "./bankMessage";
 
 export type TraiSuffix = "T" | "S" | "P" | "G";
 
@@ -31,12 +28,8 @@ export interface ParsedSmsSender {
 const TRAI_RE = /^(?:([A-Z]{2})-)?([A-Z0-9]{3,11})(?:-([TSPG]))?$/;
 const PHONE_RE = /^\+?[0-9]{8,15}$/;
 const OTP_RE = /\botp\b|one[\s-]?time\s+(password|passcode|code)|verification code/i;
-const AMOUNT_RE = /(₹|\bRs\.?|\bINR)\s*[0-9]/i;
-const CREDIT_RE = /\b(credited|received|deposited|credit)\b/i;
-const DEBIT_RE = /\b(debited|debit|spent|withdrawn)\b/i;
 
-export const MAX_SMS_SENDERS = 25;
-export const MAX_DETECTED_SMS_SENDERS = 20;
+export const MAX_SMS_SENDERS = 200;
 
 /** Splits a TRAI-style sender header into prefix, entity and suffix. */
 export function parseSmsSender(sender: string): ParsedSmsSender {
@@ -54,14 +47,9 @@ export function parseSmsSender(sender: string): ParsedSmsSender {
   return { entity: s, isPhone: false };
 }
 
-/** True when the body is an OTP or verification message. Never stored. */
+/** True when the body is an OTP or verification message. Stored only with codes masked. */
 export function isOtpBody(body: string): boolean {
   return OTP_RE.test(body);
-}
-
-/** Amount marker plus credit wording, and no debit wording. */
-export function looksLikeCredit(body: string): boolean {
-  return AMOUNT_RE.test(body) && CREDIT_RE.test(body) && !DEBIT_RE.test(body);
 }
 
 /** Uppercase, trim, dedupe. Entries are kept as typed (after case folding). Null if one is malformed. */
@@ -94,37 +82,57 @@ export function smsSenderAllowed(
 }
 
 export type SmsDecision =
-  | { accept: true; entity: string; isPhone: boolean; suffix?: TraiSuffix }
+  | { accept: true; entity: string; isPhone: boolean; suffix?: TraiSuffix; known: boolean }
   | {
       accept: false;
-      /** false = drop silently, true = keep a metadata-only row (no body). */
-      store: boolean;
+      /** Machine code: otp, phone_sender, suffix, unknown_sender, debit, not_credit. */
+      code: string;
+      /** Plain-language reason for the super-admin Messages view. */
       reason: string;
       suffix?: TraiSuffix;
+      entity: string;
+      isPhone: boolean;
     };
 
-/**
- * Decides one incoming SMS. The body is only read here, never returned or stored
- * on a drop.
- */
-export function decideSms(
-  sender: string,
-  body: string,
-  allowlist: string[] | undefined | null,
-): SmsDecision {
+const SUFFIX_NAME: Record<TraiSuffix, string> = {
+  T: "transactional",
+  S: "service",
+  P: "promotional",
+  G: "government",
+};
+
+/** True when the sender's entity is in the known list (entity match; phone numbers exact). */
+export function isKnownSender(sender: string, known: string[]): boolean {
+  return smsSenderAllowed(sender, known);
+}
+
+/** Decides one incoming SMS against the pipeline config. */
+export function decideSms(sender: string, body: string, cfg: PipelineConfig): SmsDecision {
   const parsed = parseSmsSender(sender);
-  const { suffix } = parsed;
+  const { suffix, entity, isPhone } = parsed;
+  const base = { entity, isPhone, suffix };
 
-  if (isOtpBody(body)) return { accept: false, store: false, reason: "otp" };
-  if (suffix === "P") return { accept: false, store: false, reason: "promotional", suffix };
-  if (suffix === "G") return { accept: false, store: false, reason: "government", suffix };
-
-  const base = { entity: parsed.entity, isPhone: parsed.isPhone, suffix };
-  if (allowlist && allowlist.length > 0) {
-    if (smsSenderAllowed(sender, allowlist)) return { accept: true, ...base };
-    return { accept: false, store: true, reason: "sender not in SMS allowlist", suffix };
+  if (isOtpBody(body)) return { accept: false, code: "otp", reason: "OTP message", ...base };
+  if (isPhone && !cfg.allowPhoneSenders) {
+    return { accept: false, code: "phone_sender", reason: "Sent from a phone number, not a bank", ...base };
   }
-
-  if (looksLikeCredit(body)) return { accept: true, ...base };
-  return { accept: false, store: true, reason: "not a credit SMS", suffix };
+  if (!isPhone) {
+    const rule: SuffixRule = suffix ?? "none";
+    if (!cfg.acceptedSuffixes.includes(rule)) {
+      return {
+        accept: false,
+        code: "suffix",
+        reason: suffix ? `Sender suffix ${suffix} (${SUFFIX_NAME[suffix]}) not accepted` : "Sender without suffix not accepted",
+        ...base,
+      };
+    }
+  }
+  const known = isKnownSender(sender, cfg.bankSenders);
+  if (cfg.knownSendersOnly && !known) {
+    return { accept: false, code: "unknown_sender", reason: "Sender is not a known bank", ...base };
+  }
+  const verdict = classifyCredit(body, cfg);
+  if (verdict === "debit") return { accept: false, code: "debit", reason: "Debit or outgoing payment", ...base };
+  if (verdict === "not_credit") return { accept: false, code: "not_credit", reason: "Not a credit message", ...base };
+  return { accept: true, entity, isPhone, suffix, known };
 }
