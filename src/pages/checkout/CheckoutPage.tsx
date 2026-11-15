@@ -7,14 +7,14 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { OrderConsentSheet } from '../../components/checkout/OrderConsentSheet';
 import { InlineStatus } from '../../components/common/InlineStatus';
 import { useAuthDialog } from '../../hooks/useAuth';
-import { useCheckoutModel } from './desktop/useCheckoutModel';
+import { useCheckoutModel } from './useCheckoutModel';
 import { AddressSection } from './desktop/AddressSection';
 import { ItemsSection } from './desktop/ItemsSection';
 import { DeliverySection } from './desktop/DeliverySection';
 import { SummaryAside } from './desktop/SummaryAside';
 
 // Desktop checkout. Same steps, data and order placement as
-// MobileCheckoutPage (see desktop/useCheckoutModel.ts); laid out as stacked
+// MobileCheckoutPage (see useCheckoutModel.ts); laid out as stacked
 // steps on the left and a sticky summary with the Pay button on the right.
 export function CheckoutPage() {
   const model = useCheckoutModel();

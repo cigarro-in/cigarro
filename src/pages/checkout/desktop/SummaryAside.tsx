@@ -5,7 +5,7 @@ import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { OrderSummary } from '../../../components/checkout';
 import { formatINR } from '../../../utils/currency';
-import type { CheckoutModel } from './useCheckoutModel';
+import type { CheckoutModel } from '../useCheckoutModel';
 
 // Sticky right column: offers, totals (shared OrderSummary: lucky, coupon,
 // shipping, wallet) and the one Pay button.

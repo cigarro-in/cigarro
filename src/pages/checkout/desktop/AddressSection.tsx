@@ -9,7 +9,7 @@ import { useMyProfile } from '../../../hooks/data/useMyProfile';
 import { realNameOrEmpty } from '../../../lib/profile/personName';
 import { cn } from '../../../components/ui/utils';
 import { Section } from './Section';
-import type { CheckoutModel } from './useCheckoutModel';
+import type { CheckoutModel } from '../useCheckoutModel';
 
 // Delivery address step. Saved addresses as a selectable grid; add and edit
 // open the shared AddressForm in place (the mobile page uses the same form

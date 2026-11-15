@@ -1,33 +1,16 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Tag, MapPin, Wallet, ChevronRight, Truck, Clock, Zap, QrCode, Gift, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Tag, MapPin, Gift, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { OrderSummary, ShippingOptions, PaymentMethods } from '../../components/checkout';
+import { OrderSummary, ShippingOptions } from '../../components/checkout';
 import { AddressDrawer } from '../../components/checkout/address/AddressDrawer';
-import { Address } from '../../components/checkout/address/AddressCard';
-import { useCart } from '../../hooks/useCart';
-import { useAuth } from '../../hooks/useAuth';
-import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
-import { useMyProfile, toPhone10 } from '../../hooks/data/useMyProfile';
+import { InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
-import { validateCouponCode } from '../../utils/discounts';
 import { getProductImageUrl } from '../../lib/images/urls';
-import { useAddresses } from '../../lib/convex/useAddresses';
-import { useMutation, useQuery } from 'convex/react';
-import { useShippingMethods } from '../../hooks/data/useContent';
-import { api } from '../../../convex/_generated/api';
-import { convex } from '../../lib/convex/client';
-import { useOrg } from '../../lib/convex/useOrg';
-import { useOrgInfo } from '../../lib/org/OrgContext';
-import { useOrderConsent } from '../../hooks/data/useOrderConsent';
 import { OrderConsentSheet } from '../../components/checkout/OrderConsentSheet';
-import { rupeesToPaise } from '../../lib/convex/money';
-import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
-import { cleanPersonName, isRealPersonName } from '../../lib/profile/personName';
+import { useCheckoutModel } from './useCheckoutModel';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -41,630 +24,46 @@ const getBrandName = (brand: any): string => {
 };
 
 
+// Mobile checkout. State and order placement live in useCheckoutModel
+// (shared with the desktop CheckoutPage); this file is layout only.
 export function MobileCheckoutPage() {
-  const { slug: orgSlug } = useOrgInfo();
-  const navigate = useNavigate();
-  const { items: cartItems, updateQuantity, removeFromCart, totalPrice: cartTotalPrice, clearCart } = useCart();
-  const { user } = useAuth();
-  // Phase 1: address reads share the adapter with AddressDrawer so saves
-  // stay visible (single backend, no split brain).
-  const { fetchNow: fetchStoreAddresses } = useAddresses(user);
+  const {
+    user, opStatus,
+    isRetryPayment, retryDisplayOrderId,
+    items, subtotal: totalPrice, updateItemQuantity: handleUpdateQuantity,
+    luckyDiscount,
+    activeShippingId, setSelectedShipping, getShippingCost,
+    couponCode, setCouponCode, appliedDiscount, isValidatingCoupon, applyCoupon: handleApplyCoupon,
+    referral,
+    walletBalance, walletAmountToUse, setWalletAmountToUse,
+    savedAddresses, selectedAddress, selectAddress: handleAddressSelect, refreshAddresses, addressAttention,
+    consentSheetOpen, setConsentSheetOpen, confirmConsent: handleConsentConfirm,
+    getFinalTotal, isProcessing, placeOrder: handlePayment,
+  } = useCheckoutModel({ openUpiApp: true, syncSelectedAddress: false });
+  const {
+    visible: showReferral,
+    applied: referralApplied,
+    code: referralCode,
+    setCode: setReferralCode,
+    isApplying: isApplyingReferral,
+  } = referral;
 
-  const org = useOrg();
-  const convexWallet = useQuery(
-    api.wallet.getMyBalance,
-    org && user ? { orgId: org._id } : 'skip',
-  );
-  const createConvexOrder = useMutation(api.orders.createOrder);
-  // Reuse the key if a response is lost after Convex committed the order.
-  const paymentIdempotencyKeyRef = useRef<string | null>(null);
-
-  // Determine checkout flow type using URL params as source of truth, initialized once
-  const [isBuyNow] = useState(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    return searchParams.get('buynow') === 'true' || sessionStorage.getItem('isBuyNow') === 'true';
-  });
-
-  const [isRetryPayment] = useState(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    return searchParams.get('retry') === 'true' || sessionStorage.getItem('isRetryPayment') === 'true';
-  });
-
-  const normalizeString = (value: unknown): string | undefined =>
-    typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
-
-  // Single normalized profile contract first (Convex users), session
-  // fallback. (Legacy auth-metadata reads removed: own-JWT sessions carry
-  // no user_metadata, so they could never prefill.)
-  const { profileName, profilePhone10 } = useMyProfile();
-
-  const defaultUserName =
-    profileName ||
-    normalizeString(user?.name) ||
-    '';
-
-  const defaultUserPhone =
-    profilePhone10 ||
-    toPhone10(user?.phone);
-
-  // URL params for effects
-  const searchParams = new URLSearchParams(window.location.search);
-  const urlRetryParam = searchParams.get('retry') === 'true';
-  const urlBuyNowParam = searchParams.get('buynow') === 'true';
-
-  // Clear sessionStorage on mount if this is a normal cart checkout (no URL params)
-  useEffect(() => {
-    if (!urlRetryParam && !urlBuyNowParam) {
-      // This is a normal cart checkout - clear any stale flow data
-      sessionStorage.removeItem('isRetryPayment');
-      sessionStorage.removeItem('retryOrder');
-      sessionStorage.removeItem('isBuyNow');
-      sessionStorage.removeItem('buyNowItem');
-    }
-  }, [urlRetryParam, urlBuyNowParam]);
-
-  // Get flow-specific data from sessionStorage
-  const buyNowItemData = sessionStorage.getItem('buyNowItem');
-  const initialBuyNowItem = isBuyNow && buyNowItemData ? JSON.parse(buyNowItemData) : null;
-
-  // Local state for Buy Now item to handle quantity updates
-  const [localBuyNowItem, setLocalBuyNowItem] = useState(initialBuyNowItem);
-
-  // Update local state if sessionStorage changes (e.g. initial load)
-  useEffect(() => {
-    if (initialBuyNowItem) {
-      setLocalBuyNowItem(initialBuyNowItem);
-    }
-  }, [buyNowItemData]);
-
-  const retryOrderData = sessionStorage.getItem('retryOrder');
-  const retryOrder = useMemo(() =>
-    isRetryPayment && retryOrderData ? JSON.parse(retryOrderData) : null,
-    [isRetryPayment, retryOrderData]
-  );
-
-  // Retry order derived values
-  const retrySubtotal = isRetryPayment && retryOrder
-    ? (typeof retryOrder.subtotal === 'number'
-      ? retryOrder.subtotal
-      : (retryOrder.total + (retryOrder.discount || 0) - (retryOrder.shipping || 0)))
-    : null;
-
-  const retryShippingCost = isRetryPayment && retryOrder
-    ? retryOrder.shipping || 0
-    : null;
-
-  const retryLuckyDiscount = isRetryPayment && retryOrder
-    ? retryOrder.discount || 0
-    : null;
-
-  const retryDisplayOrderId = isRetryPayment && retryOrder
-    ? retryOrder.displayOrderId || null
-    : null;
-
-  // Redirect if retry param exists but session data is missing (e.g. Back button after transaction)
-  useEffect(() => {
-    if (urlRetryParam && !retryOrderData) {
-      console.warn('⚠️ Retry param present but session data missing. Redirecting to orders.');
-      setOpError('Retry session expired. Please try again.');
-      navigate('/orders');
-    }
-  }, [urlRetryParam, retryOrderData, navigate]);
-
-  // Use Retry Order, Buy Now item, or cart items
-  const items = isRetryPayment && retryOrder
-    ? retryOrder.items
-    : (isBuyNow && localBuyNowItem ? [localBuyNowItem] : cartItems);
-
-  // Handle quantity updates for both Cart and Buy Now flows
-  const handleUpdateQuantity = async (productId: string, quantity: number, variantId?: string, comboId?: string) => {
-    // Check if we should update locally
-    // Normalize undefined/null to null for comparison
-    const targetVariantId = variantId || null;
-    const targetComboId = comboId || null;
-    const localVariantId = localBuyNowItem?.variant_id || null;
-    const localComboId = localBuyNowItem?.combo_id || null;
-
-    const isLocalUpdate = localBuyNowItem &&
-      localBuyNowItem.id === productId &&
-      localVariantId === targetVariantId &&
-      localComboId === targetComboId;
-
-    if (isLocalUpdate) {
-      if (quantity <= 0) {
-        // Return to product page if quantity becomes 0
-        sessionStorage.removeItem('buyNowItem');
-        sessionStorage.removeItem('isBuyNow');
-        navigate(-1);
-        return;
-      }
-
-      const updatedItem = { ...localBuyNowItem, quantity };
-      setLocalBuyNowItem(updatedItem);
-      sessionStorage.setItem('buyNowItem', JSON.stringify(updatedItem));
-    } else {
-      // Normal cart update
-      await updateQuantity(productId, quantity, variantId, comboId);
-    }
-  };
-
-  const totalPrice = isRetryPayment && retrySubtotal !== null
-    ? retrySubtotal
-    : (isBuyNow && localBuyNowItem
-      ? (localBuyNowItem.variant_price || localBuyNowItem.price) * localBuyNowItem.quantity
-      : cartTotalPrice);
-
-  // GA4 begin_checkout: once per checkout entry (funnel entry point).
-  const checkoutTrackedRef = useRef(false);
-  useEffect(() => {
-    if (checkoutTrackedRef.current || items.length === 0) return;
-    checkoutTrackedRef.current = true;
-    trackBeginCheckout(items, Number(totalPrice ?? 0));
-  }, [items, totalPrice]);
-
-  // State management
-  const [selectedShipping, setSelectedShipping] = useState('standard');
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  // One-time declaration sheet, shown before a customer's first order.
-  const orderConsent = useOrderConsent(org?._id, !!user);
-  const [consentSheetOpen, setConsentSheetOpen] = useState(false);
-  // Set once the sheet is confirmed, so the retried placement does not reopen it
-  // before the status query catches up.
-  const consentConfirmedRef = useRef(false);
-  const { status: opStatus, setError: setOpError } = useInlineStatus();
-
-  // Wallet state
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [isWalletLoading, setIsWalletLoading] = useState(false);
-  const [walletAmountToUse, setWalletAmountToUse] = useState(0);
-
-  // Dialog states
   const [showAddressDialog, setShowAddressDialog] = useState(false);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('upi');
-
-  // Coupon state
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
-  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
-
-  // Referral state (Late Attachment)
-  const [referralCode, setReferralCode] = useState('');
-  const [isReferralEligible, setIsReferralEligible] = useState(false);
-  const [isApplyingReferral, setIsApplyingReferral] = useState(false);
   const [showReferralInput, setShowReferralInput] = useState(false);
-  const [referralApplied, setReferralApplied] = useState(false);
 
-  // Check referral eligibility on mount (Convex; subject-scoped)
+  // No address, or a name missing on it: open the address drawer.
   useEffect(() => {
-    const checkEligibility = async () => {
-      if (!user?.id) return;
-      try {
-        const gate = await convex.query(api.referrals.checkEligibility, { orgSlug: orgSlug });
-        if (gate.eligible) {
-          // New user - eligible
-          setIsReferralEligible(true);
-        } else {
-          setIsReferralEligible(false);
-          if (gate.applied) {
-            // Show that referral is already applied
-            setReferralApplied(true);
-          }
-        }
-      } catch (err) {
-        console.error('Referral check error:', err);
-      }
-    };
-
-    checkEligibility();
-  }, [user?.id]);
+    if (addressAttention > 0) setShowAddressDialog(true);
+  }, [addressAttention]);
 
   const handleApplyReferral = async () => {
-    if (!referralCode.trim()) {
-      setOpError('Please enter a referral code');
-      return;
-    }
-
-    setIsApplyingReferral(true);
-    try {
-      const data = await convex.mutation(api.referrals.attachReferralLate, {
-        orgSlug: orgSlug,
-        referredUserId: user!.id,
-        referralCode: referralCode.trim()
-      });
-
-      if (data.success) {
-        // No status: the "Referral code activated" line renders in place.
-        setReferralApplied(true);
-        setShowReferralInput(false);
-        setReferralCode('');
-      } else {
-        if (data.error === 'User already referred') {
-          setOpError('Not eligible for referral code');
-          setIsReferralEligible(false);
-        } else if (data.error === 'Invalid referral code' || data.error === 'Cannot refer yourself') {
-          setOpError('Invalid referral code');
-        } else {
-          setOpError('Failed to apply referral code');
-        }
-      }
-    } catch (error) {
-      console.error('Error applying referral:', error);
-      setOpError('Failed to apply referral code');
-    } finally {
-      setIsApplyingReferral(false);
-    }
+    if (await referral.apply()) setShowReferralInput(false);
   };
 
-  // Lucky discount - use original discount for retry orders. Gated on
-  // org.luckyEnabled (absent = enabled); off = exact rupees.
-  const luckyOn = (org as any)?.luckyEnabled ?? true;
-  const [randomDiscount] = useState(() => {
-    if (retryLuckyDiscount !== null) {
-      return retryLuckyDiscount;
-    }
-    const paise = Math.floor(Math.random() * 99) + 1;
-    const discount = paise / 100;
-    return Math.max(0.01, Math.min(0.99, discount));
-  });
-  const luckyDiscount = isRetryPayment ? randomDiscount : luckyOn ? randomDiscount : 0;
-
-  // QR code state
-  const [qrCode, setQrCode] = useState<string>('');
-  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
-
-  // Use ref for navigation state to avoid race conditions with empty cart redirect
-  // on slower devices where state updates might lag behind context updates
-  const isNavigatingRef = useRef(false);
-
-
-  // Saved addresses state
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-
-  // Shipping cost from admin config (Settings > Shipping), merged over defaults.
-  const { methods: shippingMethods } = useShippingMethods();
-  // If the admin disabled the currently selected method, fall back to the
-  // first enabled one so totals never silently use a stale price.
-  const activeShippingId = shippingMethods.some((m) => m.id === selectedShipping)
-    ? selectedShipping
-    : (shippingMethods[0]?.id ?? 'standard');
-  const getShippingCost = () => {
-    if (retryShippingCost !== null) {
-      return retryShippingCost;
-    }
-    return shippingMethods.find((m) => m.id === activeShippingId)?.priceRupees ?? 0;
-  };
-
-  // Final total calculation
-  const getFinalTotal = () => {
-    const shipping = getShippingCost();
-    const coupon = appliedDiscount?.discount_amount ?? appliedDiscount?.discount_value ?? 0;
-    const discount = luckyDiscount + coupon;
-    return Math.max(0, totalPrice + shipping - discount);
-  };
-
-  // Sync Convex wallet balance (paise) into local state (rupees)
-  const fetchWalletBalance = useCallback(async () => {
-    // No-op: balance is fed reactively from the useQuery below.
-  }, []);
-
-  useEffect(() => {
-    if (convexWallet === undefined) {
-      setIsWalletLoading(true);
-      return;
-    }
-    setWalletBalance(convexWallet.balancePaise / 100);
-    setIsWalletLoading(false);
-  }, [convexWallet]);
-
-  // Ref to hold latest values for fetchSavedAddresses to avoid dependency cycles
-  const fetchContextRef = useRef({
-    isRetryPayment,
-    retryOrder,
-    defaultUserName,
-    defaultUserPhone
-  });
-
-  // Keep ref updated
-  useEffect(() => {
-    fetchContextRef.current = {
-      isRetryPayment,
-      retryOrder,
-      defaultUserName,
-      defaultUserPhone
-    };
-  });
-
-  // Fetch saved addresses and auto-select (memoized to prevent re-render loops)
-  // Adapter-backed so Drawer saves stay visible immediately.
-  const fetchSavedAddresses = useCallback(async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    // Use ref values to avoid dependency changes
-    const { isRetryPayment, retryOrder, defaultUserName, defaultUserPhone } = fetchContextRef.current;
-    try {
-      // Always fetch saved addresses from the address store
-      const rows = await fetchStoreAddresses();
-      if (rows && rows.length > 0) {
-        setSavedAddresses(rows);
-      } else {
-        setSavedAddresses([]);
-      }
-
-      // If retry payment, use the original shipping address for selection
-      if (isRetryPayment && retryOrder?.shippingAddress) {
-        const shippingAddress = retryOrder.shippingAddress as Record<string, unknown>;
-
-        setSelectedAddress({
-          id: normalizeString(shippingAddress.id),
-          full_name:
-            normalizeString(shippingAddress.full_name) ||
-            normalizeString(shippingAddress.name) ||
-            defaultUserName,
-          phone:
-            normalizeString(shippingAddress.phone) ||
-            normalizeString(shippingAddress.contact) ||
-            defaultUserPhone,
-          address:
-            normalizeString(shippingAddress.address) ||
-            normalizeString(shippingAddress.line1) ||
-            'Address unavailable',
-          pincode:
-            normalizeString(shippingAddress.pincode) ||
-            normalizeString(shippingAddress.zipCode) ||
-            normalizeString(shippingAddress.postcode) ||
-            '000000',
-          city:
-            normalizeString(shippingAddress.city) ||
-            normalizeString(shippingAddress.town) ||
-            'Unknown',
-          state:
-            normalizeString(shippingAddress.state) ||
-            normalizeString(shippingAddress.region) ||
-            'Unknown',
-          country: normalizeString(shippingAddress.country) || 'India',
-          label:
-            normalizeString(shippingAddress.label) ||
-            normalizeString(shippingAddress.tag) ||
-            'Saved address'
-        });
-      } else if (rows.length > 0) {
-        // Deterministic default: explicit default wins, else newest (last —
-        // listAddresses returns oldest-first). Matches desktop checkout.
-        const addressToSelect =
-          rows.find((r: any) => (r as any).is_default) ?? rows[rows.length - 1];
-        setSelectedAddress({
-          id: addressToSelect.id,
-          full_name: addressToSelect.full_name,
-          phone: addressToSelect.phone,
-          address: addressToSelect.address,
-          pincode: addressToSelect.pincode,
-          city: addressToSelect.city,
-          state: addressToSelect.state,
-          country: addressToSelect.country || 'India',
-          label: addressToSelect.label
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching addresses:', error);
-    }
-  }, [user?.id]); // Only depend on stable user.id
-
-  // Validate and apply coupon
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      setOpError('Please enter a coupon code');
-      return;
-    }
-
-    setIsValidatingCoupon(true);
-    try {
-      const result = await validateCouponCode(orgSlug, couponCode.trim());
-
-      if (result.isValid && result.discount) {
-        setAppliedDiscount(result.discount);
-        // No status: the "✓ Coupon applied" line + total update in place.
-      } else {
-        setOpError(result.message || 'Invalid coupon code');
-      }
-    } catch (error) {
-      console.error('Error validating coupon:', error);
-      setOpError('Failed to validate coupon');
-    } finally {
-      setIsValidatingCoupon(false);
-    }
-  };
-
-  // Build Convex orderItemV[] from the current items list
-  const buildConvexItems = () =>
-    items.map((item: any) => {
-      const unitRupees = Number(item.variant_price ?? item.combo_price ?? item.price ?? 0);
-      return {
-        productId: String(item.id),
-        variantId: item.variant_id ? String(item.variant_id) : undefined,
-        name: String(item.name ?? 'Item'),
-        qty: Number(item.quantity ?? 1),
-        unitPricePaise: rupeesToPaise(unitRupees),
-      };
-    });
-
-  // Unified payment handler — creates a Convex order, navigates to /transaction.
-  // Convex handles wallet split, UPI URL generation, slot allocation, and verification.
-  const handlePayment = async () => {
-    if (!selectedAddress) {
-      setOpError('Please select a delivery address');
-      setShowAddressDialog(true);
-      return;
-    }
-    if (!isRealPersonName(selectedAddress.full_name)) {
-      setOpError('Add your full name to the delivery address before placing the order.');
-      setShowAddressDialog(true);
-      return;
-    }
-    if (!user) {
-      setOpError('Please sign in to continue');
-      return;
-    }
-    if (!org) {
-      setOpError('Store is loading. Please try again in a moment.');
-      return;
-    }
-
-    if (orderConsent.needed && !consentConfirmedRef.current) {
-      setConsentSheetOpen(true);
-      return;
-    }
-
-    const shouldClearCart = !isBuyNow && !isRetryPayment;
-    setIsProcessing(true);
-    setIsCompletingOrder(true);
-
-    try {
-      const idempotencyKey = paymentIdempotencyKeyRef.current ??= (
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      );
-      const address = {
-        line1: selectedAddress.address,
-        city: selectedAddress.city,
-        state: selectedAddress.state,
-        pincode: selectedAddress.pincode,
-        name: cleanPersonName(selectedAddress.full_name || defaultUserName),
-        phone: selectedAddress.phone || defaultUserPhone || '',
-      };
-
-      const walletAmountPaise = walletAmountToUse > 0 ? rupeesToPaise(walletAmountToUse) : 0;
-
-      const luckyPaise = rupeesToPaise(luckyDiscount);
-      const couponName = appliedDiscount?.discount_name || appliedDiscount?.name;
-
-      const result = await createConvexOrder({
-        orgSlug: orgSlug,
-        orgId: org._id,
-        kind: 'purchase',
-        items: buildConvexItems(),
-        address,
-        idempotencyKey,
-        walletAmountPaise,
-        discountId: appliedDiscount?.discount_id ?? undefined,
-        discountLabel: couponName ?? undefined,
-        // Lucky 1–99p: visible discount + server-side payment fingerprint.
-        luckyPaise,
-        shippingMethod: activeShippingId,
-        shippingPricePaise: rupeesToPaise(getShippingCost()),
-      });
-
-      isNavigatingRef.current = true;
-
-      // GA4: order created in Convex = purchase (UPI capture follows async).
-      trackPurchase(String(result.orderId), Number(totalPrice ?? 0), items);
-
-      // Open UPI app if we have a URL (skip for wallet-only orders)
-      if (result.upiUrl) {
-        try {
-          window.location.href = result.upiUrl;
-        } catch (err) {
-          console.error('Failed to open UPI app:', err);
-        }
-      }
-
-      sessionStorage.setItem('pendingOrderId', String(result.orderId));
-      navigate(`/transaction/${result.orderId}`, {
-        state: {
-          orderId: result.orderId,
-          shouldClearCart,
-        },
-        replace: result.status === 'paid',
-      });
-    } catch (error: any) {
-      console.error('❌ Payment error:', error);
-      const code = error?.data?.code ?? error?.message;
-      if (code === 'CONSENT_REQUIRED') {
-        // Status had not loaded yet, or the declaration was never recorded.
-        consentConfirmedRef.current = false;
-        setConsentSheetOpen(true);
-        setIsProcessing(false);
-        setIsCompletingOrder(false);
-        return;
-      }
-      const msg =
-        code === 'SLOT_POOL_EXHAUSTED' || code === 'LUCKY_POOL_EXHAUSTED'
-          ? 'Too many pending orders at this price — please retry in a few minutes.'
-          : code === 'NAME_REQUIRED'
-          ? 'Add your full name to the delivery address before placing the order.'
-          : code === 'WALLET_INSUFFICIENT'
-          ? 'Wallet balance is insufficient.'
-          : code === 'ORG_INACTIVE'
-          ? 'Store is currently unavailable.'
-          : 'Payment failed. Please try again.';
-      setOpError(msg);
-      setIsCompletingOrder(false);
-      isNavigatingRef.current = false;
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleConsentConfirm = async () => {
-    await orderConsent.confirm();
-    consentConfirmedRef.current = true;
-    setConsentSheetOpen(false);
-    await handlePayment();
-  };
-
-  // Wallet-only payment — set slider to full total then submit
-  const handleWalletPayment = async () => {
-    const finalTotal = getFinalTotal();
-    setWalletAmountToUse(finalTotal);
-    await handlePayment();
-  };
-
-  // QR is just a different rendering of the UPI URL — same backend path
-  const handleQRPayment = handlePayment;
-
-  // Load data on mount
-  useEffect(() => {
-    if (user?.id) {
-      fetchWalletBalance();
-      // Only fetch addresses if we haven't loaded them yet to prevent re-render loops
-      // The AddressDrawer will trigger updates when addresses are added/edited
-      if (savedAddresses.length === 0) {
-        fetchSavedAddresses();
-      }
-    }
-  }, [user?.id]); // Removed fetch functions from dependency array to break infinite loop
-
-  // Memoized callbacks for AddressDrawer to prevent re-renders
+  // Memoized callback for AddressDrawer to prevent re-renders
   const handleAddressDrawerOpenChange = useCallback((open: boolean) => {
     setShowAddressDialog(open);
   }, []);
-
-  const handleAddressSelect = useCallback((addr: Address) => {
-    setSelectedAddress(addr);
-  }, []);
-
-  // Redirect if no items (but not during order completion, navigation, or retry payment)
-  useEffect(() => {
-    // Check ref directly - safe even if component is unmounting or state is stale
-    if (isNavigatingRef.current) return;
-
-    if (items.length === 0 && !isCompletingOrder && !isBuyNow && !isRetryPayment) {
-      navigate('/cart');
-    }
-  }, [items, navigate, isCompletingOrder, isBuyNow, isRetryPayment]);
-
-  // REMOVED: Full page loading state to keep user on checkout page during processing
-  // if (isCompletingOrder || isNavigating) {
-  //   return (
-  //     <div className="min-h-screen bg-background flex items-center justify-center">
-  //       ...
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -758,7 +157,7 @@ export function MobileCheckoutPage() {
             </div>
 
             {/* Referral Code Section - Late Attachment */}
-            {(isReferralEligible || referralApplied) && (
+            {showReferral && (
               <div className="mb-4 pt-3 border-t border-dashed border-border/40">
                 {referralApplied ? (
                   <div className="flex items-center gap-2 text-xs text-green-600 font-medium animate-in fade-in duration-300">
@@ -877,24 +276,6 @@ export function MobileCheckoutPage() {
         onConfirm={handleConsentConfirm}
       />
 
-      {/* Payment Methods Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Payment Method</DialogTitle>
-          </DialogHeader>
-          <PaymentMethods
-            selectedPaymentMethod={selectedPaymentMethod}
-            setSelectedPaymentMethod={setSelectedPaymentMethod}
-            setShowPaymentDialog={setShowPaymentDialog}
-            handleQRPayment={handleQRPayment}
-            handleWalletPayment={handleWalletPayment}
-            walletBalance={walletBalance}
-            getFinalTotal={getFinalTotal}
-          />
-        </DialogContent>
-      </Dialog>
-
       {/* Address Drawer */}
       <AddressDrawer
         open={showAddressDialog}
@@ -903,7 +284,7 @@ export function MobileCheckoutPage() {
         selectedAddress={selectedAddress}
         onAddressSelect={handleAddressSelect}
         savedAddresses={savedAddresses}
-        onAddressesUpdate={fetchSavedAddresses}
+        onAddressesUpdate={refreshAddresses}
       />
     </div>
   );

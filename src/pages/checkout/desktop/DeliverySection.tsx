@@ -3,7 +3,7 @@ import { useShippingMethods } from '../../../hooks/data/useContent';
 import { formatINR } from '../../../utils/currency';
 import { cn } from '../../../components/ui/utils';
 import { Section } from './Section';
-import type { CheckoutModel } from './useCheckoutModel';
+import type { CheckoutModel } from '../useCheckoutModel';
 
 const ICONS: Record<string, typeof Truck> = { standard: Truck, express: Clock, priority: Zap };
 

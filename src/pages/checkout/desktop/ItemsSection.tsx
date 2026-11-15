@@ -2,7 +2,7 @@ import { QuantityStepper } from '../../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../../lib/images/urls';
 import { formatINR } from '../../../utils/currency';
 import { Section } from './Section';
-import type { CheckoutModel } from './useCheckoutModel';
+import type { CheckoutModel } from '../useCheckoutModel';
 
 const brandName = (brand: any): string => {
   if (!brand) return '';

@@ -1,27 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
-import { convex } from '../../../lib/convex/client';
-import { useOrg } from '../../../lib/convex/useOrg';
-import { useOrgInfo } from '../../../lib/org/OrgContext';
-import { useAddresses } from '../../../lib/convex/useAddresses';
-import { rupeesToPaise } from '../../../lib/convex/money';
-import { useCart } from '../../../hooks/useCart';
-import { useAuth } from '../../../hooks/useAuth';
-import { useMyProfile, toPhone10 } from '../../../hooks/data/useMyProfile';
-import { useShippingMethods } from '../../../hooks/data/useContent';
-import { useOrderConsent } from '../../../hooks/data/useOrderConsent';
-import { useInlineStatus } from '../../../components/common/InlineStatus';
-import type { Address } from '../../../components/checkout/address/AddressCard';
-import { validateCouponCode } from '../../../utils/discounts';
-import { trackBeginCheckout, trackPurchase } from '../../../lib/analytics/ga';
-import { cleanPersonName, isRealPersonName } from '../../../lib/profile/personName';
+import { api } from '../../../convex/_generated/api';
+import { convex } from '../../lib/convex/client';
+import { useOrg } from '../../lib/convex/useOrg';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { useAddresses } from '../../lib/convex/useAddresses';
+import { rupeesToPaise } from '../../lib/convex/money';
+import { useCart } from '../../hooks/useCart';
+import { useAuth } from '../../hooks/useAuth';
+import { useMyProfile, toPhone10 } from '../../hooks/data/useMyProfile';
+import { useShippingMethods } from '../../hooks/data/useContent';
+import { useOrderConsent } from '../../hooks/data/useOrderConsent';
+import { useInlineStatus } from '../../components/common/InlineStatus';
+import type { Address } from '../../components/checkout/address/AddressCard';
+import { validateCouponCode } from '../../utils/discounts';
+import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
+import { cleanPersonName, isRealPersonName } from '../../lib/profile/personName';
 
-// Checkout state and order placement for the desktop page. Mirrors
-// MobileCheckoutPage step for step (flows, totals, lucky, coupon, referral,
-// wallet, consent, createOrder args, error codes) so both pages place the
-// same order. Written so the mobile page can adopt it later unchanged.
+// Checkout state and order placement shared by the desktop CheckoutPage and
+// MobileCheckoutPage (flows, totals, lucky, coupon, referral, wallet, consent,
+// createOrder args, error codes), so both pages place the same order.
+
+export interface CheckoutModelOptions {
+  // Mobile hands off to the UPI app (result.upiUrl) after createOrder.
+  // Desktop has no UPI app and goes straight to the QR on /transaction.
+  openUpiApp?: boolean;
+  // Replace the selected address with the fresh saved row after it is
+  // edited. Mobile re-selects the saved address from AddressDrawer instead.
+  syncSelectedAddress?: boolean;
+}
 
 const normalizeString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
@@ -50,7 +58,7 @@ function addressFromRetry(raw: Record<string, unknown>, name: string, phone: str
   };
 }
 
-export function useCheckoutModel() {
+export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = true }: CheckoutModelOptions = {}) {
   const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, totalPrice: cartTotalPrice } = useCart();
@@ -249,7 +257,7 @@ export function useCheckoutModel() {
   const { profileName, profilePhone10 } = useMyProfile();
   const defaultUserName = profileName || normalizeString(user?.name) || '';
   const defaultUserPhone = profilePhone10 || toPhone10(user?.phone);
-  const { addresses: savedAddresses, isLoading: addressesLoading } = useAddresses(user);
+  const { addresses: savedAddresses, isLoading: addressesLoading, fetchNow: fetchAddressesNow } = useAddresses(user);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const addressInitRef = useRef(false);
 
@@ -270,14 +278,14 @@ export function useCheckoutModel() {
 
   // Keep the selected card in sync after an edit of that address.
   useEffect(() => {
-    if (!selectedAddress?.id) return;
+    if (!syncSelectedAddress || !selectedAddress?.id) return;
     const fresh = savedAddresses.find((a) => a.id === selectedAddress.id);
     if (fresh && (fresh.address !== selectedAddress.address || fresh.full_name !== selectedAddress.full_name
       || fresh.phone !== selectedAddress.phone || fresh.pincode !== selectedAddress.pincode
       || fresh.label !== selectedAddress.label)) {
       setSelectedAddress({ ...fresh, country: fresh.country || 'India' });
     }
-  }, [savedAddresses, selectedAddress]);
+  }, [syncSelectedAddress, savedAddresses, selectedAddress]);
 
   // ---- Consent (one-time declaration before a first order) ----
   const orderConsent = useOrderConsent(org?._id, !!user);
@@ -358,8 +366,16 @@ export function useCheckoutModel() {
       isNavigatingRef.current = true;
       trackPurchase(String(result.orderId), Number(subtotal ?? 0), items);
 
-      // Desktop has no UPI app to hand off to: go straight to the
-      // transaction page, which shows the QR. (Mobile opens result.upiUrl.)
+      // Mobile: open the UPI app (skipped for wallet-only orders). Desktop
+      // goes straight to the transaction page, which shows the QR.
+      if (openUpiApp && result.upiUrl) {
+        try {
+          window.location.href = result.upiUrl;
+        } catch (err) {
+          console.error('Failed to open UPI app:', err);
+        }
+      }
+
       sessionStorage.setItem('pendingOrderId', String(result.orderId));
       navigate(`/transaction/${result.orderId}`, {
         state: { orderId: result.orderId, shouldClearCart },
@@ -407,7 +423,16 @@ export function useCheckoutModel() {
 
   const amountDue = Math.max(0, getFinalTotal() - walletAmountToUse);
 
-  const selectAddress = useCallback((addr: Address) => setSelectedAddress(addr), []);
+  // A customer's own pick is never replaced by the automatic first pick.
+  const selectAddress = useCallback((addr: Address) => {
+    addressInitRef.current = true;
+    setSelectedAddress(addr);
+  }, []);
+
+  // Re-read saved addresses now (AddressDrawer awaits this after a save).
+  const refreshAddresses = useCallback(async () => {
+    await fetchAddressesNow();
+  }, [fetchAddressesNow]);
 
   return {
     user, authLoading, opStatus,
@@ -425,7 +450,7 @@ export function useCheckoutModel() {
       apply: applyReferral,
     },
     walletBalance, isWalletLoading, walletAmountToUse, setWalletAmountToUse,
-    savedAddresses: savedAddresses as Address[], addressesLoading, selectedAddress, selectAddress, addressAttention,
+    savedAddresses: savedAddresses as Address[], addressesLoading, selectedAddress, selectAddress, refreshAddresses, addressAttention,
     consentSheetOpen, setConsentSheetOpen, confirmConsent,
     getFinalTotal, amountDue, isProcessing, placeOrder,
   };
