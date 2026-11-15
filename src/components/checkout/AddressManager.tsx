@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Plus, Edit3, Check, Loader2, X, Home, Building2, Hotel, GraduationCap, MapPin as MapPinIcon } from 'lucide-react';
+import { MapPin, Plus, Edit3, Check, Loader2, X, Home, Building2, Hotel, GraduationCap, MapPin as MapPinIcon, LocateFixed } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -9,6 +9,7 @@ import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
+import { useCurrentLocation } from '../../hooks/useCurrentLocation';
 import { cleanPersonName, personNameError, realNameOrEmpty } from '../../lib/profile/personName';
 import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 
@@ -56,6 +57,8 @@ export function AddressManager({
   const [showAddNewDialog, setShowAddNewDialog] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [locError, setLocError] = useState('');
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
   const { status: opStatus, setError: setOpError } = useInlineStatus();
   // Phase 1: address store behind the flat-shape adapter (Convex or Supabase).
@@ -70,6 +73,7 @@ export function AddressManager({
   // Address form state (name/phone prefill from the normalized profile
   // contract; typed values are never overwritten by late arrivals).
   const { profileName, profilePhone10 } = useMyProfile();
+  const { locate } = useCurrentLocation();
   const [addressForm, setAddressForm] = useState({
     full_name: realNameOrEmpty(user?.name),
     phone: '',
@@ -156,6 +160,37 @@ export function AddressManager({
       } catch (error) {
         console.error('Pincode lookup error:', error);
       }
+    }
+  };
+
+  // Current location via the shared path (device fix + server reverse geocode,
+  // coded inline errors). Fills blanks only; manual entry always stays open.
+  const getCurrentLocation = async () => {
+    setIsLoadingLocation(true);
+    setLocError('');
+    try {
+      const res = await locate();
+      if (!res.ok) {
+        setLocError(res.message);
+        return;
+      }
+      const addr = res.value;
+      const pincode = addr.pincode || '';
+      setAddressForm(prev => ({
+        ...prev,
+        address: prev.address || addr.address || prev.address,
+        pincode: prev.pincode || pincode || prev.pincode,
+        city: prev.city || addr.city || prev.city,
+        state: prev.state || addr.state || prev.state,
+      }));
+      if (pincode && pincode.length === 6) {
+        await fetchLocationFromPincode(pincode);
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      setLocError('Could not fetch location. Type your address manually.');
+    } finally {
+      setIsLoadingLocation(false);
     }
   };
 
@@ -527,6 +562,20 @@ export function AddressManager({
 
           <div className="space-y-4">
             <InlineStatus status={opStatus} />
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getCurrentLocation}
+                disabled={isLoadingLocation}
+                aria-busy={isLoadingLocation}
+                className="h-10 gap-2 rounded-md border-border px-3.5 text-sm font-medium text-accent hover:bg-accent/10 hover:text-accent"
+              >
+                {isLoadingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+                {isLoadingLocation ? 'Locating' : 'Use current location'}
+              </Button>
+              {locError && <p role="alert" className="mt-1.5 text-xs text-red-500">{locError}</p>}
+            </div>
             {/* Full Name */}
             <div>
               <Label htmlFor="full_name">Full Name</Label>

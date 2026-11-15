@@ -511,22 +511,6 @@ async function matchEmailToOrder(
 ) {
   const { amountPaise, upiRef, payerVpa, payerName } = parsed;
 
-  // 0) UPI ref first: exact, collision-proof, amount-independent. Our
-  //    deeplink sets tr=<displayOrderId>, but the bank's credit alert
-  //    carries the BANK's ref (UTR/RRN), not our tr — so this only hits
-  //    when a template was explicitly taught the mapping. Falls through
-  //    to amount matching otherwise.
-  if (upiRef) {
-    const byRef = await ctx.db
-      .query("orders")
-      .withIndex("by_display_id", (q) => q.eq("displayOrderId", upiRef))
-      .first();
-    if (byRef && byRef.orgId === orgId && byRef.status === "pending") {
-      await markOrderPaid(ctx, byRef, emailId, "paid", { upiRef, payerVpa, payerName });
-      return { matched: true, orderId: byRef._id, via: "upi_ref" };
-    }
-  }
-
   // 0a) Customer-submitted UTR (paymentClaim): a bank message whose ref equals
   //     a UTR the customer claimed on a pending order confirms that order. The
   //     amount must still equal the order's fingerprint, so another payment
@@ -556,7 +540,7 @@ async function matchEmailToOrder(
   //    by messageId happens before we get here). The amount must still equal
   //    the order's fingerprint — otherwise an under/over-payment would mark
   //    the order paid. Legacy orders have no orderNumber and skip this path —
-  //    displayOrderId ref (above) and exact-amount matching (below) cover them.
+  //    exact-amount matching (below) covers them.
   const email = await ctx.db.get(emailId);
   const bodyText = `${email?.subject ?? ""}\n${email?.rawBody ?? ""}`;
   const numberCandidates = [

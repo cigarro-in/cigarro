@@ -138,6 +138,7 @@ export const BUILTIN_STORE_PAGES: readonly BuiltInStorePage[] = [
 <h2>Questions?</h2>
 <p>Email <a href="mailto:{{supportEmail}}">{{supportEmail}}</a>.</p>
 <p>Last updated: 20 September 2026</p>
+<p>Address lookup uses <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>.</p>
 `,
   },
   {

@@ -9,7 +9,7 @@ import {
   inOrg,
   resolveOrg,
 } from "./lib/org";
-import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf } from "./lib/ids";
+import { genDisplayOrderId, genOrderNumberCandidate, orderNumberOf, orderNumberRef } from "./lib/ids";
 import { schedulePaidOrderPush } from "./push";
 import { assertPositiveInt, rupeesToPaise } from "./lib/money";
 import { buildUpiUrl } from "./lib/upi";
@@ -670,9 +670,9 @@ export const createOrder = mutation({
       vpa: payingVpa,
       payeeName: org.name,
       amountPaise: finalAmount,
-      referenceId: displayOrderId,
-      // 5-digit number first: bank alerts echo tn, and the matcher keys on it.
-      note: `Order ${orderNumber} / ${displayOrderId}`,
+      orderNumber,
+      // Bank alerts echo tn; the matcher keys on the five-digit number in it.
+      note: `Order${orderNumberRef({ orderNumber })}`,
     });
 
     const orderId = await ctx.db.insert("orders", {

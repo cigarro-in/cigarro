@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import { MapPin, Loader2, Home, Building2, GraduationCap, Hotel, Check } from 'lucide-react';
+import { MapPin, Loader2, Home, Building2, GraduationCap, Hotel, Check, LocateFixed } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
 import { Address } from './AddressCard';
 import { cn } from '../../ui/utils';
 import { cleanPersonName, personNameError, realNameOrEmpty } from '../../../lib/profile/personName';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 
 interface AddressFormProps {
   initialData?: Address | null;
@@ -52,6 +53,9 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { status: opStatus, setError: setOpError } = useInlineStatus();
+  const { locate } = useCurrentLocation();
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState('');
 
   // Prefill fills EMPTY name/phone fields only: profile data arriving late
   // (async) must never wipe what the customer already typed. Editing an
@@ -149,6 +153,35 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     }
   };
 
+  // Current location via the shared path (device fix + server reverse geocode,
+  // coded inline errors). Fills blanks only; manual entry always stays open.
+  const getCurrentLocation = async () => {
+    setLocating(true);
+    setLocError('');
+    try {
+      const res = await locate();
+      if (!res.ok) {
+        setLocError(res.message);
+        return;
+      }
+      const addr = res.value;
+      setFormData(prev => ({
+        ...prev,
+        address: prev.address || addr.address || prev.address,
+        pincode: prev.pincode || addr.pincode || prev.pincode,
+        city: prev.city || addr.city || prev.city,
+        state: prev.state || addr.state || prev.state,
+        country: 'India',
+      }));
+      if (addr.pincode) fetchLocationFromPincode(addr.pincode);
+    } catch (error) {
+      console.error('Location error:', error);
+      setLocError('Could not fetch location. Type your address manually.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const saveLabel = {
     idle: 'Save address',
     saving: 'Saving',
@@ -159,6 +192,21 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
   return (
     <div className="space-y-5 py-2">
       <InlineStatus status={opStatus} />
+
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={getCurrentLocation}
+          disabled={locating}
+          aria-busy={locating}
+          className="h-10 gap-2 rounded-md border-border px-3.5 text-sm font-medium text-accent hover:bg-accent/10 hover:text-accent"
+        >
+          {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+          {locating ? 'Locating' : 'Use current location'}
+        </Button>
+        {locError && <p role="alert" className={ERROR_CLASS}>{locError}</p>}
+      </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>

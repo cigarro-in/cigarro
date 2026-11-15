@@ -4,7 +4,8 @@ export interface BuildUpiUrlArgs {
   vpa: string;
   payeeName?: string;
   amountPaise: number;
-  referenceId: string; // our displayOrderId (stable; bank-email ref matching)
+  /** Customer-facing five-digit order number. Never the internal ORD- display id. */
+  orderNumber: number;
   note?: string;
 }
 
@@ -12,7 +13,7 @@ export function buildUpiUrl({
   vpa,
   payeeName,
   amountPaise,
-  referenceId,
+  orderNumber,
   note,
 }: BuildUpiUrlArgs): string {
   const params = new URLSearchParams({
@@ -20,10 +21,8 @@ export function buildUpiUrl({
     pn: payeeName ?? "Merchant",
     am: paiseToRupees(amountPaise).toFixed(2),
     cu: "INR",
-    tr: referenceId,
-    // tn echoes the ref into the payer's app + the bank alert text, which is
-    // what the email templates actually parse. Belt and suspenders with tr.
-    tn: note ?? `Order ${referenceId}`,
+    tr: String(orderNumber),
+    tn: note ?? `Order ${orderNumber}`,
   });
   return `upi://pay?${params.toString()}`;
 }
