@@ -37,7 +37,8 @@ function ago(ms: number, now: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-type Setup = { file: File; url: string };
+/** Android: the downloaded macro file. iPhone: the link to copy (never saved). */
+type Setup = { file?: File; url?: string };
 
 function macroFile(text: string, name: string): File {
   return new File([text], name, { type: 'application/octet-stream' });
@@ -124,7 +125,7 @@ function AndroidSteps({ onDownload, shared }: { onDownload: () => void; shared: 
           </Button>
         </div>
       </Step>
-      <Step n={2} title="Open the downloaded file, choose MacroDroid, tap Import">
+      <Step n={2} title="Tap the downloaded file (in the download notification or Downloads), open it with MacroDroid, then tap ✓ to save.">
         <div>
           <Button variant={shared ? 'secondary' : 'primary'} size="sm" onClick={onDownload}>
             {shared ? 'Download again' : 'Download setup file'}
@@ -136,11 +137,11 @@ function AndroidSteps({ onDownload, shared }: { onDownload: () => void; shared: 
   );
 }
 
-function IphoneSteps({ setup }: { setup: Setup }) {
+function IphoneSteps({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(setup.url);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
     } catch {
       setCopied(false);
@@ -178,8 +179,8 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
   const gmailFb = useButtonFeedback();
   const offFb = useButtonFeedback();
 
-  const downloadSetup = (s: Setup) => {
-    download(s.file);
+  const downloadSetup = (file: File) => {
+    download(file);
     setShared(true);
   };
 
@@ -187,8 +188,8 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
     if (!orgId) return;
     setConfirm(null);
     connectFb.run(async () => {
-      const r = await connectPhone({ orgId });
-      const s = { file: macroFile(r.macro, r.filename), url: r.url };
+      const r = await connectPhone({ orgId, device: device === 'iphone' ? 'iphone' : 'android' });
+      const s: Setup = 'url' in r ? { url: r.url } : { file: macroFile(r.macro, r.filename) };
       setSetup(s);
       setShared(false);
       return s;
@@ -260,6 +261,12 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
             The phone app was not set up correctly. Tap Set up again to get a fresh file.
           </StatusLine>
         );
+      case 'setup_expired':
+        return (
+          <StatusLine tone="bad" icon={<CircleAlert />}>
+            The setup code expired or was already used. Tap Set up again to get a fresh file.
+          </StatusLine>
+        );
       default:
         return null;
     }
@@ -290,11 +297,11 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
           </div>
         )}
 
-        {showSetup && setup && device === 'android' && (
-          <AndroidSteps shared={shared} onDownload={() => downloadSetup(setup)} />
+        {showSetup && setup?.file && device === 'android' && (
+          <AndroidSteps shared={shared} onDownload={() => downloadSetup(setup.file!)} />
         )}
-        {showSetup && setup && device === 'iphone' && <IphoneSteps setup={setup} />}
-        {device === 'desktop' && (!phoneOn || phone.state === 'setup_error' || phone.state === 'quiet') && <PhoneQr />}
+        {showSetup && setup?.url && device === 'iphone' && <IphoneSteps url={setup.url} />}
+        {device === 'desktop' && (!phoneOn || phone.state === 'setup_error' || phone.state === 'setup_expired' || phone.state === 'quiet') && <PhoneQr />}
 
         {/* One primary action. */}
         <div className="flex flex-wrap items-center gap-2">
@@ -309,7 +316,7 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
               {device === 'iphone' ? 'Set up on this iPhone' : 'Connect this phone'}
             </Button>
           )}
-          {(phone.state === 'setup_error' || phone.state === 'quiet') && !showSetup && device !== 'desktop' && (
+          {(phone.state === 'setup_error' || phone.state === 'setup_expired' || phone.state === 'quiet') && !showSetup && device !== 'desktop' && (
             <Button variant="primary" state={connectFb.state} onClick={() => setConfirm('redo')}>
               Set up again
             </Button>
@@ -332,7 +339,7 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
               {gmailFb.busy ? 'Opening Google…' : 'or confirm via Gmail'}
             </button>
           )}
-          {phoneOn && phone.state !== 'setup_error' && phone.state !== 'quiet' && device !== 'desktop' && !showSetup && (
+          {phoneOn && phone.state !== 'setup_error' && phone.state !== 'setup_expired' && phone.state !== 'quiet' && device !== 'desktop' && !showSetup && (
             <button
               type="button"
               onClick={() => setConfirm('redo')}

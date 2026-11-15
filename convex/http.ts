@@ -6,7 +6,7 @@ import { encryptSecret } from "./lib/crypto";
 import { gmailRedirectUri } from "./gmail";
 import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
 import { LEGACY_ORG_SLUG } from "./lib/legacyOrg";
-import { SMS_PATH_PREFIX, SMS_TOKEN_RE, sha256Hex } from "./smsRelay";
+import { CLAIM_PATH_PREFIX, SMS_PATH_PREFIX, SMS_TOKEN_RE, sha256Hex } from "./smsRelay";
 import { detectSetupError, parseRelayPayload } from "./lib/bankMessage";
 
 const http = httpRouter();
@@ -243,6 +243,32 @@ http.route({
     }
     // 200 even for setup errors: a retry would not fix them. The store sees it.
     return jsonResponse({ ok: true, ...res.result });
+  }),
+});
+
+// ---------- SMS relay claim (MacroDroid first run) ----------
+//
+// POST /claimSmsRelay/<code>. The code comes from the macro file (24 h, single
+// use). Valid code: 200 with the store token as a text/plain body, nothing
+// else. Anything else: 401 with an empty body. The token is then the macro's
+// cigarro_key variable (convex/lib/macrodroid.ts). Rate limited like the SMS route.
+http.route({
+  pathPrefix: CLAIM_PATH_PREFIX,
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const code = new URL(req.url).pathname.slice(CLAIM_PATH_PREFIX.length).replace(/\/$/, "");
+    if (!SMS_TOKEN_RE.test(code)) return new Response(null, { status: 401 });
+
+    const codeHash = await sha256Hex(code);
+    const res = await ctx.runMutation(internal.smsRelay.claim, { codeHash });
+    if (res.status === 429) {
+      return new Response(null, { status: 429, headers: { "retry-after": "60" } });
+    }
+    if (res.status !== 200) return new Response(null, { status: 401 });
+    return new Response(res.token, {
+      status: 200,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
   }),
 });
 

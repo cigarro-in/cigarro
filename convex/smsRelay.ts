@@ -1,10 +1,12 @@
 // SMS relay: MacroDroid on the store owner's Android phone (or an iPhone
 // Shortcuts automation) POSTs each incoming SMS to /receiveBankSms/<token>.
 // The token is the store's secret; only its SHA-256 is stored. The merchant
-// never sees the URL: "Connect phone" rotates the token and returns a ready
-// MacroDroid file (convex/lib/macrodroid.ts). Bank credits go through
-// processBankMessage (payments.ts), the same matching path as bank emails.
-// Decision rules live in the super-admin pipeline config (convex/pipeline.ts).
+// never sees a token: "Connect phone" makes a one-time setup code (24 h) and
+// returns a MacroDroid file that carries only the code (convex/lib/macrodroid.ts).
+// The macro POSTs the code to /claimSmsRelay/<code>, which creates the token,
+// returns it once, and burns the code. Until that claim, receiveBankSms rejects.
+// Bank credits go through processBankMessage (payments.ts), the same matching
+// path as bank emails. Decision rules live in convex/pipeline.ts.
 
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -19,15 +21,18 @@ import { processBankMessage } from "./payments";
 import { loadPipelineConfig, recordPaymentMessage } from "./pipeline";
 
 const RATE_WINDOW_MS = 60_000;
-const RATE_MAX = 60; // requests per token per minute
+const RATE_MAX = 60; // requests per token (or code) per minute
 const DEDUPE_BUCKET_MS = 120_000; // identical sender+body inside one bucket = duplicate
 /** Phone silent this long = "open MacroDroid" warning on the merchant card. */
 export const SMS_STALE_MS = 24 * 60 * 60 * 1000;
 /** A setup error newer than this (and newer than the last good SMS) is shown. */
 const SETUP_ERROR_SHOW_MS = 24 * 60 * 60 * 1000;
+/** A setup code works for this long after "Connect phone". */
+export const CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const SMS_PATH_PREFIX = "/receiveBankSms/";
-/** 32 random bytes, base64url without padding = 43 chars. */
+export const CLAIM_PATH_PREFIX = "/claimSmsRelay/";
+/** 32 random bytes, base64url without padding = 43 chars. Used for tokens and setup codes. */
 export const SMS_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 
 export async function sha256Hex(text: string): Promise<string> {
@@ -59,16 +64,22 @@ function newToken(): string {
 
 // ---------- Merchant (store admins only) ----------
 
-export type PhoneState = "not_connected" | "waiting" | "connected" | "quiet" | "setup_error";
+export type PhoneState = "not_connected" | "waiting" | "connected" | "quiet" | "setup_error" | "setup_expired";
+
+/** Unclaimed = a setup code is pending. Rows without one (every relay before claims) are claimed. */
+function isUnclaimed(relay: Doc<"smsRelays">): boolean {
+  return relay.claimCodeHash !== undefined;
+}
 
 /**
  * Connection status only. No URL, senders or message details: those live in
  * the super admin. `state`:
  * - not_connected: never set up, or disconnected
- * - waiting: set up, no bank credit SMS yet
+ * - waiting: set up, no bank credit SMS yet (also while the file is not yet run)
  * - connected: bank credit SMS seen; lastConfirmedAt = last order it confirmed
  * - quiet: the phone has sent nothing for a day
  * - setup_error: the phone sent template text (bad import), newer than any good SMS
+ * - setup_expired: the setup code ran out (24 h) before the file was run
  */
 export const getStatus = query({
   args: { orgId: v.id("organizations") },
@@ -83,7 +94,9 @@ export const getStatus = query({
     if (relay && relay.active) {
       const setupAt = relay.rotatedAt ?? relay.createdAt;
       const lastGood = relay.lastCreditSmsAt ?? 0;
-      if (
+      if (isUnclaimed(relay) && now > (relay.claimExpiresAt ?? 0)) {
+        state = "setup_expired";
+      } else if (
         relay.lastSetupErrorAt &&
         relay.lastSetupErrorAt > lastGood &&
         relay.lastSetupErrorAt >= setupAt &&
@@ -108,21 +121,32 @@ export const getStatus = query({
   },
 });
 
-async function rotate(ctx: MutationCtx, orgId: Id<"organizations">, userId: string) {
-  const siteUrl = process.env.CONVEX_SITE_URL;
-  if (!siteUrl) throw new ConvexError({ code: "SMS_RELAY_NOT_CONFIGURED" });
-  const token = newToken();
-  const tokenHash = await sha256Hex(token);
-  const tokenLast4 = token.slice(-4);
-  const now = Date.now();
+/**
+ * Starts a fresh setup: kills the current token and any pending code at once
+ * (tokenHash cleared, so the old phone's requests get 401), and makes a new
+ * one-time code. The token itself is made at claim time, because only its hash
+ * is stored and the claim must hand the token back.
+ */
+/** Writes the store's relay row: new token state, plus claim fields (undefined clears them). */
+async function writeRelay(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  now: number,
+  state: {
+    tokenHash: string;
+    tokenLast4: string;
+    claimCodeHash: string | undefined;
+    claimExpiresAt: number | undefined;
+    claimedAt: number | undefined;
+  },
+): Promise<boolean> {
   const existing = await ctx.db
     .query("smsRelays")
     .withIndex("by_org", (q) => q.eq("orgId", orgId))
     .first();
   if (existing) {
     await ctx.db.patch(existing._id, {
-      tokenHash,
-      tokenLast4,
+      ...state,
       active: true,
       rotatedAt: now,
       revokedAt: undefined,
@@ -132,30 +156,130 @@ async function rotate(ctx: MutationCtx, orgId: Id<"organizations">, userId: stri
       lastSetupError: undefined,
     });
   } else {
-    await ctx.db.insert("smsRelays", { orgId, tokenHash, tokenLast4, active: true, createdAt: now });
+    await ctx.db.insert("smsRelays", { orgId, ...state, active: true, createdAt: now });
   }
+  return !!existing;
+}
+
+/**
+ * Android: starts a fresh setup. Kills the current token and any pending code
+ * (tokenHash cleared, so old requests get 401) and makes a one-time setup code.
+ * The token is made at claim time, because the claim must hand it back and only
+ * its hash is stored.
+ */
+async function rotateAndroid(ctx: MutationCtx, orgId: Id<"organizations">, userId: string): Promise<{ siteUrl: string; code: string }> {
+  const siteUrl = process.env.CONVEX_SITE_URL;
+  if (!siteUrl) throw new ConvexError({ code: "SMS_RELAY_NOT_CONFIGURED" });
+  const code = newToken();
+  const now = Date.now();
+  const claimExpiresAt = now + CLAIM_TTL_MS;
+  const existed = await writeRelay(ctx, orgId, now, {
+    tokenHash: "",
+    tokenLast4: "",
+    claimCodeHash: await sha256Hex(code),
+    claimExpiresAt,
+    claimedAt: undefined,
+  });
   await audit(ctx, {
     orgId,
     adminUserId: userId,
-    action: existing ? "sms_relay.token_rotated" : "sms_relay.token_created",
+    action: existed ? "sms_relay.setup_rotated" : "sms_relay.setup_created",
     targetType: "smsRelay",
     targetId: String(orgId),
-    payload: { tokenLast4 },
+    payload: { claimExpiresAt },
+  });
+  return { siteUrl: siteUrl.replace(/\/$/, ""), code };
+}
+
+/**
+ * iPhone: the link is copied to the clipboard, never saved as a file, so the
+ * token is made now and the relay is claimed at once (no setup code).
+ */
+async function rotateIphone(ctx: MutationCtx, orgId: Id<"organizations">, userId: string): Promise<string> {
+  const siteUrl = process.env.CONVEX_SITE_URL;
+  if (!siteUrl) throw new ConvexError({ code: "SMS_RELAY_NOT_CONFIGURED" });
+  const token = newToken();
+  const now = Date.now();
+  const existed = await writeRelay(ctx, orgId, now, {
+    tokenHash: await sha256Hex(token),
+    tokenLast4: token.slice(-4),
+    claimCodeHash: undefined,
+    claimExpiresAt: undefined,
+    claimedAt: now,
+  });
+  await audit(ctx, {
+    orgId,
+    adminUserId: userId,
+    action: existed ? "sms_relay.token_rotated" : "sms_relay.token_created",
+    targetType: "smsRelay",
+    targetId: String(orgId),
+    payload: { tokenLast4: token.slice(-4) },
   });
   return `${siteUrl.replace(/\/$/, "")}${SMS_PATH_PREFIX}${token}`;
 }
 
 /**
- * Connects (or reconnects) a phone: rotates the store's relay token (an older
- * phone stops at once) and returns the MacroDroid file with the new URL inside.
- * `url` is returned only for the iPhone "copy link" step; the UI never shows it.
+ * Connects (or reconnects) a phone. Android returns the MacroDroid file built
+ * with a one-time setup code (no token; the macro claims it). iPhone returns the
+ * receiveBankSms URL to copy, with the token already live.
  */
 export const connectPhone = mutation({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
+  args: { orgId: v.id("organizations"), device: v.union(v.literal("android"), v.literal("iphone")) },
+  handler: async (ctx, { orgId, device }) => {
     const { userId } = await requireOrgAdmin(ctx, orgId);
-    const url = await rotate(ctx, orgId, String(userId));
-    return { macro: buildMacroFile(url), filename: MACRO_FILENAME, url };
+    if (device === "iphone") {
+      const url = await rotateIphone(ctx, orgId, String(userId));
+      return { url };
+    }
+    const { siteUrl, code } = await rotateAndroid(ctx, orgId, String(userId));
+    return { macro: buildMacroFile(siteUrl, code), filename: MACRO_FILENAME };
+  },
+});
+
+/**
+ * Claim (called by the http route after hashing the setup code). A valid,
+ * unexpired, unclaimed code creates the store token, returns it once, and
+ * clears the code. Anything else is 401.
+ */
+export const claim = internalMutation({
+  args: { codeHash: v.string() },
+  handler: async (ctx, { codeHash }) => {
+    const relay = await ctx.db
+      .query("smsRelays")
+      .withIndex("by_claim_code_hash", (q) => q.eq("claimCodeHash", codeHash))
+      .unique();
+    const now = Date.now();
+    if (!relay || !relay.active || !isUnclaimed(relay)) return { status: 401 as const };
+    if (!relay.claimExpiresAt || now > relay.claimExpiresAt) return { status: 401 as const };
+
+    // Same fixed-window limit as the SMS route, on the row the code points to.
+    let windowStart = relay.rateWindowStart ?? 0;
+    let count = relay.rateCount ?? 0;
+    if (now - windowStart >= RATE_WINDOW_MS) {
+      windowStart = now;
+      count = 0;
+    }
+    if (count >= RATE_MAX) return { status: 429 as const };
+
+    const token = newToken();
+    await ctx.db.patch(relay._id, {
+      tokenHash: await sha256Hex(token),
+      tokenLast4: token.slice(-4),
+      claimCodeHash: undefined,
+      claimExpiresAt: undefined,
+      claimedAt: now,
+      rateWindowStart: windowStart,
+      rateCount: count + 1,
+    });
+    await audit(ctx, {
+      orgId: relay.orgId,
+      adminUserId: "sms_relay_claim",
+      action: "sms_relay.claimed",
+      targetType: "smsRelay",
+      targetId: String(relay.orgId),
+      payload: { tokenLast4: token.slice(-4) },
+    });
+    return { status: 200 as const, token };
   },
 });
 
@@ -202,7 +326,8 @@ export const ingest = internalMutation({
       .query("smsRelays")
       .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
       .unique();
-    if (!relay || !relay.active) return { status: 401 as const };
+    // Unclaimed: the macro has not run its claim yet, so the token is not live.
+    if (!relay || !relay.active || isUnclaimed(relay)) return { status: 401 as const };
 
     // Fixed-window rate limit per token. Also records lastSmsAt.
     const now = Date.now();

@@ -13,13 +13,16 @@ super admin at `/sa/payments` (Messages, Rules) and on the store page
 
 ## Merchant flow
 
-- Android: "Connect this phone" calls `smsRelay.connectPhone`, which rotates the
-  store token and returns a ready MacroDroid file (`convex/lib/macrodroid.ts`,
+- Android: "Connect this phone" calls `smsRelay.connectPhone`, which kills the old
+  token, makes a one-time setup code (24 h) and returns a ready MacroDroid file that
+  carries only the code (see section 2) (`convex/lib/macrodroid.ts`,
   name "Cigarro payments", any-number SMS trigger, HTTP POST). Steps shown:
   1. Get MacroDroid (an `intent://` link that opens MacroDroid, or the Play Store
      when it is not installed). 2. The file downloads as `cigarro-payments.macro`;
-  the merchant opens it, chooses MacroDroid, and taps Import. 3. Allow SMS and
-  battery when MacroDroid asks. The URL is never displayed.
+  the merchant taps the downloaded file (in the download notification or Downloads),
+  opens it with MacroDroid, then taps ✓ to save. Sharing the file to MacroDroid does
+  not import it (it fires a trigger); it must be opened. Source: MacroDroid wiki,
+  Sharing Macros. 3. Allow SMS and battery when MacroDroid asks. The URL is never displayed.
 - iPhone: "Set up on this iPhone" gives a "Copy setup link" button and a three-line
   Shortcuts guide (Apple cannot share automations). The link is copied, not shown.
 - Desktop: a QR code that opens the same page on the phone.
@@ -66,10 +69,28 @@ rules (no third-party cloud, HTTPS POST, sender filter).
 
 ## 2. Endpoint and auth
 
+- Android uses the claim flow below. iPhone skips it: "Copy setup link" copies the
+  `receiveBankSms` URL with the token, which is live at once (see section 5).
+- Claim: `POST https://<deployment>.convex.site/claimSmsRelay/<code>` (`convex/http.ts`).
+  The code is the one-time setup code from the macro file. A valid, unexpired,
+  unclaimed code gets 200 with the store token as a `text/plain` body and nothing
+  else. Anything else gets 401 with an empty body. 60 requests per minute on the
+  code's store (429 with `Retry-After: 60`).
 - Route: `POST https://<deployment>.convex.site/receiveBankSms/<token>` (`convex/http.ts`, `pathPrefix` route).
-- Token: 32 random bytes, base64url (43 characters). Only its SHA-256 is stored (`smsRelays.tokenHash`), plus the last 4 characters.
-- Unknown or revoked tokens get 401. 60 requests per token per minute (429 with `Retry-After: 60`). Body up to 8 KB.
-- Connecting a phone again rotates the token; the old phone stops at once.
+- Token: 32 random bytes, base64url (43 characters). Created at claim time, not at
+  connect time, because the claim has to hand it back and only its SHA-256 is stored
+  (`smsRelays.tokenHash`), plus the last 4 characters.
+- Setup code: 32 random bytes, base64url. Only its SHA-256 is stored
+  (`smsRelays.claimCodeHash`), with `claimExpiresAt` = 24 hours after "Connect this
+  phone". Single use: the claim clears the hash and sets `claimedAt`.
+- Until the claim, `receiveBankSms` rejects every request (401). Unknown, revoked,
+  or unclaimed tokens get 401. 60 requests per token per minute (429 with `Retry-After: 60`). Body up to 8 KB.
+- Connecting again (or "Set up on a new phone") kills the old token and any pending
+  code at once. The old phone stops.
+- Relays from before claims (no claim fields) count as claimed and keep working with
+  the token in their URL. No migration.
+- If the setup code expires before the file is run, the card shows "setup code
+  expired or was already used" and "Set up again" makes a new one.
 
 ## 3. Payload
 
@@ -169,11 +190,32 @@ Shortcut body, JSON equivalent: `{"sender": "<Sender>", "body": "<Shortcut Input
 - **Sender field:** the exact sender filter UI and the Sender variable name differ by iOS version. Check on the device.
 - **Headers:** I did not confirm the Get Contents of URL header field from Apple's page. The body needs `Content-Type: application/json`, but if the body is sent as JSON, Shortcuts sets that header itself. Check on the device.
 - iPhone cannot relay RCS messages; bank SMS are normal SMS, so this is fine for the banks in use.
+- The setup link is copied to the clipboard and never saved as a file, so it can
+  carry the token directly. Connecting with iPhone (`connectPhone` with
+  `device: "iphone"`) makes the token at once and marks the relay claimed (no
+  setup code). Only Android uses the claim flow.
 
 ## 6. Security notes
 
-- The token is in the URL path, so it appears in request logs (Convex, and any proxy the phone uses). Anyone who sees the URL can post fake credits. Rotate the URL if it leaks; a rotated URL is dead at once. The fake-credit risk is limited to matching against pending orders with the exact paise amount, and every matched order still shows in Payments for review.
-- Only the hash is stored; the admin can never read the URL back.
+- The Android macro file holds only the one-time setup code, never the store token. The
+  macro's first run POSTs the code to `/claimSmsRelay/<code>` and gets the token
+  back once. The code works once and for 24 hours. After the claim the file is
+  harmless: the code is dead, and the token sits only in the macro's secure
+  variable `cigarro_key`. A copy of the file that leaks before it is run could be
+  used to claim the token first, so the file is still treated as a secret until
+  it has been run. "Set up again" makes a new code and kills the old one.
+- Assumed, not yet verified on a phone: MacroDroid clears a secure variable's value
+  when the macro is exported, so a shared export does not reveal the token. Check
+  this on a real device before rollout.
+- The iPhone link carries the token in its URL. It is copied to the clipboard and
+  never saved as a file. The token is in the URL path of `receiveBankSms`, so it appears in request logs
+  (Convex, and any proxy the phone uses). Anyone who sees the URL can post fake
+  credits. Rotate the URL if it leaks; a rotated URL is dead at once. The fake-credit
+  risk is limited to matching against pending orders with the exact paise amount,
+  and every matched order still shows in Payments for review.
+- Only the hash is stored; the admin can never read the token back.
+- If the claim response is lost after the server has claimed the code, the phone
+  cannot claim again. The card shows "waiting" and then "quiet". Set up again.
 - Dedupe and the super-admin rules run before any matching. Phone-number senders are rejected by default.
 - The relay stores every SMS body for now (may include account digits and UPI refs; OTP codes masked). See "Message log". Only the super admin can read them.
 - Only use HTTPS. Do not paste the webhook URL into shared chats.

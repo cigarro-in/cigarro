@@ -396,8 +396,14 @@ export default defineSchema({
     // Fixed-window rate limit per token (requests per minute).
     rateWindowStart: v.optional(v.number()),
     rateCount: v.optional(v.number()),
+    // One-time setup code (SHA-256 only). Set on connect, cleared on claim.
+    // Rows with no claimCodeHash are claimed (every relay before this change).
+    claimCodeHash: v.optional(v.string()),
+    claimExpiresAt: v.optional(v.number()),
+    claimedAt: v.optional(v.number()),
   })
     .index("by_org", ["orgId"])
+    .index("by_claim_code_hash", ["claimCodeHash"])
     .index("by_token_hash", ["tokenHash"]),
 
   // Every bank SMS and bank email the pipeline received, across stores, with the

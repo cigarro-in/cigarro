@@ -27,7 +27,7 @@ export function GmailBanner() {
   if (dismissed || status === undefined || phone === undefined) return null;
   if (location.pathname.startsWith('/payments')) return null;
   const gmailOn = status?.status === 'active';
-  const phoneProblem = phone.state === 'quiet' || phone.state === 'setup_error';
+  const phoneProblem = phone.state === 'quiet' || phone.state === 'setup_error' || phone.state === 'setup_expired';
   const phoneOn = phone.state !== 'not_connected' && !phoneProblem;
   if (phoneOn || (gmailOn && !phoneProblem)) return null;
 
