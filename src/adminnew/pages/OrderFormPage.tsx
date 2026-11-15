@@ -20,6 +20,7 @@ import { InvoiceCard } from '../features/orders/InvoiceCard';
 import { ItemsCard } from '../features/orders/ItemsCard';
 import { NextActionCard } from '../features/orders/NextActionCard';
 import { OrderTimeline } from '../features/orders/OrderTimeline';
+import { PaymentClaimCard } from '../features/orders/PaymentClaimCard';
 import { PaymentSummaryCard } from '../features/orders/PaymentSummaryCard';
 import { ShippingAddressCard } from '../features/orders/ShippingAddressCard';
 import { orderNumberLabel, type OrderDoc } from '../features/orders/orderModel';
@@ -68,6 +69,7 @@ function OrderDetail({ orderId }: { orderId?: string }) {
         main={
           <>
             <NextActionCard order={order} stage={stage} />
+            <PaymentClaimCard order={order} />
             <ItemsCard order={order} />
             <OrderTimeline order={order} stage={stage} />
             <PaymentSummaryCard order={order} />

@@ -45,7 +45,11 @@ export function StoreOptionsCard({ orgId }: { orgId: Id<'organizations'> | undef
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-medium text-foreground">Lucky discount</div>
-            <p className="text-xs text-muted-foreground">Adds 1–99 paise per order so amounts match exactly.</p>
+            <p className="text-xs text-muted-foreground">
+              {lucky
+                ? 'Adds 1–99 paise per order so amounts match exactly.'
+                : 'Exact rupee totals. If two orders would have the same amount, a few paise come off one so payments can be told apart.'}
+            </p>
           </div>
           <Switch
             checked={lucky}

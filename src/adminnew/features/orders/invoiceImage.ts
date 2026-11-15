@@ -20,6 +20,8 @@ export interface InvoiceData {
   lines: InvoiceLine[];
   subtotal: string;
   discount: string | null;
+  /** Payment-match offset, e.g. "-₹0.02". Null when there is none. */
+  paymentMatch: string | null;
   delivery: string;
   wallet: string | null;
   total: string;
@@ -168,6 +170,7 @@ function paint(ctx: CanvasRenderingContext2D, inv: InvoiceData, logo: HTMLImageE
   const totalsTop = y;
   totalRow('Subtotal', inv.subtotal);
   if (inv.discount) totalRow('Discount', inv.discount);
+  if (inv.paymentMatch) totalRow('Payment match', inv.paymentMatch);
   totalRow('Delivery', inv.delivery);
   if (inv.wallet) totalRow('Paid from wallet', inv.wallet);
   y += 6;

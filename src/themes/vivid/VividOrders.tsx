@@ -15,6 +15,8 @@ import {
 import { SEOHead } from '../../components/seo/SEOHead';
 import { InlineStatus, useInlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
+import { PaymentMatchRow } from '../../components/payment/PaymentMatchRow';
+import { PaymentClaimPanel } from '../../components/payment/PaymentClaimPanel';
 import {
   useMyOrders,
   useRetryOrder,
@@ -26,6 +28,7 @@ type StatusMeta = { label: string; cls: string; icon: React.ComponentType<any> }
 
 const uiStatusMeta: Record<OrderUiStatus, StatusMeta> = {
   pending:    { label: 'Payment pending', cls: 'vv-badge--warning', icon: Clock },
+  under_review: { label: 'Under review', cls: 'vv-badge--info', icon: Clock },
   placed:     { label: 'Order placed',    cls: 'vv-badge--info',    icon: Clock },
   processing: { label: 'Confirmed',       cls: 'vv-badge--info',    icon: Package },
   shipped:    { label: 'On the way',      cls: 'vv-badge--info',    icon: Truck },
@@ -164,6 +167,8 @@ function OrderCard({ order }: { order: NormalizedOrder }) {
 
   const paymentLine = order.isPaid
     ? { text: 'Payment received', cls: 'text-[var(--vv-success)]' }
+    : order.uiStatus === 'under_review'
+      ? { text: 'Payment under review', cls: 'text-[var(--vv-warning)]' }
     : order.paymentStatus === 'pending'
       ? { text: 'Awaiting UPI payment', cls: 'text-[var(--vv-warning)]' }
       : { text: terminalPaymentLabel[order.paymentStatus], cls: 'text-[var(--vv-danger)]' };
@@ -285,6 +290,7 @@ function OrderCard({ order }: { order: NormalizedOrder }) {
           )}
         </div>
       )}
+      <PaymentClaimPanel order={order} className="mt-3" />
       <div className="mt-2">
         <InlineStatus status={opStatus} />
       </div>
@@ -335,6 +341,11 @@ function OrderDetail({ order }: { order: NormalizedOrder }) {
             <span className="text-[var(--vv-success)]">−{formatINR(order.walletUsed)}</span>
           </div>
         )}
+        <PaymentMatchRow
+          amount={order.paymentMatch}
+          className="text-[var(--vv-fg-muted)]"
+          helpClassName="mt-0.5 text-[11px] opacity-80"
+        />
         <div className="flex justify-between border-t border-[var(--vv-border)] pt-1.5 font-semibold">
           <span className="text-[var(--vv-fg)]">Total</span>
           <span className="text-[var(--vv-fg)]">{formatINR(order.total)}</span>

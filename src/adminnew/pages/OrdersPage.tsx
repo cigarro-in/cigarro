@@ -29,6 +29,7 @@ import {
   type Column,
   type DateRangePreset,
 } from '../ui';
+import { UnderReviewBadge } from '../features/orders/PaymentClaimCard';
 import {
   STAGE_FILTERS,
   customerName,
@@ -160,7 +161,12 @@ export function OrdersPage() {
     {
       id: 'stage',
       header: 'Stage',
-      cell: ({ stage: s }) => <StatusBadge stage={s} />,
+      cell: ({ order, stage: s }) => (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <StatusBadge stage={s} />
+          {order.paymentClaim?.status === 'review' && <UnderReviewBadge />}
+        </span>
+      ),
     },
     {
       id: 'date',
@@ -236,7 +242,10 @@ export function OrdersPage() {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold tabular-nums text-foreground">{orderNumberLabel(order)}</span>
-                        <StatusBadge stage={s} />
+                        <span className="inline-flex items-center gap-1.5">
+                          {order.paymentClaim?.status === 'review' && <UnderReviewBadge />}
+                          <StatusBadge stage={s} />
+                        </span>
                       </div>
                       <span className="truncate text-sm text-foreground">{customerName(order)}</span>
                       <span className="truncate text-sm text-muted-foreground">{itemsSummary(order)}</span>

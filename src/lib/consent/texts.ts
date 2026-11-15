@@ -5,4 +5,5 @@ export const CONSENT_TEXT_VERSION = {
   ageGateClassic: 'age-gate.classic.v1',
   ageGateVivid: 'age-gate.vivid.v1',
   checkoutTerms: 'checkout-terms.v1',
+  orderSheet: 'order-sheet.v1',
 } as const;

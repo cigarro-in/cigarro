@@ -30,6 +30,10 @@ export const expireHeldSlot = internalMutation({
     const order = await ctx.db.get(orderId);
     if (!order) return;
     if (order.status !== "pending") return;
+    // Customer claimed a UPI transaction ID and the store is reviewing it:
+    // the order (and its inventory) stays held. Rejecting the claim
+    // reschedules expiry (see admin.rejectPaymentClaim).
+    if (order.paymentClaim?.status === "review") return;
 
     await ctx.db.patch(orderId, {
       status: "expired",
@@ -523,6 +527,30 @@ async function matchEmailToOrder(
     }
   }
 
+  // 0a) Customer-submitted UTR (paymentClaim): a bank message whose ref equals
+  //     a UTR the customer claimed on a pending order confirms that order. The
+  //     amount must still equal the order's fingerprint, so another payment
+  //     that happens to carry the same ref cannot confirm it.
+  if (upiRef) {
+    const claimed = await ctx.db
+      .query("orders")
+      .withIndex("by_org_claim_utr", (q) =>
+        q.eq("orgId", orgId).eq("paymentClaim.utr", upiRef),
+      )
+      .collect();
+    const hit = claimed.find(
+      (o) =>
+        o.status === "pending" &&
+        o.paymentClaim !== undefined &&
+        o.paymentClaim.status !== "confirmed" &&
+        o.finalAmountPaise === amountPaise,
+    );
+    if (hit && hit.paymentClaim) {
+      await markOrderPaid(ctx, hit, emailId, "paid", { upiRef, payerVpa, payerName });
+      return { matched: true, orderId: hit._id, via: "customer_claim" };
+    }
+  }
+
   // 0b) Order-number fallback: our UPI note echoes `Order <5-digit>`, which
   //    bank alerts carry in the body text. Exact and idempotent (email dedupe
   //    by messageId happens before we get here). The amount must still equal
@@ -702,13 +730,14 @@ async function matchEmailToOrder(
   return { matched: false, nearestPaise: nearest === Infinity ? null : nearest };
 }
 
-async function markOrderPaid(
+export async function markOrderPaid(
   ctx: MutationCtx,
   order: Doc<"orders">,
   emailId: Id<"bankEmails">,
   newStatus: "paid" | "late_paid",
   extras: { upiRef?: string; payerVpa?: string; payerName?: string },
 ) {
+  const claim = order.paymentClaim;
   await ctx.db.patch(order._id, {
     status: newStatus,
     paidAt: Date.now(),
@@ -716,6 +745,19 @@ async function markOrderPaid(
     bankEmailId: emailId,
     payerVpa: extras.payerVpa,
     payerName: extras.payerName,
+    // A bank message paid the order: any open customer claim is confirmed.
+    ...(claim && claim.status !== "confirmed"
+      ? {
+          paymentClaim: {
+            utr: claim.utr,
+            submittedAt: claim.submittedAt,
+            status: "confirmed" as const,
+            reviewedAt: Date.now(),
+            confirmedVia: "auto" as const,
+            ...(claim.bankMessage ? { bankMessage: claim.bankMessage } : {}),
+          },
+        }
+      : {}),
   });
   await schedulePaidOrderPush(ctx, order._id);
   await commitOrderInventory(ctx, order, "system");
@@ -740,6 +782,59 @@ async function markOrderPaid(
     status: "matched",
     matchedOrderId: order._id,
   });
+}
+
+
+/**
+ * Called when a customer submits a UTR. Looks for an earlier bank message in
+ * this store with the same UPI ref that is not yet linked to an order.
+ * Same amount as the order: confirm now (confirmedVia auto). Otherwise keep
+ * the claim in review and link the message so the admin and super admin see it.
+ */
+export async function linkEarlierBankMessage(
+  ctx: MutationCtx,
+  orderId: Id<"orders">,
+  utr: string,
+): Promise<"confirmed" | "linked" | "none"> {
+  const order = await ctx.db.get(orderId);
+  if (!order || !order.paymentClaim || order.paymentClaim.status !== "review") return "none";
+  const rows = await ctx.db
+    .query("paymentMessages")
+    .withIndex("by_org_upi_ref", (q) => q.eq("orgId", order.orgId).eq("upiRef", utr))
+    .collect();
+  const candidates = rows
+    .filter(
+      (r) =>
+        r.orderId === undefined &&
+        r.outcome !== "matched" &&
+        r.outcome !== "duplicate" &&
+        (r.amountPaise ?? 0) > 0,
+    )
+    .sort((a, b) => b.at - a.at);
+  if (candidates.length === 0) return "none";
+
+  const sameAmount = candidates.find(
+    (r) => r.amountPaise === order.finalAmountPaise && r.bankEmailId !== undefined,
+  );
+  const pick = sameAmount ?? candidates[0];
+  const bankMessage = { messageId: pick._id, amountPaise: pick.amountPaise!, at: pick.at };
+  const claim = order.paymentClaim;
+
+  if (sameAmount && sameAmount.bankEmailId && order.status === "pending") {
+    const email = await ctx.db.get(sameAmount.bankEmailId);
+    if (email && email.status !== "matched") {
+      await ctx.db.patch(orderId, {
+        paymentClaim: { utr: claim.utr, submittedAt: claim.submittedAt, status: "review", bankMessage },
+      });
+      const fresh = await ctx.db.get(orderId);
+      if (fresh) await markOrderPaid(ctx, fresh, sameAmount.bankEmailId, "paid", { upiRef: utr });
+      await ctx.db.patch(sameAmount._id, { outcome: "matched", orderId });
+      return "confirmed";
+    }
+  }
+
+  await ctx.db.patch(orderId, { paymentClaim: { ...claim, bankMessage } });
+  return "linked";
 }
 
 // ---------- Admin: payment statement + matched emails ----------

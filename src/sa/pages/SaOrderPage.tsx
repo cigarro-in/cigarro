@@ -60,6 +60,57 @@ function EvidenceItem({ e, orderAmount, showRole }: { e: Evidence; orderAmount: 
   );
 }
 
+const CLAIM_OUTCOME: Record<'review' | 'rejected' | 'confirmed', { label: string; tone: 'attention' | 'critical' | 'success' }> = {
+  review: { label: 'Under review', tone: 'attention' },
+  rejected: { label: 'Rejected', tone: 'critical' },
+  confirmed: { label: 'Confirmed', tone: 'success' },
+};
+
+// What the customer reported when auto-confirmation failed, and how it ended.
+function ClaimRow({ claim, orderAmount }: { claim: NonNullable<Data['order']['paymentClaim']>; orderAmount?: number }) {
+  const outcome = CLAIM_OUTCOME[claim.status];
+  return (
+    <div className="flex flex-col gap-1.5 border-b border-[var(--admin-border)] px-4 py-3 text-[13px]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="font-medium">Customer claim</span>
+        <Badge tone={outcome.tone} dot>
+          {outcome.label}
+        </Badge>
+        {claim.status === 'confirmed' && claim.confirmedVia && (
+          <span className="text-[var(--admin-text-muted)]">
+            via {claim.confirmedVia === 'auto' ? 'bank message' : 'admin'}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>
+          <span className="text-[var(--admin-text-muted)]">UPI ref </span>
+          <span className="font-mono">{claim.utr}</span>
+        </span>
+        <span>
+          <span className="text-[var(--admin-text-muted)]">Submitted </span>
+          <span className="tabular-nums">{formatDateTime(claim.submittedAt)}</span>
+        </span>
+        {claim.reviewedAt && (
+          <span>
+            <span className="text-[var(--admin-text-muted)]">Reviewed </span>
+            <span className="tabular-nums">{formatDateTime(claim.reviewedAt)}</span>
+          </span>
+        )}
+      </div>
+      {claim.bankMessage && (
+        <span className="text-[var(--admin-text-muted)]">
+          Bank message found: {rupees(claim.bankMessage.amountPaise)} at {formatDateTime(claim.bankMessage.at)}
+          {orderAmount !== undefined && claim.bankMessage.amountPaise !== orderAmount ? ' (amount differs)' : ''}
+        </span>
+      )}
+      {claim.status === 'rejected' && claim.rejectReason && (
+        <span className="text-[var(--admin-text-muted)]">Reason: {claim.rejectReason}</span>
+      )}
+    </div>
+  );
+}
+
 // Read-only order view for the super admin: summary plus every bank SMS and
 // email linked to it, and unmatched credits that came close.
 export function SaOrderPage() {
@@ -89,6 +140,7 @@ export function SaOrderPage() {
         main={
           <div className="flex flex-col gap-3">
             <Card title="Payment evidence" padding="none">
+              {o?.paymentClaim && <ClaimRow claim={o.paymentClaim} orderAmount={o.finalAmountPaise} />}
               {!data ? (
                 <div className="p-4">
                   <Skeleton className="h-24 w-full" />
@@ -140,6 +192,7 @@ export function SaOrderPage() {
                     { label: 'Phone', value: o.customer.phone ?? '-', mono: true },
                     { label: 'Amount to pay', value: <AmountCell finalPaise={o.finalAmountPaise} slotPaise={o.slotOffsetPaise} /> },
                     { label: 'Base amount', value: rupees(o.baseAmountPaise) },
+                    ...(o.matchOffsetPaise > 0 ? [{ label: 'Payment match', value: `−${rupees(o.matchOffsetPaise)} (a few paise off so the payment can be matched)` }] : []),
                     { label: 'Wallet used', value: rupees(o.walletDebitPaise) },
                     { label: 'Confirmed by', value: <SourceBadge source={o.source} /> },
                     { label: 'Created', value: formatDateTime(o.createdAt) },

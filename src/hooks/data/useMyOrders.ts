@@ -11,6 +11,7 @@ import { deriveOrderStage, type OrderStage } from '../../lib/orders/orderStage';
 
 export type OrderUiStatus =
   | 'pending'
+  | 'under_review'
   | 'placed'
   | 'processing'
   | 'shipped'
@@ -39,9 +40,14 @@ export interface NormalizedOrder {
   paymentStatus: 'pending' | 'paid' | 'late_paid' | 'expired' | 'cancelled' | 'refunded' | 'voided';
   shippingStatus?: 'awaiting' | 'processing' | 'shipped' | 'delivered' | 'returned';
   uiStatus: OrderUiStatus;
+  // Customer-submitted UPI transaction ID (paid but not auto-confirmed).
+  // 'review' keeps the order pending; 'rejected' lets the customer resubmit.
+  claim?: PaymentClaimState;
   isPaid: boolean;
   isTerminal: boolean;
   createdAt: Date;
+  // Set when the order expired or was cancelled (drives the claim window).
+  terminalAt?: Date;
   paidAt?: Date;
   shippedAt?: Date;
   deliveredAt?: Date;
@@ -49,6 +55,9 @@ export interface NormalizedOrder {
   itemsCount: number;
   subtotal: number;
   walletUsed: number;
+  // Payment-match offset in rupees (lucky OFF only, else 0). Already inside
+  // `total`; show as "Payment match −₹X", never as a coupon or lucky discount.
+  paymentMatch: number;
   total: number;
   address?: {
     name: string;
@@ -69,7 +78,26 @@ export interface NormalizedOrder {
   retryOfOrderId?: string;
 }
 
+export interface PaymentClaimState {
+  utr: string;
+  status: 'review' | 'rejected' | 'confirmed';
+  submittedAt: Date;
+  reviewedAt?: Date;
+  rejectReason?: string;
+}
+
 const TERMINAL_STATUSES = new Set(['expired', 'cancelled', 'refunded', 'voided']);
+
+export function normalizeClaim(raw: any): PaymentClaimState | undefined {
+  if (!raw) return undefined;
+  return {
+    utr: raw.utr,
+    status: raw.status,
+    submittedAt: new Date(raw.submittedAt),
+    reviewedAt: raw.reviewedAt ? new Date(raw.reviewedAt) : undefined,
+    rejectReason: raw.rejectReason,
+  };
+}
 
 // Same single-stage mapping as the admin (src/lib/orders/orderStage.ts),
 // projected onto the customer uiStatus union (kept for theme compatibility).
@@ -85,6 +113,7 @@ const STAGE_TO_UI: Record<OrderStage, OrderUiStatus> = {
 };
 
 function deriveUiStatus(o: any): OrderUiStatus {
+  if (o.status === 'pending' && o.paymentClaim?.status === 'review') return 'under_review';
   return STAGE_TO_UI[deriveOrderStage(o)];
 }
 
@@ -123,9 +152,11 @@ function normalize(o: any, products: Array<{ id: string; image?: string | null; 
     paymentStatus: o.status,
     shippingStatus: o.shippingStatus,
     uiStatus: deriveUiStatus(o),
+    claim: normalizeClaim(o.paymentClaim),
     isPaid: o.status === 'paid' || o.status === 'late_paid',
     isTerminal: TERMINAL_STATUSES.has(o.status),
     createdAt: new Date(o._creationTime),
+    terminalAt: o.terminalAt ? new Date(o.terminalAt) : undefined,
     paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
     shippedAt: o.shippedAt ? new Date(o.shippedAt) : undefined,
     deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : undefined,
@@ -140,6 +171,7 @@ function normalize(o: any, products: Array<{ id: string; image?: string | null; 
     itemsCount: (o.items || []).length,
     subtotal: paiseToRupees(o.cartTotalPaise),
     walletUsed: paiseToRupees(o.walletDebitPaise),
+    paymentMatch: paiseToRupees(o.matchOffsetPaise ?? 0),
     total: paiseToRupees(o.finalAmountPaise),
     address: o.address
       ? {

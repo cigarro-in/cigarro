@@ -20,6 +20,20 @@ export function orderTotalPaise(order: OrderDoc): number {
   return order.cartTotalPaise + (order.shippingPricePaise ?? 0) - (order.discountPaise ?? 0);
 }
 
+/**
+ * Payment-match offset (lucky OFF, exact total collided). Lives inside
+ * discountPaise, so every "Discount" display must subtract it and show it on
+ * its own "Payment match" row instead.
+ */
+export function paymentMatchPaise(order: OrderDoc): number {
+  return order.matchOffsetPaise ?? 0;
+}
+
+/** Coupon or lucky discount only, without the payment-match offset. */
+export function displayDiscountPaise(order: OrderDoc): number {
+  return Math.max(0, (order.discountPaise ?? 0) - paymentMatchPaise(order));
+}
+
 export function orderTotalRupees(order: OrderDoc): number {
   return paiseToRupees(orderTotalPaise(order));
 }

@@ -4,6 +4,7 @@ import { Card, Page, Tabs, type TabItem } from '../ui';
 import { StatementTab } from '../features/payments/StatementTab';
 import { MatchedEmailsTab } from '../features/payments/MatchedEmailsTab';
 import { SettingsTab } from '../features/payments/SettingsTab';
+import { NeedsReviewCard } from '../features/payments/NeedsReviewCard';
 
 type Tab = 'statement' | 'emails' | 'settings';
 
@@ -46,6 +47,7 @@ export function PaymentsPage() {
 
   return (
     <Page title="Payments">
+      <NeedsReviewCard />
       <Card padding="none">
         <Tabs tabs={TABS} value={tab} onChange={(t) => navigate(TAB_PATH[t])} />
       </Card>

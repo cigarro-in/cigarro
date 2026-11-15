@@ -1,7 +1,8 @@
 import { formatINR } from '../../../utils/currency';
 import { paiseToRupees } from '../../../lib/convex/money';
 import { Card } from '../../ui';
-import { orderTotalPaise, type OrderDoc } from './orderModel';
+import { PaymentMatchRow } from '../../../components/payment/PaymentMatchRow';
+import { displayDiscountPaise, orderTotalPaise, paymentMatchPaise, type OrderDoc } from './orderModel';
 
 const VERIFIED_VIA: Record<string, string> = {
   email: 'Bank alert email',
@@ -28,7 +29,8 @@ function Row({ label, value, strong, muted }: { label: string; value: string; st
 
 export function PaymentSummaryCard({ order }: { order: OrderDoc }) {
   const money = (paise: number) => formatINR(paiseToRupees(paise));
-  const discount = order.discountPaise ?? 0;
+  const discount = displayDiscountPaise(order);
+  const match = paymentMatchPaise(order);
   const delivery = order.shippingPricePaise ?? 0;
   const wallet = order.walletDebitPaise ?? 0;
   const paidStatus = order.status === 'paid' || order.status === 'late_paid' || order.status === 'refunded';
@@ -41,6 +43,13 @@ export function PaymentSummaryCard({ order }: { order: OrderDoc }) {
         <Row label="Subtotal" value={money(order.cartTotalPaise)} />
         {discount > 0 && (
           <Row label={order.discountLabel ? `Discount (${order.discountLabel})` : 'Discount'} value={`-${money(discount)}`} />
+        )}
+        {match > 0 && (
+          <PaymentMatchRow
+            amount={paiseToRupees(match)}
+            className="text-sm text-muted-foreground"
+            helpClassName="mt-0.5 text-[11px] text-muted-foreground/70"
+          />
         )}
         {order.shippingMethod && (
           <Row label={`Delivery · ${order.shippingMethod}`} value={delivery > 0 ? money(delivery) : 'Free'} />

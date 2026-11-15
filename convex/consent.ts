@@ -1,7 +1,15 @@
 import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
-import { MutationCtx, mutation, query } from "./_generated/server";
-import { assertTokenOrg, requireIdentity, requireOrgAdmin, requireSaSession } from "./lib/auth";
+import { MutationCtx, QueryCtx, mutation, query } from "./_generated/server";
+import {
+  assertTokenOrg,
+  requireIdentity,
+  requireMember,
+  requireOrgAdmin,
+  requireSaSession,
+  tokenMatchesOrg,
+} from "./lib/auth";
+import { isLegacyOrg } from "./lib/legacyOrg";
 
 // Consent log. Append-only: this module only inserts rows. A changed decision
 // is a new row with a later `at`; old rows are never patched or deleted.
@@ -12,9 +20,12 @@ import { assertTokenOrg, requireIdentity, requireOrgAdmin, requireSaSession } fr
 //   CF-Connecting-IP.
 // - linkAnonymous: on sign-in, copies the visitor's rows onto the user (new rows
 //   with userId and linkedFrom; the originals stay untouched).
-// - recordCheckoutConsent: signed-in checkout checkbox ("18+ and accept the
-//   Terms"). Writes age_confirmation + terms_acceptance.
-// - assertCheckoutConsent: used by orders.createOrder for purchases.
+// - recordCheckoutConsent: legacy signed-in checkout checkbox. No longer called
+//   by checkout; kept so older clients still work.
+// - confirmOrderConsent: one-time order sheet before a customer's first order.
+//   Writes age_confirmation + terms_acceptance and sets users.orderConsentAt.
+// - assertCheckoutConsent: used by orders.createOrder for purchases (see
+//   hasOrderConsent for what counts).
 
 const ANON_ID_RE = /^[A-Za-z0-9_-]{16,80}$/;
 const TEXT_VERSION_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -168,27 +179,133 @@ export const recordCheckoutConsent = mutation({
   },
 });
 
-// Throws CONSENT_REQUIRED unless the customer's latest row for each checkout
-// kind is granted. Called by orders.createOrder for kind "purchase".
-export async function assertCheckoutConsent(
-  ctx: MutationCtx,
-  orgId: Id<"organizations">,
+// The customer's user row for this store. Legacy rows without orgId belong to
+// the legacy store (same rule as phoneForUser above, plus the legacy org).
+async function userRowForOrg(
+  ctx: QueryCtx | MutationCtx,
+  org: Doc<"organizations">,
   userId: string,
 ) {
   const rows = await ctx.db
+    .query("users")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  return rows.find(
+    (r) => r.orgId === org._id || (r.orgId === undefined && isLegacyOrg(org)),
+  );
+}
+
+// Whether this customer has already made the one-time order declaration.
+// Any one of these counts:
+// - users.orderConsentAt is set (the order sheet was confirmed);
+// - the append-only log has both checkout kinds granted (older checkbox);
+// - the customer has a purchase in this store. Every purchase since consent
+//   was enforced required the checkout record, so older purchases count too.
+export async function hasOrderConsent(
+  ctx: QueryCtx | MutationCtx,
+  org: Doc<"organizations">,
+  userId: string,
+): Promise<boolean> {
+  const userRow = await userRowForOrg(ctx, org, userId);
+  if (userRow?.orderConsentAt !== undefined) return true;
+
+  const rows = await ctx.db
     .query("consentEvents")
-    .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", userId))
+    .withIndex("by_org_user", (q) => q.eq("orgId", org._id).eq("userId", userId))
     .order("desc")
     .take(CUSTOMER_LOG_CAP);
   const latest = new Map<string, Doc<"consentEvents">>();
   for (const row of rows) {
     if (!latest.has(row.kind)) latest.set(row.kind, row);
   }
-  const missing = CHECKOUT_KINDS.filter((kind) => latest.get(kind)?.granted !== true);
-  if (missing.length > 0) {
-    throw new ConvexError({ code: "CONSENT_REQUIRED", missing: missing.join(",") });
+  if (CHECKOUT_KINDS.every((kind) => latest.get(kind)?.granted === true)) return true;
+
+  const purchase = await ctx.db
+    .query("orders")
+    .withIndex("by_org_user", (q) => q.eq("orgId", org._id).eq("userId", userId))
+    .filter((q) => q.eq(q.field("kind"), "purchase"))
+    .first();
+  return purchase !== null;
+}
+
+// Throws CONSENT_REQUIRED unless the customer has made the declaration (see
+// hasOrderConsent). Called by orders.createOrder for kind "purchase".
+export async function assertCheckoutConsent(
+  ctx: MutationCtx,
+  org: Doc<"organizations">,
+  userId: string,
+) {
+  if (!(await hasOrderConsent(ctx, org, userId))) {
+    throw new ConvexError({ code: "CONSENT_REQUIRED" });
   }
 }
+
+// Customer-facing status for the order sheet. Never throws for a signed-out or
+// non-member caller: the page would crash on render. Those callers are shown
+// the sheet, and confirmOrderConsent reports the real error.
+export const orderConsentStatus = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const org = await ctx.db.get(orgId);
+    if (!identity || !org || !(await tokenMatchesOrg(ctx, identity, org))) {
+      return { needed: true };
+    }
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", identity.subject))
+      .first();
+    if (!membership) return { needed: true };
+    return { needed: !(await hasOrderConsent(ctx, org, identity.subject)) };
+  },
+});
+
+// One-time order declaration. Writes the same two checkout rows the log has
+// always used (append-only), and stamps users.orderConsentAt. Idempotent.
+export const confirmOrderConsent = mutation({
+  args: {
+    orgId: v.id("organizations"),
+    textVersion: v.string(),
+    pagePath: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, textVersion, pagePath }) => {
+    const { userId } = await requireMember(ctx, orgId);
+    const org = await requireOrg(ctx, orgId);
+    checkTextVersion(textVersion);
+    const now = Date.now();
+    const phone = await phoneForUser(ctx, orgId, userId);
+
+    for (const kind of CHECKOUT_KINDS) {
+      await ctx.db.insert("consentEvents", {
+        orgId,
+        userId,
+        phone,
+        kind,
+        granted: true,
+        textVersion,
+        at: now,
+        pagePath: clip(pagePath, PAGE_PATH_MAX),
+        source: "checkout",
+      });
+    }
+
+    const userRow = await userRowForOrg(ctx, org, userId);
+    if (userRow) {
+      if (userRow.orderConsentAt === undefined) {
+        await ctx.db.patch(userRow._id, { orderConsentAt: now, updatedAt: now });
+      }
+    } else {
+      await ctx.db.insert("users", {
+        userId,
+        orgId,
+        createdAt: now,
+        updatedAt: now,
+        orderConsentAt: now,
+      });
+    }
+    return { ok: true };
+  },
+});
 
 // Admin: one customer's log, newest first (customer profile page).
 export const listForCustomer = query({

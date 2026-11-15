@@ -6,7 +6,7 @@ import { formatINR } from '../../../utils/currency';
 import { Banner, Button, Card, useButtonFeedback } from '../../ui';
 import { useLiveStoreSettings } from '../settings/useSettingsDraft';
 import { renderInvoiceJpeg, type InvoiceData } from './invoiceImage';
-import { customerName, orderNumberLabel, splitItemName, whatsappUrl, type OrderDoc } from './orderModel';
+import { customerName, displayDiscountPaise, orderNumberLabel, paymentMatchPaise, splitItemName, whatsappUrl, type OrderDoc } from './orderModel';
 
 const money = (paise: number) => formatINR(paiseToRupees(paise));
 
@@ -26,10 +26,12 @@ function invoiceStatus(order: OrderDoc): string {
 
 export function buildInvoiceData(order: OrderDoc, storeName: string, logoUrl?: string | null): InvoiceData {
   const a = order.address;
-  const discount = order.discountPaise ?? 0;
+  const discount = displayDiscountPaise(order);
+  const match = paymentMatchPaise(order);
   const delivery = order.shippingPricePaise ?? 0;
   const wallet = order.walletDebitPaise ?? 0;
-  const total = order.cartTotalPaise + delivery - discount;
+  // Full discount (coupon + match) so the total matches what was payable.
+  const total = order.cartTotalPaise + delivery - (order.discountPaise ?? 0);
   return {
     storeName,
     logoUrl: logoUrl || null,
@@ -50,6 +52,7 @@ export function buildInvoiceData(order: OrderDoc, storeName: string, logoUrl?: s
     }),
     subtotal: money(order.cartTotalPaise),
     discount: discount > 0 ? `-${money(discount)}` : null,
+    paymentMatch: match > 0 ? `-${money(match)}` : null,
     delivery: delivery > 0 ? money(delivery) : 'Free',
     wallet: wallet > 0 ? money(wallet) : null,
     total: money(total),

@@ -17,8 +17,11 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { paiseToRupees } from '../../lib/convex/money';
+import { PaymentMatchRow } from '../../components/payment/PaymentMatchRow';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
-import { resolveOrderItemImageUrl } from '../../hooks/data/useMyOrders';
+import { resolveOrderItemImageUrl, normalizeClaim } from '../../hooks/data/useMyOrders';
+import type { ClaimableOrder } from '../../hooks/data/usePaymentClaim';
+import { PaymentClaimPanel } from '../../components/payment/PaymentClaimPanel';
 
 interface OrderItem {
   id: string;
@@ -32,6 +35,8 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  // Claim state for the "Paid but not confirmed?" flow.
+  claimable?: ClaimableOrder;
   displayOrderId: string;
   orderNumber?: number;
   transactionId?: string;
@@ -41,6 +46,8 @@ interface Order {
   tax: number;
   shipping: number;
   discount?: number;
+  // Payment-match offset in rupees (lucky OFF only). Already inside total.
+  paymentMatch?: number;
   status: 'placed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'pending';
   paymentConfirmed?: boolean;
   paymentConfirmedAt?: string;
@@ -134,6 +141,7 @@ export function OrdersPage() {
       tax: 0,
       shipping: 0,
       discount: paiseToRupees(o.walletDebitPaise ?? 0),
+      paymentMatch: paiseToRupees(o.matchOffsetPaise ?? 0),
       total: paiseToRupees(o.finalAmountPaise > 0 ? o.finalAmountPaise : o.cartTotalPaise),
       status: mapConvexStatus(o.status),
       paymentConfirmed: o.status === 'paid' || o.status === 'late_paid',
@@ -145,6 +153,12 @@ export function OrdersPage() {
           ? 'NO'
           : 'REJECTED',
       paymentVerifiedAt: o.paidAt ? new Date(o.paidAt).toISOString() : undefined,
+      claimable: {
+        id: o._id,
+        paymentStatus: o.status,
+        terminalAt: o.terminalAt ? new Date(o.terminalAt) : undefined,
+        claim: normalizeClaim(o.paymentClaim),
+      },
       createdAt: new Date(o.createdAt).toISOString(),
       estimatedDelivery: '',
       shippingAddress: {
@@ -552,10 +566,15 @@ export function OrdersPage() {
                               </div>
                               {order.discount && order.discount > 0 && (
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Discount</span>
+                                  <span className="text-muted-foreground">Paid from wallet</span>
                                   <span className="text-green-600 font-medium">-{formatINR(order.discount)}</span>
                                 </div>
                               )}
+                              <PaymentMatchRow
+                                amount={order.paymentMatch}
+                                className="text-muted-foreground"
+                                helpClassName="mt-0.5 text-[11px] opacity-80"
+                              />
                               {order.tax > 0 && (
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Tax</span>
@@ -695,6 +714,8 @@ export function OrdersPage() {
                             </div>
                           </div>
                         )}
+
+                        {order.claimable && <PaymentClaimPanel order={order.claimable} className="pt-2 text-[13px] text-coyote" />}
 
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-2">

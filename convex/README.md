@@ -40,11 +40,11 @@ Everything is **integer paise**. `500.47` rupees ↔ `50047` paise. No floats cr
 
 ## Paise fingerprinting (the matching trick)
 
-Bank alert emails only expose the amount (note field is stripped). To match a payment to an order, each pending order's amount is made unique via the last two paise digits:
+Bank alert emails only expose the amount (note field is stripped). To match a payment to an order, each pending order's payable amount is made unique with a 1–99 paise offset that is **subtracted** from the total:
 
 1. Re-price the cart, shipping, coupon and wallet contribution on the server.
-2. Choose a 1–99 paise discount whose resulting amount is not used by a pending order, a recently terminal order in quarantine, or a recently paid order in the duplicate-detection window.
-3. Store that exact amount in `finalAmountPaise` and use it in the UPI request.
+2. Pick an offset from a free pool: its resulting amount must not be used by a pending order, a recently terminal order in quarantine, or a recently paid order in the duplicate-detection window. With the lucky discount off, 0 (exact rupees) is tried first and the 1–99 pool is used only on a collision. With it on, the offset is drawn from the pool at random.
+3. Store that exact amount in `finalAmountPaise` and use it in the UPI request. With lucky off, a non-zero offset is also stored in `matchOffsetPaise` (already included in `discountPaise`) so the UI can show "Payment match −₹X".
 4. A bank email for `X` identifies the order through `orders.by_org_final_status`.
 
 Legacy `paymentSlots` rows are still supported for older orders.

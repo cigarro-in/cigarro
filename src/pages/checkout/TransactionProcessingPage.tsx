@@ -11,7 +11,10 @@ import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
-import { formatPaiseINR } from '../../lib/convex/money';
+import { formatPaiseINR, paiseToRupees } from '../../lib/convex/money';
+import { PaymentMatchRow } from '../../components/payment/PaymentMatchRow';
+import { PaymentClaimPanel } from '../../components/payment/PaymentClaimPanel';
+import { normalizeClaim } from '../../hooks/data/useMyOrders';
 import QRCode from 'qrcode';
 import { motion } from 'framer-motion';
 
@@ -50,6 +53,14 @@ export function TransactionProcessingPage() {
     api.orders.getMine,
     orderId ? { orgSlug: orgSlug, orderId } : 'skip',
   );
+  const claimable = order
+    ? {
+        id: String(order._id),
+        paymentStatus: order.status,
+        terminalAt: order.terminalAt ? new Date(order.terminalAt) : undefined,
+        claim: normalizeClaim(order.paymentClaim),
+      }
+    : null;
 
   const [qrCode, setQrCode] = useState<string>('');
   const [now, setNow] = useState(() => Date.now());
@@ -282,6 +293,10 @@ export function TransactionProcessingPage() {
                 <span className="text-coyote text-sm font-medium">Amount Paid</span>
                 <span className="text-dark font-mono font-bold text-xl">{formatPaiseINR(amountPaise)}</span>
               </div>
+              <PaymentMatchRow
+                amount={paiseToRupees(order.matchOffsetPaise ?? 0)}
+                className="text-coyote text-xs font-mono"
+              />
               <div className="flex justify-between items-center">
                 <span className="text-coyote text-sm font-medium">Order</span>
                 <span className="text-dark font-mono font-bold text-lg">{orderLabel}</span>
@@ -337,6 +352,7 @@ export function TransactionProcessingPage() {
               : 'Your order was cancelled. Any wallet debit has been refunded.'}
           </p>
           <p className="text-xs text-coyote mb-5 font-mono">Order {orderLabel}</p>
+          {claimable && <PaymentClaimPanel order={claimable} className="mb-5 text-coyote" />}
 
           <div className="space-y-3">
             {canRetry && (
@@ -428,6 +444,10 @@ export function TransactionProcessingPage() {
         >
           <p className="text-xs text-coyote uppercase tracking-widest font-bold mb-1">Pay exactly</p>
           <p className="text-3xl font-mono tracking-tighter text-dark break-all">{formatPaiseINR(amountPaise)}</p>
+          <PaymentMatchRow
+            amount={paiseToRupees(order.matchOffsetPaise ?? 0)}
+            className="text-xs text-coyote mt-2 font-mono"
+          />
           <p className="text-xs text-coyote mt-2 font-mono">Order {orderLabel}</p>
         </motion.div>
 
@@ -476,6 +496,7 @@ export function TransactionProcessingPage() {
               Still pending? Confirm you paid the exact amount above, then check Orders in a few minutes or contact support.
             </p>
           )}
+          {claimable && <PaymentClaimPanel order={claimable} className="text-coyote text-left" />}
         </div>
       </div>
     </div>

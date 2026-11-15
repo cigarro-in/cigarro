@@ -271,6 +271,10 @@ export default defineSchema({
     discountPaise: v.optional(v.number()),
     discountId: v.optional(v.id("discounts")),
     discountLabel: v.optional(v.string()),
+    // Payment-match offset (1–99p) taken off the total when the lucky discount
+    // is OFF and the exact total collided with another order. Already included
+    // in discountPaise; stored separately so UIs can explain it. Absent = none.
+    matchOffsetPaise: v.optional(v.number()),
     walletDebitPaise: v.number(),
     // Server-resolved delivery charge included in the UPI fingerprint amount.
     // The client may request a method, but never sets this money value.
@@ -291,6 +295,29 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     terminalAt: v.optional(v.number()),
     walletRefundedAt: v.optional(v.number()),
+    // Customer says they paid but auto-confirmation failed: they submit the
+    // UPI transaction ID (12 digits). Status stays pending; while 'review' the
+    // order does not expire and keeps its inventory reserved.
+    paymentClaim: v.optional(v.object({
+      utr: v.string(),
+      submittedAt: v.number(),
+      status: v.union(
+        v.literal("review"),
+        v.literal("rejected"),
+        v.literal("confirmed"),
+      ),
+      reviewedAt: v.optional(v.number()),
+      rejectReason: v.optional(v.string()),
+      // How a claim was confirmed: a bank message carrying the UTR, or an admin.
+      confirmedVia: v.optional(v.union(v.literal("auto"), v.literal("admin"))),
+      // Earlier bank message with the same UTR found at submit time. Its amount
+      // may differ from the order (then the claim stays in review for the admin).
+      bankMessage: v.optional(v.object({
+        messageId: v.id("paymentMessages"),
+        amountPaise: v.number(),
+        at: v.number(),
+      })),
+    })),
 
     shippingStatus: v.optional(shippingStatus),
     trackingCarrier: v.optional(v.string()),
@@ -330,7 +357,9 @@ export default defineSchema({
     .index("by_org_user_idem", ["orgId", "userId", "idempotencyKey"])
     // Payment statement: email-matched credits by paid time, refunds by refund time.
     .index("by_org_method_paid", ["orgId", "verificationMethod", "paidAt"])
-    .index("by_org_status_terminal", ["orgId", "status", "terminalAt"]),
+    .index("by_org_status_terminal", ["orgId", "status", "terminalAt"])
+    .index("by_org_claim_utr", ["orgId", "paymentClaim.utr"])
+    .index("by_org_claim_status", ["orgId", "paymentClaim.status"]),
 
   paymentSlots: defineTable({
     orgId: v.id("organizations"),
@@ -440,6 +469,7 @@ export default defineSchema({
     .index("by_org_outcome_at", ["orgId", "outcome", "at"])
     .index("by_bank_email", ["bankEmailId"])
     .index("by_order", ["orderId"])
+    .index("by_org_upi_ref", ["orgId", "upiRef"])
     .searchIndex("search_body", {
       searchField: "body",
       filterFields: ["orgId", "channel", "outcome"],
@@ -798,6 +828,9 @@ export default defineSchema({
     orgId: v.optional(v.id("organizations")),
     phone: v.optional(v.string()), // E.164, e.g. +919876543210
     name: v.optional(v.string()),
+    // First-order declaration (age, not buying for minors, not near a school).
+    // Set once by confirmOrderConsent (convex/consent.ts). Absent = not yet confirmed.
+    orderConsentAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

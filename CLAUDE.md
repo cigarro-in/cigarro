@@ -61,7 +61,7 @@ Themes own:
 - `convex/payments.ts` — `expireHeldSlot`, `releaseQuarantine`, `ingestBankEmail`
 - **Bank-email matching** is per store. Gmail sign-in per store (`convex/gmail.ts`, `gmailConnections`, refresh tokens encrypted) is the primary path. Forwarding to a store alias through `email-worker` (`POST /receiveBankEmail`, `bankInboxes`) is the fallback.
 - **SMS relay + pipeline**: MacroDroid/Shortcuts POST bank SMS to `/receiveBankSms/<token>` (`convex/smsRelay.ts`). Decision rules (suffixes, known banks, credit/debit words, dedupe window) are super-admin only (`convex/pipeline.ts`, `/sa/payments`); merchants see one status card. Every SMS/email is logged in `paymentMessages`. SMS and email copies of one UPI credit are deduped by UPI ref or amount + time. See `docs/sms-relay.md`.
-- **Paise-slot fingerprinting**: each order gets a unique offset 0–99 paise added to the base so the incoming UPI email amount uniquely identifies the order. `slotsPerBase` is configurable per org.
+- **Paise-slot fingerprinting**: each order gets a unique offset of 1–99 paise SUBTRACTED from its total, drawn from a free pool, so the incoming UPI email amount uniquely identifies the order. With the lucky discount off, 0 (exact rupees) is tried first and the offset is only used on a collision; it is stored in `orders.matchOffsetPaise` and shown as "Payment match −₹X". Legacy `paymentSlots` / `slotsPerBase` are not used by `createOrder` (`allocateSlot` has no callers).
 - **Retry semantics**: `retryOrder` only accepts `expired` or `cancelled` source orders. It creates a new order with `retryOfOrderId` link. For `pending` orders the UI shows "Continue Payment" (go back to the existing order), not "Retry".
 
 ## Customers and auth

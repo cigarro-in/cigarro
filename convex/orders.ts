@@ -21,6 +21,7 @@ import { rewardPaidReferral } from "./referrals";
 import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } from "./lib/inventory";
 import { isLegacyOrg } from "./lib/legacyOrg";
 import { assertCheckoutConsent } from "./consent";
+import { linkEarlierBankMessage } from "./payments";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -443,7 +444,7 @@ export const createOrder = mutation({
     // Purchases need the customer's age + terms record (convex/consent.ts).
     // Wallet loads are not tobacco sales and are not gated here.
     if (args.kind === "purchase") {
-      await assertCheckoutConsent(ctx, args.orgId, userId);
+      await assertCheckoutConsent(ctx, org, userId);
     }
 
     const retrySource = args.retryOfOrderId
@@ -568,6 +569,9 @@ export const createOrder = mutation({
       org.quarantineMs,
     );
     const luckyPaise = fingerprint.luckyPaise;
+    // With lucky off, a non-zero offset is a payment-match offset, not a
+    // discount. Stored separately so the customer sees why the total is short.
+    const matchOffsetPaise = !luckyOn && luckyPaise > 0 ? luckyPaise : undefined;
 
     // Wallet debit (purchase only; wallet_load cannot use wallet)
     let walletDebit = 0;
@@ -611,6 +615,7 @@ export const createOrder = mutation({
         walletDebitPaise: walletDebit,
         discountPaise: discountPaise + luckyPaise,
         discountLabel: discount.label ?? args.discountLabel,
+        matchOffsetPaise,
         discountId: discount.id,
         shippingMethod: resolvedShippingMethod,
         shippingPricePaise,
@@ -682,6 +687,7 @@ export const createOrder = mutation({
       walletDebitPaise: walletDebit,
       discountPaise: discountPaise + luckyPaise,
       discountLabel: discount.label ?? args.discountLabel,
+      matchOffsetPaise,
       discountId: discount.id,
       shippingMethod: resolvedShippingMethod,
       shippingPricePaise,
@@ -778,6 +784,9 @@ export const cancelOrder = mutation({
     if (order.userId !== userId)
       throw new ConvexError({ code: "FORBIDDEN" });
     if (order.status !== "pending") return;
+    // The customer reported a payment and the store is checking it: keep the
+    // order held instead of letting it be cancelled under the review.
+    if (order.paymentClaim?.status === "review") return;
 
     await ctx.db.patch(orderId, {
       status: "cancelled",
@@ -870,6 +879,120 @@ export const retryOrder = mutation({
       luckyPaise: luckyOn ? 1 + Math.floor(Math.random() * 99) : 0,
       retryOfOrderId: oldOrderId,
     });
+  },
+});
+
+// ---------- Payment claims (customer says they paid) ----------
+
+// How long after expiry a customer may still submit a UTR. The order is
+// revived to pending while the claim is reviewed.
+const CLAIM_REVIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Schedules the expiry check for a pending order. Expiry is measured from
+ * createdAt, so an order whose timeout already passed expires right away.
+ */
+export async function scheduleOrderExpiry(
+  ctx: MutationCtx,
+  order: Doc<"orders">,
+  slotTimeoutMs: number,
+) {
+  const remaining = Math.max(0, order.createdAt + slotTimeoutMs - Date.now());
+  await ctx.scheduler.runAfter(remaining, internal.payments.expireHeldSlot, {
+    orderId: order._id,
+  });
+}
+
+export const submitPaymentClaim = mutation({
+  args: { orgSlug: v.string(), orderId: v.id("orders"), utr: v.string() },
+  handler: async (ctx, { orgSlug, orderId, utr }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) throw new ConvexError({ code: "NOT_FOUND" });
+    const org = await resolveOrg(ctx, orgSlug);
+    assertOrgMatch(order.orgId, org);
+    const { userId } = await requireMember(ctx, order.orgId);
+    if (order.userId !== userId) throw new ConvexError({ code: "FORBIDDEN" });
+
+    const ref = utr.replace(/\s+/g, "");
+    if (!/^\d{12}$/.test(ref)) throw new ConvexError({ code: "INVALID_UTR" });
+    if (order.paymentClaim?.status === "review")
+      throw new ConvexError({ code: "CLAIM_UNDER_REVIEW" });
+
+    const now = Date.now();
+    const reviveExpired = order.status === "expired";
+    if (order.status !== "pending" && !reviveExpired)
+      throw new ConvexError({ code: "NOT_CLAIMABLE", status: order.status });
+    if (
+      reviveExpired &&
+      (order.terminalAt ?? 0) < now - CLAIM_REVIVE_WINDOW_MS
+    )
+      throw new ConvexError({ code: "CLAIM_WINDOW_CLOSED" });
+
+    // The same UTR already on another active or confirmed claim, or already
+    // matched to a bank message in this store, belongs to a different order.
+    const sameUtr = await ctx.db
+      .query("orders")
+      .withIndex("by_org_claim_utr", (q) =>
+        q.eq("orgId", order.orgId).eq("paymentClaim.utr", ref),
+      )
+      .collect();
+    if (
+      sameUtr.some(
+        (o) =>
+          o._id !== orderId &&
+          (o.paymentClaim?.status === "review" ||
+            o.paymentClaim?.status === "confirmed"),
+      )
+    )
+      throw new ConvexError({ code: "DUPLICATE_UTR" });
+    const matchedEmail = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_org_upi_ref", (q) =>
+        q.eq("orgId", order.orgId).eq("upiRef", ref),
+      )
+      .filter((q) => q.eq(q.field("status"), "matched"))
+      .first();
+    if (matchedEmail) throw new ConvexError({ code: "DUPLICATE_UTR" });
+
+    if (reviveExpired) {
+      // An expired order's wallet portion was refunded and its inventory
+      // released: reviving it is only safe when neither needs undoing.
+      if (order.slotId || (order.walletDebitPaise > 0 && order.walletRefundedAt))
+        throw new ConvexError({ code: "EXPIRED_NOT_REVIVABLE" });
+      // Another pending order with the same fingerprint amount would make
+      // the revived order's bank credit ambiguous.
+      const clash = await ctx.db
+        .query("orders")
+        .withIndex("by_org_final_status", (q) =>
+          q
+            .eq("orgId", order.orgId)
+            .eq("finalAmountPaise", order.finalAmountPaise)
+            .eq("status", "pending"),
+        )
+        .first();
+      if (clash) throw new ConvexError({ code: "AMOUNT_IN_USE" });
+    }
+
+    const reReserve =
+      reviveExpired && order.kind === "purchase" && order.inventoryState === "released";
+    if (reReserve) {
+      await reserveOrderInventory(ctx, order.orgId, order.items, orderId, `user:${userId}`);
+    }
+
+    await ctx.db.patch(orderId, {
+      ...(reviveExpired
+        ? {
+            status: "pending" as const,
+            terminalAt: undefined,
+            ...(reReserve ? { inventoryState: "reserved" as const } : {}),
+          }
+        : {}),
+      paymentClaim: { utr: ref, submittedAt: now, status: "review" },
+    });
+
+    // An earlier bank message with this UTR may already be in the inbox.
+    const linked = await linkEarlierBankMessage(ctx, orderId, ref);
+    return { orderId, status: linked === "confirmed" ? ("confirmed" as const) : ("review" as const) };
   },
 });
 
