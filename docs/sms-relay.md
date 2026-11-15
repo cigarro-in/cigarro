@@ -91,6 +91,13 @@ Any UPI-ref duplicate is also caught by the existing matching step.
 Every accepted SMS is stored in `bankEmails` with `channel: "sms"` and shows in
 Payments > Matched (or Unmatched, Ignored by status).
 
+Recent messages card: every SMS the relay handles (accepted, dropped or
+duplicate) also writes one metadata row to `smsRelayLog` (time, sender entity and
+suffix, outcome, plain-language reason, amount, order link). No body is stored
+there. The card lists the latest 20, newest first, live. The SMS text is shown only
+for accepted credits and is read from `bankEmails`. The log keeps the latest 200
+rows per store.
+
 ## 4. Android setup (MacroDroid)
 
 1. Install **MacroDroid - Device Automation** from Google Play.

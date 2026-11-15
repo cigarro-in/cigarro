@@ -1,8 +1,27 @@
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import { api } from '../../../../convex/_generated/api';
 import type { Id } from '../../../../convex/_generated/dataModel';
-import { Banner, Button, Card, ConfirmDialog, ErrorBanner, Input, Tabs, useButtonFeedback } from '../../ui';
+import { paiseToRupees } from '../../../lib/convex/money';
+import { formatINR } from '../../../utils/currency';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  Skeleton,
+  Tabs,
+  formatOrderDate,
+  formatOrderNumber,
+  useButtonFeedback,
+  type BadgeTone,
+} from '../../ui';
 
 const STALE_MS = 24 * 60 * 60 * 1000;
 const MACRODROID_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid';
@@ -16,6 +35,109 @@ function ago(ms: number, now: number): string {
   const hours = Math.round(mins / 60);
   if (hours < 48) return `${hours} h ago`;
   return `${Math.round(hours / 24)} days ago`;
+}
+
+const OUTCOME: Record<string, { label: string; tone: BadgeTone }> = {
+  matched: { label: 'Matched', tone: 'success' },
+  credit_unmatched: { label: 'Credit not matched', tone: 'warning' },
+  ignored: { label: 'Ignored', tone: 'neutral' },
+  duplicate: { label: 'Duplicate', tone: 'info' },
+};
+
+const SUFFIX_LABEL: Record<string, string> = {
+  T: 'Transactional',
+  S: 'Service',
+  P: 'Promotional',
+  G: 'Government',
+};
+
+type RecentData = FunctionReturnType<typeof api.smsRelay.recentMessages>;
+
+function RecentMessages({
+  data,
+  openTexts,
+  onToggleText,
+}: {
+  data: RecentData | undefined;
+  openTexts: Record<string, boolean>;
+  onToggleText: (id: string) => void;
+}) {
+  if (data === undefined) return <Skeleton className="h-24 w-full" />;
+  if (data.messages.length === 0) {
+    return (
+      <EmptyState
+        title="No messages yet"
+        description="Each SMS the phone sends appears here, including the ones that were skipped and why."
+      />
+    );
+  }
+  const now = data.serverNow;
+  return (
+    <div className="overflow-hidden rounded-md border border-border">
+      <ul className="divide-y divide-border">
+        {data.messages.map((m) => {
+          const outcome = OUTCOME[m.outcome] ?? OUTCOME.ignored;
+          const amount = m.amountPaise !== null ? formatINR(paiseToRupees(m.amountPaise)) : null;
+          const isOpen = !!openTexts[m._id];
+          return (
+            <li key={m._id} className="flex flex-col gap-2 px-3 py-2.5 text-sm">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <span
+                  className="w-20 shrink-0 text-xs text-muted-foreground"
+                  title={formatOrderDate(m.at, { withTime: true, now: new Date(now) })}
+                >
+                  {ago(m.at, now)}
+                </span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate font-mono text-xs">{m.entity}</span>
+                  {m.suffix && (
+                    <Badge tone="neutral">{SUFFIX_LABEL[m.suffix] ?? m.suffix}</Badge>
+                  )}
+                </span>
+                <Badge tone={outcome.tone} dot>
+                  {outcome.label}
+                </Badge>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-0 text-xs text-muted-foreground sm:pl-[5.75rem]">
+                {m.outcome === 'matched' && (
+                  <>
+                    {m.orderId ? (
+                      <Link to={`/orders/${m.orderId}`} className="font-medium text-primary hover:underline">
+                        Order {formatOrderNumber(m.orderNumber, m.displayOrderId)}
+                      </Link>
+                    ) : (
+                      <span>Matched</span>
+                    )}
+                    {amount && <span>{amount}</span>}
+                  </>
+                )}
+                {m.outcome === 'credit_unmatched' && (
+                  <>
+                    {amount && <span className="font-medium text-foreground">{amount}</span>}
+                    <span>{m.reason ?? 'No order with that exact amount'}</span>
+                  </>
+                )}
+                {m.outcome === 'ignored' && <span>{m.reason ?? 'Skipped'}</span>}
+                {m.outcome === 'duplicate' && <span>Same message already received</span>}
+                {m.body && (
+                  <Button size="sm" variant="plain" onClick={() => onToggleText(m._id)} aria-expanded={isOpen}>
+                    {isOpen ? 'Hide text' : 'Show text'}
+                  </Button>
+                )}
+              </div>
+
+              {m.body && isOpen && (
+                <pre className="overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
+                  {m.body}
+                </pre>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -59,6 +181,9 @@ function Steps({ items }: { items: ReactNode[] }) {
  */
 export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined }) {
   const status = useQuery(api.smsRelay.getStatus, orgId ? { orgId } : 'skip');
+  const recent = useQuery(api.smsRelay.recentMessages, orgId ? { orgId } : 'skip');
+  const [openTexts, setOpenTexts] = useState<Record<string, boolean>>({});
+  const toggleText = (id: string) => setOpenTexts((s) => ({ ...s, [id]: !s[id] }));
   const generate = useMutation(api.smsRelay.generateToken);
   const revoke = useMutation(api.smsRelay.revokeToken);
   const setSenders = useMutation(api.smsRelay.setAllowedSmsSenders);
@@ -159,6 +284,14 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
         </p>
 
         {statusBanner}
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Recent messages</span>
+          <p className="text-xs text-muted-foreground">
+            The last 20 SMS from the phone, newest first. Skipped messages show why; their text is never kept.
+          </p>
+          <RecentMessages data={recent} openTexts={openTexts} onToggleText={toggleText} />
+        </div>
 
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Webhook URL</span>

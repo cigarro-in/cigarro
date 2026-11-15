@@ -4,7 +4,7 @@
 // processBankMessage (payments.ts), the same matching path as bank emails.
 
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
@@ -14,13 +14,24 @@ import {
   MAX_SMS_SENDERS,
   decideSms,
   normalizeSmsSenders,
+  parseSmsSender,
 } from "./lib/smsSenders";
 import { processBankMessage } from "./payments";
 
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 60; // requests per token per minute
 const DEDUPE_BUCKET_MS = 120_000; // identical sender+body inside one bucket = duplicate
+const LOG_KEEP = 200; // smsRelayLog rows kept per store
 export const SMS_STALE_MS = 24 * 60 * 60 * 1000;
+
+// Plain-language reasons for the admin list (decideSms codes -> wording).
+const DROP_REASON_LABEL: Record<string, string> = {
+  otp: "OTP",
+  promotional: "Promotional",
+  government: "Government message",
+  "sender not in SMS allowlist": "Sender not in your list",
+  "not a credit SMS": "Not a credit",
+};
 
 export const SMS_PATH_PREFIX = "/receiveBankSms/";
 /** 32 random bytes, base64url without padding = 43 chars. */
@@ -182,6 +193,105 @@ export const setAllowedSmsSenders = mutation({
   },
 });
 
+// ---------- Recent messages (metadata log, live on the admin card) ----------
+
+type LogEntry = {
+  orgId: Id<"organizations">;
+  at: number;
+  sender: string;
+  entity: string;
+  suffix?: string;
+  isPhone: boolean;
+  outcome: "matched" | "credit_unmatched" | "ignored" | "duplicate";
+  reason?: string;
+  amountPaise?: number;
+  orderId?: Id<"orders">;
+  bankEmailId?: Id<"bankEmails">;
+};
+
+function senderFields(sender: string) {
+  const p = parseSmsSender(sender);
+  return { sender, entity: p.entity, suffix: p.suffix, isPhone: p.isPhone };
+}
+
+/** Writes one metadata row (never a body) and keeps only the latest LOG_KEEP rows. */
+async function logSms(ctx: MutationCtx, entry: LogEntry) {
+  await ctx.db.insert("smsRelayLog", entry);
+  const overflow = await ctx.db
+    .query("smsRelayLog")
+    .withIndex("by_org_at", (q) => q.eq("orgId", entry.orgId))
+    .order("desc")
+    .take(LOG_KEEP + 1);
+  for (const old of overflow.slice(LOG_KEEP)) await ctx.db.delete(old._id);
+}
+
+/** Maps the stored bank email row of an accepted SMS to a list outcome. */
+function acceptedOutcome(
+  row: Doc<"bankEmails"> | null,
+): Pick<LogEntry, "outcome" | "reason" | "amountPaise" | "orderId" | "bankEmailId"> {
+  if (!row) return { outcome: "ignored", reason: "Not recorded" };
+  if (row.status === "duplicate") return { outcome: "duplicate" };
+  if (row.status === "matched") {
+    return {
+      outcome: "matched",
+      amountPaise: row.amountPaise,
+      orderId: row.matchedOrderId,
+      bankEmailId: row._id,
+    };
+  }
+  if (row.status === "ignored") return { outcome: "ignored", reason: "No amount found" };
+  const amount = row.amountPaise;
+  return {
+    outcome: "credit_unmatched",
+    amountPaise: amount > 0 ? amount : undefined,
+    reason:
+      row.status === "quarantine_late"
+        ? "Held for review"
+        : amount > 0
+          ? "No order with that exact amount"
+          : "Amount not read",
+    bankEmailId: row._id,
+  };
+}
+
+/** Latest 20 SMS the relay received for this store, newest first. Admins only. */
+export const recentMessages = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const rows = await ctx.db
+      .query("smsRelayLog")
+      .withIndex("by_org_at", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .take(20);
+    const messages = await Promise.all(
+      rows.map(async (r) => {
+        const order = r.orderId ? await ctx.db.get(r.orderId) : null;
+        // Body is shown only for accepted credits, read from the bank email row.
+        const email =
+          r.bankEmailId && (r.outcome === "matched" || r.outcome === "credit_unmatched")
+            ? await ctx.db.get(r.bankEmailId)
+            : null;
+        return {
+          _id: r._id,
+          at: r.at,
+          entity: r.entity,
+          suffix: r.suffix ?? null,
+          isPhone: r.isPhone,
+          outcome: r.outcome,
+          reason: r.reason ?? null,
+          amountPaise: r.amountPaise ?? null,
+          orderId: order?._id ?? null,
+          orderNumber: order?.orderNumber ?? null,
+          displayOrderId: order?.displayOrderId ?? null,
+          body: email && email.orgId === orgId ? email.rawBody : null,
+        };
+      }),
+    );
+    return { serverNow: Date.now(), messages };
+  },
+});
+
 // ---------- Webhook ingest (called by the http route after hashing the token) ----------
 
 export const ingest = internalMutation({
@@ -216,6 +326,7 @@ export const ingest = internalMutation({
     // Dedupe: same sender+body in the same (or previous) 2-minute bucket.
     // Scoped by org so two stores receiving the same SMS do not collide.
     const orgId = relay.orgId;
+    const who = senderFields(args.sender);
     const hash = cyrb53(`${args.sender}|${args.body}`);
     const bucket = Math.floor(args.receivedAt / DEDUPE_BUCKET_MS);
     const keyFor = (b: number) => `sms:${orgId}:${b}:${hash}`;
@@ -224,7 +335,10 @@ export const ingest = internalMutation({
         .query("bankEmails")
         .withIndex("by_message_id", (q) => q.eq("gmailMessageId", key))
         .unique();
-      if (seen) return { status: 200 as const, result: { duplicate: true, emailId: seen._id } };
+      if (seen) {
+        await logSms(ctx, { orgId, at: now, ...who, outcome: "duplicate" });
+        return { status: 200 as const, result: { duplicate: true, emailId: seen._id } };
+      }
     }
 
     const org = await ctx.db.get(orgId);
@@ -233,6 +347,13 @@ export const ingest = internalMutation({
     if (!decision.accept) {
       // Privacy: no body is stored for anything dropped. Metadata-only rows keep
       // sender, suffix and reason so the admin can see what was skipped.
+      await logSms(ctx, {
+        orgId,
+        at: now,
+        ...who,
+        outcome: "ignored",
+        reason: DROP_REASON_LABEL[decision.reason] ?? decision.reason,
+      });
       if (!decision.store) return { status: 200 as const, result: { ignored: true, reason: decision.reason } };
       const suffixNote = decision.suffix ? ` (suffix ${decision.suffix})` : "";
       const emailId = await ctx.db.insert("bankEmails", {
@@ -259,12 +380,13 @@ export const ingest = internalMutation({
       ignoredNote: "sender not in SMS allowlist",
     });
 
+    const row = await ctx.db
+      .query("bankEmails")
+      .withIndex("by_message_id", (q) => q.eq("gmailMessageId", keyFor(bucket)))
+      .first();
+
     // Learning: a parsed credit from a bank entity is recorded for the admin card.
     if (!decision.isPhone) {
-      const row = await ctx.db
-        .query("bankEmails")
-        .withIndex("by_message_id", (q) => q.eq("gmailMessageId", keyFor(bucket)))
-        .first();
       const parsedOk =
         row !== null &&
         row.amountPaise > 0 &&
@@ -273,6 +395,8 @@ export const ingest = internalMutation({
         row.status !== "duplicate";
       if (parsedOk) await recordDetectedSender(ctx, orgId, decision.entity);
     }
+
+    await logSms(ctx, { orgId, at: now, ...who, ...acceptedOutcome(row) });
     return { status: 200 as const, result };
   },
 });

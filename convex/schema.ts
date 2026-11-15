@@ -389,6 +389,29 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_token_hash", ["tokenHash"]),
 
+  // One metadata row per SMS the relay received (accepted, dropped or duplicate),
+  // so the admin card can explain what happened. Never stores a body: accepted
+  // credit text stays in bankEmails (via bankEmailId), dropped text is never kept.
+  // Auto-pruned to the latest ~200 rows per store (smsRelay.ts logSms).
+  smsRelayLog: defineTable({
+    orgId: v.id("organizations"),
+    at: v.number(),
+    sender: v.string(),
+    entity: v.string(),
+    suffix: v.optional(v.string()),
+    isPhone: v.boolean(),
+    outcome: v.union(
+      v.literal("matched"),
+      v.literal("credit_unmatched"),
+      v.literal("ignored"),
+      v.literal("duplicate"),
+    ),
+    reason: v.optional(v.string()),
+    amountPaise: v.optional(v.number()),
+    orderId: v.optional(v.id("orders")),
+    bankEmailId: v.optional(v.id("bankEmails")),
+  }).index("by_org_at", ["orgId", "at"]),
+
   // Multiple UPI VPAs per org for rotation / failover.
   paymentVpas: defineTable({
     orgId: v.id("organizations"),
