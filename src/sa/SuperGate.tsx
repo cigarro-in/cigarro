@@ -57,7 +57,7 @@ export function SuperGate() {
         if (cancelled) return;
         if (!me) {
           clearStoredSa();
-          setState({ kind: 'missing', reason: 'Your Citadel session ended.' });
+          setState({ kind: 'missing', reason: 'Your KeyBastion session ended.' });
           return;
         }
         setState({
@@ -105,14 +105,14 @@ export function SuperGate() {
   }
 
   if (state.kind === 'missing') {
-    const message = state.reason ?? 'Open this app from Citadel to sign in.';
+    const message = state.reason ?? 'Open this app from KeyBastion to sign in.';
     return (
       <AuthFrame>
         <h1 className="text-xl font-semibold text-[var(--admin-text)]">Super admin</h1>
         <p className="mt-1 text-sm text-[var(--admin-text-muted)]">{message}</p>
         <div className="mt-5 flex flex-col gap-3">
           <Button asChild variant="primary" size="lg" fullWidth>
-            <a href={CITADEL_HUB_URL}>Open from Citadel</a>
+            <a href={CITADEL_HUB_URL}>Open from KeyBastion</a>
           </Button>
           {fetchError && <Banner tone="critical">{fetchError}</Banner>}
         </div>

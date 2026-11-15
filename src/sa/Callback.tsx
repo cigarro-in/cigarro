@@ -21,7 +21,7 @@ export function Callback() {
     // Remove the token from the address bar before anything else.
     window.history.replaceState(null, '', window.location.pathname);
     if (!match) {
-      setError('No launch token found. Open this app from Citadel.');
+      setError('No launch token found. Open this app from KeyBastion.');
       return;
     }
     const launchToken = decodeURIComponent(match[1]);
@@ -52,7 +52,7 @@ export function Callback() {
       <div className="mt-5 flex flex-col gap-3">
         <Banner tone="critical">{error}</Banner>
         <Button asChild variant="secondary" size="lg" fullWidth>
-          <a href={CITADEL_HUB_URL}>Back to Citadel</a>
+          <a href={CITADEL_HUB_URL}>Back to KeyBastion</a>
         </Button>
       </div>
     </AuthFrame>

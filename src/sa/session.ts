@@ -53,7 +53,7 @@ export function saErrorMessage(e: unknown): string {
   const code = (e as { data?: { code?: string } })?.data?.code;
   switch (code) {
     case 'NOT_SIGNED_IN':
-      return 'Your Citadel session ended. Open this app from Citadel again.';
+      return 'Your KeyBastion session ended. Open this app from KeyBastion again.';
     case 'WRITE_REQUIRED':
     case 'WRITE_EXPIRED':
       return 'Write access expired. Open it again from KeyBastion to edit.';

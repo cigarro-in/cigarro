@@ -96,7 +96,7 @@ function SaSidebar({ adminId, onSignOut }: { adminId: string; onSignOut: () => v
             SA
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[var(--admin-text)]">Signed in via Citadel</p>
+            <p className="truncate text-sm font-medium text-[var(--admin-text)]">Signed in via KeyBastion</p>
             <p className="truncate font-mono text-[11px] text-[var(--admin-text-subtle)]">{adminId.slice(0, 12)}</p>
           </div>
         </div>
