@@ -30,6 +30,9 @@ export type LaunchClaims = {
   scope: "superadmin";
   write: boolean;
   citadelSid: string;
+  // Epoch ms when the admin's KeyBastion passkey hour ends. Optional: older
+  // tokens do not carry it.
+  accessUntil?: number;
 };
 
 export class LaunchTokenError extends Error {}

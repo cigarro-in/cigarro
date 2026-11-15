@@ -28,7 +28,9 @@ export const JWKS_CACHE_MS = 5 * 60 * 1000;
 
 export const SA_SESSION_HARD_CAP_MS = 60 * 60 * 1000; // 1 h
 export const SA_IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
-export const SA_WRITE_WINDOW_MS = 15 * 60 * 1000; // 15 min after exchange
+// Edits are allowed for the whole session: Citadel (KeyBastion) has no
+// read-only mode, so the write window matches the session cap.
+export const SA_WRITE_WINDOW_MS = 60 * 60 * 1000; // 1 h, same as SA_SESSION_HARD_CAP_MS
 
 // Browser origins allowed to call /api/sa/* (CORS). Anything else gets no
 // Access-Control-Allow-Origin header.

@@ -22,6 +22,7 @@ const exchangeLaunchRef = makeFunctionReference<
     adminId: string;
     citadelSid: string;
     write: boolean;
+    accessUntil?: number;
   },
   { ok: boolean; expiresAt?: number; writeExpiresAt?: number }
 >("saHttp:exchangeLaunch");
@@ -47,6 +48,7 @@ export const exchangeLaunch = internalMutation({
     adminId: v.string(),
     citadelSid: v.string(),
     write: v.boolean(),
+    accessUntil: v.optional(v.number()),
   },
   returns: v.object({
     ok: v.boolean(),
@@ -71,8 +73,11 @@ export const exchangeLaunch = internalMutation({
     if (seen) return { ok: false };
     await ctx.db.insert("saExchangedJtis", { jti: args.jti, exp: args.exp });
 
-    const expiresAt = now + SA_SESSION_HARD_CAP_MS;
-    const writeExpiresAt = args.write ? now + SA_WRITE_WINDOW_MS : undefined;
+    // The session never outlives the KeyBastion passkey hour.
+    const expiresAt = Math.min(now + SA_SESSION_HARD_CAP_MS, args.accessUntil ?? Infinity);
+    const writeExpiresAt = args.write
+      ? Math.min(now + SA_WRITE_WINDOW_MS, expiresAt)
+      : undefined;
     await ctx.db.insert("saSessions", {
       tokenHash: args.tokenHash,
       adminId: args.adminId,
@@ -175,6 +180,7 @@ export const saExchange = httpAction(async (ctx, req) => {
     adminId: claims.sub,
     citadelSid: claims.citadelSid,
     write: claims.write,
+    accessUntil: typeof claims.accessUntil === "number" ? claims.accessUntil : undefined,
   });
   if (!result.ok) return saJson(req, 401, { error: "Token already exchanged" });
 
