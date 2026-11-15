@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Globe, LayoutDashboard, LogOut, Settings, Store } from 'lucide-react';
+import { Globe, LayoutDashboard, LogOut, Receipt, Settings, Store } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +24,7 @@ import { Banner, Button } from '../adminnew/ui';
 const NAV = [
   { label: 'Overview', path: '/sa/overview', icon: LayoutDashboard },
   { label: 'Stores', path: '/sa/stores', icon: Store },
+  { label: 'Payments', path: '/sa/payments', icon: Receipt },
   { label: 'Domains', path: '/sa/domains', icon: Globe },
   { label: 'Platform config', path: '/sa/platform', icon: Settings },
 ] as const;

@@ -11,6 +11,8 @@ import { StoreDetailPage } from './pages/StoreDetailPage';
 import { PlatformConfigPage } from './pages/PlatformConfigPage';
 import { DomainsPage } from './pages/DomainsPage';
 import { StoreImportPage } from './pages/StoreImportPage';
+import { PaymentsPipelinePage } from './pages/PaymentsPipelinePage';
+import { SaOrderPage } from './pages/SaOrderPage';
 import { AdminRoot } from '../adminnew/AdminRoot';
 
 // Citadel super-admin app, mounted for admin.<root>/sa/*. No store is injected
@@ -40,6 +42,8 @@ export function SaApp() {
               <Route path="/sa/stores" element={<ErrorBoundary variant="inline"><StoresPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId" element={<ErrorBoundary variant="inline"><StoreDetailPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId/import" element={<ErrorBoundary variant="inline"><StoreImportPage /></ErrorBoundary>} />
+              <Route path="/sa/stores/:orgId/orders/:orderId" element={<ErrorBoundary variant="inline"><SaOrderPage /></ErrorBoundary>} />
+              <Route path="/sa/payments" element={<ErrorBoundary variant="inline"><PaymentsPipelinePage /></ErrorBoundary>} />
               <Route path="/sa/domains" element={<ErrorBoundary variant="inline"><DomainsPage /></ErrorBoundary>} />
               <Route path="/sa/platform" element={<ErrorBoundary variant="inline"><PlatformConfigPage /></ErrorBoundary>} />
             </Route>
