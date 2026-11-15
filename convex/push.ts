@@ -15,6 +15,7 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
+import { readOrgSiteSettings } from "./lib/siteSettings";
 
 export const ADMIN_ORIGIN = "https://admin.cigarro.in";
 const ADMIN_ROLES = ["admin", "owner"] as const;
@@ -31,6 +32,18 @@ export interface PushPayload {
   body: string;
   url: string;
   tag: string;
+  /** Store logo (https), shown as the notification icon. Absent: the admin default icon. */
+  icon?: string;
+}
+
+/** The store's logo as a notification icon, when it is an https URL. */
+async function storeLogoIcon(
+  ctx: { db: Parameters<typeof readOrgSiteSettings>[0]["db"] },
+  org: { _id: Id<"organizations">; slug: string },
+): Promise<string | undefined> {
+  const settings = await readOrgSiteSettings(ctx, org);
+  const logo = settings?.brand?.logoUrl?.trim();
+  return logo && /^https:\/\/[^\s"'<>]+$/i.test(logo) && logo.length <= 2048 ? logo : undefined;
 }
 
 export interface PushTarget {
@@ -142,6 +155,7 @@ export const testTarget = query({
       body: `${org.name}: you will get an alert for every new paid order.`,
       url: adminUrl(org.slug, "/orders"),
       tag: "push-test",
+      icon: await storeLogoIcon(ctx, org),
     };
     const targets: PushTarget[] = [{ _id: row._id, endpoint: row.endpoint, keys: row.keys }];
     return { payload, targets };
@@ -184,6 +198,7 @@ export const loadOrderPush = internalQuery({
       body: `${customer} · ${items} ${items === 1 ? "item" : "items"}`,
       url: adminUrl(org.slug, `/orders/${order._id}`),
       tag: `order-${order._id}`,
+      icon: await storeLogoIcon(ctx, org),
     };
     return { payload, targets };
   },

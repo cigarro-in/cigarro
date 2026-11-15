@@ -5,6 +5,8 @@
 import { brandName } from './org.js';
 
 const DEFAULT_THEME_COLOR = '#e8e0d2';
+// Mirrors --admin-bg in src/adminnew/styles/admin.css (light), the admin splash background.
+const ADMIN_BACKGROUND_COLOR = '#f4f4f5';
 
 export function storeManifestPath(slug) {
   return `/${slug}/manifest.webmanifest`;
@@ -23,7 +25,7 @@ export function buildAdminManifest(store, brand) {
     start_url: base,
     scope: base,
     display: 'standalone',
-    background_color: DEFAULT_THEME_COLOR,
+    background_color: ADMIN_BACKGROUND_COLOR,
     theme_color: themeColor,
     lang: 'en-IN',
     categories: ['business', 'shopping'],

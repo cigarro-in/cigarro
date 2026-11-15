@@ -29,6 +29,11 @@ export function NotificationsCard() {
           {state === 'off' && <Badge tone="neutral">Off</Badge>}
         </div>
 
+        {(state === 'on' || state === 'off') && (
+          <p className="text-xs text-muted-foreground">
+            Uses your phone&apos;s notification sound. To change it on Android: long-press the notification &gt; Settings &gt; Sound.
+          </p>
+        )}
         {state === 'loading' && <p className="text-sm text-muted-foreground" role="status">Checking this device...</p>}
         {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
 
