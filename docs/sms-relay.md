@@ -17,11 +17,9 @@ super admin at `/sa/payments` (Messages, Rules) and on the store page
   store token and returns a ready MacroDroid file (`convex/lib/macrodroid.ts`,
   name "Cigarro payments", any-number SMS trigger, HTTP POST). Steps shown:
   1. Get MacroDroid (an `intent://` link that opens MacroDroid, or the Play Store
-     when it is not installed). 2. Share to MacroDroid via the Web Share API; when
-  the browser cannot share the file (Chrome only shares a fixed list of file
-  types and `.macro` is not on it), the file downloads as `cigarro-payments.macro`
-  and the step reads "Open the downloaded file, choose MacroDroid, tap Import".
-  3. Allow SMS and battery when MacroDroid asks. The URL is never displayed.
+     when it is not installed). 2. The file downloads as `cigarro-payments.macro`;
+  the merchant opens it, chooses MacroDroid, and taps Import. 3. Allow SMS and
+  battery when MacroDroid asks. The URL is never displayed.
 - iPhone: "Set up on this iPhone" gives a "Copy setup link" button and a three-line
   Shortcuts guide (Apple cannot share automations). The link is copied, not shown.
 - Desktop: a QR code that opens the same page on the phone.

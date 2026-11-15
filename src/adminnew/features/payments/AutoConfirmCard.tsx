@@ -43,14 +43,6 @@ function macroFile(text: string, name: string): File {
   return new File([text], name, { type: 'application/octet-stream' });
 }
 
-function canShareFile(file: File): boolean {
-  try {
-    return typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
-  } catch {
-    return false;
-  }
-}
-
 function download(file: File) {
   const href = URL.createObjectURL(file);
   const a = document.createElement('a');
@@ -122,8 +114,7 @@ function PhoneQr() {
   );
 }
 
-function AndroidSteps({ setup, onShare, shared }: { setup: Setup; onShare: () => void; shared: boolean }) {
-  const shareable = canShareFile(setup.file);
+function AndroidSteps({ onDownload, shared }: { onDownload: () => void; shared: boolean }) {
   return (
     <ol className="flex flex-col gap-4">
       <Step n={1} title="Install MacroDroid (free)">
@@ -133,13 +124,10 @@ function AndroidSteps({ setup, onShare, shared }: { setup: Setup; onShare: () =>
           </Button>
         </div>
       </Step>
-      <Step
-        n={2}
-        title={shareable ? 'Tap Share, choose MacroDroid, tap Import' : 'Open the downloaded file, choose MacroDroid, tap Import'}
-      >
+      <Step n={2} title="Open the downloaded file, choose MacroDroid, tap Import">
         <div>
-          <Button variant={shared ? 'secondary' : 'primary'} size="sm" onClick={onShare}>
-            {shareable ? 'Share to MacroDroid' : shared ? 'Download again' : 'Download setup file'}
+          <Button variant={shared ? 'secondary' : 'primary'} size="sm" onClick={onDownload}>
+            {shared ? 'Download again' : 'Download setup file'}
           </Button>
         </div>
       </Step>
@@ -190,19 +178,7 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
   const gmailFb = useButtonFeedback();
   const offFb = useButtonFeedback();
 
-  const share = async (s: Setup) => {
-    if (canShareFile(s.file)) {
-      try {
-        await navigator.share({ files: [s.file], title: 'Cigarro payments' });
-        setShared(true);
-        return;
-      } catch (e) {
-        // Cancelled, or the tap that made the file is no longer "fresh": the
-        // Share button in step 2 retries with a new tap.
-        if ((e as DOMException)?.name === 'AbortError') return;
-        if ((e as DOMException)?.name === 'NotAllowedError') return;
-      }
-    }
+  const downloadSetup = (s: Setup) => {
     download(s.file);
     setShared(true);
   };
@@ -315,7 +291,7 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
         )}
 
         {showSetup && setup && device === 'android' && (
-          <AndroidSteps setup={setup} shared={shared} onShare={() => void share(setup)} />
+          <AndroidSteps shared={shared} onDownload={() => downloadSetup(setup)} />
         )}
         {showSetup && setup && device === 'iphone' && <IphoneSteps setup={setup} />}
         {device === 'desktop' && (!phoneOn || phone.state === 'setup_error' || phone.state === 'quiet') && <PhoneQr />}
