@@ -119,7 +119,7 @@ export function MessageRow({ m, showStore }: { m: MessageRowData; showStore: boo
         {m.order && (
           <Fact label="Order">
             <Link to={orderPath(m.order.orgId, m.order._id)} className="text-[var(--admin-primary)] hover:underline">
-              {formatOrderNumber(m.order.orderNumber, m.order.displayOrderId)}
+              {formatOrderNumber(m.order.orderNumber) || '—'}
             </Link>
           </Fact>
         )}
@@ -134,7 +134,7 @@ export function MessageRow({ m, showStore }: { m: MessageRowData; showStore: boo
               to={orderPath(c.orgId, c._id)}
               className="rounded-full border border-[var(--admin-border)] px-2 py-0.5 text-xs hover:bg-[var(--admin-neutral-soft)]"
             >
-              {formatOrderNumber(c.orderNumber, c.displayOrderId)} · {rupees(c.finalAmountPaise)} · {c.status}
+              {formatOrderNumber(c.orderNumber) || '—'} · {rupees(c.finalAmountPaise)} · {c.status}
             </Link>
           ))}
         </div>

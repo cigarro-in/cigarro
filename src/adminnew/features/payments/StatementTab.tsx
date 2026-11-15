@@ -177,7 +177,7 @@ function EntryLabel({ entry: e }: { entry: Entry }) {
         <div className="text-sm text-foreground">
           Order{' '}
           <Link to={`/orders/${e.orderId}`} className="font-medium text-primary hover:underline">
-            {formatOrderNumber(e.orderNumber, e.displayOrderId)}
+            {formatOrderNumber(e.orderNumber) || '—'}
           </Link>{' '}
           credited
         </div>
@@ -192,7 +192,7 @@ function EntryLabel({ entry: e }: { entry: Entry }) {
       <div className="text-sm text-foreground">
         Order{' '}
         <Link to={`/orders/${e.orderId}`} className="font-medium text-primary hover:underline">
-          {formatOrderNumber(e.orderNumber, e.displayOrderId)}
+          {formatOrderNumber(e.orderNumber) || '—'}
         </Link>{' '}
         refunded{where ? ` ${where}` : ''}
       </div>

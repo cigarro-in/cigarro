@@ -127,8 +127,7 @@ function OrderCard({ order }: { order: NormalizedOrder }) {
 
   const meta = badgeFor(order);
   const Icon = meta.icon;
-  const numberLabel = order.orderNumber !== undefined ? String(order.orderNumber) : order.displayOrderId;
-  const showsDisplayId = order.orderNumber !== undefined;
+  const numberLabel = order.orderNumber !== undefined ? String(order.orderNumber) : '';
   const canContinue = order.paymentStatus === 'pending';
   const canRetry = RETRYABLE.has(order.paymentStatus);
   const shownItems = order.items.slice(0, 3);
@@ -185,17 +184,12 @@ function OrderCard({ order }: { order: NormalizedOrder }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[15px] md:text-base font-semibold text-[var(--vv-fg)] break-all">
-            Order {numberLabel}
+            {numberLabel ? `Order ${numberLabel}` : 'Order'}
           </h2>
           <p className="text-xs text-[var(--vv-fg-muted)] mt-0.5">
             {order.createdAt.toLocaleDateString('en-IN', DATE_OPTS)}
             {order.itemsCount > 0 && ` · ${order.itemsCount} item${order.itemsCount > 1 ? 's' : ''}`}
           </p>
-          {showsDisplayId && (
-            <p className="font-mono text-[11px] text-[var(--vv-fg-subtle)] mt-0.5 break-all">
-              {order.displayOrderId}
-            </p>
-          )}
         </div>
         <span className={`vv-badge ${meta.cls} shrink-0 inline-flex items-center gap-1`}>
           <Icon className="w-3 h-3" aria-hidden="true" />

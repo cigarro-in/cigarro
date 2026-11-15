@@ -39,7 +39,6 @@ interface Order {
   claimable?: ClaimableOrder;
   displayOrderId: string;
   orderNumber?: number;
-  transactionId?: string;
   items: OrderItem[];
   total: number;
   subtotal: number;
@@ -122,12 +121,11 @@ export function OrdersPage() {
     const isWalletLoad = o.kind === 'wallet_load';
     return {
       id: o._id,
-      displayOrderId: o.displayOrderId ?? 'N/A',
+      displayOrderId: o.displayOrderId ?? '',
       orderNumber:
         Number.isInteger(o.orderNumber) && o.orderNumber >= 10000 && o.orderNumber <= 99999
           ? o.orderNumber
           : undefined,
-      transactionId: o.displayOrderId,
       items: (o.items ?? []).map((it: any) => ({
         id: it.productId,
         name: it.name,
@@ -394,7 +392,7 @@ export function OrdersPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0 pr-3">
                         <h3 className="font-mono tracking-tight text-base md:text-lg text-foreground font-bold mb-1">
-                          Order {order.orderNumber ?? order.displayOrderId}
+                          {order.orderNumber !== undefined ? `Order ${order.orderNumber}` : 'Order'}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{new Date(order.createdAt).toLocaleDateString('en-IN', {

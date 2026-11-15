@@ -29,7 +29,7 @@ const getBrandName = (brand: any): string => {
 export function MobileCheckoutPage() {
   const {
     user, opStatus,
-    isRetryPayment, retryDisplayOrderId,
+    isRetryPayment, retryOrderNumber,
     items, subtotal: totalPrice, updateItemQuantity: handleUpdateQuantity,
     luckyDiscount,
     activeShippingId, setSelectedShipping, getShippingCost,
@@ -210,7 +210,7 @@ export function MobileCheckoutPage() {
               totalPrice={totalPrice}
               randomDiscount={luckyDiscount}
               isRetryPayment={isRetryPayment}
-              retryDisplayOrderId={retryDisplayOrderId}
+              retryOrderNumber={retryOrderNumber}
               appliedDiscount={appliedDiscount}
               getShippingCost={getShippingCost}
               getFinalTotal={getFinalTotal}

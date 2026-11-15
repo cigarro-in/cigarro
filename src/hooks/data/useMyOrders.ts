@@ -33,8 +33,8 @@ export interface NormalizedOrderItem {
 export interface NormalizedOrder {
   id: string;
   displayOrderId: string;
-  // Five-digit customer-facing number (10000–99999). Absent on legacy rows —
-  // views must fall back to displayOrderId.
+  // Five-digit customer-facing number (10000–99999), the only identifier views
+  // may show. Absent on legacy rows: render nothing, never displayOrderId.
   orderNumber?: number;
   kind: 'purchase' | 'wallet_load';
   paymentStatus: 'pending' | 'paid' | 'late_paid' | 'expired' | 'cancelled' | 'refunded' | 'voided';

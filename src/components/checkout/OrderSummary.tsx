@@ -12,7 +12,7 @@ interface OrderSummaryProps {
   totalPrice: number;
   randomDiscount: number;
   isRetryPayment?: boolean;
-  retryDisplayOrderId?: string | null;
+  retryOrderNumber?: string | null;
   appliedDiscount: any;
   getShippingCost: () => number;
   getFinalTotal: () => number;
@@ -27,7 +27,7 @@ export function OrderSummary({
   totalPrice,
   randomDiscount,
   isRetryPayment = false,
-  retryDisplayOrderId = null,
+  retryOrderNumber = null,
   appliedDiscount,
   getShippingCost,
   getFinalTotal,
@@ -76,7 +76,7 @@ export function OrderSummary({
           </div>
           {isRetryPayment && (
             <p className="text-xs text-muted-foreground">
-              Preserved from order {retryDisplayOrderId ?? 'retry'}
+              {retryOrderNumber ? `Preserved from order ${retryOrderNumber}` : 'Preserved from your previous order'}
             </p>
           )}
         </div>

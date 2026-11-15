@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Plus, Edit3, Check, Loader2, X, Navigation, Home, Building2, Hotel, GraduationCap, MapPin as MapPinIcon } from 'lucide-react';
+import { MapPin, Plus, Edit3, Check, Loader2, X, Home, Building2, Hotel, GraduationCap, MapPin as MapPinIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -9,7 +9,6 @@ import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useAddresses } from '../../lib/convex/useAddresses';
 import { useMyProfile } from '../../hooks/data/useMyProfile';
-import { useCurrentLocation } from '../../hooks/useCurrentLocation';
 import { cleanPersonName, personNameError, realNameOrEmpty } from '../../lib/profile/personName';
 import { useInlineStatus, InlineStatus } from '../common/InlineStatus';
 
@@ -57,7 +56,6 @@ export function AddressManager({
   const [showAddNewDialog, setShowAddNewDialog] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
   const { status: opStatus, setError: setOpError } = useInlineStatus();
   // Phase 1: address store behind the flat-shape adapter (Convex or Supabase).
@@ -72,7 +70,6 @@ export function AddressManager({
   // Address form state (name/phone prefill from the normalized profile
   // contract; typed values are never overwritten by late arrivals).
   const { profileName, profilePhone10 } = useMyProfile();
-  const { locate } = useCurrentLocation();
   const [addressForm, setAddressForm] = useState({
     full_name: realNameOrEmpty(user?.name),
     phone: '',
@@ -159,43 +156,6 @@ export function AddressManager({
       } catch (error) {
         console.error('Pincode lookup error:', error);
       }
-    }
-  };
-
-  // Current location via the shared path (device position + server-side
-  // reverse geocode, coded inline errors). Manual fields stay editable.
-  const getCurrentLocation = async () => {
-    setIsLoadingLocation(true);
-
-    try {
-      const res = await locate();
-      if (!res.ok) {
-        setOpError(res.message);
-        return;
-      }
-      const addr = res.value;
-      const pincode = addr.pincode || '';
-
-      // Update form (blanks only — typed values survive; geocoded
-      // city/state fill empty fields, pincode lookup refines them after)
-      setAddressForm(prev => ({
-        ...prev,
-        address: prev.address || addr.address || prev.address,
-        pincode: prev.pincode || pincode || prev.pincode,
-        city: prev.city || addr.city || prev.city,
-        state: prev.state || addr.state || prev.state
-      }));
-
-      // Trigger pincode lookup to fill city/state automatically
-      if (pincode && pincode.length === 6) {
-        await fetchLocationFromPincode(pincode);
-      }
-      // No status: the form fields filling in IS the confirmation.
-    } catch (error: any) {
-      console.error('Location error:', error);
-      setOpError('Failed to get location');
-    } finally {
-      setIsLoadingLocation(false);
     }
   };
 
@@ -601,26 +561,9 @@ export function AddressManager({
               )}
             </div>
 
-            {/* Address with Current Location button */}
+            {/* Address */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="address">Address</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={getCurrentLocation}
-                  disabled={isLoadingLocation}
-                  className="text-xs px-2 py-1 h-6"
-                >
-                  {isLoadingLocation ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Navigation className="w-3 h-3" />
-                  )}
-                  <span className="ml-1">Current Location</span>
-                </Button>
-              </div>
+              <Label htmlFor="address" className="mb-2">Address</Label>
               <Input
                 id="address"
                 value={addressForm.address}
@@ -631,7 +574,6 @@ export function AddressManager({
               {addressErrors.address && (
                 <p className="text-xs text-red-500 mt-1">{addressErrors.address}</p>
               )}
-              <p className="text-[10px] text-muted-foreground text-right mt-1">Location lookup by © OpenStreetMap contributors</p>
             </div>
 
             {/* Pincode and City */}

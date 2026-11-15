@@ -16,7 +16,7 @@ export function Section({
     <section className="rounded-xl border border-border bg-card p-6">
       <header className="mb-5 flex items-center justify-between gap-4">
         <h2 className="flex items-center gap-3 text-base font-semibold text-foreground">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-medium leading-none text-accent">
             {step}
           </span>
           {title}

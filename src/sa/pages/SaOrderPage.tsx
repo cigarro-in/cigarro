@@ -132,7 +132,7 @@ export function SaOrderPage() {
   const o = data?.order;
   return (
     <Page
-      title={o ? `Order ${formatOrderNumber(o.orderNumber, o.displayOrderId)}` : <Skeleton className="inline-block h-6 w-40 align-middle" />}
+      title={o ? `Order ${formatOrderNumber(o.orderNumber) || '—'}` : <Skeleton className="inline-block h-6 w-40 align-middle" />}
       backTo={backTo}
       titleMeta={o ? <StatusBadge order={{ status: o.status, shippingStatus: o.shippingStatus ?? undefined }} /> : undefined}
     >

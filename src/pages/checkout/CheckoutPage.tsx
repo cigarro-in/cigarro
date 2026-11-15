@@ -18,7 +18,7 @@ import { SummaryAside } from './desktop/SummaryAside';
 // steps on the left and a sticky summary with the Pay button on the right.
 export function CheckoutPage() {
   const model = useCheckoutModel();
-  const { user, authLoading, opStatus, isRetryPayment, retryDisplayOrderId } = model;
+  const { user, authLoading, opStatus, isRetryPayment, retryOrderNumber } = model;
   const { requestAuth } = useAuthDialog();
   const navigate = useNavigate();
 
@@ -47,8 +47,8 @@ export function CheckoutPage() {
                 <ArrowLeft className="h-4 w-4" /> Back to cart
               </Link>
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">Checkout</h1>
-              {isRetryPayment && retryDisplayOrderId && (
-                <p className="mt-1 text-sm text-muted-foreground">Paying again for order {retryDisplayOrderId}</p>
+              {isRetryPayment && retryOrderNumber && (
+                <p className="mt-1 text-sm text-muted-foreground">Paying again for order {retryOrderNumber}</p>
               )}
             </div>
           </div>

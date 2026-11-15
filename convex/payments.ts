@@ -14,7 +14,7 @@ import {
 } from "./lib/bankMessage";
 import { parseSmsSender } from "./lib/smsSenders";
 import { loadPipelineConfig, recordPaymentMessage, type MessageOutcome } from "./pipeline";
-import { isValidOrderNumber } from "./lib/ids";
+import { isValidOrderNumber, orderNumberRef } from "./lib/ids";
 import { freeSlot } from "./orders";
 import { RECONCILE_OFFSETS_MS } from "./lib/pollSchedule";
 import { creditWallet } from "./wallet";
@@ -631,7 +631,7 @@ async function matchEmailToOrder(
         reason: "late_payment_credit",
         relatedOrderId: expired._id,
         createdBy: "system",
-        note: `late payment for expired order ${expired.displayOrderId}`,
+        note: `late payment for expired order${orderNumberRef(expired)}`,
       });
       await ctx.db.patch(emailId, {
         status: "matched",
@@ -696,7 +696,7 @@ async function matchEmailToOrder(
       reason: "duplicate_payment_credit",
       relatedOrderId: recentPaid._id,
       createdBy: "system",
-      note: `duplicate for order ${recentPaid.displayOrderId}${upiRef ? ` (ref ${upiRef})` : ""}`,
+      note: `duplicate for order${orderNumberRef(recentPaid)}${upiRef ? ` (ref ${upiRef})` : ""}`,
     });
     await ctx.db.patch(emailId, {
       status: "duplicate",

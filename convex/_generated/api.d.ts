@@ -22,7 +22,6 @@ import type * as crons from "../crons.js";
 import type * as discounts from "../discounts.js";
 import type * as domains from "../domains.js";
 import type * as email from "../email.js";
-import type * as geocode from "../geocode.js";
 import type * as gmail from "../gmail.js";
 import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
@@ -97,7 +96,6 @@ declare const fullApi: ApiFromModules<{
   discounts: typeof discounts;
   domains: typeof domains;
   email: typeof email;
-  geocode: typeof geocode;
   gmail: typeof gmail;
   http: typeof http;
   inventory: typeof inventory;

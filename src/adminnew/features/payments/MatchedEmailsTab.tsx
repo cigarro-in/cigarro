@@ -79,7 +79,7 @@ export function MatchedEmailsTab() {
             to={`/orders/${r.orderId}`}
             className="font-medium text-primary hover:underline"
           >
-            {formatOrderNumber(r.orderNumber, r.displayOrderId)}
+            {formatOrderNumber(r.orderNumber) || '—'}
           </Link>
         ) : (
           <span className="text-muted-foreground">—</span>

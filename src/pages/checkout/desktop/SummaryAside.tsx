@@ -11,7 +11,7 @@ import type { CheckoutModel } from '../useCheckoutModel';
 // shipping, wallet) and the one Pay button.
 export function SummaryAside({ model }: { model: CheckoutModel }) {
   const {
-    user, items, subtotal, luckyDiscount, isRetryPayment, retryDisplayOrderId,
+    user, items, subtotal, luckyDiscount, isRetryPayment, retryOrderNumber,
     appliedDiscount, couponCode, setCouponCode, isValidatingCoupon, applyCoupon,
     referral, getShippingCost, getFinalTotal,
     walletBalance, isWalletLoading, walletAmountToUse, setWalletAmountToUse,
@@ -106,7 +106,7 @@ export function SummaryAside({ model }: { model: CheckoutModel }) {
           totalPrice={subtotal}
           randomDiscount={luckyDiscount}
           isRetryPayment={isRetryPayment}
-          retryDisplayOrderId={retryDisplayOrderId}
+          retryOrderNumber={retryOrderNumber}
           appliedDiscount={appliedDiscount}
           getShippingCost={getShippingCost}
           getFinalTotal={getFinalTotal}

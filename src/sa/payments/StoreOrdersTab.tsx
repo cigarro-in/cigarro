@@ -50,7 +50,7 @@ export function StoreOrdersTab({ orgId }: { orgId: Id<'organizations'> }) {
     {
       id: 'number',
       header: 'Order',
-      cell: (r) => <span className="font-medium tabular-nums">{formatOrderNumber(r.orderNumber, r.displayOrderId)}</span>,
+      cell: (r) => <span className="font-medium tabular-nums">{formatOrderNumber(r.orderNumber) || '—'}</span>,
     },
     {
       id: 'customer',
@@ -98,7 +98,7 @@ export function StoreOrdersTab({ orgId }: { orgId: Id<'organizations'> }) {
         rows={status === 'LoadingFirstPage' ? undefined : results}
         getRowId={(r) => r._id}
         onRowClick={(r) => navigate(orderPath(orgId, r._id))}
-        rowLabel={(r) => `Open order ${formatOrderNumber(r.orderNumber, r.displayOrderId)}`}
+        rowLabel={(r) => `Open order ${formatOrderNumber(r.orderNumber) || '—'}`}
         empty={<EmptyState title="No orders yet" description="Orders placed in this store appear here, newest first." />}
       />
       {status === 'CanLoadMore' || status === 'LoadingMore' ? (

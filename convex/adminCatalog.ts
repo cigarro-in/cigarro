@@ -346,7 +346,7 @@ async function collectImageUsage(
     if (count)
       push({
         kind: "order",
-        label: orderNumberOf(o as any) ? `Order ${orderNumberOf(o as any)}` : ((o as any).displayOrderId ?? String((o as any)._id)),
+        label: orderNumberOf(o as any) !== undefined ? `Order ${orderNumberOf(o as any)}` : "Order",
         detail: "item snapshot",
         mutable: false,
       }, count);

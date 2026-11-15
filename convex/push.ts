@@ -16,6 +16,7 @@ import { Id } from "./_generated/dataModel";
 import { MutationCtx, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { readOrgSiteSettings } from "./lib/siteSettings";
+import { orderNumberOf } from "./lib/ids";
 
 export const ADMIN_ORIGIN = "https://admin.cigarro.in";
 const ADMIN_ROLES = ["admin", "owner"] as const;
@@ -200,9 +201,9 @@ export const loadOrderPush = internalQuery({
     const total = order.finalAmountPaise + order.walletDebitPaise;
     const items = order.items.reduce((n, item) => n + item.qty, 0);
     const customer = order.address?.name?.trim() || order.payerName?.trim() || "Customer";
-    const number = order.orderNumber ?? order.displayOrderId;
+    const number = orderNumberOf(order);
     const payload: PushPayload = {
-      title: `New order ${number} · ${formatRupees(total)}`,
+      title: `New order${number !== undefined ? ` ${number}` : ""} · ${formatRupees(total)}`,
       body: `${customer} · ${items} ${items === 1 ? "item" : "items"}`,
       url: adminUrl(org.slug, `/orders/${order._id}`),
       tag: `order-${order._id}`,

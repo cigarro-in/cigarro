@@ -47,3 +47,10 @@ export function orderNumberOf(order: { orderNumber?: unknown }): number | undefi
   const n = (order as { orderNumber?: unknown }).orderNumber;
   return isValidOrderNumber(n) ? n : undefined;
 }
+
+// Admin-facing note text: " 12345" when the order has a number, "" for legacy
+// rows. Never embeds the internal ORD- display id.
+export function orderNumberRef(order: { orderNumber?: unknown }): string {
+  const n = orderNumberOf(order);
+  return n === undefined ? "" : ` ${n}`;
+}

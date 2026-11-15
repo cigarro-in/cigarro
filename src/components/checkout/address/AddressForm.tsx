@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
-import { MapPin, Loader2, Navigation, Home, Building2, GraduationCap, Hotel, Check } from 'lucide-react';
+import { useState, useEffect, useRef, useId } from 'react';
+import { MapPin, Loader2, Home, Building2, GraduationCap, Hotel, Check } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
-import { Label } from '../../ui/label';
 import { useInlineStatus, InlineStatus } from '../../common/InlineStatus';
-import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { Address } from './AddressCard';
 import { cn } from '../../ui/utils';
 import { cleanPersonName, personNameError, realNameOrEmpty } from '../../../lib/profile/personName';
@@ -17,19 +15,26 @@ interface AddressFormProps {
   onCancel: () => void;
 }
 
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 const addressSuggestions = [
-  { id: 'home', label: 'Home', icon: <Home className="w-3.5 h-3.5" /> },
-  { id: 'work', label: 'Work', icon: <Building2 className="w-3.5 h-3.5" /> },
-  { id: 'pg', label: 'PG', icon: <GraduationCap className="w-3.5 h-3.5" /> },
-  { id: 'hotel', label: 'Hotel', icon: <Hotel className="w-3.5 h-3.5" /> },
-  { id: 'other', label: 'Other', icon: <MapPin className="w-3.5 h-3.5" /> }
+  { id: 'home', label: 'Home', icon: <Home className="h-4 w-4 shrink-0" /> },
+  { id: 'work', label: 'Work', icon: <Building2 className="h-4 w-4 shrink-0" /> },
+  { id: 'pg', label: 'PG', icon: <GraduationCap className="h-4 w-4 shrink-0" /> },
+  { id: 'hotel', label: 'Hotel', icon: <Hotel className="h-4 w-4 shrink-0" /> },
+  { id: 'other', label: 'Other', icon: <MapPin className="h-4 w-4 shrink-0" /> }
 ];
 
+const FIELD_HEIGHT = 'h-10 rounded-md';
+const LABEL_CLASS = 'mb-1.5 block text-xs font-medium text-foreground/80';
+const ERROR_CLASS = 'mt-1.5 text-xs text-destructive';
+
 export function AddressForm({ initialData, defaultValues, userId, onSave, onCancel }: AddressFormProps) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [customLabel, setCustomLabel] = useState('');
-  const [pincodeLookupTimeout, setPincodeLookupTimeout] = useState<NodeJS.Timeout | null>(null);
+  const pincodeLookupTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uid = useId();
+  const id = (field: string) => `${uid}-${field}`;
 
   const [formData, setFormData] = useState<Address>({
     // Prefill only with a real saved name; placeholders such as "Customer" start empty.
@@ -69,6 +74,18 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     }
   }, [initialData, defaultValues]);
 
+  // Back to idle a moment after a successful save (the parent normally
+  // closes the form first, in which case this never runs).
+  useEffect(() => {
+    if (saveState !== 'saved') return;
+    const t = setTimeout(() => setSaveState('idle'), 1500);
+    return () => clearTimeout(t);
+  }, [saveState]);
+
+  useEffect(() => () => {
+    if (pincodeLookupTimeout.current) clearTimeout(pincodeLookupTimeout.current);
+  }, []);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     const nameProblem = personNameError(formData.full_name);
@@ -80,7 +97,7 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     if (formData.pincode.length !== 6) newErrors.pincode = 'Enter valid 6-digit pincode';
     if (!formData.city.trim()) newErrors.city = 'City is required';
     if (!formData.state.trim()) newErrors.state = 'State is required';
-    
+
     if (formData.label === 'other' && !customLabel.trim()) {
       newErrors.label = 'Custom label is required';
     }
@@ -91,10 +108,10 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
 
   const handleSave = async () => {
     if (!validateForm()) return;
-    setIsSaving(true);
+    setSaveState('saving');
 
     try {
-      const finalLabel = formData.label === 'other' ? customLabel : 
+      const finalLabel = formData.label === 'other' ? customLabel :
         addressSuggestions.find(s => s.id === formData.label)?.label || 'Home';
 
       await onSave({
@@ -102,11 +119,11 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
         full_name: cleanPersonName(formData.full_name),
         label: finalLabel
       });
+      setSaveState('saved');
     } catch (error) {
       console.error('Error saving address:', error);
       setOpError('Failed to save address');
-    } finally {
-      setIsSaving(false);
+      setSaveState('error');
     }
   };
 
@@ -132,196 +149,197 @@ export function AddressForm({ initialData, defaultValues, userId, onSave, onCanc
     }
   };
 
-  const { locate } = useCurrentLocation();
-
-  const getCurrentLocation = async () => {
-    setIsLoadingLocation(true);
-    try {
-      // Shared path: device position + server-side reverse geocode with
-      // coded inline errors. Manual entry below always stays available.
-      const res = await locate();
-      if (!res.ok) {
-        setOpError(res.message);
-        return;
-      }
-      const addr = res.value;
-
-      // Fill blanks only — never overwrite what the customer typed.
-      setFormData(prev => ({
-        ...prev,
-        address: prev.address || addr.address || prev.address,
-        pincode: prev.pincode || addr.pincode || prev.pincode,
-        city: prev.city || addr.city || prev.city,
-        state: prev.state || addr.state || prev.state,
-        country: 'India' // Force India as per business logic
-      }));
-
-      if (addr.pincode) fetchLocationFromPincode(addr.pincode);
-      // No status: the form fields filling in IS the confirmation.
-    } catch (error) {
-      console.error('Location error:', error);
-      setOpError('Could not fetch location');
-    } finally {
-      setIsLoadingLocation(false);
-    }
-  };
+  const saveLabel = {
+    idle: 'Save address',
+    saving: 'Saving',
+    saved: 'Saved',
+    error: 'Try again',
+  }[saveState];
 
   return (
-    <div className="space-y-6 py-2">
+    <div className="space-y-5 py-2">
       <InlineStatus status={opStatus} />
-      {/* Use Current Location Button */}
-      <Button
-        type="button"
-        variant="outline"
-        onClick={getCurrentLocation}
-        disabled={isLoadingLocation}
-        className="w-full border-canyon/30 text-canyon hover:bg-canyon/5 h-12"
-      >
-        {isLoadingLocation ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Navigation className="w-4 h-4 mr-2" />}
-        Use Current Location
-      </Button>
-      <p className="text-[10px] text-center text-muted-foreground -mt-4">Location lookup by © OpenStreetMap contributors</p>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <Label>Full Name</Label>
-          <Input 
+          <label htmlFor={id('name')} className={LABEL_CLASS}>Full name</label>
+          <Input
+            id={id('name')}
             value={formData.full_name}
             onChange={e => {
               setFormData({ ...formData, full_name: e.target.value });
               if (errors.full_name) setErrors(prev => ({ ...prev, full_name: '' }));
             }}
             placeholder="Enter your full name"
+            autoComplete="name"
             maxLength={60}
             required
             aria-invalid={!!errors.full_name}
-            className={cn("mt-1.5 bg-creme-light/50", errors.full_name && "border-red-500")}
+            className={FIELD_HEIGHT}
           />
-          {errors.full_name && <p className="text-xs text-red-500 mt-1">{errors.full_name}</p>}
+          {errors.full_name && <p className={ERROR_CLASS}>{errors.full_name}</p>}
         </div>
 
         <div>
-          <Label>Phone Number</Label>
-          <div className="flex mt-1.5">
-            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-coyote bg-creme-light text-dark/60 text-sm">
+          <label htmlFor={id('phone')} className={LABEL_CLASS}>Phone number</label>
+          <div
+            className={cn(
+              'flex h-10 overflow-hidden rounded-md border border-input bg-input-background transition-[color,box-shadow]',
+              'focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50',
+              errors.phone && 'border-destructive',
+            )}
+          >
+            <span className="flex shrink-0 select-none items-center border-r border-input bg-muted/40 px-3 text-sm text-muted-foreground">
               +91
             </span>
-            <Input 
+            <input
+              id={id('phone')}
               value={formData.phone}
               onChange={e => {
                 const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                 setFormData({ ...formData, phone: val });
               }}
-              className={cn("rounded-l-none bg-creme-light/50", errors.phone && "border-red-500")}
               type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              aria-invalid={!!errors.phone}
+              className="min-w-0 flex-1 bg-transparent px-3 text-base outline-none md:text-sm"
             />
           </div>
-          {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+          {errors.phone && <p className={ERROR_CLASS}>{errors.phone}</p>}
         </div>
+      </div>
 
+      <div>
+        <label htmlFor={id('address')} className={LABEL_CLASS}>House no., building, street</label>
+        <Input
+          id={id('address')}
+          value={formData.address}
+          onChange={e => setFormData({ ...formData, address: e.target.value })}
+          autoComplete="address-line1"
+          aria-invalid={!!errors.address}
+          className={FIELD_HEIGHT}
+        />
+        {errors.address && <p className={ERROR_CLASS}>{errors.address}</p>}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <Label>Address (House No, Building, Street)</Label>
-          <Input 
-            value={formData.address}
-            onChange={e => setFormData({ ...formData, address: e.target.value })}
-            className={cn("mt-1.5", errors.address && "border-red-500")}
+          <label htmlFor={id('pincode')} className={LABEL_CLASS}>Pincode</label>
+          <Input
+            id={id('pincode')}
+            value={formData.pincode}
+            onChange={e => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setFormData({ ...formData, pincode: val });
+
+              if (pincodeLookupTimeout.current) clearTimeout(pincodeLookupTimeout.current);
+              if (val.length === 6) {
+                pincodeLookupTimeout.current = setTimeout(() => fetchLocationFromPincode(val), 500);
+              }
+            }}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="postal-code"
+            aria-invalid={!!errors.pincode}
+            className={FIELD_HEIGHT}
           />
-          {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+          {errors.pincode && <p className={ERROR_CLASS}>{errors.pincode}</p>}
         </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Pincode</Label>
-            <Input 
-              value={formData.pincode}
-              onChange={e => {
-                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                setFormData({ ...formData, pincode: val });
-                
-                if (pincodeLookupTimeout) clearTimeout(pincodeLookupTimeout);
-                if (val.length === 6) {
-                  setPincodeLookupTimeout(setTimeout(() => fetchLocationFromPincode(val), 500));
-                }
-              }}
-              className={cn("mt-1.5", errors.pincode && "border-red-500")}
-              type="tel"
-            />
-            {errors.pincode && <p className="text-xs text-red-500 mt-1">{errors.pincode}</p>}
-          </div>
-          <div>
-            <Label>City</Label>
-            <Input 
-              value={formData.city}
-              onChange={e => setFormData({ ...formData, city: e.target.value })}
-              className={cn("mt-1.5 bg-creme-light/50", errors.city && "border-red-500")}
-            />
-          </div>
-        </div>
-
         <div>
-          <Label>State</Label>
-          <Input 
-            value={formData.state}
-            onChange={e => setFormData({ ...formData, state: e.target.value })}
-            className={cn("mt-1.5 bg-creme-light/50", errors.state && "border-red-500")}
+          <label htmlFor={id('city')} className={LABEL_CLASS}>City</label>
+          <Input
+            id={id('city')}
+            value={formData.city}
+            onChange={e => setFormData({ ...formData, city: e.target.value })}
+            autoComplete="address-level2"
+            aria-invalid={!!errors.city}
+            className={FIELD_HEIGHT}
           />
+          {errors.city && <p className={ERROR_CLASS}>{errors.city}</p>}
         </div>
+      </div>
 
-        {/* Label Selection - Full Width Grid */}
-        <div>
-          <Label>Save As</Label>
-          <div className="grid grid-cols-5 gap-2 mt-2">
-            {addressSuggestions.map((s) => (
+      <div>
+        <label htmlFor={id('state')} className={LABEL_CLASS}>State</label>
+        <Input
+          id={id('state')}
+          value={formData.state}
+          onChange={e => setFormData({ ...formData, state: e.target.value })}
+          autoComplete="address-level1"
+          aria-invalid={!!errors.state}
+          className={FIELD_HEIGHT}
+        />
+        {errors.state && <p className={ERROR_CLASS}>{errors.state}</p>}
+      </div>
+
+      <div>
+        <span id={id('save-as')} className={LABEL_CLASS}>Save as</span>
+        <div role="radiogroup" aria-labelledby={id('save-as')} className="flex flex-wrap gap-2">
+          {addressSuggestions.map((s) => {
+            const selected = formData.label === s.id;
+            return (
               <button
                 key={s.id}
                 type="button"
+                role="radio"
+                aria-checked={selected}
                 onClick={() => {
                   setFormData({ ...formData, label: s.id });
                   if (s.id !== 'other') setCustomLabel('');
                 }}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-xl border text-xs transition-all",
-                  formData.label === s.id
-                    ? "border-canyon bg-canyon/10 text-canyon font-medium shadow-sm"
-                    : "border-coyote/30 bg-creme-light hover:border-canyon/30"
+                  'inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  selected
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border text-foreground/80 hover:border-foreground/30',
                 )}
               >
                 {s.icon}
-                <span className="truncate w-full text-center">{s.label}</span>
+                {s.label}
               </button>
-            ))}
-          </div>
-          {formData.label === 'other' && (
-            <Input 
-              value={customLabel}
-              onChange={e => setCustomLabel(e.target.value)}
-              className="mt-2"
-              autoFocus
-            />
-          )}
-          {errors.label && <p className="text-xs text-red-500 mt-1">{errors.label}</p>}
+            );
+          })}
         </div>
+        {formData.label === 'other' && (
+          <Input
+            value={customLabel}
+            onChange={e => setCustomLabel(e.target.value)}
+            aria-label="Custom label"
+            placeholder="Name this address"
+            className={cn(FIELD_HEIGHT, 'mt-2')}
+            autoFocus
+          />
+        )}
+        {errors.label && <p className={ERROR_CLASS}>{errors.label}</p>}
       </div>
 
-      {/* Spacer to ensure content is visible above keyboard */}
-      <div className="h-48 md:h-0" />
+      {/* Spacer so the focused field stays above the on-screen keyboard (phone) */}
+      <div className="h-24 md:hidden" />
 
-      <div className="pt-4 flex gap-3 sticky bottom-0 bg-creme py-4 border-t border-coyote/10 -mx-4 px-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="flex-1 h-12 border-coyote/30 rounded-full"
+      <div className="sticky bottom-0 -mx-4 flex gap-3 border-t border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:pb-4 md:pt-2 md:shadow-none md:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 flex-1 rounded-md border-border md:flex-none md:min-w-32"
           onClick={onCancel}
         >
           Cancel
         </Button>
-        <Button 
-          type="button" 
-          className="flex-1 h-12 bg-dark hover:bg-canyon text-creme-light rounded-full shadow-lg"
+        <Button
+          type="button"
+          className={cn(
+            'h-11 flex-1 rounded-md bg-accent text-accent-foreground shadow-none hover:bg-accent/90 md:flex-none md:min-w-32',
+            saveState === 'error' && 'bg-destructive hover:bg-destructive/90',
+          )}
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={saveState === 'saving'}
+          aria-busy={saveState === 'saving'}
         >
-          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Address'}
+          {saveState === 'saving' && <Loader2 className="animate-spin" />}
+          {saveState === 'saved' && <Check />}
+          <span role="status">{saveLabel}</span>
         </Button>
       </div>
     </div>

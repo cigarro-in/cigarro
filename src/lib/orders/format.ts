@@ -1,14 +1,7 @@
 // Order number and date formatting shared by admin and customer views.
+// formatOrderNumber lives in ./orderNumber (re-exported here for existing imports).
 
-/**
- * Plain digits, no '#'. Falls back to the display id for legacy rows that have
- * no numeric order number. Never prefix the result with '#'.
- */
-export function formatOrderNumber(n: number | string | null | undefined, fallback?: string | null): string {
-  if (typeof n === 'number' && Number.isFinite(n)) return String(Math.trunc(n));
-  if (typeof n === 'string' && n.trim()) return n.trim().replace(/^#+/, '');
-  return (fallback ?? '').replace(/^#+/, '');
-}
+export { formatOrderNumber } from './orderNumber';
 
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();

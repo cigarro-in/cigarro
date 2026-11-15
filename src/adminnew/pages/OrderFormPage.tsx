@@ -13,7 +13,6 @@ import {
   StatusBadge,
   deriveOrderStage,
   formatOrderDate,
-  useButtonFeedback,
 } from '../ui';
 import { CustomerCard } from '../features/orders/CustomerCard';
 import { InvoiceCard } from '../features/orders/InvoiceCard';
@@ -90,7 +89,6 @@ function OrderDetail({ orderId }: { orderId?: string }) {
 
 /** Internal id and placement time, collapsed. The ORD id is only ever shown here. */
 function DetailsCard({ order }: { order: OrderDoc }) {
-  const copy = useButtonFeedback();
   return (
     <Card padding="none">
       <details className="px-4 py-3 text-sm">
@@ -99,22 +97,6 @@ function DetailsCard({ order }: { order: OrderDoc }) {
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-muted-foreground">Placed</span>
             <span className="text-right tabular-nums text-foreground">{formatOrderDate(order.createdAt, { withTime: true })}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Internal ID</span>
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-mono text-xs text-foreground">{order.displayOrderId}</span>
-              <Button
-                size="sm"
-                variant="plain"
-                state={copy.state}
-                successLabel="Copied"
-                errorLabel="Failed"
-                onClick={() => void copy.run(() => navigator.clipboard.writeText(order.displayOrderId))}
-              >
-                Copy
-              </Button>
-            </span>
           </div>
         </div>
       </details>

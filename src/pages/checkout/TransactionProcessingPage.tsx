@@ -15,6 +15,7 @@ import { formatPaiseINR, paiseToRupees } from '../../lib/convex/money';
 import { PaymentMatchRow } from '../../components/payment/PaymentMatchRow';
 import { PaymentClaimPanel } from '../../components/payment/PaymentClaimPanel';
 import { normalizeClaim } from '../../hooks/data/useMyOrders';
+import { formatOrderNumber } from '../../lib/orders/orderNumber';
 import QRCode from 'qrcode';
 import { motion } from 'framer-motion';
 
@@ -232,16 +233,13 @@ export function TransactionProcessingPage() {
 
   const isWalletOnly = order.verificationMethod === 'wallet_only';
   const amountPaise = order.finalAmountPaise > 0 ? order.finalAmountPaise : order.cartTotalPaise;
-  // Five-digit customer order number; legacy rows fall back to displayOrderId.
-  const rawNumber = (order as unknown as { orderNumber?: unknown }).orderNumber;
-  const orderNumber =
-    typeof rawNumber === 'number' && Number.isInteger(rawNumber) && rawNumber >= 10000 && rawNumber <= 99999
-      ? rawNumber
-      : null;
-  const orderLabel = orderNumber ? String(orderNumber) : order.displayOrderId;
+  // Five-digit customer order number: the only order id a person sees. Legacy
+  // rows without one show no number at all (never the internal ORD- id).
+  const orderLabel = formatOrderNumber((order as unknown as { orderNumber?: unknown }).orderNumber);
   // Download reuses the already-generated QR data URL — same pixels, same
   // server-generated UPI URL. Never regenerate with different params.
-  const qrFilename = `${orgSlug}-order-${orderNumber ?? order.displayOrderId}-upi-qr.png`;
+  const orderRef = orderLabel ? ` ${orderLabel}` : '';
+  const qrFilename = `${orgSlug}-order-${orderLabel || 'payment'}-upi-qr.png`;
   const refreshExhausted = refreshCount >= MAX_MANUAL_REFRESH;
   // Fall back to the 10-min server default so the countdown never NaNs when
   // the org row hasn't loaded or predates the slotTimeoutMs field.
@@ -351,7 +349,7 @@ export function TransactionProcessingPage() {
               ? "We didn't receive your payment in time. If money was deducted, it will arrive shortly and we'll credit your wallet."
               : 'Your order was cancelled. Any wallet debit has been refunded.'}
           </p>
-          <p className="text-xs text-coyote mb-5 font-mono">Order {orderLabel}</p>
+          <p className="text-xs text-coyote mb-5 font-mono">Order{orderRef}</p>
           {claimable && <PaymentClaimPanel order={claimable} className="mb-5 text-coyote" />}
 
           <div className="space-y-3">
@@ -448,7 +446,7 @@ export function TransactionProcessingPage() {
             amount={paiseToRupees(order.matchOffsetPaise ?? 0)}
             className="text-xs text-coyote mt-2 font-mono"
           />
-          <p className="text-xs text-coyote mt-2 font-mono">Order {orderLabel}</p>
+          <p className="text-xs text-coyote mt-2 font-mono">Order{orderRef}</p>
         </motion.div>
 
         <div className="space-y-3">
@@ -458,14 +456,14 @@ export function TransactionProcessingPage() {
               orgSlug={orgSlug}
               qrDataUrl={qrCode || undefined}
               qrFilename={qrFilename}
-              title={`Pay order ${orderLabel}`}
+              title={`Pay order${orderRef}`}
             />
           )}
 
           {qrCode && (
             <div>
               <div className="bg-white p-3 rounded-xl shadow-inner inline-block border border-coyote/20">
-                <img src={qrCode} alt={`UPI QR for order ${orderLabel}`} className="w-36 h-36 mix-blend-multiply" />
+                <img src={qrCode} alt={`UPI QR for order${orderRef}`} className="w-36 h-36 mix-blend-multiply" />
                 <p className="text-[11px] text-coyote mt-1.5 font-mono">Scan with any UPI app</p>
               </div>
               {order.upiUrl && (
@@ -474,7 +472,7 @@ export function TransactionProcessingPage() {
                     qrDataUrl={qrCode}
                     filename={qrFilename}
                     upiUrl={order.upiUrl}
-                    title={`Pay order ${orderLabel}`}
+                    title={`Pay order${orderRef}`}
                   />
                 </div>
               )}

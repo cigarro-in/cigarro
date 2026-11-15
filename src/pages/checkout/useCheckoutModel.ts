@@ -17,6 +17,7 @@ import type { Address } from '../../components/checkout/address/AddressCard';
 import { validateCouponCode } from '../../utils/discounts';
 import { trackBeginCheckout, trackPurchase } from '../../lib/analytics/ga';
 import { cleanPersonName, isRealPersonName } from '../../lib/profile/personName';
+import { formatOrderNumber } from '../../lib/orders/orderNumber';
 
 // Checkout state and order placement shared by the desktop CheckoutPage and
 // MobileCheckoutPage (flows, totals, lucky, coupon, referral, wallet, consent,
@@ -106,7 +107,7 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
     : null;
   const retryShippingCost: number | null = isRetryPayment && retryOrder ? retryOrder.shipping || 0 : null;
   const retryLuckyDiscount: number | null = isRetryPayment && retryOrder ? retryOrder.discount || 0 : null;
-  const retryDisplayOrderId: string | null = isRetryPayment && retryOrder ? retryOrder.displayOrderId || null : null;
+  const retryOrderNumber: string | null = isRetryPayment && retryOrder ? formatOrderNumber(retryOrder.orderNumber) || null : null;
 
   const subtotal: number = retrySubtotal !== null
     ? retrySubtotal
@@ -436,7 +437,7 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
 
   return {
     user, authLoading, opStatus,
-    isRetryPayment, retryDisplayOrderId,
+    isRetryPayment, retryOrderNumber,
     items, subtotal, updateItemQuantity,
     luckyDiscount,
     activeShippingId, setSelectedShipping, getShippingCost,
