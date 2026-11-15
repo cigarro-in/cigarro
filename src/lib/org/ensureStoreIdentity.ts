@@ -33,6 +33,7 @@ function readSavedIdentity(): Identity | null {
       id: typeof v.id === 'string' ? v.id : null,
       name: typeof v.name === 'string' ? v.name : '',
       primaryHost: typeof v.primaryHost === 'string' ? v.primaryHost : window.location.host,
+      themeId: typeof v.themeId === 'string' ? v.themeId : null,
     };
   } catch {
     return null;

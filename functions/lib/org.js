@@ -261,19 +261,25 @@ export function brandName(org) {
   return org?.siteName || org?.name || FALLBACK_STORE_NAME;
 }
 
-// Fetches the store's siteName once per request (cached 60s per store on the
-// Cache API, like hostnames). Returns null when unset or unknown; never throws.
-export async function resolveSiteName(env, org) {
+// Storefront themes the edge may name on <html data-theme> and window.__ORG__.
+// Must match the ids registered in src/themes/registry.ts.
+const KNOWN_THEME_IDS = new Set(['classic', 'vivid']);
+const EMPTY_SITE_SETTINGS = Object.freeze({ siteName: null, themeId: null });
+
+// Fetches the store's siteName and active theme once per request (cached 60s per
+// store on the Cache API, like hostnames). themeId is null when unset or unknown,
+// and the client then uses its own default. Never throws.
+export async function resolveSiteSettings(env, org) {
   const cache = globalThis.caches?.default;
-  const key = new Request(`https://${org.primaryHost}/__site_name_cache/${encodeURIComponent(org.slug)}`);
+  const key = new Request(`https://${org.primaryHost}/__site_settings_cache/${encodeURIComponent(org.slug)}`);
   try {
     const hit = cache ? await cache.match(key) : undefined;
-    if (hit) return (await hit.json()).value ?? null;
+    if (hit) return (await hit.json()).value ?? EMPTY_SITE_SETTINGS;
   } catch {
     // Cache is an optimisation only.
   }
 
-  let siteName;
+  let settings;
   try {
     const res = await fetch(`${requiredConvexUrl(env)}/api/query`, {
       method: 'POST',
@@ -284,24 +290,32 @@ export async function resolveSiteName(env, org) {
     const body = await res.json();
     if (body.status !== 'success') throw new Error(`content:getSiteSettings failed: ${body.errorMessage || body.status}`);
     const raw = body.value?.siteName;
-    siteName = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+    const theme = body.value?.activeTheme;
+    settings = {
+      siteName: typeof raw === 'string' && raw.trim() ? raw.trim() : null,
+      themeId: typeof theme === 'string' && KNOWN_THEME_IDS.has(theme) ? theme : null,
+    };
   } catch (error) {
     // Not cached, so the next request retries. The caller falls back to org.name.
-    console.error('Site name unavailable, using org name:', error instanceof Error ? error.message : error);
-    return null;
+    console.error('Site settings unavailable, using org name and client theme default:', error instanceof Error ? error.message : error);
+    return EMPTY_SITE_SETTINGS;
   }
 
   try {
     // A fallback org (legacy host, Convex down) must not write its data to the cache.
     if (cache && !org.fallback) {
-      await cache.put(key, new Response(JSON.stringify({ value: siteName }), {
+      await cache.put(key, new Response(JSON.stringify({ value: settings }), {
         headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}` },
       }));
     }
   } catch {
     // Cache is an optimisation only.
   }
-  return siteName;
+  return settings;
+}
+
+export async function resolveSiteName(env, org) {
+  return (await resolveSiteSettings(env, org)).siteName;
 }
 
 // Injected into <head> of HTML pages so the SPA knows its store.
@@ -312,5 +326,6 @@ export function orgScriptJson(org) {
     name: org.name,
     siteName: org.siteName ?? null,
     primaryHost: org.primaryHost,
+    themeId: org.themeId ?? null,
   }).replace(/</g, '\\u003c');
 }

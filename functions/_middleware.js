@@ -3,7 +3,7 @@
 // and stored on context.data.org for every downstream handler.
 import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware.js';
 import { persistCrash } from './lib/crash-logs.js';
-import { resolveRequestOrg, resolveSiteName, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath, brandName } from './lib/org.js';
+import { resolveRequestOrg, resolveSiteSettings, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath, brandName } from './lib/org.js';
 import { buildAdminManifest, storeManifestPath } from './lib/admin-pwa.js';
 import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
 import { applyRedirect } from './lib/redirects.js';
@@ -58,9 +58,11 @@ async function handleRequest(context) {
 
   // Never throws: unknown hosts resolve to null, Convex failures to the default org.
   const resolved = await resolveRequestOrg(request, env);
-  // One siteName lookup per request (60s cached): edge output brands with it.
+  // One site-settings lookup per request (60s cached): edge output brands with
+  // siteName, and the storefront shell and window.__ORG__ carry themeId so the
+  // first paint is the store's own theme (no default-theme flash).
   const org = resolved && !resolved.unavailable
-    ? { ...resolved, siteName: await resolveSiteName(env, resolved) }
+    ? { ...resolved, ...(await resolveSiteSettings(env, resolved)) }
     : resolved;
   context.data = context.data || {};
   context.data.org = org;
@@ -230,6 +232,12 @@ async function nextWithOrg(context) {
   const script = `<script>window.__ORG__=${orgScriptJson(org)}</script>`;
   let rewriter = new HTMLRewriter()
     .on('head', { element(el) { el.append(script, { html: true }); } });
+  // Storefront theme on <html> before any script runs: the theme CSS
+  // ([data-theme] selectors) paints the store's background and colours on the
+  // first frame, not the default theme. The admin host never wears a store theme.
+  if (!org.admin && org.themeId) {
+    rewriter = rewriter.on('html', { element(el) { el.setAttribute('data-theme', org.themeId); } });
+  }
   // Admin host and its store apps are never indexed: the shell's index,follow
   // meta would contradict the X-Robots-Tag header.
   if (org.admin) rewriter = rewriter.on('meta[name="robots"]', { element: setNoindexMeta });

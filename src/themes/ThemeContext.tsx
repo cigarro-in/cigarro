@@ -1,4 +1,4 @@
-import { writeStoredPreference } from '../lib/browserStorage';
+import { readStoredPreference, writeStoredPreference } from '../lib/browserStorage';
 import { createContext, startTransition, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSiteSettings } from '../hooks/data/useContent';
 import { themes, DEFAULT_THEME_ID, getTheme, themeHtmlAttrs } from './registry';
@@ -38,9 +38,17 @@ function readEdgeThemeId(): string | undefined {
 }
 
 export function ThemeProvider({ children, initialThemeId, applyToDocument = true }: ProviderProps) {
-  // Render-safe: no storage access here. The first valid candidate wins, else the default.
+  // The first valid candidate wins: the server render's theme, the edge-injected
+  // store theme, then this origin's last applied theme (storefront only; it is
+  // this store's own origin, so it can never be another store's theme). The
+  // hard-coded default is the last resort and only applies to a store that has
+  // no theme of its own.
   const [themeId, setThemeIdState] = useState<string>(() => {
-    const candidates = [initialThemeId, readEdgeThemeId()];
+    const candidates = [
+      initialThemeId,
+      readEdgeThemeId(),
+      applyToDocument ? readStoredPreference(STORAGE_KEY) : null,
+    ];
     const found = candidates.find((id) => id && getTheme(id));
     return found ?? DEFAULT_THEME_ID;
   });
