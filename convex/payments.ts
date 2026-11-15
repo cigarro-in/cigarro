@@ -186,7 +186,8 @@ export async function processBankMessage(ctx: MutationCtx, input: BankMessageInp
       senderEmail: from,
       toAlias,
       subject,
-      rawBody: body,
+      // SMS bodies are never stored when ignored (privacy).
+      rawBody: channel === "sms" ? "" : body,
       status: "ignored",
       adminNote: input.ignoredNote,
       channel,

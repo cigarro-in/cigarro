@@ -77,6 +77,10 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
   const savedSenders = status?.allowedSmsSenders ?? [];
   const senderText = senderDraft ?? savedSenders.join(', ');
   const sendersDirty = senderDraft !== null && senderDraft !== savedSenders.join(', ');
+  const detected = (status?.detectedSmsSenders ?? []).map((d) => d.entity);
+  const detectedKey = detected.join(',');
+  const savedKey = savedSenders.join(',');
+  const detectedMatchesSaved = detectedKey === savedKey;
 
   const doGenerate = () => {
     if (!orgId) return;
@@ -104,6 +108,14 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
       .filter(Boolean);
     sendersFb.run(async () => {
       await setSenders({ orgId, senders: list });
+      setSenderDraft(null);
+    });
+  };
+
+  const doAcceptDetected = () => {
+    if (!orgId || detected.length === 0) return;
+    sendersFb.run(async () => {
+      await setSenders({ orgId, senders: detected });
       setSenderDraft(null);
     });
   };
@@ -196,7 +208,7 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
                   <>
                     Install <a className="underline" href={MACRODROID_PLAY_URL} target="_blank" rel="noreferrer">MacroDroid</a> from Google Play. The free version is what we set up; check that its HTTP request action is available.
                   </>,
-                  'Create a macro. Trigger: SMS received. Set the sender to your bank sender ID (see the allowed senders below).',
+                  'Create a macro. Trigger: SMS received. Set the sender to Any number. The server checks each SMS and keeps only bank credits, so nothing else needs to be listed on the phone.',
                   'Add an action: HTTP request, method POST, the webhook URL above, body type JSON, header Content-Type: application/json.',
                   <>Body: <code className="font-mono text-xs">{androidJson}</code>. Replace the two placeholders with MacroDroid&apos;s sender and message magic text.</>,
                   'Turn off battery optimisation for MacroDroid (Android Settings > Apps > MacroDroid > Battery > Unrestricted) so the phone does not stop it overnight.',
@@ -209,7 +221,7 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
               <Steps
                 items={[
                   'Open Shortcuts, go to Automation, tap +, choose Create Personal Automation, then Message.',
-                  'Set Sender to your bank sender ID (or the bank contact), and optionally Message contains "credited".',
+                  'Leave Sender empty so the automation runs for any sender. The server checks each SMS and keeps only bank credits.',
                   'Next, add the action Get Contents of URL. URL: the webhook URL above. Tap Show More: Method POST, Request Body JSON, and a Content-Type: application/json header.',
                   <>Body: a Dictionary with two keys, <code className="font-mono text-xs">sender</code> = the Sender variable and <code className="font-mono text-xs">body</code> = the Shortcut Input (message text). A Dictionary avoids quote-escaping bugs.</>,
                   'On iOS 17 or later, choose Run Immediately (not Run After Confirmation). Then Edit, Info, Privacy: turn on Allow Running When Locked, so it runs with the phone locked.',
@@ -241,7 +253,7 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
             autoCorrect="off"
           />
           <p className="text-xs text-muted-foreground">
-            Only SMS from these senders count. The sender ID is the part after the prefix, like HDFCBK in VM-HDFCBK. Leave empty and the relay accepts nothing.
+            Only SMS from these senders count. Match is on the sender ID, like HDFCBK for VM-HDFCBK-S; the prefix and suffix are ignored. Leave empty and the relay accepts only bank credit SMS from transactional or service senders.
           </p>
           <div>
             <Button variant="secondary" size="sm" state={sendersFb.state} disabled={!sendersDirty || !orgId} onClick={doSaveSenders}>
@@ -249,6 +261,35 @@ export function SmsRelayCard({ orgId }: { orgId: Id<'organizations'> | undefined
             </Button>
           </div>
           <ErrorBanner error={sendersFb.error} />
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/50 px-3 py-2">
+          <span className="text-sm font-medium">Detected bank senders</span>
+          {detected.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              None yet. Each bank credit SMS that is matched adds its sender ID here.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm">
+                Detected: <span className="font-mono text-xs">{detected.join(', ')}</span>
+              </p>
+              <div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  state={sendersFb.state}
+                  disabled={!orgId || detectedMatchesSaved}
+                  onClick={doAcceptDetected}
+                >
+                  {detectedMatchesSaved ? 'Saved' : 'Only accept these'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Saves the detected IDs as the allowed list, replacing the list above.
+              </p>
+            </>
+          )}
         </div>
       </div>
 

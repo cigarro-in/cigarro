@@ -4,10 +4,17 @@
 // processBankMessage (payments.ts), the same matching path as bank emails.
 
 import { ConvexError, v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
-import { MAX_SMS_SENDERS, normalizeSmsSenders, smsSenderAllowed } from "./lib/smsSenders";
+import {
+  MAX_DETECTED_SMS_SENDERS,
+  MAX_SMS_SENDERS,
+  decideSms,
+  normalizeSmsSenders,
+} from "./lib/smsSenders";
 import { processBankMessage } from "./payments";
 
 const RATE_WINDOW_MS = 60_000;
@@ -70,6 +77,9 @@ export const getStatus = query({
           }
         : null,
       allowedSmsSenders: org?.allowedSmsSenders ?? [],
+      detectedSmsSenders: [...(org?.detectedSmsSenders ?? [])].sort(
+        (a, b) => b.lastSeenAt - a.lastSeenAt,
+      ),
     };
   },
 });
@@ -218,15 +228,70 @@ export const ingest = internalMutation({
     }
 
     const org = await ctx.db.get(orgId);
+    const decision = decideSms(args.sender, args.body, org?.allowedSmsSenders);
+
+    if (!decision.accept) {
+      // Privacy: no body is stored for anything dropped. Metadata-only rows keep
+      // sender, suffix and reason so the admin can see what was skipped.
+      if (!decision.store) return { status: 200 as const, result: { ignored: true, reason: decision.reason } };
+      const suffixNote = decision.suffix ? ` (suffix ${decision.suffix})` : "";
+      const emailId = await ctx.db.insert("bankEmails", {
+        orgId,
+        gmailMessageId: keyFor(bucket),
+        receivedAt: now,
+        amountPaise: 0,
+        senderEmail: args.sender,
+        rawBody: "",
+        status: "ignored",
+        adminNote: `${decision.reason}${suffixNote}`,
+        channel: "sms",
+      });
+      return { status: 200 as const, result: { ignored: true, reason: decision.reason, emailId } };
+    }
+
     const result = await processBankMessage(ctx, {
       orgId,
       messageId: keyFor(bucket),
       channel: "sms",
       from: args.sender,
       body: args.body,
-      senderAllowed: smsSenderAllowed(args.sender, org?.allowedSmsSenders),
+      senderAllowed: true,
       ignoredNote: "sender not in SMS allowlist",
     });
+
+    // Learning: a parsed credit from a bank entity is recorded for the admin card.
+    if (!decision.isPhone) {
+      const row = await ctx.db
+        .query("bankEmails")
+        .withIndex("by_message_id", (q) => q.eq("gmailMessageId", keyFor(bucket)))
+        .first();
+      const parsedOk =
+        row !== null &&
+        row.amountPaise > 0 &&
+        row.status !== "parse_failed" &&
+        row.status !== "ignored" &&
+        row.status !== "duplicate";
+      if (parsedOk) await recordDetectedSender(ctx, orgId, decision.entity);
+    }
     return { status: 200 as const, result };
   },
 });
+
+async function recordDetectedSender(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  entity: string,
+) {
+  const org = await ctx.db.get(orgId);
+  if (!org) return;
+  const now = Date.now();
+  const list = [...(org.detectedSmsSenders ?? [])];
+  const idx = list.findIndex((d) => d.entity === entity);
+  if (idx >= 0) {
+    list[idx] = { entity, count: list[idx].count + 1, lastSeenAt: now };
+  } else {
+    list.push({ entity, count: 1, lastSeenAt: now });
+  }
+  list.sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  await ctx.db.patch(orgId, { detectedSmsSenders: list.slice(0, MAX_DETECTED_SMS_SENDERS) });
+}

@@ -183,6 +183,11 @@ export default defineSchema({
     // Bank SMS sender IDs (e.g. "HDFCBK" or "VM-HDFCBK") for the SMS relay.
     // Empty or absent = SMS relay accepts nothing. See convex/lib/smsSenders.ts.
     allowedSmsSenders: v.optional(v.array(v.string())),
+    // Entities (e.g. "ICICIT") seen on accepted, parsed bank credit SMS. Shown
+    // in the admin SMS relay card so the store can save them as the allowlist.
+    detectedSmsSenders: v.optional(
+      v.array(v.object({ entity: v.string(), count: v.number(), lastSeenAt: v.number() })),
+    ),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),

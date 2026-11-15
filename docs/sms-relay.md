@@ -64,10 +64,25 @@ rules (no third-party cloud, HTTPS POST, sender filter).
 - `receivedAt` (optional): epoch milliseconds or an ISO string. Used for dedupe. Values more than a day old or 5 minutes in the future are replaced by server time.
 - Response: `{"ok": true, "matched": true, ...}` or the processing result (`duplicate`, `ignored`, `unmatched`).
 
-Sender filter: only SMS from `allowedSmsSenders` are matched. Empty means
-nothing is accepted. Entries are the sender ID after the prefix (`HDFCBK` matches
-`VM-HDFCBK` and `AD-HDFCBK`) or the full string. Other senders are stored as
-`ignored` with the reason, so the admin can see them.
+Sender filter (`convex/lib/smsSenders.ts`, `decideSms`): the phone forwards every
+SMS ("Any number"). The sender is parsed as TRAI format `<prefix>-<entity>-<suffix>`
+(`AX-ICICIT-T`: prefix AX, entity ICICIT, suffix T; prefix and suffix are optional).
+
+- Explicit list (`allowedSmsSenders`): match on the entity. `HDFCBK`, `VM-HDFCBK`
+  and `AD-HDFCBK-S` all match HDFCBK. Other senders are stored as `ignored` with
+  the reason, no body.
+- Empty list: accept only suffix T, S or none, and only when the body reads as a
+  credit (amount marker plus credited/received/deposited/credit, no
+  debited/debit/spent/withdrawn).
+- Always dropped without storing anything: OTP bodies, suffix P (promotional),
+  suffix G (government).
+
+Dropped and ignored SMS never store the body. Non-credit ones keep a metadata
+row (sender, suffix, reason) with an empty `rawBody`.
+
+Detected senders: each accepted SMS that parses to an amount records its entity
+on the organization (`detectedSmsSenders`, count and last seen). The admin card
+shows them with "Only accept these", which saves them as the explicit list.
 
 Dedupe: key = org + sender + body + 2-minute bucket of `receivedAt`, checked
 against the current and previous bucket. Repeats are returned as `duplicate`.
@@ -79,7 +94,7 @@ Payments > Matched (or Unmatched, Ignored by status).
 ## 4. Android setup (MacroDroid)
 
 1. Install **MacroDroid - Device Automation** from Google Play.
-2. New macro. Trigger: **Phone > SMS received**. Set the sender to the bank sender ID (for example `HDFCBK`).
+2. New macro. Trigger: **Phone > SMS received**. Sender: **Any number**. The server filters bank credits; do not list senders on the phone.
 3. Action: **Web > HTTP request**. Method POST. URL = the webhook URL from the card. Body type JSON. Header `Content-Type: application/json`.
 4. Body: `{"sender": "<SENDER>", "body": "<MESSAGE>"}`. Replace the placeholders with MacroDroid's sender and message magic text (verify the names in the app).
 5. Battery: Android Settings > Apps > MacroDroid > Battery > **Unrestricted**. Turn off "Remove permissions if app is not used" for MacroDroid on Android 11 and later. Keep the phone plugged in overnight if the store runs late.
