@@ -131,7 +131,7 @@ export function SaShell({
         {!writeOpen && (
           <div className="px-3 pt-3 sm:px-4">
             <Banner tone="warning" title="Read-only">
-              Write access expired. Re-launch from Citadel to edit.
+              Write access expired. Open it again from KeyBastion to edit.
             </Banner>
           </div>
         )}

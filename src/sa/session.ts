@@ -56,7 +56,7 @@ export function saErrorMessage(e: unknown): string {
       return 'Your Citadel session ended. Open this app from Citadel again.';
     case 'WRITE_REQUIRED':
     case 'WRITE_EXPIRED':
-      return 'Write access expired. Re-launch from Citadel to edit.';
+      return 'Write access expired. Open it again from KeyBastion to edit.';
     case 'SLUG_TAKEN':
       return 'That store slug is already taken.';
     case 'ALIAS_TAKEN':

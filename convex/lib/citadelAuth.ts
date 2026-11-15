@@ -29,7 +29,13 @@ export type LaunchClaims = {
   exp: number;
   scope: "superadmin";
   write: boolean;
-  citadelSid: string;
+  // KeyBastion session id. KeyBastion now sends keybastionSid and will stop
+  // sending citadelSid; neither is required on its own, but one must be set.
+  keybastionSid?: string;
+  citadelSid?: string;
+  // Resolved session id (keybastionSid, else citadelSid). Set by
+  // verifyLaunchTokenWithKeys, not a JWT claim.
+  sid: string;
   // Epoch ms when the admin's KeyBastion passkey hour ends. Optional: older
   // tokens do not carry it.
   accessUntil?: number;
@@ -118,12 +124,16 @@ export async function verifyLaunchTokenWithKeys(
     throw new LaunchTokenError("iat in future");
   }
   if (typeof claims.write !== "boolean") throw new LaunchTokenError("bad write");
-  if (typeof claims.citadelSid !== "string" || !claims.citadelSid) {
-    throw new LaunchTokenError("bad citadelSid");
-  }
+  const sid =
+    typeof claims.keybastionSid === "string" && claims.keybastionSid
+      ? claims.keybastionSid
+      : typeof claims.citadelSid === "string" && claims.citadelSid
+        ? claims.citadelSid
+        : null;
+  if (!sid) throw new LaunchTokenError("bad keybastionSid");
   if (typeof claims.jti !== "string" || !claims.jti) throw new LaunchTokenError("bad jti");
   if (typeof claims.sub !== "string" || !claims.sub) throw new LaunchTokenError("bad sub");
-  return claims as LaunchClaims;
+  return { ...claims, sid } as LaunchClaims;
 }
 
 // JWKS cache, module-scoped (per isolate). A kid miss forces one refetch so a

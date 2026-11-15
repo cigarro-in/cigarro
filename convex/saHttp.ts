@@ -178,7 +178,8 @@ export const saExchange = httpAction(async (ctx, req) => {
     exp: claims.exp,
     tokenHash: await sha256Hex(sessionToken),
     adminId: claims.sub,
-    citadelSid: claims.citadelSid,
+    // Stored in the citadelSid column; value is keybastionSid when present.
+    citadelSid: claims.sid,
     write: claims.write,
     accessUntil: typeof claims.accessUntil === "number" ? claims.accessUntil : undefined,
   });

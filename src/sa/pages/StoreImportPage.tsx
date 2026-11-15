@@ -244,7 +244,7 @@ export function StoreImportPage() {
       title={store ? `Import into ${store.name}` : <Skeleton className="inline-block h-6 w-56 align-middle" />}
       backTo={`/sa/stores/${orgId}?tab=import`}
     >
-      {!writeOpen && <Banner tone="warning">Write access is closed. Re-launch from Citadel to import.</Banner>}
+      {!writeOpen && <Banner tone="warning">Write access is closed. Open it again from KeyBastion to import.</Banner>}
       {notice && (
         <Banner tone={notice.tone} onDismiss={() => setNotice(null)}>
           {notice.text}
