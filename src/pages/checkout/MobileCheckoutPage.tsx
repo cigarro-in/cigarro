@@ -10,7 +10,7 @@ import { InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { OrderConsentSheet } from '../../components/checkout/OrderConsentSheet';
-import { useCheckoutModel } from './useCheckoutModel';
+import { STORE_CLOSED_MESSAGE, useCheckoutModel } from './useCheckoutModel';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -38,7 +38,7 @@ export function MobileCheckoutPage() {
     walletBalance, walletAmountToUse, setWalletAmountToUse,
     savedAddresses, selectedAddress, selectAddress: handleAddressSelect, refreshAddresses, addressAttention,
     consentSheetOpen, setConsentSheetOpen, confirmConsent: handleConsentConfirm,
-    getFinalTotal, isProcessing, placeOrder: handlePayment,
+    getFinalTotal, isProcessing, placeOrder: handlePayment, storeClosed,
   } = useCheckoutModel({ openUpiApp: true, syncSelectedAddress: false });
   const {
     visible: showReferral,
@@ -256,9 +256,14 @@ export function MobileCheckoutPage() {
 
         {/* Payment Row */}
         <div className="px-4 py-3">
+          {storeClosed && (
+            <p className="mb-3 text-center text-sm text-muted-foreground" role="status">
+              {STORE_CLOSED_MESSAGE}
+            </p>
+          )}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || !selectedAddress}
+            disabled={isProcessing || !selectedAddress || storeClosed}
             className="w-full bg-dark hover:bg-canyon text-creme-light font-semibold py-4 rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {isProcessing ? 'Processing...' :

@@ -12,6 +12,7 @@ import { PlatformConfigPage } from './pages/PlatformConfigPage';
 import { DomainsPage } from './pages/DomainsPage';
 import { StoreImportPage } from './pages/StoreImportPage';
 import { PaymentsPipelinePage } from './pages/PaymentsPipelinePage';
+import { PlatformPaymentsPage } from './pages/PlatformPaymentsPage';
 import { SaOrderPage } from './pages/SaOrderPage';
 import { AdminRoot } from '../adminnew/AdminRoot';
 
@@ -44,6 +45,7 @@ export function SaApp() {
               <Route path="/sa/stores/:orgId/import" element={<ErrorBoundary variant="inline"><StoreImportPage /></ErrorBoundary>} />
               <Route path="/sa/stores/:orgId/orders/:orderId" element={<ErrorBoundary variant="inline"><SaOrderPage /></ErrorBoundary>} />
               <Route path="/sa/payments" element={<ErrorBoundary variant="inline"><PaymentsPipelinePage /></ErrorBoundary>} />
+              <Route path="/sa/platform-payments" element={<ErrorBoundary variant="inline"><PlatformPaymentsPage /></ErrorBoundary>} />
               <Route path="/sa/domains" element={<ErrorBoundary variant="inline"><DomainsPage /></ErrorBoundary>} />
               <Route path="/sa/platform" element={<ErrorBoundary variant="inline"><PlatformConfigPage /></ErrorBoundary>} />
             </Route>

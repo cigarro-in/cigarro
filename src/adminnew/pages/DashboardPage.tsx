@@ -9,6 +9,7 @@ import { formatINR } from '../../utils/currency';
 import { AttentionRow, type AttentionItem } from '../features/overview/AttentionRow';
 import { CountUp } from '../features/overview/CountUp';
 import { InstallAppCard } from '../features/overview/InstallAppCard';
+import { SetupCard } from '../features/setup/SetupCard';
 import { isRealPersonName } from '../../lib/profile/personName';
 import { greetingTitle } from '../features/overview/greetings';
 import { SalesComparison } from '../features/overview/SalesComparison';
@@ -174,6 +175,7 @@ export function DashboardPage() {
 
   return (
     <Page title={title} primaryAction={{ label: 'Add product', to: '/products/new' }}>
+      <SetupCard orgId={org?._id} />
       <InstallAppCard />
       {data === undefined ? (
         <OverviewSkeleton />

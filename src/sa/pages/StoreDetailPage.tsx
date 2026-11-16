@@ -32,6 +32,7 @@ import { runSa, formatCount, formatDateTime, GmailBadge, KeyValues, ROLE_LABEL, 
 import { DomainList, PRIMARY_WARNING } from '../DomainList';
 import { StorePaymentsTab } from '../payments/StorePaymentsTab';
 import { StoreOrdersTab } from '../payments/StoreOrdersTab';
+import { StoreBillingTab } from '../payments/StoreBillingTab';
 import { downloadConsentCsv } from '../consentCsv';
 import { cleanPersonName, customerDisplayName, isRealPersonName, personNameError } from '../../lib/profile/personName';
 import { storeAdminUrl, storeLiveUrl } from '../health';
@@ -57,8 +58,8 @@ import {
   type StoreSummary,
 } from '../refs';
 
-type TabId = 'overview' | 'orders' | 'payments' | 'domains' | 'team' | 'import' | 'settings';
-const TAB_IDS: TabId[] = ['overview', 'orders', 'payments', 'domains', 'team', 'import', 'settings'];
+type TabId = 'overview' | 'orders' | 'payments' | 'billing' | 'domains' | 'team' | 'import' | 'settings';
+const TAB_IDS: TabId[] = ['overview', 'orders', 'payments', 'billing', 'domains', 'team', 'import', 'settings'];
 const ROLES: Role[] = ['owner', 'admin', 'staff', 'customer'];
 
 // One store, split into small tabs. Overview answers "is this store working?"
@@ -159,6 +160,7 @@ export function StoreDetailPage() {
             { id: 'overview', label: 'Overview' },
             { id: 'orders', label: 'Orders' },
             { id: 'payments', label: 'Payments' },
+            { id: 'billing', label: 'Billing' },
             { id: 'domains', label: 'Domains', count: notLive > 0 ? notLive : undefined },
             { id: 'team', label: 'Team', count: members?.length },
             { id: 'import', label: 'Import' },
@@ -172,6 +174,7 @@ export function StoreDetailPage() {
       )}
       {tab === 'orders' && <StoreOrdersTab orgId={orgId} />}
       {tab === 'payments' && <StorePaymentsTab orgId={orgId} />}
+      {tab === 'billing' && <StoreBillingTab orgId={orgId} />}
       {tab === 'domains' && <DomainsTab orgId={orgId} store={store} domains={domains} token={token} writeOpen={writeOpen} />}
       {tab === 'team' && <TeamTab orgId={orgId} members={members} token={token} writeOpen={writeOpen} />}
       {tab === 'import' && <ImportTab orgId={orgId} productCount={summary?.activeProductCount} />}

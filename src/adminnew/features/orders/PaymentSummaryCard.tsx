@@ -1,7 +1,10 @@
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 import { formatINR } from '../../../utils/currency';
 import { paiseToRupees } from '../../../lib/convex/money';
 import { Card } from '../../ui';
 import { PaymentMatchRow } from '../../../components/payment/PaymentMatchRow';
+import { feeRateLabel } from '../payments/platformFeeFormat';
 import { displayDiscountPaise, orderTotalPaise, paymentMatchPaise, type OrderDoc } from './orderModel';
 
 const VERIFIED_VIA: Record<string, string> = {
@@ -36,6 +39,8 @@ export function PaymentSummaryCard({ order }: { order: OrderDoc }) {
   const paidStatus = order.status === 'paid' || order.status === 'late_paid' || order.status === 'refunded';
   const verifiedVia = order.verificationMethod ? VERIFIED_VIA[order.verificationMethod] ?? order.verificationMethod : null;
   const payer = [order.payerName, order.payerVpa].filter(Boolean).join(' · ');
+  // Marketplace fee on this sale (absent until the order is paid).
+  const fee = useQuery(api.platformFees.getOrderFee, { orderId: order._id });
 
   return (
     <Card title="Payment">
@@ -58,6 +63,26 @@ export function PaymentSummaryCard({ order }: { order: OrderDoc }) {
         <Row label="Total" value={money(orderTotalPaise(order))} strong />
         {wallet > 0 && <Row label="Paid from wallet" value={money(wallet)} />}
         {paidStatus && <Row label="Paid via UPI" value={money(order.finalAmountPaise)} />}
+        {fee && (
+          <>
+            <div className="my-1 border-t border-border" />
+            {fee.reversed ? (
+              <Row
+                label={`Marketplace fee${fee.feeBps != null ? ` (${feeRateLabel(fee.feeBps)})` : ''}`}
+                value="Fee reversed"
+                muted
+              />
+            ) : (
+              <>
+                <Row
+                  label={`Marketplace fee${fee.feeBps != null ? ` (${feeRateLabel(fee.feeBps)})` : ''}`}
+                  value={`-${money(fee.feePaise)}`}
+                />
+                <Row label="You keep" value={money((fee.saleAmountPaise ?? order.finalAmountPaise) - fee.feePaise)} strong />
+              </>
+            )}
+          </>
+        )}
         {!paidStatus && order.status === 'pending' && (
           <Row label="Amount to pay via UPI" value={money(order.finalAmountPaise)} muted />
         )}

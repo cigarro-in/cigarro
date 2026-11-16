@@ -8,6 +8,7 @@ import { role } from "./schema";
 import { adminStoresForPhone } from "./lib/adminStores";
 import { MAX_BANK_SENDERS, normalizeBankSenders } from "./lib/bankSenders";
 import { requireRealPersonName } from "./lib/personName";
+import { DEFAULT_MARKETPLACE_FEE_BPS } from "./lib/platformFeeDefaults";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
 const DEFAULT_QUARANTINE_MS = 20 * 60 * 1000; // 20 min — grace for late UPI arrivals
@@ -238,6 +239,13 @@ export async function insertOrganization(
     upiVpa: string;
     bankEmailAlias: string;
     walletEnabled?: boolean;
+    kind?: "store" | "platform";
+    luckyEnabled?: boolean;
+    marketplaceFeeBps?: number;
+    // New stores default to "enforced" (checkout gated until setup is done).
+    setupGate?: "enforced" | "waived";
+    securityDepositRequired?: boolean;
+    securityDepositPaise?: number;
   },
 ): Promise<Id<"organizations">> {
   const existing = await ctx.db
@@ -263,6 +271,14 @@ export async function insertOrganization(
     slotsPerBase: DEFAULT_SLOTS_PER_BASE,
     active: true,
     createdAt: Date.now(),
+    ...(args.kind ? { kind: args.kind } : {}),
+    ...(args.luckyEnabled !== undefined ? { luckyEnabled: args.luckyEnabled } : {}),
+    marketplaceFeeBps: args.marketplaceFeeBps ?? DEFAULT_MARKETPLACE_FEE_BPS,
+    setupGate: args.setupGate ?? "enforced",
+    securityDepositRequired: args.securityDepositRequired ?? true,
+    ...(args.securityDepositPaise !== undefined
+      ? { securityDepositPaise: args.securityDepositPaise }
+      : {}),
   });
 }
 

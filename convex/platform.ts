@@ -14,6 +14,13 @@ import { role } from "./schema";
 import { insertOrganization } from "./organizations";
 import { pickUniqueBankAlias } from "./lib/bankAlias";
 import { ensureStoreSubdomain } from "./domains";
+import {
+  DEFAULT_MARKETPLACE_FEE_BPS,
+  assertDepositAmount,
+  assertFeeBps,
+  feeBpsOf,
+  gateOf,
+} from "./platformFees";
 
 // Super-admin (Citadel SSO) store management. Every function takes `saToken`:
 // reads use requireSaSession, writes use requireSaWrite (write window + audit
@@ -31,6 +38,7 @@ const RESERVED_SLUGS = new Set([
   "admin",
   "sa",
   "www",
+  "platform", // internal org that collects deposits/dues (convex/platformFees.ts)
 ]);
 
 // ---------- migrations ----------
@@ -97,7 +105,9 @@ export const listStores = query({
   args: { saToken: v.string() },
   handler: async (ctx, { saToken }) => {
     await requireSaSession(ctx, saToken);
-    const orgs = await ctx.db.query("organizations").collect();
+    const orgs = (await ctx.db.query("organizations").collect()).filter(
+      (o) => o.kind !== "platform",
+    );
     return await Promise.all(
       orgs.map(async (org) => {
         const domains = await ctx.db
@@ -121,6 +131,8 @@ export const listStores = query({
           memberCount: members.length,
           primaryHost: primary?.hostname ?? null,
           primaryStatus: primary?.status ?? null,
+          marketplaceFeeBps: feeBpsOf(org),
+          setupGate: gateOf(org),
         };
       }),
     );
@@ -133,9 +145,17 @@ export const createStore = mutation({
     slug: v.string(),
     name: v.string(),
     upiVpa: v.optional(v.string()),
+    // Platform fees (convex/platformFees.ts). Defaults: 800 bps, deposit
+    // required at the platform default amount.
+    marketplaceFeeBps: v.optional(v.number()),
+    securityDepositRequired: v.optional(v.boolean()),
+    securityDepositPaise: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const sa = await requireSaWrite(ctx, args.saToken);
+    const marketplaceFeeBps = args.marketplaceFeeBps ?? DEFAULT_MARKETPLACE_FEE_BPS;
+    assertFeeBps(marketplaceFeeBps);
+    if (args.securityDepositPaise !== undefined) assertDepositAmount(args.securityDepositPaise);
     const slug = args.slug.trim().toLowerCase();
     if (!STORE_SLUG_RE.test(slug) || RESERVED_SLUGS.has(slug)) {
       throw new ConvexError({ code: "INVALID_SLUG" });
@@ -153,6 +173,10 @@ export const createStore = mutation({
       name,
       upiVpa: (args.upiVpa ?? "").trim(),
       bankEmailAlias,
+      marketplaceFeeBps,
+      setupGate: "enforced",
+      securityDepositRequired: args.securityDepositRequired ?? true,
+      securityDepositPaise: args.securityDepositPaise,
     });
     // <slug>.<platform root>: registered on Cloudflare, primary while the store has none.
     await ensureStoreSubdomain(ctx, { orgId, slug, adminId: sa.adminId });
@@ -162,7 +186,7 @@ export const createStore = mutation({
       action: "platform.store.create",
       targetType: "organization",
       targetId: orgId,
-      payload: { slug, name },
+      payload: { slug, name, marketplaceFeeBps },
     });
     return orgId;
   },
@@ -399,7 +423,9 @@ export const listStoreStats = query({
   handler: async (ctx, { saToken }) => {
     await requireSaSession(ctx, saToken);
     const now = Date.now();
-    const orgs = await ctx.db.query("organizations").collect();
+    const orgs = (await ctx.db.query("organizations").collect()).filter(
+      (o) => o.kind !== "platform",
+    );
     return await Promise.all(orgs.map((org) => collectStoreStats(ctx, org, now)));
   },
 });
@@ -410,7 +436,9 @@ export const platformOverview = query({
   handler: async (ctx, { saToken }) => {
     await requireSaSession(ctx, saToken);
     const now = Date.now();
-    const orgs = await ctx.db.query("organizations").collect();
+    const orgs = (await ctx.db.query("organizations").collect()).filter(
+      (o) => o.kind !== "platform",
+    );
     const rows = await Promise.all(orgs.map((org) => collectStoreStats(ctx, org, now)));
     let ordersToday = 0;
     let gmvTodayPaise = 0;

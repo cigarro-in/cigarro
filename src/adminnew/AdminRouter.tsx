@@ -64,14 +64,15 @@ export const ADMIN_ROUTES = [
   { path: '/settings/checkout', element: SettingsPage, label: 'Checkout & shipping', section: 'platform' },
   { path: '/settings/referral', element: SettingsPage, label: 'Refer & earn', section: 'platform' },
   { path: '/settings/legal', element: SettingsPage, label: 'Legal & age gate', section: 'platform' },
+  { path: '/settings/payments', element: SettingsPage, label: 'Payments', section: 'platform' },
   { path: '/settings/advanced', element: SettingsPage, label: 'Advanced', section: 'platform' },
   { path: '/payments', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/marketing', element: MarketingPage, label: 'Marketing', section: 'marketing' },
   // Deep links into the Payments tabs (single page, tab picked from the path).
   // /payments/unmatched is retired: PaymentsPage redirects it to the statement.
   { path: '/payments/emails', element: PaymentsPage, label: 'Payments', section: 'payments' },
+  { path: '/payments/account', element: PaymentsPage, label: 'Payments', section: 'payments' },
   { path: '/payments/unmatched', element: PaymentsPage, label: 'Payments', section: 'payments' },
-  { path: '/payments/settings', element: PaymentsPage, label: 'Payments', section: 'payments' },
 ] as const;
 
 /**
@@ -110,6 +111,8 @@ export function AdminRouter() {
         <Route path="/blogs/new" element={<BlogFormPage />} />
         <Route path="/blogs/:id" element={<BlogFormPage />} />
         <Route path="/pages/:slug" element={<StorePageFormPage />} />
+        {/* Payments settings now live in Settings > Payments. */}
+        <Route path="/payments/settings" element={<Navigate to="/settings#payments" replace />} />
         
         {/* List routes */}
         {ADMIN_ROUTES.map(({ path, element: Element }) => (

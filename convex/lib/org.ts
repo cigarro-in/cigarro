@@ -20,7 +20,8 @@ export async function resolveOrg(ctx: Ctx, orgSlug: string) {
   // slug until renameSmokeshopToOldsmokeshop-v1 has run. Never after that.
   if (!org && orgSlug === LEGACY_ORG_SLUG && !(await renameDone(ctx)))
     org = await orgBySlug(ctx, PRE_RENAME_LEGACY_SLUG);
-  if (!org || !org.active)
+  // The platform org (deposits/dues) is never a storefront.
+  if (!org || !org.active || org.kind === "platform")
     throw new ConvexError({ code: "ORG_NOT_FOUND", orgSlug });
   return org;
 }

@@ -1,21 +1,30 @@
-import type { ComponentType } from 'react';
-import { Link, Navigate, NavLink } from 'react-router-dom';
-import { ArrowRight, CreditCard } from 'lucide-react';
+import { useEffect, type ComponentType } from 'react';
+import { Navigate, NavLink, useLocation } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useOrg } from '../../lib/convex/useOrg';
 import { adminPath } from '../lib/paths';
-import { Button, Card, Page, Skeleton } from '../ui';
+import { Card, Page, Skeleton } from '../ui';
+import { SetupChecklist } from './setup/SetupChecklist';
 import { NotificationsCard } from './notifications/NotificationsCard';
 import { cn } from '../../components/ui/utils';
-import { SETTINGS_SECTIONS, type SectionProps, type SettingsSectionId } from './settings/sections';
+import {
+  SETTINGS_SECTIONS,
+  settingsSectionFromHash,
+  type SectionProps,
+  type SettingsSectionId,
+} from './settings/sections';
 import { useLiveStoreSettings } from './settings/useSettingsDraft';
 import { StoreDetailsSection } from './settings/StoreDetailsSection';
 import { CheckoutSection } from './settings/CheckoutSection';
 import { ReferralSection } from './settings/ReferralSection';
 import { LegalSection } from './settings/LegalSection';
 import { AdvancedSection } from './settings/AdvancedSection';
+import { PaymentsSection } from './settings/PaymentsSection';
 
 const SECTION_VIEW: Record<SettingsSectionId, ComponentType<SectionProps>> = {
   store: StoreDetailsSection,
+  payments: PaymentsSection,
   checkout: CheckoutSection,
   referral: ReferralSection,
   legal: LegalSection,
@@ -30,6 +39,18 @@ const SECTION_VIEW: Record<SettingsSectionId, ComponentType<SectionProps>> = {
 export function SettingsManager({ section }: { section: SettingsSectionId | null }) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const { raw, live } = useLiveStoreSettings();
+  const { hash } = useLocation();
+  const org = useOrg();
+
+  // Scroll to a #anchor once its section is on screen (the section loads its settings first).
+  useEffect(() => {
+    if (!section || !hash) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [section, hash, live]);
+
+  // /settings#<anchor> opens the section that owns it, keeping the hash so it can scroll.
+  const hashSection = section ? null : settingsSectionFromHash(hash);
+  if (hashSection) return <Navigate to={`${adminPath(`/settings/${hashSection}`)}${hash}`} replace />;
 
   // Desktop has no separate empty index: open the first section instead.
   if (!section && isDesktop) return <Navigate to={adminPath(`/settings/${SETTINGS_SECTIONS[0].id}`)} replace />;
@@ -39,6 +60,7 @@ export function SettingsManager({ section }: { section: SettingsSectionId | null
 
   return (
     <Page title={current ? current.label : 'Settings'} backTo={current && !isDesktop ? '/settings' : undefined}>
+      <SetupChecklist orgId={org?._id} />
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
         <aside className={cn("flex w-full flex-col gap-3 md:w-60 md:shrink-0", section && "hidden md:flex")}>
           <Card padding="none">
@@ -68,19 +90,6 @@ export function SettingsManager({ section }: { section: SettingsSectionId | null
 
           <NotificationsCard />
 
-          <Card title="Payments">
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted-foreground">
-                UPI IDs, Gmail, bank senders, wallet and the lucky discount are managed on the Payments page.
-              </p>
-              <Button asChild variant="secondary" size="sm" className="self-start">
-                <Link to={adminPath('/payments/settings')}>
-                  <CreditCard aria-hidden />
-                  Open Payments settings
-                </Link>
-              </Button>
-            </div>
-          </Card>
         </aside>
 
         <div className={cn("min-w-0 flex-1", !section && "hidden md:block")}>

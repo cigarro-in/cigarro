@@ -195,6 +195,61 @@ export function adminPaymentsFallback(): string {
   return `${site}/admin/payments`;
 }
 
+// Super-admin platform payments page (src/sa/pages/PlatformPaymentsPage.tsx).
+export function platformPaymentsFallback(): string {
+  const site = (process.env.SITE_URL ?? "https://cigarro.in").replace(/\/$/, "");
+  return `${site}/sa/platform-payments`;
+}
+
+// Fallback for a return URL that failed isSafeReturnTo. The raw value is only a
+// hint (super-admin flows send an /sa/ path from whatever origin they run on);
+// the target is always one of the fixed constants above, never the raw value.
+export function returnFallbackFor(raw: unknown): string {
+  if (typeof raw === "string") {
+    try {
+      if (new URL(raw).pathname.startsWith("/sa/")) return platformPaymentsFallback();
+    } catch {
+      // not a URL: use the admin fallback
+    }
+  }
+  return adminPaymentsFallback();
+}
+
 export function safeReturnTo(raw: unknown): string {
-  return isSafeReturnTo(raw) ? raw : adminPaymentsFallback();
+  return isSafeReturnTo(raw) ? raw : returnFallbackFor(raw);
+}
+
+// ---------- Payments admin: store admin, or super admin for the platform org ----------
+//
+// The platform org (organizations.kind "platform", convex/platformFees.ts)
+// collects merchant deposits and dues with the same payment machinery stores
+// use. It has no store admins: the super admin manages its UPI IDs, Gmail,
+// SMS relay and claims through the store-level functions by passing saToken.
+// A saToken is accepted ONLY for the platform org; stores always need
+// requireOrgAdmin. Returns the actor id used for audit/createdBy fields.
+export async function requirePaymentsAdmin(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<"organizations">,
+  saToken: string | undefined,
+  // "write": mutation (touches the session). "write_check": write window
+  // checked without writing (internal queries run from actions).
+  mode: "read" | "write" | "write_check",
+): Promise<{ userId: string; viaSa: boolean }> {
+  if (saToken === undefined) {
+    const { userId } = await requireOrgAdmin(ctx, orgId);
+    return { userId, viaSa: false };
+  }
+  const org = await ctx.db.get(orgId);
+  if (!org || org.kind !== "platform") throw new ConvexError({ code: "FORBIDDEN" });
+  let s: Doc<"saSessions">;
+  if (mode === "write") {
+    s = await requireSaWrite(ctx as MutationCtx, saToken);
+  } else {
+    s = await requireSaSession(ctx, saToken);
+    if (mode === "write_check") {
+      if (!s.write) saError("WRITE_REQUIRED");
+      if (!s.writeExpiresAt || s.writeExpiresAt <= Date.now()) saError("WRITE_EXPIRED");
+    }
+  }
+  return { userId: `sa:${s.adminId}`, viaSa: true };
 }

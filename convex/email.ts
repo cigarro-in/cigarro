@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
-import { requireOrgAdmin } from "./lib/auth";
+import { requireOrgAdmin, requirePaymentsAdmin } from "./lib/auth";
 import { SYSTEM_TEMPLATES } from "./lib/email";
 
 // ---------- Template installation ----------
@@ -245,10 +245,11 @@ async function syncPrimaryVpa(ctx: MutationCtx, orgId: Id<"organizations">) {
   if (primary) await ctx.db.patch(orgId, { upiVpa: primary.vpa });
 }
 
+// VPA functions take saToken for the platform org (lib/auth requirePaymentsAdmin).
 export const listVpas = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
+    await requirePaymentsAdmin(ctx, orgId, saToken, "read");
     return await ctx.db
       .query("paymentVpas")
       .withIndex("by_org_active", (q) => q.eq("orgId", orgId))
@@ -264,12 +265,16 @@ export const upsertVpa = mutation({
     label: v.optional(v.string()),
     active: v.boolean(),
     priority: v.number(),
+    saToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireOrgAdmin(ctx, args.orgId);
+    await requirePaymentsAdmin(ctx, args.orgId, args.saToken, "write");
     if (!/^[A-Za-z0-9._\-]+@[A-Za-z0-9.\-]+$/.test(args.vpa))
       throw new ConvexError({ code: "INVALID_VPA" });
     if (args.vpaId) {
+      const row = await ctx.db.get(args.vpaId);
+      if (!row || row.orgId !== args.orgId)
+        throw new ConvexError({ code: "NOT_FOUND" });
       await ctx.db.patch(args.vpaId, {
         vpa: args.vpa,
         label: args.label,
@@ -293,9 +298,9 @@ export const upsertVpa = mutation({
 });
 
 export const deleteVpa = mutation({
-  args: { orgId: v.id("organizations"), vpaId: v.id("paymentVpas") },
-  handler: async (ctx, { orgId, vpaId }) => {
-    await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), vpaId: v.id("paymentVpas"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, vpaId, saToken }) => {
+    await requirePaymentsAdmin(ctx, orgId, saToken, "write");
     const row = await ctx.db.get(vpaId);
     if (!row || row.orgId !== orgId)
       throw new ConvexError({ code: "NOT_FOUND" });

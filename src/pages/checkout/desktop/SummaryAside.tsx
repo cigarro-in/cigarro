@@ -5,7 +5,7 @@ import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { OrderSummary } from '../../../components/checkout';
 import { formatINR } from '../../../utils/currency';
-import type { CheckoutModel } from '../useCheckoutModel';
+import { STORE_CLOSED_MESSAGE, type CheckoutModel } from '../useCheckoutModel';
 
 // Sticky right column: offers, totals (shared OrderSummary: lucky, coupon,
 // shipping, wallet) and the one Pay button.
@@ -15,7 +15,7 @@ export function SummaryAside({ model }: { model: CheckoutModel }) {
     appliedDiscount, couponCode, setCouponCode, isValidatingCoupon, applyCoupon,
     referral, getShippingCost, getFinalTotal,
     walletBalance, isWalletLoading, walletAmountToUse, setWalletAmountToUse,
-    selectedAddress, amountDue, isProcessing, placeOrder,
+    selectedAddress, amountDue, isProcessing, placeOrder, storeClosed,
   } = model;
   const [referralOpen, setReferralOpen] = useState(false);
 
@@ -117,9 +117,14 @@ export function SummaryAside({ model }: { model: CheckoutModel }) {
         />
         {isWalletLoading && <Skeleton className="mt-3 h-6 w-40 bg-muted" />}
 
+        {storeClosed && (
+          <p className="mt-3 text-center text-sm text-muted-foreground" role="status">
+            {STORE_CLOSED_MESSAGE}
+          </p>
+        )}
         <Button
           onClick={() => void placeOrder()}
-          disabled={isProcessing || !selectedAddress}
+          disabled={isProcessing || !selectedAddress || storeClosed}
           aria-busy={isProcessing}
           className="mt-6 h-12 w-full rounded-lg bg-accent text-base font-semibold text-accent-foreground hover:bg-accent/90 disabled:opacity-60"
         >

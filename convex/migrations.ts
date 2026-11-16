@@ -41,6 +41,12 @@ const importSmokeshopRedirectsRef = makeFunctionReference<
   unknown
 >("redirects:importSmokeshopRedirects");
 
+const backfillPlatformFeesRef = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  unknown
+>("platformFees:backfillPlatformFees");
+
 const writeRowRef = makeFunctionReference<
   "mutation",
   { name: string; status: "done" | "failed"; result?: string; updatedAt: number },
@@ -192,6 +198,12 @@ const MIGRATIONS: Migration[] = [
     // Dukaan redirects (imports/the2935/redirects.csv) for smokeshop. Idempotent.
     name: "smokeshopRedirects-v1",
     run: async (ctx) => await ctx.runMutation(importSmokeshopRedirectsRef, {}),
+  },
+  {
+    // Platform fees: existing stores get fee 800 bps + setupGate "waived";
+    // default deposit in appConfig; creates the internal platform org. Idempotent.
+    name: "platformFees-v1",
+    run: async (ctx) => await ctx.runMutation(backfillPlatformFeesRef, {}),
   },
 ];
 

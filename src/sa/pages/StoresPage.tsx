@@ -1,8 +1,10 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import {
+  Badge,
   Banner,
   Button,
   Card,
@@ -16,10 +18,11 @@ import {
   Menu,
   Page,
   Skeleton,
+  Switch,
   useButtonFeedback,
 } from '../../adminnew/ui';
 import { formatINR } from '../../utils/currency';
-import { paiseToRupees } from '../../lib/convex/money';
+import { paiseToRupees, rupeesToPaise } from '../../lib/convex/money';
 import { useSa } from '../SuperGate';
 import { runSa, formatCount, HealthDot, StoreStateBadge } from '../saUi';
 import { storeAdminUrl, storeChecks, storeLiveUrl } from '../health';
@@ -57,6 +60,9 @@ export function StoresPage() {
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [upiVpa, setUpiVpa] = useState('');
+  const [feePct, setFeePct] = useState('8');
+  const [depositRequired, setDepositRequired] = useState(true);
+  const [depositAmount, setDepositAmount] = useState('');
 
   const rows = useMemo<Joined[] | undefined>(() => {
     if (!stores) return undefined;
@@ -85,15 +91,34 @@ export function StoresPage() {
     });
   }, [rows, q, statusFilter]);
 
+  const feeNum = Number(feePct);
+  const feeValid = feePct.trim() !== '' && Number.isFinite(feeNum) && feeNum >= 0 && feeNum <= 50;
+  const depositNum = Number(depositAmount);
+  const depositValid = depositAmount.trim() === '' || (Number.isFinite(depositNum) && depositNum > 0);
+
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
+    if (!feeValid || !depositValid) return;
     const created = await create.run(() =>
-      runSa(() => createStore({ saToken: token, slug, name, upiVpa: upiVpa || undefined })),
+      runSa(() =>
+        createStore({
+          saToken: token,
+          slug,
+          name,
+          upiVpa: upiVpa || undefined,
+          marketplaceFeeBps: Math.round(feeNum * 100),
+          securityDepositRequired: depositRequired,
+          securityDepositPaise: depositAmount.trim() === '' ? undefined : rupeesToPaise(depositNum),
+        }),
+      ),
     );
     if (created === undefined) return;
     setSlug('');
     setName('');
     setUpiVpa('');
+    setFeePct('8');
+    setDepositRequired(true);
+    setDepositAmount('');
     setCreateOpen(false);
     create.reset();
     navigate(`/sa/stores/${created}`);
@@ -168,7 +193,7 @@ export function StoresPage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {filtered.map((r) => (
-            <StoreCard key={r._id} r={r} writeOpen={writeOpen} onToggle={() => setToggleTarget(r)} />
+            <StoreCard key={r._id} r={r} token={token} writeOpen={writeOpen} onToggle={() => setToggleTarget(r)} />
           ))}
         </div>
       )}
@@ -219,6 +244,44 @@ export function StoresPage() {
               disabled={!writeOpen || create.busy}
             />
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sa-fee">Marketplace fee (%)</Label>
+            <Input
+              id="sa-fee"
+              inputMode="decimal"
+              className="max-w-[10rem]"
+              value={feePct}
+              onChange={(e) => setFeePct(e.target.value)}
+              disabled={!writeOpen || create.busy}
+              aria-invalid={!feeValid}
+            />
+            <p className="text-xs text-[var(--admin-text-muted)]">Charged on each UPI sale, 0 to 50. Default 8.</p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--admin-text)]">Security deposit required</p>
+              <p className="text-[13px] text-[var(--admin-text-muted)]">Paid before checkout opens.</p>
+            </div>
+            <Switch
+              checked={depositRequired}
+              onCheckedChange={setDepositRequired}
+              disabled={!writeOpen || create.busy}
+              aria-label="Security deposit required"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sa-deposit">Deposit amount (₹, optional)</Label>
+            <Input
+              id="sa-deposit"
+              inputMode="decimal"
+              className="max-w-[12rem]"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              placeholder="Platform default"
+              disabled={!writeOpen || create.busy || !depositRequired}
+              aria-invalid={!depositValid}
+            />
+          </div>
           {create.error && <Banner tone="critical">{create.error.message}</Banner>}
         </form>
       </Dialog>
@@ -242,9 +305,17 @@ export function StoresPage() {
   );
 }
 
-function StoreCard({ r, writeOpen, onToggle }: { r: Joined; writeOpen: boolean; onToggle: () => void }) {
+function setupChip(gate: 'enforced' | 'waived' | undefined, complete: boolean | undefined) {
+  if (gate === undefined || complete === undefined) return null;
+  if (gate === 'waived') return <Badge tone="neutral">Exempt</Badge>;
+  return complete ? <Badge tone="success" dot>Open</Badge> : <Badge tone="warning" dot>Locked</Badge>;
+}
+
+function StoreCard({ r, token, writeOpen, onToggle }: { r: Joined; token: string; writeOpen: boolean; onToggle: () => void }) {
   const live = storeLiveUrl(r);
   const checks = storeChecks(r, r.stats);
+  const billing = useQuery(api.platformFees.saGetStoreBilling, { saToken: token, orgId: r._id });
+  const chip = setupChip(billing?.setupGate, billing?.setup.complete);
   return (
     <section className="relative flex min-w-0 flex-col rounded-[var(--admin-radius)] border border-[var(--admin-border)] bg-[var(--admin-surface)] transition-colors duration-150 hover:border-[var(--admin-border-strong)]">
       <div className="flex items-start gap-3 p-4 pb-3">
@@ -297,6 +368,11 @@ function StoreCard({ r, writeOpen, onToggle }: { r: Joined; writeOpen: boolean; 
             ]}
           />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-2 text-[13px] text-[var(--admin-text-muted)]">
+        <span className="tabular-nums">Fee {Number((r.marketplaceFeeBps / 100).toFixed(2))}%</span>
+        {chip}
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1.5 px-4 pb-3">

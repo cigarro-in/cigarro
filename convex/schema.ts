@@ -29,6 +29,9 @@ export const orderStatus = v.union(
 export const orderKind = v.union(
   v.literal("purchase"),
   v.literal("wallet_load"),
+  // Merchant -> platform payments, in the platform org only (convex/platformFees.ts).
+  v.literal("deposit"),
+  v.literal("dues"),
 );
 
 export const slotState = v.union(
@@ -119,6 +122,18 @@ export const invoicePaymentMethod = v.union(
   v.literal("other"),
 );
 
+// Checkout gate (organizations.setupGate). See convex/platformFees.ts.
+export const setupGate = v.union(v.literal("enforced"), v.literal("waived"));
+
+export const platformLedgerKind = v.union(
+  v.literal("deposit"),
+  v.literal("deposit_refund"),
+  v.literal("fee"),
+  v.literal("fee_reversal"),
+  v.literal("dues_payment"),
+  v.literal("adjustment"),
+);
+
 export const addressV = v.object({
   line1: v.string(),
   line2: v.optional(v.string()),
@@ -188,6 +203,23 @@ export default defineSchema({
     detectedSmsSenders: v.optional(
       v.array(v.object({ entity: v.string(), count: v.number(), lastSeenAt: v.number() })),
     ),
+
+    // "platform" = the internal org that collects merchant deposits and dues
+    // (convex/platformFees.ts). Never served on a host. Absent = "store".
+    kind: v.optional(v.union(v.literal("store"), v.literal("platform"))),
+    // Platform fees (convex/platformFees.ts). Marketplace fee in basis points
+    // on the UPI amount of each paid order; absent = DEFAULT_MARKETPLACE_FEE_BPS.
+    marketplaceFeeBps: v.optional(v.number()),
+    // Checkout gate until setup is complete. Absent = "waived" so stores that
+    // predate the gate keep selling; new stores are created "enforced".
+    setupGate: v.optional(setupGate),
+    // Security deposit for this store. Amount absent = platform default
+    // (appConfig.securityDepositPaise). Required absent = true; false = no
+    // deposit step at all (setup skips it).
+    securityDepositPaise: v.optional(v.number()),
+    securityDepositRequired: v.optional(v.boolean()),
+    // Merchant hid the "Finish setup" card; super admin can clear it.
+    setupCardDismissedAt: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
     .index("by_alias", ["bankEmailAlias"]),
@@ -332,6 +364,8 @@ export default defineSchema({
     payerVpa: v.optional(v.string()),        // customer VPA, captured when email matched
     payerName: v.optional(v.string()),
     idempotencyKey: v.optional(v.string()),  // client-provided; prevents double-create on retry
+    // Deposit/dues orders (platform org only): the merchant store paying.
+    payerOrgId: v.optional(v.id("organizations")),
     extraCreditsPaise: v.optional(v.number()), // sum of duplicate/over-payments credited beyond this order
     lastWakeAt: v.optional(v.number()),      // throttle for customer wake/refresh polls
     pollGeneration: v.optional(v.number()), // epoch for scheduled inbox checks; wake bumps it so stale chains exit
@@ -359,7 +393,8 @@ export default defineSchema({
     .index("by_org_method_paid", ["orgId", "verificationMethod", "paidAt"])
     .index("by_org_status_terminal", ["orgId", "status", "terminalAt"])
     .index("by_org_claim_utr", ["orgId", "paymentClaim.utr"])
-    .index("by_org_claim_status", ["orgId", "paymentClaim.status"]),
+    .index("by_org_claim_status", ["orgId", "paymentClaim.status"])
+    .index("by_payer_org", ["payerOrgId", "createdAt"]),
 
   paymentSlots: defineTable({
     orgId: v.id("organizations"),
@@ -631,6 +666,8 @@ export default defineSchema({
     pendingOAuthUri: v.optional(v.string()),
     pendingOAuthReturnTo: v.optional(v.string()),
     pendingOAuthAt: v.optional(v.number()),
+    // Security deposit each store pays; absent = DEFAULT_SECURITY_DEPOSIT_PAISE.
+    securityDepositPaise: v.optional(v.number()),
     updatedAt: v.number(),
     updatedBy: v.optional(v.string()),
   }).index("by_key", ["key"]),
@@ -1403,6 +1440,43 @@ export default defineSchema({
     userAgent: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_org_endpoint", ["orgId", "endpoint"]),
+
+  // Merchant <-> platform account (convex/platformFees.ts). Append-only.
+  // Dues = fees - reversals - dues payments (+/- adjustments); positive means the
+  // merchant owes. The security deposit is held separately and never pays dues.
+  // Every row carries the account state after it, like walletLedger.
+  platformLedger: defineTable({
+    orgId: v.id("organizations"),
+    kind: platformLedgerKind,
+    // Exactly one of debit/credit is non-zero. Debit = merchant owes more
+    // (fee, deposit refund paid out); credit = in the merchant's favour.
+    debitPaise: v.number(),
+    creditPaise: v.number(),
+    duesAfterPaise: v.number(),
+    depositAfterPaise: v.number(),
+    orderId: v.optional(v.id("orders")),
+    orderNumber: v.optional(v.number()),
+    saleAmountPaise: v.optional(v.number()),
+    feeBps: v.optional(v.number()),
+    utr: v.optional(v.string()),
+    // Deposit/dues rows: the platform-org order that paid it.
+    paymentOrderId: v.optional(v.id("orders")),
+    note: v.string(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index("by_org_created", ["orgId", "createdAt"])
+    .index("by_org_kind_created", ["orgId", "kind", "createdAt"])
+    .index("by_order", ["orderId"])
+    .index("by_payment_order", ["paymentOrderId"]),
+
+  // Materialized platform account per store (one row per org, created lazily).
+  platformAccounts: defineTable({
+    orgId: v.id("organizations"),
+    duesPaise: v.number(),
+    depositHeldPaise: v.number(),
+    updatedAt: v.number(),
+  }).index("by_org", ["orgId"]),
 
   // One row per one-time data migration (convex/migrations.ts). "done" rows are
   // never re-run; "failed" rows are retried until runs reaches the cap.

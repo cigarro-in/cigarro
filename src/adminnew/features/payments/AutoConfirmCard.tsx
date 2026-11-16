@@ -93,7 +93,7 @@ function PhoneQr() {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
-    QRCode.toDataURL(adminAbsoluteUrl('/payments/settings'), { margin: 1, width: 168 })
+    QRCode.toDataURL(adminAbsoluteUrl('/settings#payments'), { margin: 1, width: 168 })
       .then((d) => live && setSrc(d))
       .catch(() => live && setSrc(null));
     return () => {
@@ -199,7 +199,7 @@ export function AutoConfirmCard({ orgId }: { orgId: Id<'organizations'> | undefi
   const connectGmail = () => {
     if (!orgId) return;
     gmailFb.run(async () => {
-      const r = await getGmailUrl({ orgId, returnTo: adminAbsoluteUrl('/payments/settings') + '?gmail=connected' });
+      const r = await getGmailUrl({ orgId, returnTo: adminAbsoluteUrl('/settings') + '?gmail=connected#payments' });
       window.location.href = r.url;
     });
   };

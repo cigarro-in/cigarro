@@ -17,6 +17,8 @@ export interface StoreRow {
   memberCount: number;
   primaryHost: string | null;
   primaryStatus: DomainStatus | null;
+  marketplaceFeeBps: number;
+  setupGate: 'enforced' | 'waived';
 }
 
 export interface MemberRow {
@@ -53,7 +55,15 @@ export const listStoresRef = makeFunctionReference<'query', { saToken: string },
 );
 export const createStoreRef = makeFunctionReference<
   'mutation',
-  { saToken: string; slug: string; name: string; upiVpa?: string },
+  {
+    saToken: string;
+    slug: string;
+    name: string;
+    upiVpa?: string;
+    marketplaceFeeBps?: number;
+    securityDepositRequired?: boolean;
+    securityDepositPaise?: number;
+  },
   Id<'organizations'>
 >('platform:createStore');
 export const setStoreActiveRef = makeFunctionReference<

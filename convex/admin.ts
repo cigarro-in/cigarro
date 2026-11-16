@@ -1,7 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 import { MutationCtx, mutation, query } from "./_generated/server";
-import { requireOrgAdmin } from "./lib/auth";
+import { requireOrgAdmin, requirePaymentsAdmin } from "./lib/auth";
+import { onOrderPaid, onOrderReversed } from "./platformFees";
 import { audit } from "./lib/audit";
 import { freeSlot, scheduleOrderExpiry } from "./orders";
 import { orderStatus, shippingStatus } from "./schema";
@@ -12,13 +13,11 @@ import { schedulePaidOrderPush } from "./push";
 
 // ---------- Mark a pending order as paid manually ----------
 
-type AdminIdentity = Awaited<ReturnType<typeof requireOrgAdmin>>["identity"];
-
 // Shared by markPaid and confirmPaymentClaim so both take the same path.
 async function markPaidByAdmin(
   ctx: MutationCtx,
   order: Doc<"orders">,
-  identity: AdminIdentity,
+  actorId: string, // store admin userId, or sa:<id> for the platform org
   reference: string,
   note: string | undefined,
   auditAction: string,
@@ -41,7 +40,7 @@ async function markPaidByAdmin(
       : {}),
   });
   await schedulePaidOrderPush(ctx, orderId);
-  await commitOrderInventory(ctx, order, `admin:${identity.subject}`);
+  await commitOrderInventory(ctx, order, `admin:${actorId}`);
 
   if (order.slotId) await freeSlot(ctx, order.slotId);
 
@@ -52,17 +51,20 @@ async function markPaidByAdmin(
       amountPaise: order.finalAmountPaise,
       reason: "wallet_load_credit",
       relatedOrderId: orderId,
-      createdBy: `admin:${identity.subject}`,
+      createdBy: `admin:${actorId}`,
       note: `manual:${reference}`,
     });
   }
 
+  // Marketplace fee (stores) or merchant ledger credit (platform-org deposit/dues).
+  await onOrderPaid(ctx, orderId);
+
   // Refer & earn: rewards credited on payment when the store's rule says so.
-  await rewardPaidReferral(ctx, order, `admin:${identity.subject}`);
+  await rewardPaidReferral(ctx, order, `admin:${actorId}`);
 
   await audit(ctx, {
     orgId: order.orgId,
-    adminUserId: identity.subject,
+    adminUserId: actorId,
     action: auditAction,
     targetType: "order",
     targetId: orderId,
@@ -75,29 +77,31 @@ export const markPaid = mutation({
     orderId: v.id("orders"),
     reference: v.string(),
     note: v.optional(v.string()),
+    // Super admin acting on the platform org only (lib/auth requirePaymentsAdmin).
+    saToken: v.optional(v.string()),
   },
-  handler: async (ctx, { orderId, reference, note }) => {
+  handler: async (ctx, { orderId, reference, note, saToken }) => {
     const order = await ctx.db.get(orderId);
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
-    const { identity } = await requireOrgAdmin(ctx, order.orgId);
+    const { userId: actorId } = await requirePaymentsAdmin(ctx, order.orgId, saToken, "write");
     if (order.status === "paid" || order.status === "late_paid") return;
     if (["refunded", "voided"].includes(order.status))
       throw new ConvexError({ code: "ORDER_NOT_PAYABLE", status: order.status });
     if (order.walletDebitPaise > 0 && order.walletRefundedAt)
       throw new ConvexError({ code: "WALLET_PORTION_ALREADY_REFUNDED" });
 
-    await markPaidByAdmin(ctx, order, identity, reference, note, "order.mark_paid");
+    await markPaidByAdmin(ctx, order, actorId, reference, note, "order.mark_paid");
   },
 });
 
 // ---------- Customer payment claims (UTR the customer submitted) ----------
 
 export const confirmPaymentClaim = mutation({
-  args: { orderId: v.id("orders") },
-  handler: async (ctx, { orderId }) => {
+  args: { orderId: v.id("orders"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orderId, saToken }) => {
     const order = await ctx.db.get(orderId);
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
-    const { identity } = await requireOrgAdmin(ctx, order.orgId);
+    const { userId: actorId } = await requirePaymentsAdmin(ctx, order.orgId, saToken, "write");
     const claim = order.paymentClaim;
     if (!claim || claim.status !== "review")
       throw new ConvexError({ code: "CLAIM_NOT_UNDER_REVIEW" });
@@ -123,7 +127,7 @@ export const confirmPaymentClaim = mutation({
     await markPaidByAdmin(
       ctx,
       order,
-      identity,
+      actorId,
       `customer_claim:${claim.utr}`,
       undefined,
       "order.confirm_payment_claim",
@@ -132,11 +136,11 @@ export const confirmPaymentClaim = mutation({
 });
 
 export const rejectPaymentClaim = mutation({
-  args: { orderId: v.id("orders"), reason: v.optional(v.string()) },
-  handler: async (ctx, { orderId, reason }) => {
+  args: { orderId: v.id("orders"), reason: v.optional(v.string()), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orderId, reason, saToken }) => {
     const order = await ctx.db.get(orderId);
     if (!order) throw new ConvexError({ code: "NOT_FOUND" });
-    const { identity } = await requireOrgAdmin(ctx, order.orgId);
+    const { userId: actorId } = await requirePaymentsAdmin(ctx, order.orgId, saToken, "write");
     const claim = order.paymentClaim;
     if (!claim || claim.status !== "review")
       throw new ConvexError({ code: "CLAIM_NOT_UNDER_REVIEW" });
@@ -160,7 +164,7 @@ export const rejectPaymentClaim = mutation({
 
     await audit(ctx, {
       orgId: order.orgId,
-      adminUserId: identity.subject,
+      adminUserId: actorId,
       action: "order.reject_payment_claim",
       targetType: "order",
       targetId: orderId,
@@ -191,6 +195,7 @@ export const refundOrder = mutation({
       refundDestination: toWallet ? "wallet" : "bank",
     });
     if (restock) await returnOrderInventory(ctx, order, `admin:${identity.subject}`);
+    await onOrderReversed(ctx, orderId, "refunded", `admin:${identity.subject}`);
 
     // A mixed-wallet order has two customer-funded portions. The UPI portion
     // follows the selected refund destination; the wallet portion must always
@@ -252,6 +257,8 @@ export const voidOrder = mutation({
       terminalAt: Date.now(),
     });
     await releaseOrderInventory(ctx, order, `admin:${identity.subject}`);
+    // No-op today (paid orders cannot be voided); keeps fees right if that changes.
+    await onOrderReversed(ctx, orderId, "voided", `admin:${identity.subject}`);
 
     if (order.walletDebitPaise > 0 && !order.walletRefundedAt) {
       await creditWallet(ctx, {
@@ -416,9 +423,9 @@ export const listRecentOrders = query({
 
 // Pending orders where a customer reported a payment that is awaiting review.
 export const listPaymentClaims = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
+    await requirePaymentsAdmin(ctx, orgId, saToken, "read");
     return await ctx.db
       .query("orders")
       .withIndex("by_org_claim_status", (q) =>

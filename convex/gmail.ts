@@ -7,11 +7,13 @@ import {
   internalQuery,
   mutation,
   query,
+  type MutationCtx,
 } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import {
   assertTokenOrg,
   requireIdentity,
-  requireOrgAdmin,
+  requirePaymentsAdmin,
   safeReturnTo,
 } from "./lib/auth";
 import { decryptSecret } from "./lib/crypto";
@@ -411,10 +413,11 @@ export const pollInbox = internalAction({
 // and upserts this org's gmailConnections row.
 
 // Owner/admin of the given org only. Returns the caller's userId.
+// saToken: super admin, platform org only (lib/auth requirePaymentsAdmin).
 export const assertPaymentsAdmin = internalQuery({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    const { userId } = await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
+    const { userId } = await requirePaymentsAdmin(ctx, orgId, saToken, "write_check");
     return userId;
   },
 });
@@ -423,11 +426,12 @@ export const getOAuthUrl = action({
   args: {
     orgId: v.id("organizations"),
     returnTo: v.optional(v.string()),
+    saToken: v.optional(v.string()),
   },
-  handler: async (ctx, { orgId, returnTo }): Promise<{ url: string }> => {
+  handler: async (ctx, { orgId, returnTo, saToken }): Promise<{ url: string }> => {
     const adminUserId: string = await ctx.runQuery(
       internal.gmail.assertPaymentsAdmin,
-      { orgId },
+      { orgId, saToken },
     );
     const clientId = process.env.GMAIL_CLIENT_ID;
     if (!clientId) throw new ConvexError({ code: "GMAIL_NOT_CONFIGURED" });
@@ -529,9 +533,9 @@ export const saveGmailConnection = internalMutation({
 });
 
 export const disconnectGmail = action({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }): Promise<{ ok: true; revoked: boolean }> => {
-    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, { orgId });
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }): Promise<{ ok: true; revoked: boolean }> => {
+    await ctx.runQuery(internal.gmail.assertPaymentsAdmin, { orgId, saToken });
     const conn: any = await ctx.runQuery(internal.gmail.getConnectionInternal, {
       orgId,
     });
@@ -686,10 +690,10 @@ export const getPollConfigInternal = internalQuery({
 // Admin-visible connection state for one org (Payment Settings). Null for
 // non-admins and for orgs with no connection row.
 export const getGmailStatus = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
     try {
-      await requireOrgAdmin(ctx, orgId);
+      await requirePaymentsAdmin(ctx, orgId, saToken, "read");
     } catch {
       return null;
     }
@@ -726,56 +730,69 @@ export const wake = mutation({
     if (order.userId !== identity.subject)
       throw new ConvexError({ code: "FORBIDDEN" });
 
-    if (order.status !== "pending") {
-      return { skipped: "not_pending", status: order.status };
-    }
-
-    const now = Date.now();
-    const last = order.lastWakeAt ?? 0;
-    if (now - last < WAKE_THROTTLE_MS) {
-      return {
-        throttled: true,
-        retryAfterMs: WAKE_THROTTLE_MS - (now - last),
-      };
-    }
-
-    // Fresh order (creation chain still inside its first throttle window):
-    // that chain already covers every offset until expiry, so re-arming here
-    // would just double-schedule. Run one immediate check on the current
-    // epoch and leave the chain alone — no coverage lost, no fan-out.
-    if (now - order.createdAt < WAKE_THROTTLE_MS) {
-      await ctx.db.patch(orderId, { lastWakeAt: now });
-      await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, {
-        orgId: order.orgId,
-        orderId,
-        reason: source,
-        generation: order.pollGeneration ?? 0,
-      });
-      return { poked: true };
-    }
-
-    // Bumping the epoch retires any in-flight creation chain: its jobs carry
-    // the old generation and exit as stale before touching the Gmail API.
-    const nextGen = (order.pollGeneration ?? 0) + 1;
-    await ctx.db.patch(orderId, { lastWakeAt: now, pollGeneration: nextGen });
-
-    // Immediate check plus a full backoff (re)start bounded to the order's
-    // remaining timeout, so returning from the UPI app or hitting refresh
-    // re-arms fast verification AND keeps steady coverage to expiry. The
-    // bumped generation retires the creation chain (stale jobs exit pre-API);
-    // each scheduled check still skips (with zero Gmail calls) if the order
-    // turns terminal. No offset exceeds the remaining timeout.
-    const check = { orgId: order.orgId, orderId, reason: source, generation: nextGen } as const;
-    await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, { ...check });
-    const org: any = await ctx.db.get(order.orgId);
-    const timeoutMs = org?.slotTimeoutMs ?? 10 * 60 * 1000;
-    const remaining = timeoutMs - (now - order.createdAt);
-    if (remaining > 0) {
-      for (const ms of buildOrderPollOffsets(remaining)) {
-        await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, { ...check });
-      }
-    }
-
-    return { poked: true };
+    return await wakeOrderPolling(ctx, order, source);
   },
 });
+
+/**
+ * Throttled "check the inbox now" for one order. Shared by wake (customers)
+ * and platformFees.wakePlatformPayment (merchants paying the platform).
+ */
+export async function wakeOrderPolling(
+  ctx: MutationCtx,
+  order: Doc<"orders">,
+  source: "wake" | "refresh",
+) {
+  const orderId = order._id;
+  if (order.status !== "pending") {
+    return { skipped: "not_pending", status: order.status };
+  }
+
+  const now = Date.now();
+  const last = order.lastWakeAt ?? 0;
+  if (now - last < WAKE_THROTTLE_MS) {
+    return {
+      throttled: true,
+      retryAfterMs: WAKE_THROTTLE_MS - (now - last),
+    };
+  }
+
+  // Fresh order (creation chain still inside its first throttle window):
+  // that chain already covers every offset until expiry, so re-arming here
+  // would just double-schedule. Run one immediate check on the current
+  // epoch and leave the chain alone — no coverage lost, no fan-out.
+  if (now - order.createdAt < WAKE_THROTTLE_MS) {
+    await ctx.db.patch(orderId, { lastWakeAt: now });
+    await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, {
+      orgId: order.orgId,
+      orderId,
+      reason: source,
+      generation: order.pollGeneration ?? 0,
+    });
+    return { poked: true };
+  }
+
+  // Bumping the epoch retires any in-flight creation chain: its jobs carry
+  // the old generation and exit as stale before touching the Gmail API.
+  const nextGen = (order.pollGeneration ?? 0) + 1;
+  await ctx.db.patch(orderId, { lastWakeAt: now, pollGeneration: nextGen });
+
+  // Immediate check plus a full backoff (re)start bounded to the order's
+  // remaining timeout, so returning from the UPI app or hitting refresh
+  // re-arms fast verification AND keeps steady coverage to expiry. The
+  // bumped generation retires the creation chain (stale jobs exit pre-API);
+  // each scheduled check still skips (with zero Gmail calls) if the order
+  // turns terminal. No offset exceeds the remaining timeout.
+  const check = { orgId: order.orgId, orderId, reason: source, generation: nextGen } as const;
+  await ctx.scheduler.runAfter(0, internal.gmail.pollInbox, { ...check });
+  const org: any = await ctx.db.get(order.orgId);
+  const timeoutMs = org?.slotTimeoutMs ?? 10 * 60 * 1000;
+  const remaining = timeoutMs - (now - order.createdAt);
+  if (remaining > 0) {
+    for (const ms of buildOrderPollOffsets(remaining)) {
+      await ctx.scheduler.runAfter(ms, internal.gmail.pollInbox, { ...check });
+    }
+  }
+
+  return { poked: true };
+}

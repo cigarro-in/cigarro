@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Globe, LayoutDashboard, LogOut, Receipt, Settings, Store } from 'lucide-react';
+import { Globe, LayoutDashboard, LogOut, Receipt, Settings, Store, Wallet } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,7 @@ const NAV = [
   { label: 'Overview', path: '/sa/overview', icon: LayoutDashboard },
   { label: 'Stores', path: '/sa/stores', icon: Store },
   { label: 'Payments', path: '/sa/payments', icon: Receipt },
+  { label: 'Platform payments', path: '/sa/platform-payments', icon: Wallet },
   { label: 'Domains', path: '/sa/domains', icon: Globe },
   { label: 'Platform config', path: '/sa/platform', icon: Settings },
 ] as const;

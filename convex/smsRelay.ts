@@ -12,7 +12,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { requireOrgAdmin } from "./lib/auth";
+import { requirePaymentsAdmin } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { redactCodes } from "./lib/bankMessage";
 import { MACRO_FILENAME, buildMacroFile } from "./lib/macrodroid";
@@ -81,10 +81,11 @@ function isUnclaimed(relay: Doc<"smsRelays">): boolean {
  * - setup_error: the phone sent template text (bad import), newer than any good SMS
  * - setup_expired: the setup code ran out (24 h) before the file was run
  */
+// saToken: super admin, platform org only (lib/auth requirePaymentsAdmin).
 export const getStatus = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
+    await requirePaymentsAdmin(ctx, orgId, saToken, "read");
     const relay = await ctx.db
       .query("smsRelays")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -224,9 +225,13 @@ async function rotateIphone(ctx: MutationCtx, orgId: Id<"organizations">, userId
  * receiveBankSms URL to copy, with the token already live.
  */
 export const connectPhone = mutation({
-  args: { orgId: v.id("organizations"), device: v.union(v.literal("android"), v.literal("iphone")) },
-  handler: async (ctx, { orgId, device }) => {
-    const { userId } = await requireOrgAdmin(ctx, orgId);
+  args: {
+    orgId: v.id("organizations"),
+    device: v.union(v.literal("android"), v.literal("iphone")),
+    saToken: v.optional(v.string()),
+  },
+  handler: async (ctx, { orgId, device, saToken }) => {
+    const { userId } = await requirePaymentsAdmin(ctx, orgId, saToken, "write");
     if (device === "iphone") {
       const url = await rotateIphone(ctx, orgId, String(userId));
       return { url };
@@ -284,9 +289,9 @@ export const claim = internalMutation({
 });
 
 export const revokeToken = mutation({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
-    const { userId } = await requireOrgAdmin(ctx, orgId);
+  args: { orgId: v.id("organizations"), saToken: v.optional(v.string()) },
+  handler: async (ctx, { orgId, saToken }) => {
+    const { userId } = await requirePaymentsAdmin(ctx, orgId, saToken, "write");
     const relay = await ctx.db
       .query("smsRelays")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

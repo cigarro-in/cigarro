@@ -1,7 +1,7 @@
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-import { adminPaymentsFallback, isSafeReturnTo } from "./lib/auth";
+import { isSafeReturnTo, returnFallbackFor } from "./lib/auth";
 import { encryptSecret } from "./lib/crypto";
 import { gmailRedirectUri } from "./gmail";
 import { saExchange, saLogout, saMe, saPreflight } from "./saHttp";
@@ -127,7 +127,7 @@ http.route({
     const back = pending.returnTo;
     if (typeof back === "string" && back.length > 0) {
       return Response.redirect(
-        isSafeReturnTo(back) ? back : adminPaymentsFallback(),
+        isSafeReturnTo(back) ? back : returnFallbackFor(back),
         302,
       );
     }

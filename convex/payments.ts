@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { onOrderPaid } from "./platformFees";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
@@ -758,6 +759,9 @@ export async function markOrderPaid(
   }
 
   if (order.slotId) await freeSlot(ctx, order.slotId);
+
+  // Marketplace fee (stores) or merchant ledger credit (platform-org deposit/dues).
+  await onOrderPaid(ctx, order._id);
 
   // Refer & earn: every email-matched payment (ingest + Gmail path) lands here.
   await rewardPaidReferral(ctx, { ...order, status: newStatus }, "system");

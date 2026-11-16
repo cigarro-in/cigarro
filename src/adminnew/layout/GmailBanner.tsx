@@ -6,8 +6,9 @@ import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { readStoredPreference, writeStoredPreference } from '../../lib/browserStorage';
 import { Banner, Button } from '../ui';
+import { adminPath } from '../lib/paths';
 
-const SETTINGS_PATH = '/payments/settings';
+const SETTINGS_PATH = adminPath('/settings#payments');
 
 /**
  * Shell-wide prompt shown while payments are not confirmed automatically: no

@@ -19,6 +19,7 @@ import {
   type Column,
   type DateRangePreset,
 } from '../../ui';
+import { moneyPaise, type OrderFeeView } from './platformFeeFormat';
 
 type Statement = FunctionReturnType<typeof api.payments.listStatement>;
 type Entry = Statement['entries'][number];
@@ -83,6 +84,15 @@ function StatementList({
   const next = current?.nextCursor ?? null;
   const totals = head?.totals;
 
+  // Marketplace fee per credited sale on the loaded rows (paid orders only).
+  const feeOrderIds = Array.from(
+    new Set(rows.filter((e) => e.kind === 'order_credit').map((e) => e.orderId)),
+  ).slice(0, 200);
+  const fees = useQuery(
+    api.platformFees.getOrderFees,
+    org && feeOrderIds.length > 0 ? { orgId: org._id, orderIds: feeOrderIds } : 'skip',
+  );
+
   const columns: Column<Entry>[] = [
     {
       id: 'when',
@@ -96,7 +106,7 @@ function StatementList({
     {
       id: 'what',
       header: 'Entry',
-      cell: (e) => <EntryLabel entry={e} />,
+      cell: (e) => <EntryLabel entry={e} fee={fees?.[e.orderId] as OrderFeeView | null | undefined} />,
     },
     {
       id: 'amount',
@@ -170,7 +180,7 @@ function StatementList({
   );
 }
 
-function EntryLabel({ entry: e }: { entry: Entry }) {
+function EntryLabel({ entry: e, fee }: { entry: Entry; fee?: OrderFeeView | null }) {
   if (e.kind === 'order_credit') {
     return (
       <div className="min-w-0">
@@ -182,6 +192,11 @@ function EntryLabel({ entry: e }: { entry: Entry }) {
           credited
         </div>
         {e.senderEmail && <div className="truncate text-xs text-muted-foreground">{e.senderEmail}</div>}
+        {fee && (
+          <div className="text-xs tabular-nums text-muted-foreground">
+            {fee.reversed ? 'Fee reversed' : `Marketplace fee −${moneyPaise(fee.feePaise)}`}
+          </div>
+        )}
       </div>
     );
   }

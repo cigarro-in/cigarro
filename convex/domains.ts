@@ -146,12 +146,18 @@ export const resolveByHost = query({
               ?.hostname ?? null
           );
         },
-        orgBySlug: (slug) =>
-          ctx.db
+        // The platform org (convex/platformFees.ts) is never served on a host.
+        orgBySlug: async (slug) => {
+          const org = await ctx.db
             .query("organizations")
             .withIndex("by_slug", (q) => q.eq("slug", slug))
-            .unique(),
-        orgById: (orgId) => ctx.db.get(orgId),
+            .unique();
+          return org && org.kind !== "platform" ? org : null;
+        },
+        orgById: async (orgId) => {
+          const org = await ctx.db.get(orgId);
+          return org && org.kind !== "platform" ? org : null;
+        },
       },
       { platformRoot: platformRoot(), defaultOrgSlug: defaultOrgSlug() },
     );

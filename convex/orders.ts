@@ -22,6 +22,7 @@ import { commitOrderInventory, releaseOrderInventory, reserveOrderInventory } fr
 import { isLegacyOrg } from "./lib/legacyOrg";
 import { assertCheckoutConsent } from "./consent";
 import { linkEarlierBankMessage } from "./payments";
+import { assertCheckoutOpen } from "./platformFees";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -145,7 +146,7 @@ async function consumeDiscount(
   });
 }
 
-async function chooseUniqueLuckyPaise(
+export async function chooseUniqueLuckyPaise(
   ctx: MutationCtx,
   orgId: Id<"organizations">,
   orderTotalPaise: number,
@@ -323,7 +324,7 @@ async function pricePurchaseItems(
 // to undefined (callers then show displayOrderId).
 export { orderNumberOf };
 
-async function allocateOrderNumber(
+export async function allocateOrderNumber(
   ctx: MutationCtx,
   orgId: Id<"organizations">,
 ): Promise<number> {
@@ -441,6 +442,11 @@ export const createOrder = mutation({
     assertOrgMatch(args.orgId, org);
     const { userId } = await requireMember(ctx, org._id);
     if (!org.active) throw new ConvexError({ code: "ORG_INACTIVE" });
+    // Stores whose setup is unfinished (and not waived) cannot take orders.
+    await assertCheckoutOpen(ctx, org);
+    // Deposit/dues orders exist only in the platform org (platformFees.ts).
+    if (args.kind !== "purchase" && args.kind !== "wallet_load")
+      throw new ConvexError({ code: "INVALID_ORDER_KIND" });
     // Purchases need the customer's age + terms record (convex/consent.ts).
     // Wallet loads are not tobacco sales and are not gated here.
     if (args.kind === "purchase") {
@@ -913,88 +919,103 @@ export const submitPaymentClaim = mutation({
     const { userId } = await requireMember(ctx, order.orgId);
     if (order.userId !== userId) throw new ConvexError({ code: "FORBIDDEN" });
 
-    const ref = utr.replace(/\s+/g, "");
-    if (!/^\d{12}$/.test(ref)) throw new ConvexError({ code: "INVALID_UTR" });
-    if (order.paymentClaim?.status === "review")
-      throw new ConvexError({ code: "CLAIM_UNDER_REVIEW" });
-
-    const now = Date.now();
-    const reviveExpired = order.status === "expired";
-    if (order.status !== "pending" && !reviveExpired)
-      throw new ConvexError({ code: "NOT_CLAIMABLE", status: order.status });
-    if (
-      reviveExpired &&
-      (order.terminalAt ?? 0) < now - CLAIM_REVIVE_WINDOW_MS
-    )
-      throw new ConvexError({ code: "CLAIM_WINDOW_CLOSED" });
-
-    // The same UTR already on another active or confirmed claim, or already
-    // matched to a bank message in this store, belongs to a different order.
-    const sameUtr = await ctx.db
-      .query("orders")
-      .withIndex("by_org_claim_utr", (q) =>
-        q.eq("orgId", order.orgId).eq("paymentClaim.utr", ref),
-      )
-      .collect();
-    if (
-      sameUtr.some(
-        (o) =>
-          o._id !== orderId &&
-          (o.paymentClaim?.status === "review" ||
-            o.paymentClaim?.status === "confirmed"),
-      )
-    )
-      throw new ConvexError({ code: "DUPLICATE_UTR" });
-    const matchedEmail = await ctx.db
-      .query("bankEmails")
-      .withIndex("by_org_upi_ref", (q) =>
-        q.eq("orgId", order.orgId).eq("upiRef", ref),
-      )
-      .filter((q) => q.eq(q.field("status"), "matched"))
-      .first();
-    if (matchedEmail) throw new ConvexError({ code: "DUPLICATE_UTR" });
-
-    if (reviveExpired) {
-      // An expired order's wallet portion was refunded and its inventory
-      // released: reviving it is only safe when neither needs undoing.
-      if (order.slotId || (order.walletDebitPaise > 0 && order.walletRefundedAt))
-        throw new ConvexError({ code: "EXPIRED_NOT_REVIVABLE" });
-      // Another pending order with the same fingerprint amount would make
-      // the revived order's bank credit ambiguous.
-      const clash = await ctx.db
-        .query("orders")
-        .withIndex("by_org_final_status", (q) =>
-          q
-            .eq("orgId", order.orgId)
-            .eq("finalAmountPaise", order.finalAmountPaise)
-            .eq("status", "pending"),
-        )
-        .first();
-      if (clash) throw new ConvexError({ code: "AMOUNT_IN_USE" });
-    }
-
-    const reReserve =
-      reviveExpired && order.kind === "purchase" && order.inventoryState === "released";
-    if (reReserve) {
-      await reserveOrderInventory(ctx, order.orgId, order.items, orderId, `user:${userId}`);
-    }
-
-    await ctx.db.patch(orderId, {
-      ...(reviveExpired
-        ? {
-            status: "pending" as const,
-            terminalAt: undefined,
-            ...(reReserve ? { inventoryState: "reserved" as const } : {}),
-          }
-        : {}),
-      paymentClaim: { utr: ref, submittedAt: now, status: "review" },
-    });
-
-    // An earlier bank message with this UTR may already be in the inbox.
-    const linked = await linkEarlierBankMessage(ctx, orderId, ref);
-    return { orderId, status: linked === "confirmed" ? ("confirmed" as const) : ("review" as const) };
+    return await applyPaymentClaim(ctx, order, utr, `user:${userId}`);
   },
 });
+
+/**
+ * Shared by submitPaymentClaim and platformFees.submitPlatformPaymentClaim:
+ * puts a pending (or recently expired) order under review with the payer's
+ * UTR and links an earlier bank message with that UTR when there is one.
+ */
+export async function applyPaymentClaim(
+  ctx: MutationCtx,
+  order: Doc<"orders">,
+  utr: string,
+  actor: string,
+) {
+  const orderId = order._id;
+  const ref = utr.replace(/\s+/g, "");
+  if (!/^\d{12}$/.test(ref)) throw new ConvexError({ code: "INVALID_UTR" });
+  if (order.paymentClaim?.status === "review")
+    throw new ConvexError({ code: "CLAIM_UNDER_REVIEW" });
+
+  const now = Date.now();
+  const reviveExpired = order.status === "expired";
+  if (order.status !== "pending" && !reviveExpired)
+    throw new ConvexError({ code: "NOT_CLAIMABLE", status: order.status });
+  if (
+    reviveExpired &&
+    (order.terminalAt ?? 0) < now - CLAIM_REVIVE_WINDOW_MS
+  )
+    throw new ConvexError({ code: "CLAIM_WINDOW_CLOSED" });
+
+  // The same UTR already on another active or confirmed claim, or already
+  // matched to a bank message in this store, belongs to a different order.
+  const sameUtr = await ctx.db
+    .query("orders")
+    .withIndex("by_org_claim_utr", (q) =>
+      q.eq("orgId", order.orgId).eq("paymentClaim.utr", ref),
+    )
+    .collect();
+  if (
+    sameUtr.some(
+      (o) =>
+        o._id !== orderId &&
+        (o.paymentClaim?.status === "review" ||
+          o.paymentClaim?.status === "confirmed"),
+    )
+  )
+    throw new ConvexError({ code: "DUPLICATE_UTR" });
+  const matchedEmail = await ctx.db
+    .query("bankEmails")
+    .withIndex("by_org_upi_ref", (q) =>
+      q.eq("orgId", order.orgId).eq("upiRef", ref),
+    )
+    .filter((q) => q.eq(q.field("status"), "matched"))
+    .first();
+  if (matchedEmail) throw new ConvexError({ code: "DUPLICATE_UTR" });
+
+  if (reviveExpired) {
+    // An expired order's wallet portion was refunded and its inventory
+    // released: reviving it is only safe when neither needs undoing.
+    if (order.slotId || (order.walletDebitPaise > 0 && order.walletRefundedAt))
+      throw new ConvexError({ code: "EXPIRED_NOT_REVIVABLE" });
+    // Another pending order with the same fingerprint amount would make
+    // the revived order's bank credit ambiguous.
+    const clash = await ctx.db
+      .query("orders")
+      .withIndex("by_org_final_status", (q) =>
+        q
+          .eq("orgId", order.orgId)
+          .eq("finalAmountPaise", order.finalAmountPaise)
+          .eq("status", "pending"),
+      )
+      .first();
+    if (clash) throw new ConvexError({ code: "AMOUNT_IN_USE" });
+  }
+
+  const reReserve =
+    reviveExpired && order.kind === "purchase" && order.inventoryState === "released";
+  if (reReserve) {
+    await reserveOrderInventory(ctx, order.orgId, order.items, orderId, actor);
+  }
+
+  await ctx.db.patch(orderId, {
+    ...(reviveExpired
+      ? {
+          status: "pending" as const,
+          terminalAt: undefined,
+          ...(reReserve ? { inventoryState: "reserved" as const } : {}),
+        }
+      : {}),
+    paymentClaim: { utr: ref, submittedAt: now, status: "review" },
+  });
+
+  // An earlier bank message with this UTR may already be in the inbox.
+  const linked = await linkEarlierBankMessage(ctx, orderId, ref);
+  return { orderId, status: linked === "confirmed" ? ("confirmed" as const) : ("review" as const) };
+}
 
 // ---------- Queries ----------
 

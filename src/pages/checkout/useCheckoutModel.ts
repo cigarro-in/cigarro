@@ -23,6 +23,9 @@ import { formatOrderNumber } from '../../lib/orders/orderNumber';
 // MobileCheckoutPage (flows, totals, lucky, coupon, referral, wallet, consent,
 // createOrder args, error codes), so both pages place the same order.
 
+/** Shown when the store has not finished setup and cannot take orders yet. */
+export const STORE_CLOSED_MESSAGE = "This store isn't taking orders yet. Please check back soon.";
+
 export interface CheckoutModelOptions {
   // Mobile hands off to the UPI app (result.upiUrl) after createOrder.
   // Desktop has no UPI app and goes straight to the QR on /transaction.
@@ -61,6 +64,9 @@ function addressFromRetry(raw: Record<string, unknown>, name: string, phone: str
 
 export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = true }: CheckoutModelOptions = {}) {
   const { slug: orgSlug } = useOrgInfo();
+  // Public gate: false while a store's setup is unfinished (createOrder throws STORE_SETUP_INCOMPLETE).
+  const availability = useQuery(api.platformFees.checkoutAvailability, orgSlug ? { orgSlug } : 'skip');
+  const storeClosed = availability?.open === false;
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, totalPrice: cartTotalPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
@@ -320,6 +326,10 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
       setOpError('Store is loading. Please try again in a moment.');
       return;
     }
+    if (storeClosed) {
+      setOpError(STORE_CLOSED_MESSAGE);
+      return;
+    }
     if (orderConsent.needed && !consentConfirmedRef.current) {
       setConsentSheetOpen(true);
       return;
@@ -399,6 +409,8 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
           ? 'Wallet balance is insufficient.'
           : code === 'ORG_INACTIVE'
           ? 'Store is currently unavailable.'
+          : code === 'STORE_SETUP_INCOMPLETE'
+          ? STORE_CLOSED_MESSAGE
           : 'Payment failed. Please try again.',
       );
       isNavigatingRef.current = false;
@@ -454,6 +466,7 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
     savedAddresses: savedAddresses as Address[], addressesLoading, selectedAddress, selectAddress, refreshAddresses, addressAttention,
     consentSheetOpen, setConsentSheetOpen, confirmConsent,
     getFinalTotal, amountDue, isProcessing, placeOrder,
+    storeClosed,
   };
 }
 
