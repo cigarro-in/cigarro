@@ -17,7 +17,8 @@ import {
   type ActionCtx,
   type MutationCtx,
 } from "./_generated/server";
-import { RENAME_MIGRATION, renameDone } from "./lib/legacyOrg";
+import { LEGACY_ORG_SLUG, RENAME_MIGRATION, renameDone } from "./lib/legacyOrg";
+import { OLDSMOKESHOP_MOVED_IMAGE_KEYS } from "./lib/oldsmokeshopMovedImages";
 import { genOrderNumberCandidate, isValidOrderNumber } from "./lib/ids";
 import { cleanDescription } from "./lib/cleanDescription";
 
@@ -205,6 +206,11 @@ const MIGRATIONS: Migration[] = [
     name: "platformFees-v1",
     run: async (ctx) => await ctx.runMutation(backfillPlatformFeesRef, {}),
   },
+  {
+    // Old store images copied out of orgs/smokeshop/. Literal name: const is below.
+    name: "moveOldsmokeshopImages-v1",
+    run: async (ctx) => await runMoveOldsmokeshopImages(ctx),
+  },
 ];
 
 // Never throws: each migration is isolated, and failures are recorded.
@@ -351,6 +357,135 @@ async function runCleanSmokeshopDescriptions(ctx: ActionCtx): Promise<unknown> {
     let isDone = false;
     while (!isDone) {
       const r: CleanBatchResult = await ctx.runMutation(cleanSmokeshopBatchRef, { table, cursor });
+      totals[table].scanned += r.scanned;
+      totals[table].changed += r.changed;
+      cursor = r.continueCursor;
+      isDone = r.isDone;
+    }
+  }
+  return totals;
+}
+
+// ---------------------------------------------------------------------------
+// moveOldsmokeshopImages-v1: before the slug rename, the original store
+// uploaded into asset_images/orgs/smokeshop/, which now belongs to the new
+// `smokeshop` store. Those files were copied (not moved) to
+// asset_images/orgs/oldsmokeshop/ by hand. This rewrites the old store's rows
+// to the copies, only for keys in OLDSMOKESHOP_MOVED_IMAGE_KEYS, so a URL is
+// never pointed at a file that was not copied. Old copies are deleted later,
+// by hand, once this has run on PROD. Idempotent.
+// ---------------------------------------------------------------------------
+
+export const MOVE_OLDSMOKESHOP_IMAGES_MIGRATION = "moveOldsmokeshopImages-v1";
+const OLD_IMG_PREFIX = "asset_images/orgs/smokeshop/";
+const NEW_IMG_PREFIX = "asset_images/orgs/oldsmokeshop/";
+const MOVED_IMAGE_SET = new Set(OLDSMOKESHOP_MOVED_IMAGE_KEYS);
+const IMG_KEY_RE = /asset_images\/orgs\/smokeshop\/([A-Za-z0-9._-]+)/g;
+
+const IMAGE_TABLES = [
+  "catalogBrands",
+  "catalogCategories",
+  "catalogProducts",
+  "catalogVariants",
+  "catalogCollections",
+  "catalogCombos",
+  "heroSlides",
+  "blogPosts",
+  "blogCategories",
+  "siteSettings",
+  "storePages",
+  "sectionConfigurations",
+  "homepageComponentConfig",
+] as const;
+type ImageTable = (typeof IMAGE_TABLES)[number] | "orders";
+
+function rewriteImageKeys(value: unknown): { value: unknown; changed: boolean } {
+  if (typeof value === "string") {
+    if (!value.includes(OLD_IMG_PREFIX)) return { value, changed: false };
+    const next = value.replace(IMG_KEY_RE, (whole, name: string) =>
+      MOVED_IMAGE_SET.has(name) ? `${NEW_IMG_PREFIX}${name}` : whole,
+    );
+    return { value: next, changed: next !== value };
+  }
+  if (Array.isArray(value)) {
+    let changed = false;
+    const out = value.map((v) => {
+      const r = rewriteImageKeys(v);
+      changed ||= r.changed;
+      return r.value;
+    });
+    return { value: changed ? out : value, changed };
+  }
+  if (value && typeof value === "object" && !(value instanceof ArrayBuffer)) {
+    let changed = false;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      const r = rewriteImageKeys(v);
+      changed ||= r.changed;
+      out[k] = r.value;
+    }
+    return { value: changed ? out : value, changed };
+  }
+  return { value, changed: false };
+}
+
+export const moveOldsmokeshopImagesBatch = internalMutation({
+  args: { table: v.string(), cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { table, cursor }): Promise<CleanBatchResult> => {
+    if (!(await renameDone(ctx))) throw new Error("rename has not run");
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", LEGACY_ORG_SLUG))
+      .first();
+    if (!org) throw new Error(`no organization with slug ${LEGACY_ORG_SLUG}`);
+
+    let changed = 0;
+    if (table === "organizations") {
+      const { _id, _creationTime, ...fields } = org;
+      const r = rewriteImageKeys(fields);
+      if (r.changed) {
+        await ctx.db.replace(_id, r.value as typeof fields);
+        changed++;
+      }
+      return { scanned: 1, changed, continueCursor: "", isDone: true };
+    }
+
+    const t = table as ImageTable;
+    const index = t === "orders" ? "by_org_created" : "by_org";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await (ctx.db.query(t) as any)
+      .withIndex(index, (q: any) => q.eq("orgId", org._id))
+      .paginate({ cursor, numItems: CLEAN_BATCH_SIZE });
+    for (const row of page.page) {
+      const { _id, _creationTime, ...fields } = row;
+      const r = rewriteImageKeys(fields);
+      if (!r.changed) continue;
+      await ctx.db.replace(_id, r.value as typeof fields);
+      changed++;
+    }
+    return {
+      scanned: page.page.length,
+      changed,
+      continueCursor: page.continueCursor,
+      isDone: page.isDone,
+    };
+  },
+});
+
+const moveOldsmokeshopImagesBatchRef = makeFunctionReference<
+  "mutation",
+  { table: string; cursor: string | null },
+  CleanBatchResult
+>("migrations:moveOldsmokeshopImagesBatch");
+
+async function runMoveOldsmokeshopImages(ctx: ActionCtx) {
+  const totals: Record<string, { scanned: number; changed: number }> = {};
+  for (const table of ["organizations", "orders", ...IMAGE_TABLES]) {
+    totals[table] = { scanned: 0, changed: 0 };
+    let cursor: string | null = null;
+    let isDone = false;
+    while (!isDone) {
+      const r: CleanBatchResult = await ctx.runMutation(moveOldsmokeshopImagesBatchRef, { table, cursor });
       totals[table].scanned += r.scanned;
       totals[table].changed += r.changed;
       cursor = r.continueCursor;
