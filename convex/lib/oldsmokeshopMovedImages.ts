@@ -1,18 +1,19 @@
 // Generated: files copied from asset_images/orgs/smokeshop/ to orgs/oldsmokeshop/
-// (old store uploads from before the slug rename). Used by moveOldsmokeshopImages-v1.
+// (old store uploads from before the slug rename), as paths relative to that
+// folder. Used by moveOldsmokeshopImages.
 export const OLDSMOKESHOP_MOVED_IMAGE_KEYS: string[] = [
   "benson-and-hedges.webp",
   "benson-hedges-2.webp",
   "benson-hedges-3.webp",
   "benson-hedges-4.webp",
   "benson-hedges.webp",
-  "camel-yellow-vs-blue-strength.webp",
-  "cigarette-filters-explained-ca.webp",
-  "dunhill-red-vs-silver-strength.webp",
-  "esse-cigarettes-lineup-lights.webp",
-  "marlboro-red-vs-camel-yellow-v.webp",
-  "tar-nicotine-explained-cigaret.webp",
-  "top-10-imported-cigarettes-you.webp",
+  "blogs/camel-yellow-vs-blue-strength.webp",
+  "blogs/cigarette-filters-explained-ca.webp",
+  "blogs/dunhill-red-vs-silver-strength.webp",
+  "blogs/esse-cigarettes-lineup-lights.webp",
+  "blogs/marlboro-red-vs-camel-yellow-v.webp",
+  "blogs/tar-nicotine-explained-cigaret.webp",
+  "blogs/top-10-imported-cigarettes-you.webp",
   "camel-blue-2.webp",
   "camel-blue.webp",
   "camel-yellow-2.webp",

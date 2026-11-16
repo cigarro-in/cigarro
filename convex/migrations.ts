@@ -207,8 +207,8 @@ const MIGRATIONS: Migration[] = [
     run: async (ctx) => await ctx.runMutation(backfillPlatformFeesRef, {}),
   },
   {
-    // Old store images copied out of orgs/smokeshop/. Literal name: const is below.
-    name: "moveOldsmokeshopImages-v1",
+    // Old store images copied out of orgs/smokeshop/. v2 also covers subfolders (blogs/).
+    name: "moveOldsmokeshopImages-v2",
     run: async (ctx) => await runMoveOldsmokeshopImages(ctx),
   },
 ];
@@ -367,7 +367,7 @@ async function runCleanSmokeshopDescriptions(ctx: ActionCtx): Promise<unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// moveOldsmokeshopImages-v1: before the slug rename, the original store
+// moveOldsmokeshopImages (v2 adds subfolders such as blogs/): before the slug rename, the original store
 // uploaded into asset_images/orgs/smokeshop/, which now belongs to the new
 // `smokeshop` store. Those files were copied (not moved) to
 // asset_images/orgs/oldsmokeshop/ by hand. This rewrites the old store's rows
@@ -376,11 +376,11 @@ async function runCleanSmokeshopDescriptions(ctx: ActionCtx): Promise<unknown> {
 // by hand, once this has run on PROD. Idempotent.
 // ---------------------------------------------------------------------------
 
-export const MOVE_OLDSMOKESHOP_IMAGES_MIGRATION = "moveOldsmokeshopImages-v1";
+export const MOVE_OLDSMOKESHOP_IMAGES_MIGRATION = "moveOldsmokeshopImages-v2";
 const OLD_IMG_PREFIX = "asset_images/orgs/smokeshop/";
 const NEW_IMG_PREFIX = "asset_images/orgs/oldsmokeshop/";
 const MOVED_IMAGE_SET = new Set(OLDSMOKESHOP_MOVED_IMAGE_KEYS);
-const IMG_KEY_RE = /asset_images\/orgs\/smokeshop\/([A-Za-z0-9._-]+)/g;
+const IMG_KEY_RE = /asset_images\/orgs\/smokeshop\/([A-Za-z0-9._/-]+)/g;
 
 const IMAGE_TABLES = [
   "catalogBrands",
