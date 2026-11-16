@@ -30,7 +30,6 @@ import {
   type DateRangePreset,
 } from '../ui';
 import { UnderReviewBadge } from '../features/orders/PaymentClaimCard';
-import { keepPaise, moneyPaise, type OrderFeeView } from '../features/payments/platformFeeFormat';
 import {
   STAGE_FILTERS,
   customerName,
@@ -54,29 +53,6 @@ interface Entry {
 }
 
 const money = (order: OrderDoc) => formatINR(orderTotalRupees(order));
-
-/** "You keep" after the marketplace fee. Unpaid orders have no fee yet. */
-function keepCell(order: OrderDoc, fee: OrderFeeView | null | undefined) {
-  if (!fee) return <span className="text-muted-foreground">—</span>;
-  if (fee.reversed) return <span className="text-xs text-muted-foreground">Fee reversed</span>;
-  return (
-    <span className="block tabular-nums text-foreground">
-      {moneyPaise(keepPaise(fee, order.finalAmountPaise))}
-      <span className="block text-xs text-muted-foreground">Fee −{moneyPaise(fee.feePaise)}</span>
-    </span>
-  );
-}
-
-/** Phone card line: fee and what the store keeps. */
-function feeLine(order: OrderDoc, fee: OrderFeeView | null | undefined) {
-  if (!fee) return null;
-  if (fee.reversed) return <span className="text-xs text-muted-foreground">Fee reversed</span>;
-  return (
-    <span className="text-xs tabular-nums text-muted-foreground">
-      Fee −{moneyPaise(fee.feePaise)} · you keep {moneyPaise(keepPaise(fee, order.finalAmountPaise))}
-    </span>
-  );
-}
 
 export function OrdersPage() {
   const navigate = useNavigate();
@@ -136,13 +112,6 @@ export function OrdersPage() {
   useEffect(() => setPage(1), [search, stage, preset]);
 
   const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
-  // Marketplace fee for the visible orders (paid orders only; others are absent).
-  const feeById = useQuery(
-    api.platformFees.getOrderFees,
-    org && pageItems.length > 0
-      ? { orgId: org._id, orderIds: pageItems.map((e) => e.order._id) }
-      : 'skip',
-  );
   const current = Math.min(page, pageCount);
   const firstShown = filtered.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1;
   const lastShown = Math.min(current * PAGE_SIZE, filtered.length);
@@ -188,13 +157,6 @@ export function OrdersPage() {
       header: 'Total',
       align: 'right',
       cell: ({ order }) => <span className="tabular-nums text-foreground">{money(order)}</span>,
-    },
-    {
-      id: 'keep',
-      header: 'You keep',
-      align: 'right',
-      hideBelow: 'lg',
-      cell: ({ order }) => keepCell(order, feeById?.[order._id]),
     },
     {
       id: 'stage',
@@ -291,7 +253,6 @@ export function OrdersPage() {
                         <span>{formatOrderDate(order.createdAt)}</span>
                         <span className="text-sm font-semibold tabular-nums text-foreground">{money(order)}</span>
                       </span>
-                      {feeLine(order, feeById?.[id])}
                     </button>
                   </li>
                 );
