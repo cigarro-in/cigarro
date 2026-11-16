@@ -34,6 +34,7 @@ import { StorePaymentsTab } from '../payments/StorePaymentsTab';
 import { StoreOrdersTab } from '../payments/StoreOrdersTab';
 import { StoreBillingTab } from '../payments/StoreBillingTab';
 import { downloadConsentCsv } from '../consentCsv';
+import { FreshStartCard } from '../FreshStartCard';
 import { cleanPersonName, customerDisplayName, isRealPersonName, personNameError } from '../../lib/profile/personName';
 import { storeAdminUrl, storeLiveUrl } from '../health';
 import {
@@ -814,6 +815,11 @@ function SettingsTab({ store, token, writeOpen }: { store: StoreRow | undefined;
           </div>
         </Card>
       </div>
+      {store && (
+        <div className="mt-3">
+          <FreshStartCard orgId={store._id} slug={store.slug} token={token} writeOpen={writeOpen} />
+        </div>
+      )}
       <ConfirmDialog
         open={open}
         onOpenChange={setOpen}
