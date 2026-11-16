@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
+import { liveStoreHostname } from "./lib/storeHost";
 
 // Normalize Indian mobile to wa.me digits: "9188XXXXXXXX".
 // Accepts "+91-8892476825", "08892476825", "8892476825", "918892476825".
@@ -324,6 +325,7 @@ export const logClick = internalMutation({
       contactId,
       clickedAt: Date.now(),
     });
-    return { orgId: campaign.orgId, campaignName: campaign.name };
+    const hostname = await liveStoreHostname(ctx, campaign.orgId);
+    return { orgId: campaign.orgId, campaignName: campaign.name, hostname };
   },
 });

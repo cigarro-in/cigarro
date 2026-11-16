@@ -5,6 +5,7 @@ import { Box, ChevronDown, ExternalLink, ImageIcon, Plus, Search, Star, Trash2 }
 import { api } from '../../../convex/_generated/api';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useOrg } from '../../lib/convex/useOrg';
+import { useStoreHostname } from '../features/account/useStoreAccount';
 import { formatINR } from '../../utils/currency';
 import { cn } from '../../components/ui/utils';
 import { ProductImageSearchModal } from '../components/shared/ProductImageSearchModal';
@@ -176,8 +177,11 @@ export function ProductFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditMode = !!id;
-  const { slug: orgSlug, primaryHost } = useOrgInfo();
+  const { slug: orgSlug } = useOrgInfo();
   const org = useOrg();
+  // The managed store's own live domain. useOrgInfo().primaryHost is the admin
+  // host's default store, which would send every store to cigarro.in.
+  const primaryHost = useStoreHostname(org?._id)?.hostname ?? null;
 
   const taxonomy = useCatalogTaxonomy(orgSlug);
   const saveProduct = useMutation(api.adminCatalog.saveProduct);

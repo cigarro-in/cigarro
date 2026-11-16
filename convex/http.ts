@@ -353,7 +353,7 @@ http.route({
     const c = url.searchParams.get("c");
     const p = url.searchParams.get("p");
     if (!c || !p) return Response.redirect(fallback, 302);
-    let hit: { campaignName: string } | null = null;
+    let hit: { campaignName: string; hostname: string | null } | null = null;
     try {
       hit = await ctx.runMutation(internal.marketing.logClick, {
         campaignId: c as never,
@@ -368,8 +368,10 @@ http.route({
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 60);
+    // The campaign's own store, never the platform domain when it has one.
+    const storeSite = hit.hostname ? `https://${hit.hostname}` : site;
     return Response.redirect(
-      `${site}/?utm_source=whatsapp&utm_medium=blast&utm_campaign=${slug}`,
+      `${storeSite}/?utm_source=whatsapp&utm_medium=blast&utm_campaign=${slug}`,
       302,
     );
   }),

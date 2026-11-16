@@ -9,6 +9,7 @@ import { adminStoresForPhone } from "./lib/adminStores";
 import { MAX_BANK_SENDERS, normalizeBankSenders } from "./lib/bankSenders";
 import { requireRealPersonName } from "./lib/personName";
 import { DEFAULT_MARKETPLACE_FEE_BPS } from "./lib/platformFeeDefaults";
+import { liveStoreHostname } from "./lib/storeHost";
 
 const DEFAULT_SLOT_TIMEOUT_MS = 10 * 60 * 1000; // 10 min — UPI payment window
 const DEFAULT_QUARANTINE_MS = 20 * 60 * 1000; // 20 min — grace for late UPI arrivals
@@ -335,15 +336,7 @@ export const renameLegacyOrgSlug = internalMutation({
 export const storeHostname = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
-    const org = await ctx.db.get(orgId);
-    if (!org || !org.active) return null;
-    const rows = await ctx.db
-      .query("orgDomains")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-    const primary = rows.find((r) => r.kind === "primary" && r.status === "active");
-    const managed = rows.find((r) => r.managed === true && r.status === "active");
-    const hostname = primary?.hostname ?? managed?.hostname ?? null;
+    const hostname = await liveStoreHostname(ctx, orgId);
     return hostname ? { hostname, url: `https://${hostname}` } : null;
   },
 });
