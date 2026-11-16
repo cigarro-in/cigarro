@@ -47,7 +47,7 @@ export const getDashboardStats = query({
 
     const orders = await ctx.db
       .query("orders")
-      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
       .take(1000);
 
@@ -172,7 +172,7 @@ export const listCustomersForAdmin = query({
 
     const orders = await ctx.db
       .query("orders")
-      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
       .take(1000);
     const memberships = await ctx.db
@@ -443,7 +443,7 @@ export const searchAdmin = query({
 
     const recent = await ctx.db
       .query("orders")
-      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
       .take(1000);
     const orders: Array<{
