@@ -138,7 +138,7 @@ export function AddressSection({ model }: { model: CheckoutModel }) {
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm font-medium text-foreground">{addr.full_name || 'Name missing'}</span>
                         {addr.label && (
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
+                          <span className="shrink-0 rounded bg-foreground/[0.06] px-1.5 py-0.5 text-[11px] font-medium capitalize text-foreground/70">
                             {addr.label}
                           </span>
                         )}

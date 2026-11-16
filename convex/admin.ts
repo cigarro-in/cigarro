@@ -415,7 +415,7 @@ export const listRecentOrders = query({
     }
     return await ctx.db
       .query("orders")
-      .withIndex("by_org_user", (q) => q.eq("orgId", orgId))
+      .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
       .take(limit ?? 50);
   },
