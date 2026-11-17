@@ -1,7 +1,7 @@
 // Per-store PWA identity for the storefront host: web app manifest, icons and the
 // apple-touch / theme-color / title head tags. The store's brand comes from its
 // public site settings (content:getSiteSettings). Results are cached per store for
-// 60s on the Cache API, the same way org resolution is cached (lib/org.js).
+// a day on the Cache API, the same way org resolution is cached (lib/org.js).
 //
 // The admin host is not handled here: it keeps its own manifest (lib/admin-pwa.js).
 
@@ -9,7 +9,9 @@ import { requiredConvexUrl } from './env.js';
 import { brandName } from './org.js';
 
 export const MANIFEST_PATH = '/manifest.webmanifest';
-const CACHE_TTL_SECONDS = 60;
+// Brand name/icons change rarely; a long TTL keeps this Convex lookup off the
+// HTML path. A rebrand can lag up to this long per colo.
+const CACHE_TTL_SECONDS = 86400;
 const ICON_CACHE_TTL_SECONDS = 60 * 60 * 24;
 const LOOKUP_TIMEOUT_MS = 4000;
 const DEFAULT_THEME_COLOR = '#e8e0d2';
