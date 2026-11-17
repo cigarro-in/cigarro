@@ -3,12 +3,15 @@
 // The hostname decides the store. _middleware.js resolves once per request and
 // stores the result on context.data.org; every handler reads it from there via
 // getRequestOrg(context). The Convex lookup (domains:resolveByHost) is cached
-// per hostname for 60s. If Convex is unreachable or the function is not deployed
+// per hostname for a day. If Convex is unreachable or the function is not deployed
 // yet, we degrade to the env default org instead of taking the site down.
 
 import { requiredConvexUrl, getOrgSlug } from './env.js';
 
-const CACHE_TTL_SECONDS = 60;
+// Store identity and site settings change rarely; a long TTL keeps the two
+// sequential Convex lookups off every cold render. A theme/name edit can lag
+// up to this long per colo.
+const CACHE_TTL_SECONDS = 86400;
 // Last successful lookup per host, kept for outages so a store host keeps its own org.
 const LAST_GOOD_TTL_SECONDS = 86400;
 const LOOKUP_TIMEOUT_MS = 4000;
