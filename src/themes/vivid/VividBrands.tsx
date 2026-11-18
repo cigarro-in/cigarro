@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { useSectionConfig } from '../../hooks/data/useContent';
@@ -14,15 +14,12 @@ interface Brand {
 }
 
 export function VividBrands() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Wave 3: brand list from the Convex catalog (same shape).
-  const { brands: catalogBrands, loading: catalogLoading } = useFullCatalog();
+  // Derived from the catalog on the first render (no effect), so the server
+  // render lists every brand. Both queries are preloaded on /brands.
+  const { brands: catalogBrands, loading } = useFullCatalog();
   const { config: sectionCfg } = useSectionConfig('brands_section');
-
-  useEffect(() => {
-    if (catalogLoading) return;
-    setBrands(
+  const brands: Brand[] = useMemo(
+    () =>
       (catalogBrands as any[])
         .filter((b: any) => b.isActive)
         .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
@@ -33,9 +30,8 @@ export function VividBrands() {
           description: b.description ?? undefined,
           logo_url: b.logoUrl ?? undefined,
         })),
-    );
-    setLoading(false);
-  }, [catalogBrands, catalogLoading]);
+    [catalogBrands],
+  );
 
   return (
     <>

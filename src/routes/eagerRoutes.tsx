@@ -11,6 +11,8 @@ import { BrandPage } from '../pages/brands/BrandPage';
 import { BlogPost } from '../pages/blog/BlogsPage';
 import { AgentsPage } from '../pages/agents/AgentsPage';
 import { VividProductList } from '../themes/vivid/VividProductList';
+import { VividCategories } from '../themes/vivid/VividCategories';
+import { VividBrands } from '../themes/vivid/VividBrands';
 import { useBrandDetail, useBrandsHub, useCategoriesHub, useCategoryListing, useFullCatalog } from '../hooks/data/useCatalog';
 import { useBlogPost, useBlogPosts } from '../hooks/data/useContent';
 import { IS_SERVER } from '../lib/ssr/preload';
@@ -86,42 +88,82 @@ export function BlogRoute() {
 
 // Hub pages (P5-SSR slice 8: /products, /categories, /brands, /blogs). The
 // classic theme uses the eager components on the server AND the client, so the
-// hydrating render matches. Other themes keep their Slot view on the client;
-// the server throws for them, and the edge serves the bot renderer / SPA.
+// hydrating render matches. A theme listed in `themed` does the same with its
+// own eager component; that component must be eager (a lazy slot suspends
+// during hydration and React throws #421) and must match what the theme's slot
+// renders, or the server markup and the hydrating render diverge. Any other
+// theme keeps its Slot view on the client and the server throws, so the edge
+// serves the bot renderer / SPA.
 function HubRoute({
   slot,
   label,
   loading,
   View,
+  themed,
 }: {
   slot: ThemeSlotName;
   label: string;
   loading: boolean;
   View: ComponentType;
+  themed?: Record<string, ComponentType>;
 }) {
   const { themeId } = useTheme();
   if (IS_SERVER) {
     if (loading) throw new Error(`SSR ${label} preload missing`);
+    const Themed = themed?.[themeId];
+    if (Themed) return <Themed />;
     if (themeId !== 'classic') throw new Error(`No SSR ${label} page for theme "${themeId}"`);
     return <View />;
   }
+  const Themed = themed?.[themeId];
+  if (Themed) return <Themed />;
   if (themeId !== 'classic') return <Slot name={slot} />;
   return <View />;
 }
 
+// Eager vivid hub: same tree the theme's Products slot renders
+// (src/themes/vivid/index.tsx), minus the lazy wrapper.
+function VividProductsHub() {
+  return <VividProductList mode="all" />;
+}
+
 export function ProductsHubRoute() {
   const { loading } = useFullCatalog();
-  return <HubRoute slot="Products" label="products" loading={loading} View={ProductsPage} />;
+  return (
+    <HubRoute
+      slot="Products"
+      label="products"
+      loading={loading}
+      View={ProductsPage}
+      themed={{ vivid: VividProductsHub }}
+    />
+  );
 }
 
 export function CategoriesHubRoute() {
   const { loading } = useCategoriesHub();
-  return <HubRoute slot="Categories" label="categories" loading={loading} View={CategoriesPage} />;
+  return (
+    <HubRoute
+      slot="Categories"
+      label="categories"
+      loading={loading}
+      View={CategoriesPage}
+      themed={{ vivid: VividCategories }}
+    />
+  );
 }
 
 export function BrandsHubRoute() {
   const { loading } = useBrandsHub();
-  return <HubRoute slot="Brands" label="brands" loading={loading} View={BrandsPage} />;
+  return (
+    <HubRoute
+      slot="Brands"
+      label="brands"
+      loading={loading}
+      View={BrandsPage}
+      themed={{ vivid: VividBrands }}
+    />
+  );
 }
 
 // Blog listing is not themed (one view for every theme), so no theme check.

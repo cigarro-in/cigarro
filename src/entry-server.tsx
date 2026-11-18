@@ -426,13 +426,20 @@ const productsHubRoute = exactRoute('products', '/products', {
   trimPreload: (preload, params) => trimProductsHubPreload(preload, hasSearchQuery(params.search)),
 });
 
+// Vivid draws the hub title from the section copy, so those hubs preload it too.
 const categoriesHubRoute = exactRoute('categories', '/categories', {
-  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  preloadRequests: (_params, org) => [
+    ...categoryPreloadRequests(org),
+    { fnName: 'content:getSectionConfig', args: { name: 'categories_section', orgSlug: org.slug } },
+  ],
   trimPreload: (preload) => trimCategoryPreload(preload),
 });
 
 const brandsHubRoute = exactRoute('brands', '/brands', {
-  preloadRequests: (_params, org) => categoryPreloadRequests(org),
+  preloadRequests: (_params, org) => [
+    ...categoryPreloadRequests(org),
+    { fnName: 'content:getSectionConfig', args: { name: 'brands_section', orgSlug: org.slug } },
+  ],
   trimPreload: (preload) => trimBrandPreload(preload),
 });
 

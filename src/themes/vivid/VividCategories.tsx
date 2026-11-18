@@ -1,12 +1,29 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useHomepageData } from '../../hooks/useHomepageData';
+import { useFullCatalog } from '../../hooks/data/useCatalog';
+import { useSectionConfig } from '../../hooks/data/useContent';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { richTextToPlain } from '../../lib/content/richText';
 
 export function VividCategories() {
-  const { data, isLoading } = useHomepageData();
-  const categories = data?.categories || [];
+  // Catalog + section copy only: the server preloads both, so the hub SSRs.
+  const { categories: catalogCategories, loading } = useFullCatalog();
+  const { config: sectionCfg } = useSectionConfig('categories_section');
+  const categories = useMemo(
+    () =>
+      [...(catalogCategories as any[])]
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+        .slice(0, 20)
+        .map((c: any) => ({
+          id: c.supabaseId,
+          name: c.name,
+          slug: c.slug,
+          image: c.image,
+          description: c.description,
+        })),
+    [catalogCategories],
+  );
 
   return (
     <>
@@ -19,13 +36,13 @@ export function VividCategories() {
 
       <div className="max-w-[1280px] mx-auto px-4 py-6">
         <header className="vv-page-header">
-          <h1 className="vv-page-title">{data?.categoriesSectionConfig?.title || 'Categories'}</h1>
+          <h1 className="vv-page-title">{sectionCfg?.title || 'Categories'}</h1>
           <p className="vv-page-subtitle">
-            {data?.categoriesSectionConfig?.description || "Browse by category to find exactly what you're after."}
+            {sectionCfg?.description || "Browse by category to find exactly what you're after."}
           </p>
         </header>
 
-        {isLoading ? (
+        {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="vv-card overflow-hidden">
