@@ -6,6 +6,7 @@ import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, resolveSiteSettings, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath, brandName } from './lib/org.js';
 import { buildAdminManifest, storeManifestPath } from './lib/admin-pwa.js';
 import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
+import { isFaviconPath, serveFavicon } from './lib/favicon.js';
 import { applyRedirect } from './lib/redirects.js';
 import { isSsrEnabledFor, ssrRender } from './ssr-render.js';
 
@@ -92,6 +93,13 @@ async function handleRequest(context) {
         'X-Robots-Tag': 'noindex, nofollow',
       },
     });
+  }
+
+  // Storefront favicons at /favicon.ico and /favicon-192.png: the store's own icon,
+  // served directly (200, no redirect). Checked before the alias redirect.
+  if (isFaviconPath(url.pathname) && !isAdminHostname(url.hostname) && !org.admin &&
+      (request.method === 'GET' || request.method === 'HEAD')) {
+    return serveFavicon(context, org);
   }
 
   // Alias host (e.g. a registered www domain) folds onto the store's primary host.

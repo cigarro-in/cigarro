@@ -219,9 +219,9 @@ export function rewriteStorefrontHead(res, org, brand) {
   const name = brandName(org);
   const color = brand.brandColor || DEFAULT_THEME_COLOR;
   const appIcon = brand.icon ? brand.icon.url : '/icons/apple-touch-icon.png';
-  const favicon = brand.faviconUrl
-    ? `<link rel="icon" href="${attr(brand.faviconUrl)}">`
-    : '<link rel="icon" type="image/x-icon" href="/icons/favicon.ico"><link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">';
+  // Fixed, same-origin favicon URLs (functions/lib/favicon.js serves them per store).
+  // The stored faviconUrl (a webp) is never a favicon link: Google needs square PNG/ICO.
+  const favicon = '<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">';
   const tags = [
     `<link rel="manifest" href="${MANIFEST_PATH}">`,
     favicon,

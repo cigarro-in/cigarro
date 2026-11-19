@@ -65,8 +65,11 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       injectManifest: {
-        // Static assets plus the offline page only. index.html is not precached.
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}', 'offline.html'],
+        // Precache only the offline page, the icons and the CSS. JS chunks are not
+        // precached (the admin and super-admin chunks would download the whole app on
+        // first visit); src/sw.js runtime-caches /assets/ on first use instead.
+        // index.html is not precached.
+        globPatterns: ['offline.html', 'icons/**/*.{png,ico,svg}', '**/*.css'],
         // Don't cache images in precache (too large)
         globIgnores: ['**/assets/images/**'],
       },
@@ -79,7 +82,8 @@ export default defineConfig({
     },
   },
   build: {
-    target: 'esnext',
+    // Older Android WebViews and iOS Safari fail to load pages built for esnext.
+    target: ['es2020', 'chrome87', 'safari14', 'firefox78', 'edge88'],
     outDir: 'dist',
     minify: 'terser',
     sourcemap: false,

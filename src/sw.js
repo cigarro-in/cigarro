@@ -51,6 +51,16 @@ registerRoute(
   },
 );
 
+// Build assets (hashed JS and CSS under /assets/), cached on first use rather than
+// precached. Hashed names never change, so CacheFirst is safe.
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/assets/'),
+  new CacheFirst({
+    cacheName: 'assets',
+    plugins: [new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 })],
+  }),
+);
+
 // API catalogue responses: stale-while-revalidate, never on the admin host.
 registerRoute(
   ({ url }) =>

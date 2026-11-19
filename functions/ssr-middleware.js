@@ -301,8 +301,8 @@ async function generateProductHTML(slug, faviconUrl, cx) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Favicon (Dynamic from Admin Settings) -->
-  <link rel="icon" href="${faviconUrl}">
-  <link rel="shortcut icon" href="${faviconUrl}">
+  <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="${faviconUrl}">
   
   <!-- Primary Meta Tags -->
@@ -982,7 +982,7 @@ async function generateCategoryBrandHTML(categorySlug, brandSlug, faviconUrl, cx
   <script type="application/ld+json">
   ${breadcrumbJsonLd(crumbs)}
   </script>
-  <link rel="icon" href="${faviconUrl}">
+  <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
 </head>
 <body>
   ${breadcrumbNavHtml(crumbs)}
@@ -1107,8 +1107,8 @@ async function generateHomepageHTML(faviconUrl, cx) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Favicon -->
-  <link rel="icon" href="${faviconUrl}">
-  <link rel="shortcut icon" href="${faviconUrl}">
+  <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <link rel="apple-touch-icon" href="${faviconUrl}">
   
   <!-- Primary Meta Tags -->
@@ -1342,7 +1342,7 @@ function generateAgentsHTML(faviconUrl, cx) {
   <link rel="canonical" href="${canonicalUrl}">
   <link rel="alternate" type="application/json" title="Agent manifest (JSON)" href="${canonicalUrl}?format=json">
   <link rel="alternate" type="text/markdown" title="Agent manual (Markdown)" href="${canonicalUrl}?format=md">
-  <link rel="icon" href="${faviconUrl}">
+  <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
   <script type="application/ld+json">
   ${JSON.stringify({
     '@context': 'https://schema.org',
@@ -1471,7 +1471,7 @@ function generateNotFoundHTML(requestedPath, faviconUrl, cx) {
   <title>Page not found | ${cx.name}</title>
   <meta name="description" content="The page you requested does not exist. Browse ${cx.name}'s catalog, brands and categories instead.">
   <meta name="robots" content="noindex, follow">
-  <link rel="icon" href="${faviconUrl}">
+  <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Page not found | ${cx.name}">
   <meta property="og:description" content="This page does not exist. Browse the ${cx.name} catalog instead.">

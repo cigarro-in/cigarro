@@ -18,12 +18,15 @@ import { getRequestOrg, orgScriptJson } from './lib/org.js';
 // Preloads run in parallel (fetchPreload); each one gives up after this long and
 // the client's live query covers it.
 const PRELOAD_TIMEOUT_MS = 1500;
-// Edge cache (Cache API, keyed per host + path): fresh for 60s, served stale for a
-// further 300s while a background re-render refreshes it.
+// Edge cache (Cache API, keyed per host + path): fresh for 60s, then served stale for
+// a further 7 days while a background re-render refreshes it. The long stale window
+// means a low-traffic page is still a cache hit for most visitors, not a cold render.
 const SSR_FRESH_SECONDS = 60;
-const SSR_STALE_SECONDS = 300;
-const SSR_CACHE_CONTROL = `public, s-maxage=${SSR_FRESH_SECONDS}, stale-while-revalidate=${SSR_STALE_SECONDS}`;
-// Lifetime of the Cache API entry: long enough to serve the stale window.
+const SSR_STALE_SECONDS = 604800;
+// Browser- and proxy-facing header: deliberately short. It does not advertise the
+// 7-day stale window; only the Cache API entry (SSR_STORE_CONTROL) keeps it.
+const SSR_CACHE_CONTROL = `public, max-age=0, s-maxage=${SSR_FRESH_SECONDS}, stale-while-revalidate=${SSR_FRESH_SECONDS}`;
+// Lifetime of the Cache API entry: long enough to serve the full fresh + stale window.
 const SSR_STORE_CONTROL = `public, s-maxage=${SSR_FRESH_SECONDS + SSR_STALE_SECONDS}`;
 const STORED_AT_HEADER = 'x-ssr-stored-at';
 
