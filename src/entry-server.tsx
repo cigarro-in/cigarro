@@ -77,6 +77,11 @@ function homePreloadRequests(org: OrgInfo): PreloadRequest[] {
 // `description` is kept: the header search indexes it.
 const UNUSED_PRODUCT_FIELDS = ['shortDescription', 'specifications', 'metaDescription', 'metaTitle'];
 const UNUSED_BLOG_FIELDS = ['content', 'metaTitle', 'metaDescription'];
+// Storefront readers of the catalog rows use only the first image of a variant
+// (cards, cart, header search, PDP thumbnail). The home render and its hydration
+// input stay identical with one image per variant; the full array arrives with
+// the live query.
+const UNUSED_CATEGORY_FIELDS = ['metaTitle', 'metaDescription'];
 
 function without(row: unknown, fields: string[]): unknown {
   if (!row || typeof row !== 'object') return row;
@@ -85,12 +90,32 @@ function without(row: unknown, fields: string[]): unknown {
   return copy;
 }
 
+// Convex `_id` is never read by the catalog mappers (they key on supabaseId).
+const UNUSED_ROW_ID = ['_id'];
+
 export function trimHomePreload(preload: PreloadMap): PreloadMap {
   const out: PreloadMap = { ...preload };
   for (const key of Object.keys(out)) {
-    const value = out[key] as { products?: unknown[] } | unknown[] | null;
-    if (key.startsWith('catalog:fullCatalog:') && value && !Array.isArray(value) && Array.isArray(value.products)) {
-      out[key] = { ...value, products: value.products.map((p) => without(p, UNUSED_PRODUCT_FIELDS)) };
+    const value = out[key] as Record<string, unknown> | unknown[] | null;
+    if (key.startsWith('catalog:fullCatalog:') && value && !Array.isArray(value)) {
+      const bundle = value as { products?: unknown[]; variants?: unknown[]; categories?: unknown[] };
+      out[key] = {
+        ...bundle,
+        ...(Array.isArray(bundle.products)
+          ? { products: bundle.products.map((p) => without(p, [...UNUSED_PRODUCT_FIELDS, ...UNUSED_ROW_ID])) }
+          : {}),
+        ...(Array.isArray(bundle.variants)
+          ? {
+              variants: bundle.variants.map((v) => {
+                const row = without(v, UNUSED_ROW_ID) as { images?: unknown };
+                return Array.isArray(row.images) ? { ...row, images: row.images.slice(0, 1) } : row;
+              }),
+            }
+          : {}),
+        ...(Array.isArray(bundle.categories)
+          ? { categories: bundle.categories.map((c) => without(c, UNUSED_CATEGORY_FIELDS)) }
+          : {}),
+      };
     } else if (key.startsWith('content:listBlogPosts:') && Array.isArray(value)) {
       out[key] = value.map((row) => without(row, UNUSED_BLOG_FIELDS));
     }
