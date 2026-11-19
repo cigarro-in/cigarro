@@ -1,4 +1,4 @@
-import { SingleImagePicker } from '../../components/shared/ImagePicker';
+import { ImageInput } from '../../components/shared/ImagePicker';
 import { LazyRichTextEditor } from '../../ui/LazyRichTextEditor';
 import { readingMinutes, wordCount } from './contentForm';
 
@@ -38,8 +38,13 @@ export function ContentWritingEditor({
     <div className="rounded-xl border border-border bg-card">
       {showCover && onCoverChange && (
         <div className="border-b border-border p-4 sm:p-6">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Cover image</p>
-          <SingleImagePicker value={cover ?? null} onChange={(url) => onCoverChange(url)} searchHint={coverHint} />
+          <ImageInput
+            label="Cover image"
+            value={cover ?? ''}
+            onChange={(url) => onCoverChange(url || null)}
+            slug={coverHint || title || undefined}
+            searchQuery={coverHint || title || undefined}
+          />
         </div>
       )}
 

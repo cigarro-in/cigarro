@@ -22,7 +22,7 @@ import {
   useButtonFeedback,
   type ActionError,
 } from '../ui';
-import { ImageField } from '../features/homepage/ImageField';
+import { ImageInput } from '../components/shared/ImagePicker';
 import { LinkPicker } from '../features/homepage/LinkPicker';
 import { HERO_PRODUCT_SPEC, heroBannerSpec, heroPhoneSpec } from '../features/homepage/imageSpecs';
 
@@ -192,21 +192,21 @@ export function HeroSlideFormPage() {
           <div className="space-y-3">
             <Card title="Image">
               <div className="space-y-5">
-                <ImageField
+                <ImageInput
                   label="Banner image"
                   value={form.imageUrl}
                   onChange={(url) => set('imageUrl', url)}
-                  uploadSlug={form.title}
-                  spec={heroBannerSpec(themeId)}
-                  note={isClassic ? 'Shown on desktop and tablet. Phones use the phone image when one is set.' : 'Shown on desktop and tablet (768px and up).'}
+                  slug={form.title}
+                  aspect={heroBannerSpec(themeId)}
+                  help={isClassic ? 'Shown on desktop and tablet. Phones use the phone image when one is set.' : 'Shown on desktop and tablet (768px and up).'}
                 />
-                <ImageField
+                <ImageInput
                   label="Phone image (optional)"
                   value={form.mobileImageUrl}
                   onChange={(url) => set('mobileImageUrl', url)}
-                  uploadSlug={form.title}
-                  spec={heroPhoneSpec(themeId)}
-                  note={
+                  slug={form.title}
+                  aspect={heroPhoneSpec(themeId)}
+                  help={
                     isClassic
                       ? 'Used on phones. Leave empty to use the banner image.'
                       : 'Used on phones (below 768px). Leave empty to use the banner image.'
@@ -291,12 +291,12 @@ export function HeroSlideFormPage() {
                       onChange={(e) => set('productPrice', e.target.value)}
                     />
                   </div>
-                  <ImageField
+                  <ImageInput
                     label="Product image"
                     value={form.productImageUrl}
                     onChange={(url) => set('productImageUrl', url)}
-                    uploadSlug={form.productName || form.title}
-                    spec={HERO_PRODUCT_SPEC}
+                    slug={form.productName || form.title}
+                    aspect={HERO_PRODUCT_SPEC}
                   />
                 </div>
               </Card>

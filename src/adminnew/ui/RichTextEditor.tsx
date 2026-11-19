@@ -30,7 +30,7 @@ import {
 import { cn } from '../../components/ui/utils';
 import { sanitizeBlogBody } from '../../lib/blog/blogRender';
 import { CDN_IMG_PREFIX, plainTextToHtml } from '../../lib/content/richText';
-import { MediaLibraryDialog } from '../features/products/MediaLibraryDialog';
+import { ImagePickerDialog } from '../components/shared/ImagePicker';
 import { Button } from './Button';
 
 export interface RichTextEditorProps {
@@ -333,13 +333,15 @@ export default function RichTextEditor({
         <EditorContent editor={editor} className="text-foreground" />
       </div>
 
-      <MediaLibraryDialog
+      <ImagePickerDialog
         open={imageOpen}
         onOpenChange={setImageOpen}
-        onConfirm={insertImages}
-        cropRatio="original"
-        uploadSlug={uploadSlug}
-        title="Insert image"
+        onPick={insertImages}
+        multiple
+        aspect="free"
+        slug={uploadSlug}
+        searchQuery={uploadSlug}
+        title="Insert images"
       />
     </div>
   );

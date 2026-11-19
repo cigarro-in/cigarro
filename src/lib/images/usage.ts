@@ -8,6 +8,8 @@ export interface UsageContext {
   label: string;
   detail?: string;
   mutable: boolean;
+  /** Admin route that edits this reference (router-relative), when there is one. */
+  href?: string;
 }
 
 export interface AssetUsage {

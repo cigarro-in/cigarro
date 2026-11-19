@@ -5,7 +5,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
 import { generateSlug } from '../../types/product';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { ImageInput } from '../components/shared/ImagePicker';
 import { ProductMembers, useCatalogProducts } from '../features/catalog/ProductMembers';
 import {
   CatalogThumb,
@@ -208,10 +208,13 @@ export function CollectionFormPage() {
                     />
                   </Field>
                   <Field label="Image">
-                    <SingleImagePicker
+                    <ImageInput
+                      label="Image"
+                      hideLabel
                       value={form.image}
                       onChange={(url) => patch({ image: url || null })}
-                      searchHint={form.title ? `${form.title} collection` : undefined}
+                      slug={form.title || undefined}
+                      searchQuery={form.title || undefined}
                     />
                   </Field>
                 </div>

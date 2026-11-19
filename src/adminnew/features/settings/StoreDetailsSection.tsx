@@ -1,6 +1,6 @@
 import { useMutation } from 'convex/react';
 import { Button, Card, ErrorBanner, Input, Label, useButtonFeedback } from '../../ui';
-import { SingleImagePicker } from '../../components/shared/ImagePicker';
+import { ImageInput } from '../../components/shared/ImagePicker';
 import { InlineStatus, useInlineStatus } from '../../../components/common/InlineStatus';
 import { siteConfig } from '../../../config/site';
 import { api } from '../../../../convex/_generated/api';
@@ -13,7 +13,6 @@ import { useSettingsDraft } from './useSettingsDraft';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 // Link-preview image: 1200 x 630 (Open Graph / Twitter large card).
-const SHARE_IMAGE_RATIO = 1200 / 630;
 
 /** Store name, logo, site icon, brand colour, contact, address and social links. */
 export function StoreDetailsSection({ live }: SectionProps) {
@@ -109,41 +108,33 @@ export function StoreDetailsSection({ live }: SectionProps) {
             <Input id="store_name" value={draft.name} onChange={(e) => update((d) => ({ ...d, name: e.target.value }))} />
           </div>
           <FieldGrid>
-            <div className="flex flex-col gap-1.5">
-              <Label>Logo</Label>
-              <SingleImagePicker
-                value={draft.brand.logoUrl || null}
-                onChange={(url) => setBrand({ logoUrl: url || '' })}
-                searchHint={draft.name ? `${draft.name} logo` : undefined}
-                cropRatio={1}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Site icon</Label>
-              <SingleImagePicker
-                value={draft.brand.faviconUrl || null}
-                onChange={(url) => setBrand({ faviconUrl: url || '' })}
-                searchHint={draft.name ? `${draft.name} icon` : undefined}
-                cropRatio={1}
-              />
-              <p className="text-xs text-muted-foreground">32 x 32 or 64 x 64 px, PNG or ICO.</p>
-            </div>
+            <ImageInput
+              label="Logo"
+              value={draft.brand.logoUrl}
+              onChange={(url) => setBrand({ logoUrl: url })}
+              slug={draft.name ? `${draft.name} logo` : 'logo'}
+              searchQuery={draft.name ? `${draft.name} logo` : undefined}
+            />
+            <ImageInput
+              label="Site icon"
+              aspect="icon"
+              value={draft.brand.faviconUrl}
+              onChange={(url) => setBrand({ faviconUrl: url })}
+              slug={draft.name ? `${draft.name} icon` : 'site icon'}
+              searchQuery={draft.name ? `${draft.name} icon` : undefined}
+              help="Shown in the browser tab. Your home-screen app icons are made from it."
+            />
           </FieldGrid>
           <div className="flex flex-col gap-1.5">
-            <Label>Share image (link previews, 1200×630)</Label>
-            <SingleImagePicker
-              value={draft.brand.shareImageUrl || null}
-              onChange={onShareImageChange}
-              searchHint={draft.name ? `${draft.name} store` : undefined}
-              cropRatio={SHARE_IMAGE_RATIO}
-              cropPresets={[
-                { label: '1200 x 630', ratio: SHARE_IMAGE_RATIO },
-                { label: 'Original', ratio: 'original' },
-              ]}
+            <ImageInput
+              label="Share image"
+              aspect="wide"
+              value={draft.brand.shareImageUrl}
+              onChange={(url) => onShareImageChange(url || null)}
+              slug={draft.name ? `${draft.name} share` : 'share image'}
+              searchQuery={draft.name ? `${draft.name} store` : undefined}
+              help="Shown when the store link is shared on WhatsApp, social media or search. Left empty, the first hero slide is used."
             />
-            <p className="text-xs text-muted-foreground">
-              Shown when the store link is shared on WhatsApp, social media or search. Left empty, the first hero slide is used.
-            </p>
             <InlineStatus status={shareFeedback.status} onDismiss={shareFeedback.clear} />
           </div>
           <div className="flex flex-col gap-1.5">

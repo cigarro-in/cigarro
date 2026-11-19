@@ -6,6 +6,7 @@ export interface UsageContext {
   label: string; // human entity name
   detail?: string; // field or extra context
   mutable: boolean; // false = historical/read-only, never auto-patched
+  href?: string; // admin route that edits this reference (router-relative)
 }
 
 /** Match a complete R2 key or URL path. Basenames alone can collide across folders. */

@@ -1,42 +1,58 @@
 import { useState, type DragEvent, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ImagePlus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Globe, ImagePlus, X } from 'lucide-react';
 import { cn } from '../../../components/ui/utils';
 import { Button } from '../../ui';
-import { MediaLibraryDialog } from './MediaLibraryDialog';
+import { ImagePickerDialog, type PickerTab } from '../../components/shared/ImagePicker';
 
 const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
 /**
  * Product media editor: the first image is the featured one (large tile).
  * Drag tiles to reorder (arrow buttons do the same on touch and keyboard),
- * drop files on the card to upload, "Add" opens the media library dialog.
+ * drop files on the card to upload. "Add" and "Search the web" open the
+ * shared image picker (square product photos).
  */
 export function ProductMediaGrid({
   images,
   onChange,
   uploadSlug,
-  extraActions,
+  searchQuery,
   compact = false,
   label = 'Media',
 }: {
   images: string[];
   onChange: (images: string[]) => void;
   uploadSlug?: string;
-  /** Extra buttons next to "Add" (e.g. web image search). */
-  extraActions?: ReactNode;
+  /** Prefill for web search (product name and brand). Empty disables the web button. */
+  searchQuery?: string;
   /** Smaller tiles, no featured tile (variant images). */
   compact?: boolean;
   label?: string;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [droppedFiles, setDroppedFiles] = useState<File[] | undefined>(undefined);
+  const [initialTab, setInitialTab] = useState<PickerTab>('library');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [fileOver, setFileOver] = useState(false);
 
-  const openLibrary = (files?: File[]) => {
+  const openLibrary = (files?: File[], tab: PickerTab = 'library') => {
     setDroppedFiles(files);
+    setInitialTab(tab);
     setDialogOpen(true);
   };
+
+  const webButton = (
+    <Button
+      variant="plain"
+      size="sm"
+      icon={<Globe aria-hidden />}
+      disabled={!searchQuery?.trim()}
+      title={searchQuery?.trim() ? undefined : 'Add a title first'}
+      onClick={() => openLibrary(undefined, 'web')}
+    >
+      Search the web
+    </Button>
+  );
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= images.length || from === to) return;
@@ -79,9 +95,9 @@ export function ProductMediaGrid({
             <Button variant="secondary" size="sm" icon={<ImagePlus aria-hidden />} onClick={() => openLibrary()}>
               Add images
             </Button>
-            {extraActions}
+            {webButton}
           </div>
-          <p className="text-xs text-[var(--admin-text-muted)]">Pick from the library, upload, or drop files here.</p>
+          <p className="text-xs text-[var(--admin-text-muted)]">Pick from your library, upload, paste, or drop files here.</p>
         </div>
       ) : (
         <>
@@ -149,7 +165,7 @@ export function ProductMediaGrid({
               </button>
             </li>
           </ul>
-          {extraActions && <div className="mt-2 flex flex-wrap gap-2">{extraActions}</div>}
+          <div className="mt-2 flex flex-wrap gap-2">{webButton}</div>
         </>
       )}
       {fileOver && (
@@ -157,13 +173,18 @@ export function ProductMediaGrid({
           Drop images to upload
         </div>
       )}
-      <MediaLibraryDialog
+      <ImagePickerDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        multiple
+        aspect="square"
+        title={compact ? label : 'Add product images'}
         existing={images}
-        uploadSlug={uploadSlug}
+        slug={uploadSlug}
+        searchQuery={searchQuery}
+        initialTab={initialTab}
         initialFiles={droppedFiles}
-        onConfirm={(urls) => onChange([...images, ...urls])}
+        onPick={(urls) => onChange([...images, ...urls.filter((u) => !images.includes(u))])}
       />
     </div>
   );

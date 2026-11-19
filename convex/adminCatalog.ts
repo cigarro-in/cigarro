@@ -459,16 +459,17 @@ async function collectImageUsage(
         label: nameById.get(x.productSupabaseId) ?? x.productSupabaseId,
         detail: x.variantName,
         mutable: true,
+        href: `/products/${x.productSupabaseId}`,
       }, count);
   }
   for (const b of r.brands) {
-    if (hits(b.logoUrl)) push({ kind: "brand", label: b.name, detail: "logo", mutable: true });
+    if (hits(b.logoUrl)) push({ kind: "brand", label: b.name, detail: "logo", mutable: true, href: `/brands/${b.supabaseId}` });
   }
   for (const c of r.categories) {
-    if (hits(c.image)) push({ kind: "category", label: c.name, detail: "image", mutable: true });
+    if (hits(c.image)) push({ kind: "category", label: c.name, detail: "image", mutable: true, href: `/categories/${c.supabaseId}` });
   }
   for (const c of r.collections) {
-    if (hits(c.imageUrl)) push({ kind: "collection", label: c.title, detail: "image", mutable: true });
+    if (hits(c.imageUrl)) push({ kind: "collection", label: c.title, detail: "image", mutable: true, href: `/collections/${c.supabaseId}` });
   }
   for (const c of r.combos) {
     if (hits(c.image)) push({ kind: "combo", label: c.name, detail: "image", mutable: true });
@@ -477,29 +478,36 @@ async function collectImageUsage(
   }
   for (const p of r.blogs) {
     if (hits(p.featuredImage))
-      push({ kind: "blog", label: p.title, detail: "featured image", mutable: true });
-    if (hits(p.ogImage)) push({ kind: "blog", label: p.title, detail: "og image", mutable: true });
+      push({ kind: "blog", label: p.title, detail: "featured image", mutable: true, href: `/blogs/${p._id}` });
+    if (hits(p.ogImage)) push({ kind: "blog", label: p.title, detail: "og image", mutable: true, href: `/blogs/${p._id}` });
     if (replaceEmbeddedRef(p.content, key, url, "") !== null)
-      push({ kind: "blog", label: p.title, detail: "content", mutable: true });
+      push({ kind: "blog", label: p.title, detail: "content", mutable: true, href: `/blogs/${p._id}` });
   }
   for (const s of r.heroes) {
     for (const f of ["imageUrl", "mobileImageUrl", "productImageUrl", "smallImageUrl"] as const) {
       if (hits((s as any)[f]))
-        push({ kind: "hero", label: s.title || "hero slide", detail: f, mutable: true });
+        push({ kind: "hero", label: s.title || "hero slide", detail: f, mutable: true, href: `/hero-slides/${s._id}` });
     }
   }
   for (const s of r.sections) {
     if (hits(s.backgroundImage))
-      push({ kind: "section", label: s.sectionName, detail: "background", mutable: true });
+      push({ kind: "section", label: s.sectionName, detail: "background", mutable: true, href: "/homepage" });
     if (replaceDeepRefs(s.config, key, url, "") !== null)
-      push({ kind: "section", label: s.sectionName, detail: "config", mutable: true });
+      push({ kind: "section", label: s.sectionName, detail: "config", mutable: true, href: "/homepage" });
   }
   for (const site of r.sites) {
-    if (hits(site.faviconUrl)) push({ kind: "site", label: "site settings", detail: "favicon", mutable: true });
+    const settings = { kind: "site", label: "Store settings", mutable: true, href: "/settings/store" };
+    if (hits(site.faviconUrl)) push({ ...settings, detail: "favicon" });
+    // Store identity (Settings, Store): logo, site icon, share image, app icons.
+    const brand = (site as any).brand ?? {};
+    if (hits(brand.logoUrl)) push({ ...settings, detail: "logo" });
+    if (hits(brand.faviconUrl) && brand.faviconUrl !== site.faviconUrl) push({ ...settings, detail: "site icon" });
+    if (hits(brand.shareImageUrl)) push({ ...settings, detail: "share image" });
+    if (replaceDeepRefs((site as any).appIcons, key, url, "") !== null) push({ ...settings, detail: "app icons" });
   }
   for (const c of r.components) {
     if (replaceDeepRefs(c.config, key, url, "") !== null)
-      push({ kind: "homepage-config", label: c.componentName, detail: "config", mutable: true });
+      push({ kind: "homepage-config", label: c.componentName, detail: "config", mutable: true, href: "/homepage" });
   }
   for (const cart of r.carts) {
     if (hits(cart.imageUrl)) push({ kind: "cart", label: cart.name, detail: "cart image", mutable: true });
@@ -517,6 +525,7 @@ async function collectImageUsage(
         label: orderNumberOf(o as any) !== undefined ? `Order ${orderNumberOf(o as any)}` : "Order",
         detail: "item snapshot",
         mutable: false,
+        href: `/orders/${(o as any)._id}`,
       }, count);
   }
   return { contexts, mutableTotal, historicalTotal };
@@ -568,7 +577,10 @@ export const repointImageRefs = mutation({
   },
   handler: async (ctx, { orgSlug, oldKey, oldUrl, newUrl }) => {
     const { org, orgId } = await requireOrgAdminBySlug(ctx, orgSlug);
-    if (!oldKey.startsWith("asset_images/") || !newUrl.startsWith("https://cdn.cigarro.in/asset_images/"))
+    // Old: a legacy key or this store's flat key. New: only this store's flat
+    // image layout (`<slug>/images/`), never another store's or the old prefix.
+    const ownKey = (k: string) => k.startsWith(`${orgSlug}/images/`) || k.startsWith("asset_images/");
+    if (!ownKey(oldKey) || !newUrl.startsWith(`https://cdn.cigarro.in/${orgSlug}/images/`) || newUrl.includes(".."))
       throw new ConvexError({ code: "BAD_IMAGE_REFERENCE" });
     const hits = (s: unknown) => matchesRef(s, oldKey, oldUrl);
     const patched: Record<string, number> = {};
@@ -612,6 +624,18 @@ export const repointImageRefs = mutation({
         await ctx.db.patch(row._id, { ...patch, orgId });
         bump(label);
       }
+    }
+    // Store identity: logo, site icon, share image and generated app icons.
+    for (const site of await collectInOrg(ctx, "siteSettings", org)) {
+      const brand = replaceDeepRefs((site as any).brand, oldKey, oldUrl, newUrl);
+      const appIcons = replaceDeepRefs((site as any).appIcons, oldKey, oldUrl, newUrl);
+      if (brand === null && appIcons === null) continue;
+      await ctx.db.patch(site._id, {
+        ...(brand !== null ? { brand: brand as any } : {}),
+        ...(appIcons !== null ? { appIcons: appIcons as any } : {}),
+        orgId,
+      });
+      bump("siteBrand");
     }
     for (const c of await collectInOrg(ctx, "catalogCombos", org)) {
       const gallery = c.galleryImages || [];

@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
-import { Box, ChevronDown, ExternalLink, ImageIcon, Plus, Search, Star, Trash2 } from 'lucide-react';
+import { Box, ChevronDown, ExternalLink, ImageIcon, Plus, Star, Trash2 } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useStoreHostname } from '../features/account/useStoreAccount';
 import { formatINR } from '../../utils/currency';
 import { cn } from '../../components/ui/utils';
-import { ProductImageSearchModal } from '../components/shared/ProductImageSearchModal';
 import {
   ProductFormData,
   VariantFormData,
@@ -199,7 +198,6 @@ export function ProductFormPage() {
   const [saveAttempted, setSaveAttempted] = useState(false);
   const [validationError, setValidationError] = useState<ActionError | null>(null);
   const [expandedVariant, setExpandedVariant] = useState<number | null>(null);
-  const [imageSearchIndex, setImageSearchIndex] = useState<number | null>(null);
   const [seoOpen, setSeoOpen] = useState(false);
   const [confirmNoImages, setConfirmNoImages] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -469,18 +467,11 @@ export function ProductFormPage() {
     .map((variant, index) => ({ variant, index }))
     .sort((a, b) => Number(!!b.variant.is_default) - Number(!!a.variant.is_default));
 
-  const webSearchButton = (index: number) => (
-    <Button
-      variant="plain"
-      size="sm"
-      icon={<Search aria-hidden />}
-      disabled={!form.name.trim()}
-      title={form.name.trim() ? undefined : 'Add a title first'}
-      onClick={() => setImageSearchIndex(index)}
-    >
-      Search the web
-    </Button>
-  );
+  // Web image search starts from the brand and product name.
+  const brandLabel = taxonomy.brands?.find((b) => b.id === form.brand_id)?.label;
+  const imageSearchQuery = form.name.trim()
+    ? [brandLabel && !form.name.toLowerCase().includes(brandLabel.toLowerCase()) ? brandLabel : '', form.name.trim()].filter(Boolean).join(' ')
+    : '';
 
   return (
     <Page
@@ -556,7 +547,7 @@ export function ProductFormPage() {
                   images={defaultVariant.images}
                   onChange={(images) => updateDefault({ images })}
                   uploadSlug={form.name.trim() || undefined}
-                  extraActions={webSearchButton(defaultIndex)}
+                  searchQuery={imageSearchQuery}
                 />
               ) : (
                 <p className="text-sm text-[var(--admin-text-muted)]">Mark an option as default to add media.</p>
@@ -643,7 +634,7 @@ export function ProductFormPage() {
                           productName={form.name}
                           onChange={(u) => updateVariant(index, u)}
                           onRemove={() => removeVariant(index)}
-                          webSearch={webSearchButton(index)}
+                          imageSearchQuery={`${imageSearchQuery} ${variant.variant_name}`.trim()}
                           liveAvailable={live?.available}
                           saveAttempted={saveAttempted}
                         />
@@ -989,27 +980,6 @@ export function ProductFormPage() {
         }}
       />
 
-      <ProductImageSearchModal
-        open={imageSearchIndex !== null}
-        onClose={() => setImageSearchIndex(null)}
-        product={
-          form.name
-            ? {
-                id: id || 'new',
-                name: form.name,
-                slug: form.slug,
-                brand: taxonomy.brands?.find((b) => b.id === form.brand_id)?.label,
-                gallery_images: imageSearchIndex !== null ? form.variants[imageSearchIndex]?.images : [],
-              }
-            : undefined
-        }
-        onImagesAdded={(_, urls) => {
-          if (imageSearchIndex === null) return;
-          const current = form.variants[imageSearchIndex]?.images || [];
-          updateVariant(imageSearchIndex, { images: [...current, ...urls] });
-        }}
-        mode="single"
-      />
     </Page>
   );
 }
@@ -1068,7 +1038,7 @@ function VariantEditor({
   productName,
   onChange,
   onRemove,
-  webSearch,
+  imageSearchQuery,
   liveAvailable,
   saveAttempted,
 }: {
@@ -1078,7 +1048,7 @@ function VariantEditor({
   productName: string;
   onChange: (u: Partial<VariantFormData>) => void;
   onRemove: () => void;
-  webSearch: ReactNode;
+  imageSearchQuery: string;
   liveAvailable?: number;
   saveAttempted: boolean;
 }) {
@@ -1147,7 +1117,7 @@ function VariantEditor({
               images={variant.images}
               onChange={(images) => onChange({ images })}
               uploadSlug={`${productName} ${variant.variant_name}`.trim() || undefined}
-              extraActions={webSearch}
+              searchQuery={productName.trim() ? imageSearchQuery : ''}
             />
           </Field>
         </>

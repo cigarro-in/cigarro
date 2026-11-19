@@ -87,12 +87,16 @@ export async function uploadImageToR2(
     keepOriginalResolution?: boolean;
     /** Long-edge cap in px. Defaults to 1600, or 2400 with keepOriginalResolution. */
     maxDim?: number;
+    /** Called as the pipeline moves on: converting in the browser, then sending to R2. */
+    onStage?: (stage: 'converting' | 'uploading') => void;
   } = {},
 ): Promise<R2UploadResult> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
   const maxDim = opts.maxDim ?? (opts.keepOriginalResolution ? 2400 : MAX_DIM);
+  opts.onStage?.('converting');
   const webp = await convertToWebp(input, maxDim, WEBP_QUALITY, !opts.keepOriginalResolution);
+  opts.onStage?.('uploading');
   const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');

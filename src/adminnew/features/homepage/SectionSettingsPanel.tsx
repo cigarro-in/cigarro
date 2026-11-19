@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Banner, Button, ErrorBanner, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toActionError, useButtonFeedback, type ActionError } from '../../ui';
 import type { HomepageSectionDef, HomepageSectionKey } from './sections';
-import { ImageField } from './ImageField';
+import { ImageInput } from '../../components/shared/ImagePicker';
 import { SHOWCASE_IMAGE_SPEC } from './imageSpecs';
 
 // Sheet body for one product or category section: heading and collection link.
@@ -117,12 +117,12 @@ export function SectionSettingsPanel({
 
       {showcaseImage && (
         <div className="space-y-2">
-          <ImageField
+          <ImageInput
             label="Side image"
             value={config?.backgroundImage ?? ''}
             onChange={(url) => void pickImage(url)}
-            spec={SHOWCASE_IMAGE_SPEC}
-            note={
+            aspect={SHOWCASE_IMAGE_SPEC}
+            help={
               collectionHasImage
                 ? 'The linked collection has its own image, and the store shows that one. This image is used only when the collection has none.'
                 : 'Shown beside the products. Set the collection image under Products, Collections to use that instead.'

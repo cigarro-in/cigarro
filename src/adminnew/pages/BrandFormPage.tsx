@@ -5,7 +5,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
 import { generateSlug } from '../../types/product';
-import { SingleImagePicker } from '../components/shared/ImagePicker';
+import { ImageInput } from '../components/shared/ImagePicker';
 import { BrandProductsEditor, useCatalogProducts } from '../features/catalog/ProductMembers';
 import {
   CatalogThumb,
@@ -202,10 +202,13 @@ export function BrandFormPage() {
                     />
                   </Field>
                   <Field label="Logo">
-                    <SingleImagePicker
+                    <ImageInput
+                      label="Logo"
+                      hideLabel
                       value={form.logo}
                       onChange={(url) => patch({ logo: url || null })}
-                      searchHint={form.name ? `${form.name} brand logo` : undefined}
+                      slug={form.name ? `${form.name} logo` : undefined}
+                      searchQuery={form.name ? `${form.name} brand logo` : undefined}
                     />
                   </Field>
                 </div>
