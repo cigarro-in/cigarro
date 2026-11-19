@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useOrgInfo } from '../../lib/org/OrgContext';
+import { isLegacyStoreSlug } from '../../lib/storeSettings';
 
 interface FooterBrand { id: string; name: string; slug: string; }
 
 const Footer = () => {
   const { settings: store } = useStoreSettings();
+  const { slug } = useOrgInfo();
   const [brands, setBrands] = useState<FooterBrand[]>([]);
   // Wave 3: footer brand list from the Convex catalog.
   const { brands: catalogBrands, loading } = useFullCatalog();
@@ -22,16 +25,18 @@ const Footer = () => {
   }, [catalogBrands, loading]);
   return (
     <footer className="section bg-creme-light relative overflow-hidden z-10">
-      {/* Background Video (optional) - Commented out until video file is added */}
-      {/* <video 
-        className="absolute left-0 right-0 top-0 bottom-0 w-full h-full object-cover z-[-1] pointer-events-none opacity-30"
-        autoPlay
-        muted
-        loop
-        playsInline
-      >
-        <source src="/media/cigarro-background-video.mp4" type="video/mp4" />
-      </video> */}
+      {/* Cigarro background video: legacy store only. Other stores keep the plain background. */}
+      {isLegacyStoreSlug(slug) && (
+        <video
+          className="absolute left-0 right-0 top-0 bottom-0 w-full h-full object-cover z-[-1] pointer-events-none opacity-30"
+          autoPlay
+          muted
+          loop
+          playsInline
+        >
+          <source src="/media/cigarro-background-video.mp4" type="video/mp4" />
+        </video>
+      )}
       
       <div className="main-container">
         <div className="bg-creme-light rounded-lg p-8 lg:p-16">
