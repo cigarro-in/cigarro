@@ -253,7 +253,13 @@ export const referencedFileKeys = query({
     await requireSaSession(ctx, saToken);
     const org = await resettableOrg(ctx, orgId);
     if (!STORE_SLUG_RE.test(org.slug)) throw new ConvexError({ code: "INVALID_SLUG" });
-    const re = new RegExp(`asset_images/orgs/${org.slug}/[A-Za-z0-9._/-]+`, "g");
+    // Both layouts: <slug>/images|documents/… (new, may appear inside a full CDN URL)
+    // and asset_images/orgs/<slug>/… (pre-restructure). The lookbehind keeps
+    // `smokeshop/` from matching inside `oldsmokeshop/`.
+    const re = new RegExp(
+      `(?<![A-Za-z0-9-])(?:asset_images/orgs/${org.slug}/|${org.slug}/(?:images|documents)/)[A-Za-z0-9._/-]+`,
+      "g",
+    );
     const keys = new Set<string>();
     const scan = (doc: unknown) => {
       for (const m of JSON.stringify(doc).matchAll(re)) {

@@ -4,24 +4,31 @@ import { requiredConvexUrl } from '../../lib/env.js';
 /**
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
- * - GET  /api/images/upload?prefix=asset_images/  → { images: [{name,key,url,size,uploaded}], folders: [..] }
- * - POST /api/images/upload (multipart: file, folder?, png=true for generated app icons) → { url, key, size }
- * - DELETE /api/images/upload?key=asset_images/... → { success: true }
+ * Key layout (see CLAUDE.md "Images"):
+ *   <store-slug>/images/<stem>.<ext>      every image of a store, flat
+ *   <store-slug>/documents/<stem>.<ext>   raw files (pdf, zip, video)
+ *
+ * - GET    /api/images/upload?kind=images|documents&cursor=…  → { images: [{name,key,url,size,uploaded}], cursor? }
+ * - GET    /api/images/upload?legacy=1&cursor=…               → same shape, the store's pre-restructure keys (copy source)
+ * - POST   /api/images/upload (multipart: file, slug?, alt?, raw=true | png=true) → { url, key, size }
+ * - POST   /api/images/upload?action=copy  (json {from}) → { status: "copied"|"exists", key, url }
+ * - DELETE /api/images/upload?key=<store>/…  → { success: true }
  *
  * Admin-gated: Authorization Bearer <own ES256 JWT (cigarro_token)>, verified against
- * Convex memberships (same check as invalidate-cache). Files are expected
- * pre-converted to WebP by the client (canvas redraw strips EXIF/GPS and
- * applies lightweight compression); the server validates type + size.
+ * Convex memberships. Files are expected pre-converted to WebP by the client (canvas
+ * redraw strips EXIF/GPS); the server validates type + size.
  * Public reads stay on https://cdn.cigarro.in (no auth).
+ *
+ * Every write is create-only: a key that already exists is never overwritten.
  */
 
 const CDN_BASE = (env) =>
   (env.CDN_BASE_URL || 'https://cdn.cigarro.in').replace(/\/$/, '');
-const LIB_PREFIX = 'asset_images/';
-// Unprefixed legacy keys under LIB_PREFIX belong to this org only.
-const LEGACY_LIBRARY_ORG = LEGACY_ORG_SLUG;
+// Pre-restructure keys. Kept readable (copy source, delete of old objects, legacy list).
+const OLD_PREFIX = 'asset_images/';
 const MAX_BYTES = 10 * 1024 * 1024;
 const STORE_HEADER_RE = /^[a-z0-9-]{1,50}$/;
+const IMAGE_EXT_RE = /\.(webp|jpg|jpeg|png|gif|avif)$/i;
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -36,10 +43,8 @@ function json(payload, status = 200) {
 }
 
 // The store this request acts for. On the admin host the API path carries no
-// store (/api/images/upload), so the edge default store would be used and the
-// admin check would run against the wrong org. The admin client names the store
-// in X-Store instead. Only honoured on the admin host; requireAdmin still checks
-// membership in that named store, so a header cannot grant access to another store.
+// store, so the admin client names the store in X-Store. Only honoured on the
+// admin host; requireAdmin still checks membership in that named store.
 function requestedStoreSlug(request, context) {
   const org = getRequestOrg(context);
   const named = (request.headers.get('X-Store') || '').trim().toLowerCase();
@@ -75,20 +80,13 @@ async function requireAdmin(request, env, orgSlug) {
   }
 }
 
-function cleanFolder(folder) {
-  return String(folder || '')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/\.\./g, '')
-    .slice(0, 100);
-}
-
 function decodeListCursor(cursor) {
-  if (!cursor) return {};
-  try { return JSON.parse(atob(cursor)); } catch { return { tenant: cursor }; }
+  if (!cursor) return undefined;
+  try { return JSON.parse(atob(cursor)).c || undefined; } catch { return undefined; }
 }
 
-function encodeListCursor(tenant, legacy) {
-  return btoa(JSON.stringify({ tenant: tenant || null, legacy: legacy || null }));
+function encodeListCursor(cursor) {
+  return btoa(JSON.stringify({ c: cursor }));
 }
 
 // "Camel Yellow Packet!" → "camel-yellow-packet" (SEO-friendly R2 keys).
@@ -102,83 +100,110 @@ function slugify(text) {
     .replace(/-+$/, '');
 }
 
+function listedImage(obj, cdn) {
+  return {
+    id: obj.key,
+    name: obj.key.split('/').pop(),
+    path: obj.key,
+    url: `${cdn}/${obj.key}`,
+    size: obj.size || 0,
+    contentType: obj.httpMetadata?.contentType || 'image/webp',
+    createdAt: obj.uploaded ? new Date(obj.uploaded).toISOString() : new Date().toISOString(),
+    metadata: obj.customMetadata || {},
+  };
+}
+
+// Only keys that are this store's, in either layout. Old keys are the store's own
+// `asset_images/orgs/<slug>/…`, and for the legacy store also bare `asset_images/…`.
+function isOwnOldKey(key, orgSlug) {
+  if (!key.startsWith(OLD_PREFIX)) return false;
+  if (key.startsWith(`${OLD_PREFIX}orgs/`)) return key.startsWith(`${OLD_PREFIX}orgs/${orgSlug}/`);
+  return orgSlug === LEGACY_ORG_SLUG;
+}
+
+function isOwnNewKey(key, orgSlug) {
+  return key.startsWith(`${orgSlug}/images/`) || key.startsWith(`${orgSlug}/documents/`);
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   if (request.method === 'OPTIONS') return json({}, 200);
 
   const orgSlug = requestedStoreSlug(request, context);
+  if (!/^[a-z0-9-]{1,50}$/.test(orgSlug)) return json({ error: 'Invalid org configuration' }, 500);
   const gate = await requireAdmin(request, env, orgSlug);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
   const bucket = env.R2_ASSETS;
   const cdn = CDN_BASE(env);
   const url = new URL(request.url);
-  if (!/^[a-z0-9-]{1,50}$/.test(orgSlug)) return json({ error: 'Invalid org configuration' }, 500);
-  const tenantPrefix = `${LIB_PREFIX}orgs/${orgSlug}/`;
 
-  // ---- List (library browser; cursor-paginated for bulk walks) ----
+  // ---- List ----
   if (request.method === 'GET') {
-    const requestedPrefix = String(url.searchParams.get('prefix') || LIB_PREFIX);
-    if (!requestedPrefix.startsWith(LIB_PREFIX)) return json({ error: 'Bad prefix' }, 400);
-    const explicitTenantPrefix = `${tenantPrefix}`;
-    const explicitTenant = requestedPrefix.startsWith(explicitTenantPrefix);
-    if (explicitTenant && requestedPrefix.slice(explicitTenantPrefix.length).split('/').some((part) => part === 'orgs' || part === orgSlug))
-      return json({ error: 'Bad prefix' }, 400);
-    const relativePrefix = cleanFolder(requestedPrefix.slice(explicitTenant ? explicitTenantPrefix.length : LIB_PREFIX.length));
-    if (!explicitTenant && relativePrefix.split('/').some((part) => part === 'orgs'))
-      return json({ error: 'Bad prefix' }, 400);
-    const prefix = `${explicitTenantPrefix}${relativePrefix ? relativePrefix + '/' : ''}`;
-    const cursorState = decodeListCursor(url.searchParams.get('cursor'));
-    const [tenant, legacy] = await Promise.all([
-      bucket.list({ prefix, limit: 500, cursor: cursorState.tenant || undefined }),
-      orgSlug === LEGACY_LIBRARY_ORG && !explicitTenant
-        ? bucket.list({ prefix: `${LIB_PREFIX}${relativePrefix ? relativePrefix + '/' : ''}`, limit: 500, cursor: cursorState.legacy || undefined })
-        : Promise.resolve(null),
-    ]);
+    const cursor = decodeListCursor(url.searchParams.get('cursor'));
+    let prefix;
+    const legacy = url.searchParams.get('legacy') === '1';
+    const kind = url.searchParams.get('kind') === 'documents' ? 'documents' : 'images';
+    if (legacy) {
+      // Copy source: this store's pre-restructure keys. The legacy store also owns
+      // bare `asset_images/<name>` keys, so its scan starts at the root of that prefix.
+      prefix = orgSlug === LEGACY_ORG_SLUG ? OLD_PREFIX : `${OLD_PREFIX}orgs/${orgSlug}/`;
+    } else {
+      prefix = `${orgSlug}/${kind}/`;
+    }
+    const listed = await bucket.list({ prefix, limit: 500, cursor });
     const images = [];
-    const folderMap = new Map();
-    for (const [listed, sourcePrefix, isLegacy] of [
-      [tenant, prefix, false],
-      [legacy, `${LIB_PREFIX}${relativePrefix ? relativePrefix + '/' : ''}`, true],
-    ]) {
-      for (const obj of listed?.objects || []) {
-        if (isLegacy && obj.key.startsWith(`${LIB_PREFIX}orgs/`)) continue;
-        const rest = obj.key.slice(sourcePrefix.length);
-        if (!rest) continue;
-        if (rest.includes('/')) {
-          const folder = rest.split('/')[0];
-          if (folder !== 'orgs') folderMap.set(`${sourcePrefix}${folder}/`, { name: folder, path: `${sourcePrefix}${folder}/` });
-          continue;
-        }
-        if (!/\.(webp|jpg|jpeg|png|gif|avif)$/i.test(obj.key)) continue;
-        images.push({
-          id: obj.key,
-          name: obj.key.split('/').pop(),
-          path: obj.key,
-          url: `${cdn}/${obj.key}`,
-          size: obj.size || 0,
-          contentType: obj.httpMetadata?.contentType || 'image/webp',
-          createdAt: obj.uploaded ? new Date(obj.uploaded).toISOString() : new Date().toISOString(),
-          metadata: obj.customMetadata || {},
-        });
-      }
+    for (const obj of listed.objects || []) {
+      if (legacy && !isOwnOldKey(obj.key, orgSlug)) continue;
+      // Documents are listed whatever their extension; images only as image types.
+      if (kind === 'images' && !legacy && !IMAGE_EXT_RE.test(obj.key)) continue;
+      if (legacy && !IMAGE_EXT_RE.test(obj.key)) continue;
+      images.push(listedImage(obj, cdn));
     }
     images.sort((a, b) => (b.createdAt < a.createdAt ? -1 : 1));
-    const out = { images, folders: [...folderMap.values()] };
-    if (tenant.truncated || legacy?.truncated)
-      out.cursor = encodeListCursor(tenant.truncated ? tenant.cursor : null, legacy?.truncated ? legacy.cursor : null);
+    const out = { images };
+    if (listed.truncated) out.cursor = encodeListCursor(listed.cursor);
     return json(out);
   }
 
-  // ---- Upload ----
+  // ---- Upload + copy ----
+  if (request.method === 'POST' && url.searchParams.get('action') === 'copy') {
+    const body = await request.json().catch(() => null);
+    const from = String(body?.from || '');
+    if (!from || !isOwnOldKey(from, orgSlug) || !IMAGE_EXT_RE.test(from))
+      return json({ error: 'Bad source key' }, 400);
+    const stem = slugify(from.split('/').pop().replace(IMAGE_EXT_RE, '')) || `${Date.now()}`;
+    const ext = (from.match(IMAGE_EXT_RE)?.[1] || 'webp').toLowerCase();
+    // Target key is chosen by the caller (the copy script's map), so the same key is
+    // produced on every run. The server only checks it is this store's new layout.
+    const to = String(body?.to || `${orgSlug}/images/${stem}.${ext}`);
+    if (!isOwnNewKey(to, orgSlug) || to.includes('..')) return json({ error: 'Bad target key' }, 400);
+    const sourceHead = await bucket.head(from);
+    if (!sourceHead) return json({ error: 'Source not found', key: from }, 404);
+    // Target already there: fine when it holds the same bytes (an earlier run),
+    // a conflict otherwise. Never overwritten either way.
+    const existing = await bucket.head(to);
+    if (existing) {
+      const same = existing.etag === sourceHead.etag;
+      return json({ status: same ? 'exists' : 'conflict', key: to, url: `${cdn}/${to}` }, same ? 200 : 409);
+    }
+    const source = await bucket.get(from);
+    if (!source) return json({ error: 'Source not found', key: from }, 404);
+    const stored = await bucket.put(to, source.body, {
+      httpMetadata: source.httpMetadata,
+      customMetadata: source.customMetadata,
+      // Create-only: null means the target key appeared meanwhile (race-safe).
+      onlyIf: { etagDoesNotMatch: '*' },
+    });
+    if (stored === null) return json({ status: 'conflict', key: to, error: 'Target appeared during copy' }, 409);
+    return json({ status: 'copied', key: to, url: `${cdn}/${to}`, size: stored.size });
+  }
+
   if (request.method === 'POST') {
     const form = await request.formData().catch(() => null);
     const file = form?.get('file');
-    const folder = cleanFolder(form?.get('folder'));
-    // raw=true stores non-image assets (video/pdf/zip) untouched under their
-    // original extension. Images are expected pre-converted to WebP.
+    // raw=true stores non-image assets (video/pdf/zip) untouched under documents/.
     const raw = String(form?.get('raw') || '') === 'true';
-    // png=true: a PNG generated in the browser (store app icons). Checked by its
-    // signature; stored as PNG under the same create-only rule.
+    // png=true: a PNG generated in the browser (store app icons). Checked by its signature.
     const png = String(form?.get('png') || '') === 'true';
     if (raw && png) return json({ error: 'Use either raw or png, not both' }, 400);
     if (!file || typeof file.arrayBuffer !== 'function')
@@ -209,7 +234,7 @@ export async function onRequest(context) {
     // race-safe: onlyIf etagDoesNotMatch '*' never overwrites, retry next.
     const sourceName = String(form?.get('slug') || (raw ? file.name : '') || '').replace(/\.[^.]+$/, '');
     const stem = slugify(sourceName) || `${Date.now()}`;
-    const base = `${tenantPrefix}${folder ? folder + '/' : ''}${stem}`;
+    const base = `${orgSlug}/${raw ? 'documents' : 'images'}/${stem}`;
     const pipelineSource = String(form?.get('pipelineSource') || '');
     if (pipelineSource && !/^[a-f0-9]{24}$/.test(pipelineSource))
       return json({ error: 'Invalid pipeline marker' }, 400);
@@ -241,9 +266,7 @@ export async function onRequest(context) {
   // ---- Delete ----
   if (request.method === 'DELETE') {
     const key = String(url.searchParams.get('key') || '');
-    const isTenantKey = key.startsWith(tenantPrefix);
-    const isLegacyShopKey = orgSlug === LEGACY_LIBRARY_ORG && key.startsWith(LIB_PREFIX) && !key.startsWith(`${LIB_PREFIX}orgs/`);
-    if (!isTenantKey && !isLegacyShopKey) return json({ error: 'Bad key' }, 400);
+    if (!isOwnNewKey(key, orgSlug) && !isOwnOldKey(key, orgSlug)) return json({ error: 'Bad key' }, 400);
     const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
     let usage;
     try {

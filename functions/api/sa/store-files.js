@@ -98,14 +98,16 @@ export async function onRequestPost(context) {
   if (typeof slug !== 'string' || !STORE_SLUG_RE.test(slug)) return json({ error: 'Invalid store slug' }, 500);
   const referenced = new Set(Array.isArray(refs.value?.keys) ? refs.value.keys : []);
 
-  const prefix = `asset_images/orgs/${slug}/`;
+  // Both layouts: the store's new keys (<slug>/…) and its pre-restructure keys
+  // (asset_images/orgs/<slug>/…). Old objects stay until the restructure is verified.
+  const prefixes = [`${slug}/`, `asset_images/orgs/${slug}/`];
   const bucket = env.R2_ASSETS;
-  const keys = await listAllKeys(bucket, prefix);
+  const keys = (await Promise.all(prefixes.map((p) => listAllKeys(bucket, p)))).flat();
   const used = [];
   const unused = [];
   for (const key of keys) {
-    // Never touch anything outside this store's prefix.
-    if (!key.startsWith(prefix)) continue;
+    // Never touch anything outside this store's prefixes.
+    if (!prefixes.some((p) => key.startsWith(p))) continue;
     (referenced.has(key) ? used : unused).push(key);
   }
 
