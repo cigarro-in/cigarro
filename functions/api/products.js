@@ -1,5 +1,6 @@
 import { requiredConvexUrl } from '../lib/env.js';
 import { getRequestOrg } from '../lib/org.js';
+import { cleanImageUrl, cleanImageUrls } from '../lib/images.js';
 // Cloudflare Worker for Products Listing with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -59,7 +60,7 @@ export async function onRequest(context) {
         variant_type: x.variantType,
         price: x.priceRupees,
         stock: x.stock,
-        images: x.images ?? [],
+        images: cleanImageUrls(x.images),
         is_active: x.isActive,
         is_default: x.isDefault,
       });

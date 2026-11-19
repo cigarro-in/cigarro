@@ -11,6 +11,7 @@ import { QuantityStepper } from '../../components/cart/QuantityStepper';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { trackViewCart } from '../../lib/analytics/ga';
 import { Card, CardContent } from '../../components/ui/card';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -197,6 +198,7 @@ const CartSummary: React.FC<{
   onCheckout: () => void;
   isMobile?: boolean;
 }> = ({ totalPrice, totalItems, isLoading, onCheckout, isMobile = false }) => {
+  const { settings: storeSettings } = useStoreSettings();
   if (isMobile) {
     // Compact, single-row mobile summary (no Card wrapper)
     return (
@@ -258,7 +260,7 @@ const CartSummary: React.FC<{
 
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/20 p-3 rounded-lg">
           <Shield className="w-4 h-4 text-accent" />
-          <span>Secure checkout powered by Cigarro</span>
+          <span>Secure checkout powered by {storeSettings.name}</span>
         </div>
       </CardContent>
     </Card>
@@ -266,6 +268,7 @@ const CartSummary: React.FC<{
 };
 
 export default function CartPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const { items, totalPrice, isLoading, updateQuantity, removeFromCart, totalItems } = useCart();
   const { user } = useAuth();
   const { requestAuth } = useAuthDialog();
@@ -292,7 +295,7 @@ export default function CartPage() {
   return (
     <>
       <Helmet>
-        <title>{`My Cart (${totalItems}) - Cigarro`}</title>
+        <title>{`My Cart (${totalItems}) - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

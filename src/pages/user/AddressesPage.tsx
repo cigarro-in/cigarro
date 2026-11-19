@@ -10,8 +10,10 @@ import { useInlineStatus, InlineStatus } from '../../components/common/InlineSta
 import { Address } from '../../components/checkout/address/AddressCard';
 import { AddressForm } from '../../components/checkout/address/AddressForm';
 import { AddressCard } from '../../components/checkout/address/AddressCard';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 export function AddressesPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [view, setView] = useState<'list' | 'form'>('list');
@@ -99,7 +101,7 @@ export function AddressesPage() {
   return (
     <>
       <Helmet>
-        <title>My Addresses - Cigarro</title>
+        <title>{`My Addresses - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

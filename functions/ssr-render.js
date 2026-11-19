@@ -95,6 +95,7 @@ const STATIC_HEAD_TO_REPLACE = [
   'meta[name="description"]',
   'meta[name="keywords"]',
   'meta[name="title"]',
+  'meta[name="author"]',
   'link[rel="canonical"]',
   'meta[property^="og:"]',
   'meta[name^="twitter:"]',

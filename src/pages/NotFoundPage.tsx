@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { SEOHead } from '../components/seo/SEOHead';
+import { useStoreSettings } from '../hooks/data/useStoreSettings';
 
 /**
  * NotFoundPage — client-side fallback for unknown URLs (audit T7).
@@ -10,6 +11,7 @@ import { SEOHead } from '../components/seo/SEOHead';
  * bot-facing HTTP 404s are served at the edge (functions/ssr-middleware.js).
  */
 export function NotFoundPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -23,7 +25,7 @@ export function NotFoundPage() {
     <>
       <SEOHead
         title="Page not found"
-        description="The page you requested does not exist. Browse Cigarro's catalog, brands and categories instead."
+        description={`The page you requested does not exist. Browse ${storeSettings.name}'s catalog, brands and categories instead.`}
         url={location.pathname}
         type="website"
         robots="noindex, follow"

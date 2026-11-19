@@ -8,6 +8,7 @@ import {
 } from '../types/home';
 import { useHeroSlides, useSectionConfig, useBlogPosts } from './data/useContent';
 import { useFullCatalog } from './data/useCatalog';
+import { cleanImageUrl } from '../lib/images/urls';
 import { usePreloadedOrLive } from '../lib/ssr/preload';
 import { api } from '../../convex/_generated/api';
 import { useOrgInfo } from '../lib/org/OrgContext';
@@ -117,7 +118,7 @@ export function useHomepageData() {
       name: cat.name,
       slug: cat.slug,
       description: cat.description,
-      image: cat.image,
+      image: cleanImageUrl(cat.image),
       products: (productCategories as any[])
         .filter((j: any) => j.categorySupabaseId === cat.supabaseId)
         .map((j: any) => byId.get(j.productSupabaseId))
@@ -131,7 +132,7 @@ export function useHomepageData() {
     ? { title: featuredCollection.title, subtitle: featuredCfg?.subtitle, description: featuredCollection.description ?? featuredCfg?.description, button_text: (featuredCfg as any)?.button_text ?? (featuredCfg as any)?.buttonText, button_url: (featuredCfg as any)?.button_url ?? (featuredCfg as any)?.buttonUrl, is_enabled: (featuredCfg as any)?.is_enabled ?? (featuredCfg as any)?.isEnabled }
     : featuredCfg;
   const showcaseSection = showcaseCollection
-    ? { title: showcaseCollection.title, background_image: (showcaseCfg as any)?.background_image ?? (showcaseCfg as any)?.backgroundImage ?? showcaseCollection.imageUrl, button_text: (showcaseCfg as any)?.button_text ?? (showcaseCfg as any)?.buttonText, button_url: (showcaseCfg as any)?.button_url ?? (showcaseCfg as any)?.buttonUrl, is_enabled: (showcaseCfg as any)?.is_enabled ?? (showcaseCfg as any)?.isEnabled }
+    ? { title: showcaseCollection.title, background_image: cleanImageUrl((showcaseCfg as any)?.background_image ?? (showcaseCfg as any)?.backgroundImage ?? showcaseCollection.imageUrl), button_text: (showcaseCfg as any)?.button_text ?? (showcaseCfg as any)?.buttonText, button_url: (showcaseCfg as any)?.button_url ?? (showcaseCfg as any)?.buttonUrl, is_enabled: (showcaseCfg as any)?.is_enabled ?? (showcaseCfg as any)?.isEnabled }
     : showcaseCfg;
 
   // Admin on/off toggles (absent row = enabled, so existing installs keep rendering).
@@ -149,7 +150,7 @@ export function useHomepageData() {
       id: c.supabaseId,
       name: c.name,
       slug: c.slug,
-      image: c.image,
+      image: cleanImageUrl(c.image),
       description: c.description,
     })),
     brands: brands.slice(0, 20).map((b: any) => ({
@@ -157,7 +158,7 @@ export function useHomepageData() {
       name: b.name,
       slug: b.slug,
       description: b.description,
-      logo_url: b.logoUrl,
+      logo_url: cleanImageUrl(b.logoUrl),
       is_active: b.isActive,
     })),
     heroSlides: slides.map(mapHeroSlide),
@@ -165,7 +166,7 @@ export function useHomepageData() {
     showcaseConfig: showcaseSection ? mapShowcase(showcaseSection) : null,
     showcaseProducts,
     showcaseCollection: showcaseCollection
-      ? { title: showcaseCollection.title, description: showcaseCollection.description, imageUrl: showcaseCollection.imageUrl }
+      ? { title: showcaseCollection.title, description: showcaseCollection.description, imageUrl: cleanImageUrl(showcaseCollection.imageUrl) }
       : null,
     brandsSectionConfig: brandsCfg ? mapBlogSection(brandsCfg) : null,
     categoriesSectionConfig: categoriesCfg ? mapBlogSection(categoriesCfg) : null,
@@ -186,15 +187,15 @@ function mapHeroSlide(s: any): HeroSlide {
     title: s.title ?? '',
     suptitle: s.suptitle,
     description: s.description,
-    image_url: s.image_url ?? s.imageUrl ?? '',
-    mobile_image_url: s.mobile_image_url ?? s.mobileImageUrl,
+    image_url: cleanImageUrl(s.image_url ?? s.imageUrl),
+    mobile_image_url: cleanImageUrl(s.mobile_image_url ?? s.mobileImageUrl) || undefined,
     button_text: s.button_text ?? s.buttonText,
     button_url: s.button_url ?? s.buttonUrl,
     product_name: s.product_name ?? s.productName,
     product_price:
       s.product_price ??
       (s.productPrice != null ? String(s.productPrice) : undefined),
-    product_image_url: s.product_image_url ?? s.productImageUrl,
+    product_image_url: cleanImageUrl(s.product_image_url ?? s.productImageUrl) || undefined,
     is_active: s.is_active ?? true,
     sort_order: s.sort_order ?? s.sortOrder ?? 0,
   };
@@ -214,7 +215,7 @@ function mapSection(c: any): SectionConfig {
 function mapShowcase(c: any): ShowcaseConfig {
   return {
     title: c.title,
-    background_image: c.background_image ?? c.backgroundImage,
+    background_image: cleanImageUrl(c.background_image ?? c.backgroundImage) || undefined,
     button_text: c.button_text ?? c.buttonText,
     button_url: c.button_url ?? c.buttonUrl,
     is_enabled: c.is_enabled ?? c.isEnabled,
@@ -235,7 +236,7 @@ function mapHomePost(p: any): BlogPost {
     title: p.title,
     slug: p.slug,
     excerpt: p.excerpt,
-    featured_image: p.featured_image ?? p.featuredImage,
+    featured_image: cleanImageUrl(p.featured_image ?? p.featuredImage) || undefined,
     published_at: p.published_at ?? '',
     reading_time: p.reading_time ?? p.readingTime,
     author: p.author ?? (p.authorName ? { name: p.authorName } : undefined),

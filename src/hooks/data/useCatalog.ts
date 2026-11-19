@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { api } from '../../../convex/_generated/api';
 import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { cleanImageUrl, cleanImageUrls } from '../../lib/images/urls';
 
 // Theme-safe catalog reads (Convex). Shapes are snake_case rows with ISO
 // timestamps and explicit nulls, so pages keep their logic untouched. Money
@@ -58,6 +59,18 @@ export interface LegacyProduct {
   image?: string | null;
 }
 
+// Image fields on a catalog row (category, brand, collection). Foreign
+// placeholders become '' so themes fall back to their no-image view.
+const ROW_IMAGE_FIELDS = ['image', 'imageUrl', 'logoUrl', 'mobileImageUrl', 'backgroundImage'];
+function cleanRowImages(row: any): any {
+  if (!row || typeof row !== 'object') return row;
+  const out = { ...row };
+  for (const key of ROW_IMAGE_FIELDS) {
+    if (typeof out[key] === 'string') out[key] = cleanImageUrl(out[key]);
+  }
+  return out;
+}
+
 function toLegacyVariant(x: any, productSupabaseId: string): LegacyVariant {
   return {
     id: x.supabaseId,
@@ -67,7 +80,7 @@ function toLegacyVariant(x: any, productSupabaseId: string): LegacyVariant {
     variant_type: x.variantType,
     units_contained: x.unitsContained,
     unit: x.unit,
-    images: x.images ?? [],
+    images: cleanImageUrls(x.images),
     image_alt_text: x.imageAltText,
     price: x.priceRupees,
     compare_at_price: x.compareAtPriceRupees,
@@ -163,9 +176,9 @@ export function useFullCatalog() {
       products: (bundle.products || []).map((p: any) =>
         toLegacyProduct(p, brandById, variantsByProduct, catsByProduct),
       ),
-      brands: bundle.brands ?? [],
-      categories: bundle.categories ?? [],
-      collections: (bundle as any).collections ?? [],
+      brands: (bundle.brands ?? []).map(cleanRowImages),
+      categories: (bundle.categories ?? []).map(cleanRowImages),
+      collections: ((bundle as any).collections ?? []).map(cleanRowImages),
       collectionProducts: (bundle as any).collectionProducts ?? [],
       productCategories: bundle.productCategories ?? [],
       loading: false,

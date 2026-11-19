@@ -22,6 +22,7 @@ import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { resolveOrderItemImageUrl, normalizeClaim } from '../../hooks/data/useMyOrders';
 import type { ClaimableOrder } from '../../hooks/data/usePaymentClaim';
 import { PaymentClaimPanel } from '../../components/payment/PaymentClaimPanel';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 interface OrderItem {
   id: string;
@@ -96,6 +97,7 @@ function mapConvexStatus(s: string): Order['status'] {
 }
 
 export function OrdersPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -326,7 +328,7 @@ export function OrdersPage() {
   return (
     <>
       <Helmet>
-        <title>My Orders - Cigarro</title>
+        <title>{`My Orders - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
@@ -426,7 +428,7 @@ export function OrdersPage() {
                               Wallet Credit
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Cigarro Wallet • {formatINR(order.total)}
+                              {storeSettings.name} Wallet • {formatINR(order.total)}
                             </p>
                           </div>
                         </>

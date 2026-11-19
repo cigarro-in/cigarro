@@ -1,5 +1,6 @@
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg, brandName } from './lib/org.js';
+import { cleanImageUrl, cleanImageUrls } from './lib/images.js';
 // SSR Middleware for Cloudflare Pages
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
@@ -172,7 +173,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
       rating_value: p.ratingValue,
       review_count: p.reviewCount,
       product_variants: (detail.variants || []).map(x => ({
-        images: x.images,
+        images: cleanImageUrls(x.images),
         is_active: x.isActive,
         is_default: x.isDefault,
         price: x.priceRupees,
@@ -507,7 +508,7 @@ async function fetchProductData(slug, cx) {
   const def = variants.find(v => v.is_default)
     || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
     || null;
-  const images = (detail.variants || []).flatMap(x => x.images || []);
+  const images = (detail.variants || []).flatMap(x => cleanImageUrls(x.images));
   let related = [];
   try {
     const links = await cxQuery(cx, 'catalog:relatedProductLinks', { excludeSlug: slug, limit: 8 });
@@ -593,7 +594,7 @@ async function fetchSearchResults(query, cx) {
     const def = variants.find(v => v.is_default)
       || [...variants].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0]
       || null;
-    const images = cxVars.flatMap(x => x.images || []);
+    const images = cxVars.flatMap(x => cleanImageUrls(x.images));
     results.push({
       kind: 'product',
       name: p.name,
@@ -618,7 +619,7 @@ async function fetchSearchResults(query, cx) {
       url: `${cx.site}/products?search=${encodeURIComponent(c.slug || c.name)}`,
       brand: null,
       price_inr: c.comboPriceRupees != null ? Number(c.comboPriceRupees) : null,
-      image: (c.galleryImages || [])[0] || null,
+      image: cleanImageUrls(c.galleryImages)[0] || null,
       in_stock: true,
       note: 'Combo — contents and availability confirmed on page.',
     });
@@ -766,7 +767,7 @@ async function generateBrandHTML(slug, faviconUrl, cx) {
       description: detail.brand.description,
       meta_title: detail.brand.metaTitle,
       meta_description: detail.brand.metaDescription,
-      logo_url: detail.brand.logoUrl,
+      logo_url: cleanImageUrl(detail.brand.logoUrl),
     };
 
     const canonicalUrl = `${cx.site}/brand/${slug}`;
@@ -1188,7 +1189,7 @@ async function generateBlogHTML(slug, faviconUrl, cx) {
       slug: row.slug,
       excerpt: row.excerpt,
       content: row.content,
-      featured_image: row.featuredImage,
+      featured_image: cleanImageUrl(row.featuredImage),
       meta_title: row.metaTitle,
       meta_description: row.metaDescription,
       published_at: row.publishedAt ? new Date(row.publishedAt).toISOString() : null,

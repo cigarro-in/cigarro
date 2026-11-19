@@ -237,3 +237,32 @@ export function rewriteStorefrontHead(res, org, brand) {
   rewriter = rewriter.on('head', { element(el) { el.append(tags, { html: true }); } });
   return rewriter.transform(res);
 }
+
+// Static index.html head (shared by every store) rewritten for the SPA shell of
+// one store: title, description, author, canonical, Open Graph and Twitter tags
+// carry the store's own name and host. Only applied to the shell (not to SSR or
+// bot HTML, which already carry Helmet's per-page tags). Returns the rewriter.
+export function applyStaticStoreHead(rewriter, org, brand) {
+  const name = brandName(org);
+  const title = `${name} | Cigarettes and Tobacco Products Online`;
+  const description = brand.description || `Browse ${name} products online.`;
+  const home = `https://${org.primaryHost}/`;
+  const image = `https://${org.primaryHost}/og-default.jpg`;
+  const set = (attrName, value) => ({ element(el) { el.setAttribute(attrName, value); } });
+  return rewriter
+    .on('title', { element(el) { el.setInnerContent(title); } })
+    .on('meta[name="description"]', set('content', description))
+    .on('meta[name="author"]', set('content', name))
+    .on('link[rel="canonical"]', set('href', home))
+    .on('meta[property="og:url"]', set('content', home))
+    .on('meta[name="twitter:url"]', set('content', home))
+    .on('meta[property="og:title"]', set('content', title))
+    .on('meta[name="twitter:title"]', set('content', title))
+    .on('meta[property="og:description"]', set('content', description))
+    .on('meta[name="twitter:description"]', set('content', description))
+    .on('meta[property="og:image"]', set('content', image))
+    .on('meta[name="twitter:image"]', set('content', image))
+    .on('meta[property="og:image:alt"]', set('content', name))
+    .on('meta[name="twitter:image:alt"]', set('content', name))
+    .on('meta[property="og:site_name"]', set('content', name));
+}

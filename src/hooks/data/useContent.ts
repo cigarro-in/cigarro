@@ -4,6 +4,7 @@ import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { api } from '../../../convex/_generated/api';
 import { mergeShippingMethods } from '../../lib/shipping';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { cleanImageUrl } from '../../lib/images/urls';
 
 // Theme-safe content reads (Wave 2: Convex; replaces Supabase blog / hero /
 // config / settings reads). Shapes are UI-shaped (camelCase); blog author is
@@ -52,8 +53,8 @@ function withCompat(row: any): any {
   return {
     ...row,
     id: row._id,
-    featured_image: row.featuredImage ?? null,
-    author: { name: row.authorName ?? 'Cigarro' },
+    featured_image: cleanImageUrl(row.featuredImage) || null,
+    author: { name: row.authorName ?? '' },
     category: row.categorySlug
       ? { name: row.categoryName ?? row.categorySlug, color: row.categoryColor ?? undefined }
       : undefined,
@@ -152,8 +153,8 @@ function withSlideCompat(row: any): any {
   if (!row) return row;
   return {
     ...row,
-    image_url: row.imageUrl,
-    mobile_image_url: row.mobileImageUrl,
+    image_url: cleanImageUrl(row.imageUrl),
+    mobile_image_url: cleanImageUrl(row.mobileImageUrl) || undefined,
     sort_order: row.sortOrder,
     is_active: true,
   };

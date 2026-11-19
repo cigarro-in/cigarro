@@ -13,8 +13,10 @@ import { api } from '../../../convex/_generated/api';
 import { useOrg } from '../../lib/convex/useOrg';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { personNameError } from '../../lib/profile/personName';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 export function ProfileSettingsPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const navigate = useNavigate();
   const { user } = useAuth();
   const org = useOrg();
@@ -68,7 +70,7 @@ export function ProfileSettingsPage() {
   return (
     <>
       <Helmet>
-        <title>Account Settings - Cigarro</title>
+        <title>{`Account Settings - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

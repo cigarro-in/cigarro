@@ -44,6 +44,7 @@ import { useOrgInfo } from '../../lib/org/OrgContext';
 import { paiseToRupees } from '../../lib/convex/money';
 import { useReferralProgram } from '../../hooks/data/useReferralProgram';
 import { formatReferralReward } from '../../lib/storeSettings';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 interface MembershipTier {
   name: string;
@@ -123,6 +124,7 @@ const membershipTiers: MembershipTier[] = [
 ];
 
 export function ProfilePage() {
+  const { settings: storeSettings } = useStoreSettings();
   const { slug: orgSlug } = useOrgInfo();
   const navigate = useNavigate();
   const referralProgram = useReferralProgram();
@@ -235,7 +237,7 @@ export function ProfilePage() {
   return (
     <>
       <Helmet>
-        <title>My Profile - Cigarro</title>
+        <title>{`My Profile - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

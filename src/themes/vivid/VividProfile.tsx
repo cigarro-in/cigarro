@@ -3,6 +3,7 @@ import { ChevronRight, Package, MapPin, Heart, Wallet, Star, Gift, Settings, Log
 import { useAuth } from '../../hooks/useAuth';
 import { SEOHead } from '../../components/seo/SEOHead';
 import { useReferralProgram } from '../../hooks/data/useReferralProgram';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 const initials = (name?: string | null) => {
   if (!name) return 'C';
@@ -33,6 +34,7 @@ const MENU: MenuItem[] = [
 ];
 
 export function VividProfile() {
+  const { settings: storeSettings } = useStoreSettings();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { enabled: referralOn } = useReferralProgram();
@@ -100,7 +102,7 @@ export function VividProfile() {
         </div>
 
         <p className="text-center text-xs text-[var(--vv-fg-subtle)] mt-8">
-          Cigarro · 18+ only
+          {storeSettings.name} · 18+ only
         </p>
       </div>
     </>

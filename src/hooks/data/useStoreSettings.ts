@@ -13,13 +13,18 @@ export { resolveStoreSettings } from '../../lib/storeSettings';
 // this file: pass the settings down as props instead.
 
 export function useStoreSettings(): { settings: StoreSettings; loading: boolean } {
-  const { slug: orgSlug } = useOrgInfo();
+  const org = useOrgInfo();
+  const orgSlug = org.slug;
   const row = usePreloadedOrLive(api.content.getSiteSettings, { orgSlug: orgSlug });
+  const storeName = org.siteName || org.name;
   return useMemo(
     () => ({
-      settings: resolveStoreSettings(row as RawStoreSettings | null | undefined),
+      settings: resolveStoreSettings(row as RawStoreSettings | null | undefined, {
+        slug: orgSlug,
+        storeName,
+      }),
       loading: row === undefined,
     }),
-    [row],
+    [row, orgSlug, storeName],
   );
 }

@@ -1,5 +1,6 @@
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg } from './lib/org.js';
+import { cleanImageUrls } from './lib/images.js';
 // Dynamic sitemap.xml endpoint for Cloudflare Pages
 // Automatically serves fresh sitemap from database
 // URL: https://cigarro.in/sitemap.xml
@@ -182,7 +183,7 @@ async function generateSitemap(convexUrl, org) {
     <priority>0.8</priority>`;
     
     // Add product images (up to 5 per product for performance)
-    const gallery_images = product.images || [];
+    const gallery_images = cleanImageUrls(product.images);
       
     if (gallery_images.length > 0) {
       const images = gallery_images.slice(0, 5);

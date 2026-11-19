@@ -1,5 +1,6 @@
 import { paiseToRupees } from './convex/money';
 import { siteConfig } from '../config/site';
+import { LEGACY_ORG_SLUG } from './org/legacyOrg';
 
 // Pure per-store settings model (no Convex imports, safe for themes).
 // Per-store settings for themes and pages. Reads the public siteSettings
@@ -101,6 +102,15 @@ const str = (v: unknown, fallback = ''): string =>
   typeof v === 'string' && v.trim() !== '' ? v : fallback;
 
 const DEFAULT_META_TITLE = 'Cigarro';
+
+// Context for the store being rendered. Only the original store (oldsmokeshop)
+// keeps the Cigarro defaults from src/config/site.ts; every other store falls
+// back to its own name and leaves contact fields empty, so no platform brand
+// or email leaks onto another store's pages.
+export interface StoreSettingsContext {
+  storeName?: string;
+  slug?: string;
+}
 const DEFAULT_META_DESCRIPTION = 'The finest selection of premium cigarettes and cigars.';
 
 /** Human copy for one reward rule: "₹100" or "5% of the order". */
@@ -136,8 +146,11 @@ function resolveReferral(raw: RawStoreSettings | null | undefined, flatPaise: nu
 }
 
 /** Pure normalizer: stored values win, missing values fall back to defaults. */
-export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettings {
+export function resolveStoreSettings(raw?: RawStoreSettings | null, ctx?: StoreSettingsContext): StoreSettings {
   const d = siteConfig;
+  // No context (admin drafts, module-level defaults): the legacy defaults, as before.
+  const legacy = !ctx || ctx.slug === LEGACY_ORG_SLUG;
+  const storeName = str(ctx?.storeName);
   const addr = raw?.business?.address ?? {};
   const age = raw?.ageGate;
   const paise =
@@ -148,10 +161,10 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
   // Brand fallbacks derive from the store's own name, never from the
   // oldsmokeshop defaults in site.ts (a store without seo.titleTemplate must
   // not get "| Cigarro").
-  const name = str(raw?.siteName, d.name);
+  const name = str(raw?.siteName, legacy ? d.name : storeName);
   return {
     name,
-    metaTitle: str(raw?.metaTitle, name || DEFAULT_META_TITLE),
+    metaTitle: str(raw?.metaTitle, name || (legacy ? DEFAULT_META_TITLE : '')),
     metaDescription: str(raw?.metaDescription, DEFAULT_META_DESCRIPTION),
     brand: {
       logoUrl: str(raw?.brand?.logoUrl),
@@ -161,7 +174,7 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
     business: {
       legalName: str(raw?.business?.legalName),
       gstin: str(raw?.business?.gstin),
-      supportEmail: str(raw?.business?.supportEmail, d.email.support),
+      supportEmail: str(raw?.business?.supportEmail, legacy ? d.email.support : ''),
       supportPhone: str(raw?.business?.supportPhone),
       address: {
         line1: str(addr.line1),
@@ -185,7 +198,10 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null): StoreSettin
     referral,
     seo: {
       titleTemplate: str(raw?.seo?.titleTemplate, `%s | ${name}`),
-      defaultDescription: str(raw?.seo?.defaultDescription, d.seo.defaultDescription),
+      defaultDescription: str(
+        raw?.seo?.defaultDescription,
+        legacy ? d.seo.defaultDescription : name ? `Browse ${name} products online.` : '',
+      ),
       googleSiteVerification: str(raw?.seo?.googleSiteVerification),
       bingSiteVerification: str(raw?.seo?.bingSiteVerification),
       gaMeasurementId: str(raw?.seo?.gaMeasurementId),

@@ -7,8 +7,10 @@ import { Card, CardContent } from '../../components/ui/card';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyReviews } from '../../hooks/data/useProductReviews';
 import { Link } from 'react-router-dom';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 export function ReviewsPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { reviews, loading } = useMyReviews();
@@ -30,7 +32,7 @@ export function ReviewsPage() {
   return (
     <>
       <Helmet>
-        <title>My Reviews - Cigarro</title>
+        <title>{`My Reviews - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

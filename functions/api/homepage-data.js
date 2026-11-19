@@ -1,5 +1,6 @@
 import { requiredConvexUrl } from '../lib/env.js';
 import { getRequestOrg } from '../lib/org.js';
+import { cleanImageUrl, cleanImageUrls } from '../lib/images.js';
 // Cloudflare Worker for Homepage Data with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard (see setup guide below)
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -59,7 +60,7 @@ export async function onRequest(context) {
       variantsByProduct.get(x.productSupabaseId).push({
         id: x.supabaseId,
         price: x.priceRupees,
-        images: x.images ?? [],
+        images: cleanImageUrls(x.images),
         is_active: x.isActive,
         is_default: x.isDefault,
         variant_name: x.variantName,
@@ -97,7 +98,7 @@ export async function onRequest(context) {
         id: c.supabaseId,
         name: c.name,
         slug: c.slug,
-        image: c.image ?? null,
+        image: cleanImageUrl(c.image),
         description: c.description ?? null,
       }));
 
@@ -110,7 +111,7 @@ export async function onRequest(context) {
         name: b.name,
         slug: b.slug,
         description: b.description ?? null,
-        logo_url: b.logoUrl ?? null,
+        logo_url: cleanImageUrl(b.logoUrl),
         is_active: b.isActive,
       }));
 
@@ -119,14 +120,14 @@ export async function onRequest(context) {
       title: s.title ?? null,
       suptitle: s.suptitle ?? null,
       description: s.description ?? null,
-      image_url: s.imageUrl ?? null,
-      mobile_image_url: s.mobileImageUrl ?? null,
-      small_image_url: s.smallImageUrl ?? null,
+      image_url: cleanImageUrl(s.imageUrl),
+      mobile_image_url: cleanImageUrl(s.mobileImageUrl),
+      small_image_url: cleanImageUrl(s.smallImageUrl),
       button_text: s.buttonText ?? null,
       button_url: s.buttonUrl ?? null,
       product_name: s.productName ?? null,
       product_price: s.productPrice ?? null,
-      product_image_url: s.productImageUrl ?? null,
+      product_image_url: cleanImageUrl(s.productImageUrl),
       is_active: true,
       sort_order: s.sortOrder ?? 0,
       created_at: null,
@@ -151,7 +152,7 @@ export async function onRequest(context) {
     const showcaseConfig = showcaseCfg
       ? {
           title: showcaseCfg.title ?? null,
-          background_image: showcaseCfg.backgroundImage ?? null,
+          background_image: cleanImageUrl(showcaseCfg.backgroundImage),
           button_text: showcaseCfg.buttonText ?? null,
           button_url: showcaseCfg.buttonUrl ?? null,
           is_enabled: showcaseCfg.isEnabled,
@@ -173,10 +174,10 @@ export async function onRequest(context) {
         title: p.title,
         slug: p.slug,
         excerpt: p.excerpt ?? null,
-        featured_image: p.featuredImage ?? null,
+        featured_image: cleanImageUrl(p.featuredImage),
         published_at: iso(p.publishedAt),
         reading_time: p.readingTime ?? null,
-        author: { name: p.authorName || 'Cigarro' },
+        author: { name: p.authorName || '' },
         category: c ? { name: c.name, color: c.color ?? null } : null,
       };
     });
@@ -228,7 +229,7 @@ export async function onRequest(context) {
           name: cat.name,
           slug: cat.slug,
           description: cat.description ?? null,
-          image: cat.image ?? null,
+          image: cleanImageUrl(cat.image),
           products,
         };
       })

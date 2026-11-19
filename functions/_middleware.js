@@ -5,7 +5,7 @@ import { onRequest as ssrMiddleware, isUnknownRoutePath } from './ssr-middleware
 import { persistCrash } from './lib/crash-logs.js';
 import { resolveRequestOrg, resolveSiteSettings, getRequestOrg, orgScriptJson, isAdminHostname, isSaPath, brandName } from './lib/org.js';
 import { buildAdminManifest, storeManifestPath } from './lib/admin-pwa.js';
-import { resolveStoreBrand, rewriteStorefrontHead } from './lib/pwa.js';
+import { resolveStoreBrand, rewriteStorefrontHead, applyStaticStoreHead } from './lib/pwa.js';
 import { isFaviconPath, serveFavicon } from './lib/favicon.js';
 import { applyRedirect } from './lib/redirects.js';
 import { isSsrEnabledFor, ssrRender } from './ssr-render.js';
@@ -142,6 +142,13 @@ async function handleRequest(context) {
     }));
   }
 
+  // Storefront trailing slash: /product/x/ and /product/x are one page, so the
+  // slashed form 301s to the canonical one (query kept). Not on admin hosts, /api/
+  // or function/asset paths, and never for the root or a path with a file extension.
+  if (!onAdminHost && (request.method === 'GET' || request.method === 'HEAD') && isTrailingSlashRedirect(url.pathname)) {
+    return Response.redirect(`https://${url.host}${url.pathname.replace(/\/+$/, '')}${url.search}`, 301);
+  }
+
   // Storefront per-store redirects (301/302/410 from Convex). Document-style GETs
   // only: assets, API and function routes never consult the redirect table.
   if (!onAdminHost && (request.method === 'GET' || request.method === 'HEAD') && isRedirectCandidate(url.pathname)) {
@@ -189,6 +196,16 @@ async function handleRequest(context) {
     }));
     throw error;
   }
+}
+
+// True when the path ends with '/' (other than the root) and its last segment has no
+// file extension, outside /api/, /functions/ and /assets/.
+function isTrailingSlashRedirect(pathname) {
+  if (pathname === '/' || !pathname.endsWith('/')) return false;
+  if (pathname === '/api' || pathname.startsWith('/api/')) return false;
+  if (pathname.startsWith('/functions/') || pathname.startsWith('/assets/')) return false;
+  const last = pathname.slice(0, -1).split('/').pop() || '';
+  return !last.includes('.');
 }
 
 // True for page-like paths: no file extension, not under API, functions or assets.
@@ -240,6 +257,11 @@ async function nextWithOrg(context) {
   const script = `<script>window.__ORG__=${orgScriptJson(org)}</script>`;
   let rewriter = new HTMLRewriter()
     .on('head', { element(el) { el.append(script, { html: true }); } });
+  // The static index.html head is shared by every store: its title, author,
+  // canonical and social tags name this store and host (never the platform).
+  if (!org.admin && org.primaryHost) {
+    rewriter = applyStaticStoreHead(rewriter, org, await resolveStoreBrand(context.env, org));
+  }
   // Storefront theme on <html> before any script runs: the theme CSS
   // ([data-theme] selectors) paints the store's background and colours on the
   // first frame, not the default theme. The admin host never wears a store theme.

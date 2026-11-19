@@ -9,6 +9,7 @@ import { useFullCatalog } from '../../hooks/data/useCatalog';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { Button } from '../../components/ui/button';
 import { getProductImageUrl } from '../../lib/images/urls';
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 // Helper function to format price in Indian numbering system
 const formatIndianPrice = (priceINR: number): string => {
@@ -174,6 +175,7 @@ const EmptyWishlist: React.FC = () => (
 );
 
 export function WishlistPage() {
+  const { settings: storeSettings } = useStoreSettings();
   const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addToCart, isLoading: cartLoading } = useCart();
@@ -246,8 +248,8 @@ export function WishlistPage() {
   const shareWishlist = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'My Wishlist - Cigarro',
-        text: 'Check out my wishlist on Cigarro',
+        title: `My Wishlist - ${storeSettings.name}`,
+        text: `Check out my wishlist on ${storeSettings.name}`,
         url: window.location.href
       });
     } else {
@@ -270,7 +272,7 @@ export function WishlistPage() {
   return (
     <>
       <Helmet>
-        <title>My Wishlist - Cigarro</title>
+        <title>{`My Wishlist - ${storeSettings.name}`}</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

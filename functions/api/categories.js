@@ -1,5 +1,6 @@
 import { requiredConvexUrl } from '../lib/env.js';
 import { getRequestOrg } from '../lib/org.js';
+import { cleanImageUrl, cleanImageUrls } from '../lib/images.js';
 // Cloudflare Worker for Categories with Edge Caching
 // Caching: Requires Cache Rule in Cloudflare Dashboard
 // Cache Rule: URI Path starts with /api/ → Eligible for cache (24h TTL)
@@ -55,7 +56,7 @@ export async function onRequest(context) {
     const shapeVariant = (x) => ({
       id: x.supabaseId,
       price: x.priceRupees,
-      images: x.images ?? [],
+      images: cleanImageUrls(x.images),
       is_active: x.isActive,
       is_default: x.isDefault,
       variant_name: x.variantName,
@@ -84,7 +85,7 @@ export async function onRequest(context) {
         name: c.name,
         slug: c.slug,
         description: c.description ?? null,
-        image: c.image ?? null,
+        image: cleanImageUrl(c.image),
         products: (joinsByCategory.get(c.supabaseId) || []).map((j) => ({
           products: productById.has(j.productSupabaseId)
             ? shapeProduct(productById.get(j.productSupabaseId))

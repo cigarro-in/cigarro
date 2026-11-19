@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 
 interface InstallPWAProps {
   mobile?: boolean;
@@ -16,6 +17,7 @@ interface InstallPWAProps {
 }
 
 export const InstallPWA = ({ mobile, className, onCloseMenu }: InstallPWAProps) => {
+  const { settings: storeSettings } = useStoreSettings();
   const [supportsPWA, setSupportsPWA] = useState(false);
   const [promptInstall, setPromptInstall] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
@@ -87,7 +89,7 @@ export const InstallPWA = ({ mobile, className, onCloseMenu }: InstallPWAProps) 
         <Dialog open={showIOSInstructions} onOpenChange={setShowIOSInstructions}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Install Cigarro</DialogTitle>
+              <DialogTitle>Install {storeSettings.name}</DialogTitle>
               <DialogDescription>
                 Install our app on your iPhone for the best experience.
               </DialogDescription>
