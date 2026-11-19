@@ -1,6 +1,7 @@
 import { LEGACY_ORG_SLUG } from '../../lib/legacyOrg.js';
 import { getRequestOrg } from '../../lib/org.js';
 import { requiredConvexUrl } from '../../lib/env.js';
+import { copyCreateOnly } from '../../lib/r2Copy.js';
 /**
  * R2 image library API (bucket `cigarro-assets`, binding `R2_ASSETS`).
  *
@@ -177,25 +178,8 @@ export async function onRequest(context) {
     // produced on every run. The server only checks it is this store's new layout.
     const to = String(body?.to || `${orgSlug}/images/${stem}.${ext}`);
     if (!isOwnNewKey(to, orgSlug) || to.includes('..')) return json({ error: 'Bad target key' }, 400);
-    const sourceHead = await bucket.head(from);
-    if (!sourceHead) return json({ error: 'Source not found', key: from }, 404);
-    // Target already there: fine when it holds the same bytes (an earlier run),
-    // a conflict otherwise. Never overwritten either way.
-    const existing = await bucket.head(to);
-    if (existing) {
-      const same = existing.etag === sourceHead.etag;
-      return json({ status: same ? 'exists' : 'conflict', key: to, url: `${cdn}/${to}` }, same ? 200 : 409);
-    }
-    const source = await bucket.get(from);
-    if (!source) return json({ error: 'Source not found', key: from }, 404);
-    const stored = await bucket.put(to, source.body, {
-      httpMetadata: source.httpMetadata,
-      customMetadata: source.customMetadata,
-      // Create-only: null means the target key appeared meanwhile (race-safe).
-      onlyIf: { etagDoesNotMatch: '*' },
-    });
-    if (stored === null) return json({ status: 'conflict', key: to, error: 'Target appeared during copy' }, 409);
-    return json({ status: 'copied', key: to, url: `${cdn}/${to}`, size: stored.size });
+    const copied = await copyCreateOnly(bucket, cdn, from, to);
+    return json(copied.body, copied.httpStatus);
   }
 
   if (request.method === 'POST') {
