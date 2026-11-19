@@ -210,8 +210,7 @@ export function SEOHead({
         hasMerchantReturnPolicy: {
           '@type': 'MerchantReturnPolicy',
           applicableCountry: 'IN',
-          returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-          merchantReturnDays: 2,
+          returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
           merchantReturnLink: `${SITE_ORIGIN}/returns`
         }
       };

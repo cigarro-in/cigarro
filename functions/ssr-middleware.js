@@ -388,8 +388,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
           hasMerchantReturnPolicy: {
             '@type': 'MerchantReturnPolicy',
             applicableCountry: 'IN',
-            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-            merchantReturnDays: 2,
+            returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
             merchantReturnLink: `${cx.site}/returns`
           }
         },
@@ -414,8 +413,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
           hasMerchantReturnPolicy: {
             '@type': 'MerchantReturnPolicy',
             applicableCountry: 'IN',
-            returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-            merchantReturnDays: 2,
+            returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
             merchantReturnLink: `${cx.site}/returns`
           }
         }] : [])
