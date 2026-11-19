@@ -85,7 +85,7 @@
             "convex:deploy": "convex deploy",
             "type-check": "tsc --noEmit",
             "type-check:convex": "tsc --noEmit -p convex",
-            "check:guards": "node scripts/check-no-toasts.mjs && node scripts/check-no-supabase.mjs",
+            "check:guards": "node scripts/check-no-toasts.mjs && node scripts/check-no-supabase.mjs && tsx scripts/check-storage-keys.ts",
             "verify": "npm run type-check && npm run type-check:convex && npm run check:guards && npm run lint && npm run build",
             "test:admin-ui": "tsx scripts/check-admin-table.tsx",
             "lint": "npm run lint:ui",

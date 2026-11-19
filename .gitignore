@@ -205,3 +205,5 @@ imports/*/raw/**/*.html
 imports/*/raw/html/
 imports/*/raw/pages/
 imports/*/raw/blogs/
+# R2 restructure copy logs (run output, not source)
+scripts/r2-restructure/logs/
