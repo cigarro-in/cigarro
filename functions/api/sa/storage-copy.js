@@ -10,7 +10,7 @@ import { IMAGE_RE, LEGACY_PREFIX, legacyOwner, planNewKeys } from '../../../conv
  * keep working. The client calls this in a loop until done.
  *
  * POST /api/sa/storage-copy
- *   body: { saToken, orgId, cursor?: string | null, limit?: 1..50 (default 25) }
+ *   body: { saToken, orgId, cursor?: string | null, limit?: 1..10 (default 10; ~4 R2 calls per key keeps a batch under the 50-subrequest free-plan cap) }
  *   -> { slug, scanned, copied, exists, conflicts, failed, cursor, done }
  *
  * - Names are planned against the recorded moves, so re-runs and later batches keep
@@ -26,8 +26,8 @@ import { IMAGE_RE, LEGACY_PREFIX, legacyOwner, planNewKeys } from '../../../conv
 const ORG_ID_RE = /^[a-z0-9]{20,64}$/i;
 const SA_TOKEN_MIN = 20;
 const SA_TOKEN_MAX = 256;
-const DEFAULT_LIMIT = 25;
-const MAX_LIMIT = 50;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 10;
 const CURSOR_MAX = 2048;
 const CONFLICT_TRIES = 5;
 

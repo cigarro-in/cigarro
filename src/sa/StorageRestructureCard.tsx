@@ -7,7 +7,7 @@ import { listStoresRef, storageSummaryRef, type StoreRow, type StorageSummaryRow
 
 // Copy batch size. Each batch lists this many raw R2 keys and copies the images
 // among them, so one request stays well inside the Pages Functions limits.
-const BATCH_LIMIT = 25;
+const BATCH_LIMIT = 10;
 
 interface CopyBatch {
   slug: string;
