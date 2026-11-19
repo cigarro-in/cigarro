@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation } from 'convex/react';
+import { useConvex, useMutation } from 'convex/react';
 import { ArrowRight, Copy, ExternalLink, ImageIcon, RefreshCw, Replace, Search, Trash2, Upload } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
 import { ORG_SLUG } from '../../lib/convex/org';
-import { deleteR2Image, type R2Image } from '../../lib/images/upload';
-import type { AssetUsage } from '../../lib/images/usage';
+import { deleteR2Image, listR2Images, type R2Image } from '../../lib/images/upload';
+import { fetchUsageBatch, type AssetUsage } from '../../lib/images/usage';
 import { cn } from '../../components/ui/utils';
 import {
   Banner,
@@ -39,14 +39,13 @@ import {
   filesFromClipboard,
   formatBytes,
   matchesUsage,
-  removeFromLibrary,
-  useImageLibrary,
   useImageUploads,
   usageShort,
   type UsageFilter,
 } from '../components/shared/ImagePicker';
 
-const PAGE = 72;
+/** Tiles shown per page. The R2 listing is read in its own pages (cursor), as needed. */
+const PAGE = 48;
 
 interface Notice {
   tone: BannerTone;
@@ -65,15 +64,37 @@ function useIsDesktop() {
   return desktop;
 }
 
+function byNewest(a: R2Image, b: R2Image) {
+  return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+}
+
+/** Merge listing pages: one row per key, newest first. */
+function mergeNewest(prev: R2Image[], next: R2Image[]): R2Image[] {
+  const byPath = new Map(prev.map((i) => [i.path, i] as const));
+  for (const i of next) byPath.set(i.path, i);
+  return [...byPath.values()].sort(byNewest);
+}
+
 /**
  * The store's image library. Job: find an image, see where it is used, replace
  * it everywhere or delete it safely, and upload new ones.
  * Grid on the left, details of the clicked image on the right (a sheet on phones).
+ *
+ * Paging: the R2 listing is read a page at a time (cursor) and "where used" is
+ * fetched only for images that have been shown. Narrowing by name or usage
+ * reads the rest of the listing first, so those filters stay complete.
  */
 export function AssetManager() {
-  const lib = useImageLibrary();
+  const convex = useConvex();
   const isDesktop = useIsDesktop();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [images, setImages] = useState<R2Image[]>([]);
+  const [usage, setUsage] = useState<Map<string, AssetUsage>>(() => new Map());
+  const [hasMore, setHasMore] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [listing, setListing] = useState(false);
+  const [listError, setListError] = useState<ActionError | null>(null);
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<UsageFilter>('all');
@@ -84,18 +105,99 @@ export function AssetManager() {
   const [dragOver, setDragOver] = useState(false);
   const [bulkPlan, setBulkPlan] = useState<{ deletable: R2Image[]; skipped: number } | null>(null);
   const [planning, setPlanning] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Listing cursor and in-flight guard live in refs; genRef invalidates pages
+  // still in flight when the listing is reset (Refresh).
+  const cursorRef = useRef<string | undefined>(undefined);
+  const doneRef = useRef(false);
+  const listingRef = useRef(false);
+  const genRef = useRef(0);
+  const usageRequested = useRef<Set<string>>(new Set());
 
   const uploads = useImageUploads({
     aspect: 'free',
-    onUploaded: (image) => setActivePath(image.path),
+    onUploaded: (image) => {
+      setImages((prev) => mergeNewest(prev, [image]));
+      usageRequested.current.add(image.path);
+      setUsage((prev) => new Map(prev).set(image.path, { key: image.path, total: 0, mutableTotal: 0, historicalTotal: 0, contexts: [] }));
+      setActivePath(image.path);
+    },
   });
 
-  // Fresh "where used" on every visit: products saved a minute ago count.
-  const { refresh } = lib;
+  const loadPage = useCallback(async () => {
+    if (listingRef.current || doneRef.current) return;
+    const gen = genRef.current;
+    listingRef.current = true;
+    setListing(true);
+    try {
+      const page = await listR2Images('images', cursorRef.current);
+      if (gen !== genRef.current) return;
+      cursorRef.current = page.cursor;
+      doneRef.current = !page.cursor;
+      setHasMore(!!page.cursor);
+      setImages((prev) => mergeNewest(prev, page.images));
+      setListError(null);
+    } catch (err) {
+      if (gen !== genRef.current) return;
+      setListError(toActionError(err, 'Could not load your images. Try again.'));
+    } finally {
+      if (gen === genRef.current) {
+        listingRef.current = false;
+        setListing(false);
+        setLoadedOnce(true);
+      }
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    genRef.current += 1;
+    cursorRef.current = undefined;
+    doneRef.current = false;
+    listingRef.current = false;
+    usageRequested.current = new Set();
+    setImages([]);
+    setUsage(new Map());
+    setHasMore(true);
+    setLoadedOnce(false);
+    setListing(false);
+    setListError(null);
+    setVisible(PAGE);
+    void loadPage();
+  }, [loadPage]);
+
+  // First page on open.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadPage();
+  }, [loadPage]);
+
+  const fetchUsage = useCallback(
+    async (list: R2Image[]) => {
+      const missing = list.filter((i) => !usageRequested.current.has(i.path));
+      if (!missing.length) return;
+      missing.forEach((i) => usageRequested.current.add(i.path));
+      const gen = genRef.current;
+      const fresh = await fetchUsageBatch(convex, missing.map((i) => ({ key: i.path, url: i.url })));
+      if (gen !== genRef.current) return;
+      setUsage((prev) => new Map([...prev, ...fresh]));
+    },
+    [convex],
+  );
+
+  // Fresh "where used" for one or more images (before delete, after replace).
+  const recheckUsage = useCallback(
+    async (list: R2Image[]) => {
+      list.forEach((i) => usageRequested.current.add(i.path));
+      const fresh = await fetchUsageBatch(convex, list.map((i) => ({ key: i.path, url: i.url })));
+      setUsage((prev) => new Map([...prev, ...fresh]));
+      return fresh;
+    },
+    [convex],
+  );
+
+  const removeImages = useCallback((paths: string[]) => {
+    const gone = new Set(paths);
+    setImages((prev) => prev.filter((i) => !gone.has(i.path)));
+  }, []);
 
   // Paste a screenshot anywhere on the page to upload it.
   const addFilesRef = useRef(uploads.addFiles);
@@ -112,48 +214,58 @@ export function AssetManager() {
     return () => document.removeEventListener('paste', onPaste);
   }, []);
 
-  const images = useMemo(() => lib.images ?? [], [lib.images]);
   const q = query.trim().toLowerCase();
+  const narrowing = filter !== 'all' || q !== '';
+
   const filtered = useMemo(
     () =>
       images.filter(
         (i) =>
           (!q || i.name.toLowerCase().includes(q) || displayName(i.name).toLowerCase().includes(q)) &&
-          matchesUsage(lib.usage.get(i.path), filter),
+          matchesUsage(usage.get(i.path), filter),
       ),
-    [images, q, filter, lib.usage],
+    [images, q, filter, usage],
   );
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
+
+  // Usage: the visible tiles, or every loaded image when a usage filter is on.
+  const usageTargets = filter === 'all' ? shown : images;
+  useEffect(() => {
+    void fetchUsage(usageTargets);
+  }, [usageTargets, fetchUsage]);
+
+  // Name or usage filters need the whole listing; read the rest, one page at a time.
+  useEffect(() => {
+    if (narrowing && hasMore && !listing) void loadPage();
+  }, [narrowing, hasMore, listing, loadPage]);
+
+  // Chip counts only once every loaded image has its usage and the listing is complete.
   const counts = useMemo(() => {
     const out: Partial<Record<UsageFilter, number>> = {};
-    if (!lib.usageReady) return out;
-    for (const f of USAGE_FILTERS) out[f.id] = images.filter((i) => matchesUsage(lib.usage.get(i.path), f.id)).length;
+    if (hasMore || images.some((i) => !usage.has(i.path))) return out;
+    for (const f of USAGE_FILTERS) out[f.id] = images.filter((i) => matchesUsage(usage.get(i.path), f.id)).length;
     return out;
-  }, [images, lib.usage, lib.usageReady]);
-  const shown = filtered.slice(0, visible);
-  const active = activePath ? images.find((i) => i.path === activePath) ?? null : null;
+  }, [images, usage, hasMore]);
+
   const pending = uploads.items.filter((u) => u.stage !== 'done');
+  const active = activePath ? images.find((i) => i.path === activePath) ?? null : null;
 
   useEffect(() => setVisible(PAGE), [q, filter]);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setVisible((v) => (v < filtered.length ? v + PAGE : v));
-    }, { rootMargin: '600px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [filtered.length]);
+
+  const loadMore = () => {
+    setVisible((v) => v + PAGE);
+    if (hasMore && filtered.length < visible + PAGE) void loadPage();
+  };
 
   // Selection follows the library: deleted images drop out.
   useEffect(() => {
-    if (!lib.images) return;
-    const paths = new Set(lib.images.map((i) => i.path));
+    const paths = new Set(images.map((i) => i.path));
     setChecked((prev) => {
       const next = new Set([...prev].filter((p) => paths.has(p)));
       return next.size === prev.size ? prev : next;
     });
     if (activePath && !paths.has(activePath)) setActivePath(null);
-  }, [lib.images, activePath]);
+  }, [images, activePath]);
 
   const toggleChecked = (path: string) =>
     setChecked((prev) => {
@@ -163,15 +275,16 @@ export function AssetManager() {
       return next;
     });
 
-  const unusedShown = filtered.filter((i) => lib.usage.get(i.path)?.total === 0);
+  const unusedShown = filtered.filter((i) => usage.get(i.path)?.total === 0);
   const checkedImages = images.filter((i) => checked.has(i.path));
-  const checkedUnused = checkedImages.filter((i) => lib.usage.get(i.path)?.total === 0);
+  const checkedUnused = checkedImages.filter((i) => usage.get(i.path)?.total === 0);
+  const checkedKnown = checkedImages.every((i) => usage.has(i.path));
 
   const planBulkDelete = async () => {
     setPlanning(true);
     try {
       // Fail-closed: a fresh check right before deleting.
-      const fresh = await lib.recheckUsage(checkedImages);
+      const fresh = await recheckUsage(checkedImages);
       const deletable = checkedImages.filter((i) => fresh.get(i.path)?.total === 0);
       if (!deletable.length) {
         setNotice({ tone: 'warning', text: 'All selected images are in use, so none can be deleted.' });
@@ -195,7 +308,7 @@ export function AssetManager() {
         failed += 1;
       }
     }
-    removeFromLibrary(removed);
+    removeImages(removed);
     setChecked(new Set());
     const skipped = bulkPlan.skipped;
     setBulkPlan(null);
@@ -222,23 +335,27 @@ export function AssetManager() {
     document.querySelector<HTMLButtonElement>(`[data-tile="${index + delta}"]`)?.focus();
   };
 
-  const loading = lib.images === undefined;
-  const waitingForUsage = filter !== 'all' && !lib.usageReady;
-  const libraryEmpty = !loading && images.length === 0 && pending.length === 0;
+  const loading = !loadedOnce;
+  const waitingForUsage = filter !== 'all' && images.some((i) => !usage.has(i.path));
+  const libraryEmpty = loadedOnce && !listing && !hasMore && !listError && images.length === 0 && pending.length === 0;
+  const countLabel = loading
+    ? ''
+    : hasMore
+      ? `${shown.length} of ${filtered.length} loaded`
+      : `Showing ${shown.length} of ${filtered.length}`;
 
   const details = active ? (
     <AssetDetails
       key={active.path}
       image={active}
-      usage={lib.usage.get(active.path)}
-      usageReady={lib.usageReady}
-      onRecheck={() => void lib.recheckUsage([active])}
+      usage={usage.get(active.path)}
+      onRecheck={() => void recheckUsage([active])}
       onDeleted={(name) => {
-        removeFromLibrary([active.path]);
+        removeImages([active.path]);
         setActivePath(null);
         setNotice({ tone: 'success', text: `Deleted ${name}.` });
       }}
-      recheckUsage={lib.recheckUsage}
+      recheckUsage={recheckUsage}
     />
   ) : null;
 
@@ -246,7 +363,7 @@ export function AssetManager() {
     <Page
       title="Assets"
       primaryAction={{ label: 'Upload images', icon: <Upload />, onClick: () => fileRef.current?.click(), loading: uploads.busy }}
-      secondaryActions={[{ label: 'Refresh', icon: <RefreshCw />, onClick: () => void lib.refresh() }]}
+      secondaryActions={[{ label: 'Refresh', icon: <RefreshCw />, onClick: () => reset() }]}
     >
       <input
         ref={fileRef}
@@ -266,7 +383,7 @@ export function AssetManager() {
           {notice.text}
         </Banner>
       )}
-      <ErrorBanner error={lib.error} />
+      <ErrorBanner error={listError} />
 
       <Card padding="none">
         <FilterBar
@@ -277,9 +394,7 @@ export function AssetManager() {
                 Select all {unusedShown.length}
               </Button>
             ) : (
-              <span className="text-xs tabular-nums text-[var(--admin-text-muted)]">
-                {loading ? '' : `${filtered.length} image${filtered.length === 1 ? '' : 's'}`}
-              </span>
+              <span className="text-xs tabular-nums text-[var(--admin-text-muted)]">{countLabel}</span>
             )
           }
         >
@@ -318,6 +433,18 @@ export function AssetManager() {
                   </li>
                 ))}
               </ul>
+            ) : listError && images.length === 0 ? (
+              <EmptyState
+                icon={<ImageIcon />}
+                title="Could not load your images"
+                description="Check your connection and try again."
+                action={
+                  <Button variant="secondary" icon={<RefreshCw aria-hidden />} onClick={() => reset()}>
+                    Try again
+                  </Button>
+                }
+                className="py-20"
+              />
             ) : libraryEmpty ? (
               <EmptyState
                 icon={<ImageIcon />}
@@ -334,7 +461,13 @@ export function AssetManager() {
               <EmptyState
                 icon={<Search />}
                 title={filter === 'unused' ? 'No unused images' : 'No images match'}
-                description={filter === 'unused' ? 'Every image is in use somewhere. Nothing to tidy up.' : 'Try another word, or show every image.'}
+                description={
+                  filter === 'unused'
+                    ? 'Every image is in use somewhere. Nothing to tidy up.'
+                    : hasMore || listing
+                      ? 'Still searching the rest of your library.'
+                      : 'Try another word, or show every image.'
+                }
                 action={
                   <Button
                     variant="secondary"
@@ -349,65 +482,73 @@ export function AssetManager() {
                 className="py-20"
               />
             ) : (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                {pending.map((u) => (
-                  <li key={u.id} className="flex flex-col gap-1.5">
-                    <div className="relative aspect-square overflow-hidden rounded-[var(--admin-radius)] border border-[var(--admin-border)]">
-                      {u.preview ? <Thumb src={u.preview} /> : <span className="block size-full bg-[var(--admin-surface-subtle)]" />}
-                      <StageOverlay item={u} onDismiss={() => uploads.dismiss(u.id)} />
-                    </div>
-                    <p className="truncate text-[13px] font-medium text-[var(--admin-text)]">{u.name}</p>
-                  </li>
-                ))}
-                {shown.map((img, index) => {
-                  const u = lib.usage.get(img.path);
-                  const status = usageShort(u);
-                  const isActive = img.path === activePath;
-                  const isChecked = checked.has(img.path);
-                  return (
-                    <li key={img.path} className="group relative flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        data-tile={index}
-                        onClick={() => setActivePath(isActive && !isDesktop ? null : img.path)}
-                        onKeyDown={(e) => onTileKey(e, index)}
-                        aria-pressed={isActive}
-                        aria-label={`${displayName(img.name)}${status ? `, ${status.toLowerCase()}` : ''}`}
-                        className={cn(
-                          'relative block aspect-square w-full overflow-hidden rounded-[var(--admin-radius)] border transition-[border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] focus-visible:ring-offset-1',
-                          isActive
-                            ? 'border-[var(--admin-primary)] ring-2 ring-[var(--admin-primary)]'
-                            : isChecked
-                              ? 'border-[var(--admin-primary)]'
-                              : 'border-[var(--admin-border)] hover:border-[var(--admin-border-strong)]',
-                        )}
-                      >
-                        <Thumb src={img.url} />
-                      </button>
-                      <div
-                        className={cn(
-                          'absolute left-1.5 top-1.5 rounded-[5px] bg-[var(--admin-surface)]/95 p-1 shadow-sm transition-opacity duration-150',
-                          checked.size > 0 || isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100',
-                        )}
-                      >
-                        <Checkbox label={`Select ${displayName(img.name)}`} checked={isChecked} onCheckedChange={() => toggleChecked(img.path)} />
+              <>
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                  {pending.map((u) => (
+                    <li key={u.id} className="flex flex-col gap-1.5">
+                      <div className="relative aspect-square overflow-hidden rounded-[var(--admin-radius)] border border-[var(--admin-border)]">
+                        {u.preview ? <Thumb src={u.preview} /> : <span className="block size-full bg-[var(--admin-surface-subtle)]" />}
+                        <StageOverlay item={u} onDismiss={() => uploads.dismiss(u.id)} />
                       </div>
-                      <div className="min-w-0 px-0.5">
-                        <p className="truncate text-[13px] font-medium text-[var(--admin-text)]" title={img.name}>
-                          {displayName(img.name)}
-                        </p>
-                        {status ? (
-                          <p className={cn('truncate text-xs', u?.total === 0 ? 'text-[var(--admin-text-subtle)]' : 'text-[var(--admin-text-muted)]')}>{status}</p>
-                        ) : (
-                          <Skeleton className="mt-1 h-3 w-16" />
-                        )}
-                      </div>
+                      <p className="truncate text-[13px] font-medium text-[var(--admin-text)]">{u.name}</p>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                  {shown.map((img, index) => {
+                    const u = usage.get(img.path);
+                    const status = usageShort(u);
+                    const isActive = img.path === activePath;
+                    const isChecked = checked.has(img.path);
+                    return (
+                      <li key={img.path} className="group relative flex flex-col gap-1.5">
+                        <button
+                          type="button"
+                          data-tile={index}
+                          onClick={() => setActivePath(isActive && !isDesktop ? null : img.path)}
+                          onKeyDown={(e) => onTileKey(e, index)}
+                          aria-pressed={isActive}
+                          aria-label={`${displayName(img.name)}${status ? `, ${status.toLowerCase()}` : ''}`}
+                          className={cn(
+                            'relative block aspect-square w-full overflow-hidden rounded-[var(--admin-radius)] border transition-[border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] focus-visible:ring-offset-1',
+                            isActive
+                              ? 'border-[var(--admin-primary)] ring-2 ring-[var(--admin-primary)]'
+                              : isChecked
+                                ? 'border-[var(--admin-primary)]'
+                                : 'border-[var(--admin-border)] hover:border-[var(--admin-border-strong)]',
+                          )}
+                        >
+                          <Thumb src={img.url} />
+                        </button>
+                        <div
+                          className={cn(
+                            'absolute left-1.5 top-1.5 rounded-[5px] bg-[var(--admin-surface)]/95 p-1 shadow-sm transition-opacity duration-150',
+                            checked.size > 0 || isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100',
+                          )}
+                        >
+                          <Checkbox label={`Select ${displayName(img.name)}`} checked={isChecked} onCheckedChange={() => toggleChecked(img.path)} />
+                        </div>
+                        <div className="min-w-0 px-0.5">
+                          <p className="truncate text-[13px] font-medium text-[var(--admin-text)]" title={img.name}>
+                            {displayName(img.name)}
+                          </p>
+                          {status ? (
+                            <p className={cn('truncate text-xs', u?.total === 0 ? 'text-[var(--admin-text-subtle)]' : 'text-[var(--admin-text-muted)]')}>{status}</p>
+                          ) : (
+                            <Skeleton className="mt-1 h-3 w-16" />
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {(filtered.length > visible || hasMore) && (
+                  <div className="mt-4 flex justify-center">
+                    <Button variant="secondary" loading={listing} onClick={loadMore}>
+                      Load more
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-            <div ref={sentinelRef} className="h-px" aria-hidden />
             {dragOver && (
               <div className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-[var(--admin-radius)] border-2 border-dashed border-[var(--admin-primary)] text-sm font-medium text-[var(--admin-primary)]">
                 Drop to add to your library
@@ -457,11 +598,11 @@ export function AssetManager() {
               variant="critical"
               icon={<Trash2 aria-hidden />}
               loading={planning}
-              disabled={lib.usageReady && checkedUnused.length === 0}
-              title={lib.usageReady && checkedUnused.length === 0 ? 'Only unused images can be deleted' : undefined}
+              disabled={checkedKnown && checkedUnused.length === 0}
+              title={checkedKnown && checkedUnused.length === 0 ? 'Only unused images can be deleted' : undefined}
               onClick={() => void planBulkDelete()}
             >
-              {lib.usageReady ? `Delete unused (${checkedUnused.length})` : 'Delete unused'}
+              {checkedKnown ? `Delete unused (${checkedUnused.length})` : 'Delete unused'}
             </Button>
           </>
         }
@@ -488,14 +629,12 @@ export function AssetManager() {
 function AssetDetails({
   image,
   usage,
-  usageReady,
   onRecheck,
   onDeleted,
   recheckUsage,
 }: {
   image: R2Image;
   usage: AssetUsage | undefined;
-  usageReady: boolean;
   onRecheck: () => void;
   onDeleted: (name: string) => void;
   recheckUsage: (images: R2Image[]) => Promise<Map<string, AssetUsage>>;
@@ -607,7 +746,7 @@ function AssetDetails({
         <h3 id="used-in" className="text-sm font-semibold text-[var(--admin-text)]">
           Used in
         </h3>
-        {!usage && !usageReady ? (
+        {!usage ? (
           <SkeletonText lines={2} />
         ) : !known ? (
           <Banner tone="warning" action={<Button size="sm" variant="secondary" onClick={onRecheck}>Check again</Button>}>

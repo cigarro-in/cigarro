@@ -153,6 +153,23 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
     trackBeginCheckout(items, Number(subtotal ?? 0));
   }, [items, subtotal]);
 
+  // Missed orders: a cart that reached a closed store is logged once per mount.
+  // Best effort; a failed log never blocks or alters the page.
+  const logCheckoutBlocked = useMutation(api.platformFees.logCheckoutBlocked);
+  const blockedReason = availability?.open === false ? availability.reason : null;
+  const blockLoggedRef = useRef(false);
+  useEffect(() => {
+    if (blockLoggedRef.current || !orgSlug || !blockedReason || items.length === 0) return;
+    blockLoggedRef.current = true;
+    const itemCount = items.reduce((n: number, item: any) => n + (Number(item?.quantity) || 0), 0);
+    logCheckoutBlocked({
+      orgSlug,
+      reason: blockedReason,
+      cartTotalPaise: rupeesToPaise(Number(subtotal ?? 0)),
+      itemCount,
+    }).catch(() => {});
+  }, [orgSlug, blockedReason, items, subtotal, logCheckoutBlocked]);
+
   // ---- Lucky discount: 1–99 paise, kept from the source order on retry ----
   const luckyOn = (org as any)?.luckyEnabled ?? true;
   const [randomDiscount] = useState(() => {

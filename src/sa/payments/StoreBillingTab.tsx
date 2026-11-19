@@ -27,6 +27,7 @@ import { formatINR } from '../../utils/currency';
 import { useSa } from '../SuperGate';
 import { formatDateTime, runSa } from '../saUi';
 import { cleanNote } from '../../adminnew/features/payments/platformFeeFormat';
+import { MissedOrdersList } from '../../adminnew/features/payments/MissedOrdersCard';
 
 type Gate = 'enforced' | 'waived';
 type StatementRow = {
@@ -42,6 +43,11 @@ type StatementRow = {
 const GATE_TEXT: Record<Gate, string> = {
   enforced: 'Checkout stays closed until the store has automatic payment confirmation, a UPI ID and the deposit (if required).',
   waived: 'Checkout is open even if setup is not finished. Use for stores that predate the gate.',
+};
+
+const GATE_LABEL: Record<Gate, string> = {
+  enforced: 'Require setup before taking orders',
+  waived: 'Allow orders without setup',
 };
 
 function money(paise: number): string {
@@ -88,6 +94,7 @@ export function StoreBillingTab({ orgId }: { orgId: Id<'organizations'> }) {
     <>
       <Notice text={notice} onDismiss={() => setNotice(null)} />
       <div className="grid items-start gap-3 lg:grid-cols-2">
+        <StoreStateCard setup={setup} gate={billing.setupGate} />
         <Card title="Account with Cigarro">
           <dl className="divide-y divide-[var(--admin-border)] text-sm">
             <Row label="Owed to Cigarro" value={money(account.duesPaise)} hint="Fees not yet paid" />
@@ -104,7 +111,7 @@ export function StoreBillingTab({ orgId }: { orgId: Id<'organizations'> }) {
         </Card>
 
         <FeeCard orgId={orgId} token={token} writeOpen={writeOpen} bps={billing.marketplaceFeeBps} onDone={setNotice} />
-        <GateCard orgId={orgId} token={token} writeOpen={writeOpen} gate={billing.setupGate} onDone={setNotice} />
+        <GateCard orgId={orgId} token={token} writeOpen={writeOpen} gate={billing.setupGate} checkoutOpen={setup.checkoutOpen} onDone={setNotice} />
         <DepositCard
           orgId={orgId}
           token={token}
@@ -120,9 +127,12 @@ export function StoreBillingTab({ orgId }: { orgId: Id<'organizations'> }) {
       <StatementCard orgId={orgId} token={token} />
 
       <div className="mt-3 grid items-start gap-3 lg:grid-cols-2">
+        <RecordDepositForm orgId={orgId} token={token} writeOpen={writeOpen} duePaise={account.depositDuePaise} onDone={setNotice} />
         <RefundForm orgId={orgId} token={token} writeOpen={writeOpen} heldPaise={account.depositHeldPaise} onDone={setNotice} />
         <AdjustmentForm orgId={orgId} token={token} writeOpen={writeOpen} onDone={setNotice} />
       </div>
+
+      <MissedOrdersSection orgId={orgId} token={token} />
     </>
   );
 }
@@ -236,12 +246,14 @@ function GateCard({
   token,
   writeOpen,
   gate,
+  checkoutOpen,
   onDone,
 }: {
   orgId: Id<'organizations'>;
   token: string;
   writeOpen: boolean;
   gate: Gate;
+  checkoutOpen: boolean;
   onDone: (text: string) => void;
 }) {
   const save = useMutation(api.platformFees.saSetSetupGate);
@@ -259,15 +271,18 @@ function GateCard({
   return (
     <Card title="Checkout lock">
       <div className="flex flex-col gap-3">
+        <p className="text-sm text-[var(--admin-text)]">
+          Payments: <span className="font-semibold">{checkoutOpen ? 'Active' : 'Blocked'}</span>
+        </p>
         <div className="grid gap-1.5">
-          <Label htmlFor="bill-gate">Checkout</Label>
+          <Label htmlFor="bill-gate">Setup rule</Label>
           <Select value={value} onValueChange={(v) => setDraft(v as Gate)} disabled={!writeOpen || fb.busy}>
             <SelectTrigger id="bill-gate" className="w-full sm:max-w-[16rem]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="enforced">Enforced</SelectItem>
-              <SelectItem value="waived">Waived</SelectItem>
+              <SelectItem value="enforced">{GATE_LABEL.enforced}</SelectItem>
+              <SelectItem value="waived">{GATE_LABEL.waived}</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-[13px] text-[var(--admin-text-muted)]">{GATE_TEXT[value]}</p>
@@ -359,6 +374,137 @@ function DepositCard({
         </div>
         {fb.error && <Banner tone="critical">{fb.error.message}</Banner>}
       </form>
+    </Card>
+  );
+}
+
+// ---------- Current state ----------
+
+type StateSetup = {
+  checkoutOpen: boolean;
+  steps: {
+    upi: { done: boolean };
+    autoConfirm: { done: boolean };
+    deposit: { done: boolean; required: boolean; amountPaise: number; heldPaise: number; dueNowPaise: number };
+  };
+};
+
+function StoreStateCard({ setup, gate }: { setup: StateSetup; gate: Gate }) {
+  const { steps } = setup;
+  const dep = steps.deposit;
+  return (
+    <Card title="Current state">
+      <dl className="divide-y divide-[var(--admin-border)] text-sm">
+        <Row label="UPI ID" value={steps.upi.done ? 'Set' : 'Not set'} hint={steps.upi.done ? undefined : 'Customers cannot pay until a UPI ID is added'} />
+        <Row
+          label="Automatic payment confirmation"
+          value={steps.autoConfirm.done ? 'On' : 'Off'}
+          hint={steps.autoConfirm.done ? undefined : 'Gmail or the SMS relay is not connected'}
+        />
+        <Row
+          label="Security deposit"
+          value={dep.required ? `${money(dep.heldPaise)} of ${money(dep.amountPaise)}` : 'Not required'}
+          hint={dep.required ? (dep.done ? 'Held in full' : `${money(dep.dueNowPaise)} still due`) : undefined}
+        />
+        <Row
+          label="Checkout"
+          value={setup.checkoutOpen ? 'Open' : 'Closed'}
+          hint={gate === 'enforced' ? 'Setup rule: require setup' : 'Setup rule: allow without setup'}
+        />
+      </dl>
+    </Card>
+  );
+}
+
+// ---------- Mark deposit as paid ----------
+
+function RecordDepositForm({
+  orgId,
+  token,
+  writeOpen,
+  duePaise,
+  onDone,
+}: {
+  orgId: Id<'organizations'>;
+  token: string;
+  writeOpen: boolean;
+  duePaise: number;
+  onDone: (text: string) => void;
+}) {
+  const markPaid = useMutation(api.platformFees.saMarkDepositPaid);
+  const fb = useButtonFeedback();
+  const [amount, setAmount] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const amountValue = amount ?? (duePaise > 0 ? String(paiseToRupees(duePaise)) : '');
+  const num = Number(amountValue);
+  const paise = Number.isFinite(num) && num > 0 ? rupeesToPaise(num) : 0;
+  const tooMuch = paise > duePaise;
+  const valid = duePaise > 0 && paise > 0 && !tooMuch;
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    const ok = await fb.run(() => runSa(() => markPaid({ saToken: token, orgId, amountPaise: paise, note: note.trim() })));
+    if (ok === undefined) return;
+    onDone(`Recorded a deposit of ${money(paise)} as received.`);
+    setAmount(null);
+    setNote('');
+  };
+
+  return (
+    <Card title="Mark deposit as paid">
+      <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <div className="grid gap-1.5">
+          <Label htmlFor="dep-amount">Amount received (₹)</Label>
+          <Input
+            id="dep-amount"
+            inputMode="decimal"
+            className="max-w-[12rem]"
+            value={amountValue}
+            onChange={(e) => setAmount(e.target.value)}
+            disabled={!writeOpen || fb.busy || duePaise <= 0}
+            aria-invalid={tooMuch}
+            required
+          />
+          <p className="text-xs text-[var(--admin-text-muted)]">
+            {duePaise <= 0
+              ? 'The deposit is already held in full.'
+              : tooMuch
+                ? `More than the ${money(duePaise)} still due.`
+                : `Still due: ${money(duePaise)}`}
+          </p>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="dep-note">How it was paid (optional)</Label>
+          <Input
+            id="dep-note"
+            value={note}
+            maxLength={200}
+            placeholder="Cash, bank transfer ref"
+            onChange={(e) => setNote(e.target.value)}
+            disabled={!writeOpen || fb.busy || duePaise <= 0}
+          />
+        </div>
+        <RecordNote />
+        <div>
+          <Button type="submit" variant="secondary" size="sm" state={fb.state} disabled={!writeOpen || !valid}>
+            Mark deposit as paid
+          </Button>
+        </div>
+        {fb.error && <Banner tone="critical">{fb.error.message}</Banner>}
+      </form>
+    </Card>
+  );
+}
+
+// ---------- Missed orders ----------
+
+function MissedOrdersSection({ orgId, token }: { orgId: Id<'organizations'>; token: string }) {
+  const rows = useQuery(api.platformFees.saListCheckoutBlocks, { saToken: token, orgId });
+  return (
+    <Card title="Missed orders" className="mt-3">
+      <p className="mb-2 text-xs text-[var(--admin-text-muted)]">Carts that could not check out, newest 50.</p>
+      <MissedOrdersList rows={rows} loading={rows === undefined} />
     </Card>
   );
 }

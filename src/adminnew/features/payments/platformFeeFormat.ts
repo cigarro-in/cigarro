@@ -33,3 +33,8 @@ export interface OrderFeeView {
 export function keepPaise(fee: OrderFeeView, receivedPaise: number): number {
   return (fee.saleAmountPaise ?? receivedPaise) - fee.feePaise;
 }
+
+/** Plain-language reason for a missed checkout (checkoutBlocks.reason). */
+export function checkoutBlockReasonLabel(reason: 'no_upi' | 'setup'): string {
+  return reason === 'no_upi' ? 'No UPI ID set' : 'Store setup not finished';
+}

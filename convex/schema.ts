@@ -1500,4 +1500,20 @@ export default defineSchema({
   })
     .index("by_fromKey", ["fromKey"])
     .index("by_org", ["orgSlug"]),
+
+  // Carts that could not check out because the store was closed (no UPI ID, or
+  // setup not finished). Written by platformFees.logCheckoutBlocked from the
+  // storefront; read by the store's "Missed orders" list. Deduped per user (or
+  // per org + cart total when anonymous) within 30 minutes.
+  checkoutBlocks: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.optional(v.string()),
+    reason: v.union(v.literal("no_upi"), v.literal("setup")),
+    cartTotalPaise: v.number(),
+    itemCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_org_created", ["orgId", "createdAt"])
+    .index("by_org_user_created", ["orgId", "userId", "createdAt"])
+    .index("by_org_total_created", ["orgId", "cartTotalPaise", "createdAt"]),
 });

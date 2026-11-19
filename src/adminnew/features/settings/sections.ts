@@ -13,16 +13,15 @@ export type SettingsSectionId = 'store' | 'payments' | 'checkout' | 'referral' |
 export interface SettingsSection {
   id: SettingsSectionId;
   label: string;
-  description: string;
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  { id: 'store', label: 'Store details', description: 'Name, logo, site icon, contact and social links' },
-  { id: 'payments', label: 'Payments', description: 'Automatic confirmation, UPI IDs and payment options' },
-  { id: 'checkout', label: 'Checkout & shipping', description: 'Delivery methods, prices and estimates' },
-  { id: 'referral', label: 'Refer & earn', description: 'Rewards for inviting friends' },
-  { id: 'legal', label: 'Legal & age gate', description: 'Legal name, GSTIN and entry age rules' },
-  { id: 'advanced', label: 'Advanced', description: 'Theme, search metadata and analytics' },
+  { id: 'store', label: 'Store details' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'checkout', label: 'Checkout & shipping' },
+  { id: 'referral', label: 'Refer & earn' },
+  { id: 'legal', label: 'Legal & age gate' },
+  { id: 'advanced', label: 'Advanced' },
 ];
 
 // Anchors that live inside a section but are linked from elsewhere (setup

@@ -448,13 +448,20 @@ export async function computeSetupStatus(ctx: Ctx, org: Doc<"organizations">) {
     },
     complete,
     gate,
-    checkoutOpen: complete || gate === "waived",
+    // Mirrors assertCheckoutOpen: no UPI ID closes checkout even when waived.
+    checkoutOpen: upi && (complete || gate === "waived"),
     cardDismissedAt: org.setupCardDismissedAt ?? null,
     cardVisible: !complete && org.setupCardDismissedAt === undefined,
   };
 }
 
-/** createOrder gate. Throws STORE_SETUP_INCOMPLETE for enforced, unfinished stores. */
+/**
+ * createOrder gate. Throws STORE_SETUP_INCOMPLETE for enforced, unfinished stores.
+ *
+ * Missed-order logging: this throw rolls back the whole createOrder mutation, so
+ * the server cannot write a checkoutBlocks row from here. The storefront logs
+ * the block itself with logCheckoutBlocked (src/pages/checkout/useCheckoutModel.ts).
+ */
 export async function assertCheckoutOpen(ctx: Ctx, org: Doc<"organizations">) {
   // No UPI ID: closed for every store, waived or not, so no order can pay to a removed ID.
   if (!(await payingVpaOf(ctx, org)).vpa) throw new ConvexError({ code: "PAYMENTS_UNAVAILABLE" });
@@ -568,6 +575,108 @@ export const checkoutAvailability = query({
     if (gateOf(org) === "waived") return { open: true, reason: null };
     const s = await computeSetupStatus(ctx, org);
     return { open: s.complete, reason: s.complete ? null : ("setup" as const) };
+  },
+});
+
+// ---------- missed orders (blocked checkouts) ----------
+
+const CHECKOUT_BLOCK_DEDUPE_MS = 30 * 60 * 1000;
+const MAX_CHECKOUT_BLOCK_ITEMS = 500;
+const MISSED_ORDERS_LIMIT = 50;
+
+/**
+ * Storefront: a cart reached checkout while the store was closed. Deduped: a
+ * signed-in user (or, anonymous, the same org + cart total) logged within 30
+ * minutes is skipped. Public, so only numbers and a reason are accepted.
+ */
+export const logCheckoutBlocked = mutation({
+  args: {
+    orgSlug: v.string(),
+    reason: v.union(v.literal("no_upi"), v.literal("setup")),
+    cartTotalPaise: v.number(),
+    itemCount: v.number(),
+  },
+  // `reason` from the client is ignored: the server derives it, and logs nothing
+  // when checkout is actually open, so callers cannot plant fake entries.
+  handler: async (ctx, { orgSlug, cartTotalPaise, itemCount }) => {
+    const org = await resolveOrg(ctx, orgSlug);
+    const reason = !(await payingVpaOf(ctx, org)).vpa
+      ? ("no_upi" as const)
+      : gateOf(org) === "enforced" && !(await computeSetupStatus(ctx, org)).complete
+        ? ("setup" as const)
+        : null;
+    if (!reason) return null;
+    if (!Number.isInteger(cartTotalPaise) || cartTotalPaise < 0 || cartTotalPaise > MAX_AMOUNT_PAISE)
+      throw new ConvexError({ code: "INVALID_AMOUNT" });
+    if (!Number.isInteger(itemCount) || itemCount < 0 || itemCount > MAX_CHECKOUT_BLOCK_ITEMS)
+      throw new ConvexError({ code: "INVALID_COUNT" });
+
+    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const now = Date.now();
+    const since = now - CHECKOUT_BLOCK_DEDUPE_MS;
+    const recent = userId
+      ? await ctx.db
+          .query("checkoutBlocks")
+          .withIndex("by_org_user_created", (q) =>
+            q.eq("orgId", org._id).eq("userId", userId).gte("createdAt", since),
+          )
+          .first()
+      : await ctx.db
+          .query("checkoutBlocks")
+          .withIndex("by_org_total_created", (q) =>
+            q.eq("orgId", org._id).eq("cartTotalPaise", cartTotalPaise).gte("createdAt", since),
+          )
+          .first();
+    if (recent) return null;
+
+    await ctx.db.insert("checkoutBlocks", {
+      orgId: org._id,
+      ...(userId ? { userId } : {}),
+      reason,
+      cartTotalPaise,
+      itemCount,
+      createdAt: now,
+    });
+    return null;
+  },
+});
+
+// Newest blocked checkouts for one store, with the customer's phone when known.
+async function missedCheckoutRows(ctx: Ctx, orgId: Id<"organizations">) {
+  const rows = await ctx.db
+    .query("checkoutBlocks")
+    .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
+    .order("desc")
+    .take(MISSED_ORDERS_LIMIT);
+  const out = [];
+  for (const r of rows) {
+    let phone: string | null = null;
+    if (r.userId) {
+      const users = await ctx.db
+        .query("users")
+        .withIndex("by_user", (q) => q.eq("userId", r.userId as string))
+        .collect();
+      phone = users.find((u) => u.orgId === orgId)?.phone ?? null;
+    }
+    out.push({
+      _id: r._id,
+      createdAt: r.createdAt,
+      reason: r.reason,
+      cartTotalPaise: r.cartTotalPaise,
+      itemCount: r.itemCount,
+      guest: !r.userId,
+      phone,
+    });
+  }
+  return out;
+}
+
+/** Store admin: newest 50 blocked checkouts. */
+export const listCheckoutBlocks = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, { orgId }) => {
+    await requireOrgAdmin(ctx, orgId);
+    return await missedCheckoutRows(ctx, orgId);
   },
 });
 
@@ -1145,6 +1254,68 @@ export const saRecordAdjustment = mutation({
       payload: { duesDeltaPaise, note: text },
     });
     return null;
+  },
+});
+
+/**
+ * Record a security deposit received outside the app (cash, bank transfer). Credits
+ * the held deposit exactly like a paid deposit order (kind "deposit"). Defaults to
+ * the amount still due. Refused while the store has an open deposit payment
+ * (its paid email/SMS would credit the deposit a second time).
+ */
+export const saMarkDepositPaid = mutation({
+  args: {
+    saToken: v.string(),
+    orgId: v.id("organizations"),
+    amountPaise: v.optional(v.number()),
+    note: v.string(),
+  },
+  handler: async (ctx, { saToken, orgId, amountPaise, note }) => {
+    const sa = await requireSaWrite(ctx, saToken);
+    const org = await requireOrg(ctx, orgId);
+    if (org.kind === "platform") throw new ConvexError({ code: "FORBIDDEN" });
+    const terms = await depositTerms(ctx, org);
+    const { depositHeldPaise } = await balancesOf(ctx, orgId);
+    const due = Math.max(terms.amountPaise - depositHeldPaise, 0);
+    if (due <= 0) throw new ConvexError({ code: "DEPOSIT_ALREADY_HELD" });
+    const amount = amountPaise ?? due;
+    assertAmount(amount);
+    if (amount > due) throw new ConvexError({ code: "EXCEEDS_DEPOSIT_DUE" });
+    if ((await openPlatformOrders(ctx, orgId)).some((o) => o.kind === "deposit"))
+      throw new ConvexError({ code: "DEPOSIT_ORDER_OPEN" });
+    const text = note.trim().slice(0, 200);
+    await appendLedger(ctx, {
+      orgId,
+      kind: "deposit",
+      debitPaise: 0,
+      creditPaise: amount,
+      duesDelta: 0,
+      depositDelta: amount,
+      note: text
+        ? `Security deposit received, recorded by Cigarro: ${text}`
+        : "Security deposit received, recorded by Cigarro",
+      createdBy: `sa:${sa.adminId}`,
+    });
+    await audit(ctx, {
+      orgId,
+      adminUserId: sa.adminId,
+      actorType: "super_admin",
+      action: "platform.deposit.markPaid",
+      targetType: "organization",
+      targetId: orgId,
+      payload: { amountPaise: amount, note: text },
+    });
+    return null;
+  },
+});
+
+/** Super admin: newest 50 blocked checkouts for one store. */
+export const saListCheckoutBlocks = query({
+  args: { saToken: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, { saToken, orgId }) => {
+    await requireSaSession(ctx, saToken);
+    await requireOrg(ctx, orgId);
+    return await missedCheckoutRows(ctx, orgId);
   },
 });
 

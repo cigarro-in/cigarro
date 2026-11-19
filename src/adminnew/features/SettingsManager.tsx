@@ -80,7 +80,6 @@ export function SettingsManager({ section }: { section: SettingsSectionId | null
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{s.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{s.description}</span>
                   </span>
                   <ArrowRight className="size-4 shrink-0 text-muted-foreground md:hidden" aria-hidden />
                 </NavLink>
