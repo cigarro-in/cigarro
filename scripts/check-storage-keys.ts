@@ -57,6 +57,14 @@ assert.equal(slugifyStem("  --  "), "");
   assert.equal(second["asset_images/orgs/smokeshop/blog_images/a.webp"], "smokeshop/images/a-2.webp");
 }
 
+{
+  // Reserved targets (an unrelated R2 object holds the name) are skipped: the next suffix is used.
+  const plan = planNewKeys(["asset_images/orgs/smokeshop/product_images/camel.webp"], "oldsmokeshop", {}, [
+    "smokeshop/images/camel.webp",
+  ]);
+  assert.equal(plan["asset_images/orgs/smokeshop/product_images/camel.webp"], "smokeshop/images/camel-2.webp");
+}
+
 // --- rewriter ----------------------------------------------------------------
 const map: KeyMap = {
   "asset_images/orgs/smokeshop/product_images/camel.webp": "smokeshop/images/camel.webp",

@@ -1,6 +1,6 @@
 // Storage key layout (CLAUDE.md "Images"). Pure helpers, no Convex or Node imports:
-// used by the one-off migration (convex/migrations.ts), the R2 copy script
-// (scripts/r2-restructure/copy.ts) and scripts/check-storage-keys.ts.
+// used by the copy endpoint (functions/api/sa/storage-copy.js), the one-off
+// migration (convex/migrations.ts) and scripts/check-storage-keys.ts.
 //
 // Pre-restructure keys:  asset_images/orgs/<slug>/<folder>/<stem>.<ext>
 //                        asset_images/<stem>.<ext>   (bare: the legacy store only)
@@ -10,7 +10,7 @@
 
 export const CDN_ORIGIN = "https://cdn.cigarro.in";
 export const LEGACY_PREFIX = "asset_images/";
-const IMAGE_RE = /\.(webp|jpe?g|png|gif|avif)$/i;
+export const IMAGE_RE = /\.(webp|jpe?g|png|gif|avif)$/i;
 const REF_RE = /(?:https:\/\/cdn\.cigarro\.in\/)?asset_images\/[A-Za-z0-9._/-]+/g;
 const BARE_RE = /^[A-Za-z0-9._-]+\.(webp|jpe?g|png|gif|avif)$/i;
 
@@ -42,11 +42,17 @@ export function legacyOwner(oldKey: string, legacySlug: string): string | null {
  * Plan the new key for every image in `oldKeys`. Deterministic: keys are visited
  * in sorted order, a stem that is already taken gets `-2`, `-3`, … and every
  * assignment already in `existing` is kept as it is, so re-running the planner
- * never moves an object that was already copied.
+ * never moves an object that was already copied. `reserved` lists targets that
+ * are off limits too (e.g. a name an unrelated R2 object already holds).
  */
-export function planNewKeys(oldKeys: readonly string[], legacySlug: string, existing: KeyMap): KeyMap {
+export function planNewKeys(
+  oldKeys: readonly string[],
+  legacySlug: string,
+  existing: KeyMap,
+  reserved: Iterable<string> = [],
+): KeyMap {
   const out: KeyMap = { ...existing };
-  const taken = new Set(Object.values(existing));
+  const taken = new Set([...Object.values(existing), ...reserved]);
   const todo = [...new Set(oldKeys)].filter((k) => IMAGE_RE.test(k) && !(k in existing)).sort();
   for (const from of todo) {
     const slug = legacyOwner(from, legacySlug);

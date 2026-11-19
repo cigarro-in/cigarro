@@ -19,7 +19,6 @@ import {
 } from "./_generated/server";
 import { LEGACY_ORG_SLUG, RENAME_MIGRATION, renameDone } from "./lib/legacyOrg";
 import { OLDSMOKESHOP_MOVED_IMAGE_KEYS } from "./lib/oldsmokeshopMovedImages";
-import { STORAGE_KEY_MAP } from "./lib/storageKeyMap";
 import { rewriteStorageDeep } from "./lib/storageKeys";
 import { genOrderNumberCandidate, isValidOrderNumber } from "./lib/ids";
 import { cleanDescription } from "./lib/cleanDescription";
@@ -214,7 +213,7 @@ const MIGRATIONS: Migration[] = [
     run: async (ctx) => await runMoveOldsmokeshopImages(ctx),
   },
   {
-    // Pre-restructure image keys → <store>/images/ (copies made by scripts/r2-restructure/copy.ts).
+    // Pre-restructure image keys → <store>/images/ (copies recorded by the SA copy endpoint, convex/storageKeyMoves.ts).
     // Literal name: the exported const below is declared after this array.
     name: "restructureStorageKeys-v1",
     run: async (ctx) => await runRestructureStorageKeys(ctx),
@@ -506,8 +505,9 @@ async function runMoveOldsmokeshopImages(ctx: ActionCtx) {
 // ---------------------------------------------------------------------------
 // restructureStorageKeys-v1: stored image references move from the pre-restructure
 // keys (asset_images/orgs/<slug>/<folder>/…, asset_images/…) to the new layout
-// (<slug>/images/…). The objects are copied first by scripts/r2-restructure/copy.ts,
-// which writes convex/lib/storageKeyMap.ts. Old objects stay in R2, so old URLs
+// (<slug>/images/…). The objects are copied first from /sa (Platform config →
+// Storage restructure → Copy images), which records each move in the
+// storageKeyMoves table. Old objects stay in R2, so old URLs
 // (cached copies, Google's index, order history) keep working. Orders are not
 // rewritten. Idempotent: once a reference is rewritten it no longer matches a key.
 // ---------------------------------------------------------------------------
@@ -518,11 +518,13 @@ const RESTRUCTURE_TABLES = [...IMAGE_TABLES, "organizations", "carts"] as const;
 const RESTRUCTURE_BATCH_SIZE = 100;
 
 export const restructureStorageKeysBatch = internalMutation({
-  args: { table: v.string(), cursor: v.union(v.string(), v.null()) },
-  handler: async (ctx, { table, cursor }): Promise<CleanBatchResult> => {
-    if (Object.keys(STORAGE_KEY_MAP).length === 0) {
-      throw new Error("storageKeyMap is empty: run scripts/r2-restructure/copy.ts first");
-    }
+  args: {
+    table: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    // Copied moves, loaded once per run by the action (storageKeyMoves:loadCopiedMap).
+    map: v.record(v.string(), v.string()),
+  },
+  handler: async (ctx, { table, cursor, map }): Promise<CleanBatchResult> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page = await (ctx.db.query(table as any) as any).paginate({ cursor, numItems: RESTRUCTURE_BATCH_SIZE });
     let changed = 0;
@@ -530,7 +532,7 @@ export const restructureStorageKeysBatch = internalMutation({
       const patch: Record<string, unknown> = {};
       for (const [field, value] of Object.entries(row)) {
         if (field === "_id" || field === "_creationTime") continue;
-        const r = rewriteStorageDeep(value, STORAGE_KEY_MAP);
+        const r = rewriteStorageDeep(value, map);
         if (r.changed) patch[field] = r.value;
       }
       if (Object.keys(patch).length === 0) continue;
@@ -549,13 +551,17 @@ export const restructureStorageKeysBatch = internalMutation({
 
 const restructureStorageKeysBatchRef = makeFunctionReference<
   "mutation",
-  { table: string; cursor: string | null },
+  { table: string; cursor: string | null; map: Record<string, string> },
   CleanBatchResult
 >("migrations:restructureStorageKeysBatch");
+const loadCopiedMapRef = makeFunctionReference<"query", Record<string, never>, Record<string, string>>(
+  "storageKeyMoves:loadCopiedMap",
+);
 
 async function runRestructureStorageKeys(ctx: ActionCtx): Promise<unknown> {
-  if (Object.keys(STORAGE_KEY_MAP).length === 0) {
-    throw new Error("storageKeyMap is empty: run scripts/r2-restructure/copy.ts first");
+  const map = await ctx.runQuery(loadCopiedMapRef, {});
+  if (Object.keys(map).length === 0) {
+    throw new Error("no storage moves recorded: run Copy images on /sa (Platform config) first");
   }
   const totals: Record<string, { scanned: number; changed: number }> = {};
   for (const table of RESTRUCTURE_TABLES) {
@@ -563,7 +569,7 @@ async function runRestructureStorageKeys(ctx: ActionCtx): Promise<unknown> {
     let cursor: string | null = null;
     let isDone = false;
     while (!isDone) {
-      const r: CleanBatchResult = await ctx.runMutation(restructureStorageKeysBatchRef, { table, cursor });
+      const r: CleanBatchResult = await ctx.runMutation(restructureStorageKeysBatchRef, { table, cursor, map });
       totals[table].scanned += r.scanned;
       totals[table].changed += r.changed;
       cursor = r.continueCursor;

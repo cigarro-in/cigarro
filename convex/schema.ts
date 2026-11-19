@@ -1488,4 +1488,16 @@ export default defineSchema({
     runs: v.number(),
     updatedAt: v.number(),
   }).index("by_name", ["name"]),
+
+  // R2 restructure: one row per pre-restructure image key (convex/storageKeyMoves.ts).
+  // Only status "copied" is used for rewriting; conflict/failed rows are retried.
+  storageKeyMoves: defineTable({
+    fromKey: v.string(),
+    toKey: v.string(),
+    orgSlug: v.string(),
+    status: v.union(v.literal("copied"), v.literal("conflict"), v.literal("failed")),
+    updatedAt: v.number(),
+  })
+    .index("by_fromKey", ["fromKey"])
+    .index("by_org", ["orgSlug"]),
 });
