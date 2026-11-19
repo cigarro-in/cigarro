@@ -8,7 +8,7 @@ Cigarro is a multi-store platform for regulated (tobacco) retail in India, paid 
 - **Stores (orgs)**: many stores share one codebase and one deployment. The store is resolved from the request hostname, never from a build-time env var. See "Stores and hosts" below.
 - **Auth**: own ES256 JWT (`phone-verify` mints `cigarro_token`; JWKS at `/.well-known/jwks.json`). `auth.config.ts` trusts only `https://cigarro.in/auth`. Bridged into Convex via `ConvexAuthProvider` (`src/lib/convex/`). Tokens carry an org claim.
 - **Payments + orders + wallet**: Convex. PROD is `prestigious-bass-64.convex.cloud`; DEV is `proper-coyote-383.convex.cloud` (local `.env.local`). All code under `convex/`.
-- **Images**: Cloudflare R2 bucket `cigarro-assets`, served at `https://cdn.cigarro.in`. Keys are `asset_images/orgs/<slug>/<folder>/<stem>.webp`. URL helpers in `src/lib/images/urls.ts`.
+- **Images**: Cloudflare R2 bucket `cigarro-assets`, served at `https://cdn.cigarro.in`. Keys are `<store-slug>/images/<stem>.webp` (every image of a store, flat) and `<store-slug>/documents/<name>.<ext>` (pdf, zip, video). Uploads are create-only and never overwrite; a name clash gets `-2`, `-3`. Stored values are full CDN URLs. The admin library groups images by where they are used (DB references), not by folder. Pre-restructure keys (`asset_images/orgs/<slug>/<folder>/…`, bare `asset_images/…`) still exist and still resolve. URL helpers in `src/lib/images/urls.ts`; copy tooling in `scripts/r2-restructure/`, key rules in `convex/lib/storageKeys.ts`.
 - **Org scoping**: `useOrg()` returns the active store. Every Convex payment, order, wallet and catalog call is scoped by `orgId` (or `orgSlug` for public catalog queries).
 - **Money**: integers in paise at the DB/Convex boundary, rupees in UI. Use `rupeesToPaise` / `paiseToRupees` from `src/lib/convex/money.ts`. Never multiply by 100 inline.
 
@@ -102,8 +102,7 @@ Themes own:
 
 - DNS automation: adding the CNAME for custom domains and subdomains is manual.
 - Admin title shows "Cigarro Admin" instead of the store name (`src/App.tsx`, `src/adminnew/StorePicker.tsx`).
-- Old images are still under `asset_images/` and not yet moved to `orgs/oldsmokeshop`.
-- Storage restructure (backlog): move R2 to a flat `<store>/images/` and `<store>/documents/` layout, with the admin grouping images by where they are used. Audit, target layout and migration plan in `docs/storage-structure.md`. Nothing has been moved.
+- Pre-restructure R2 objects (`asset_images/…`) are still in the bucket, kept so old URLs keep working. Delete them once the restructure is verified on PROD and no references remain.
 - No media table or srcset / responsive image variants yet.
 - Vivid hub pages are not server-rendered yet.
 - `functions/ssr-middleware.js` (bot-only renderer) is still in place. It now serves bots only when SSR is switched off (`SSR_ROUTES=off`) or fails on a route. Remove it once SSR has run without needing the kill switch.
