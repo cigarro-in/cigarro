@@ -17,6 +17,8 @@ import { orderNumberOf } from "./lib/ids";
 // ---------- Mark a pending order as paid manually ----------
 
 // Shared by markPaid and confirmPaymentClaim so both take the same path.
+// An expired or cancelled order paid afterwards becomes late_paid, the same
+// status the bank-email path gives a payment that lands after expiry.
 async function markPaidByAdmin(
   ctx: MutationCtx,
   order: Doc<"orders">,
@@ -26,8 +28,11 @@ async function markPaidByAdmin(
   auditAction: string,
 ) {
   const orderId = order._id;
+  const previousStatus = order.status;
+  const afterTimeout = previousStatus === "expired" || previousStatus === "cancelled";
+  const newStatus = afterTimeout ? "late_paid" : "paid";
   await ctx.db.patch(orderId, {
-    status: "paid",
+    status: newStatus,
     paidAt: Date.now(),
     verificationMethod: "admin_manual",
     ...(order.paymentClaim?.status === "review"
@@ -45,7 +50,8 @@ async function markPaidByAdmin(
   await schedulePaidOrderPush(ctx, orderId);
   await commitOrderInventory(ctx, order, `admin:${actorId}`);
 
-  if (order.slotId) await freeSlot(ctx, order.slotId);
+  // Expiry already freed the slot, and another order may hold it by now.
+  if (order.slotId && !afterTimeout) await freeSlot(ctx, order.slotId);
 
   if (order.kind === "wallet_load") {
     await creditWallet(ctx, {
@@ -63,7 +69,7 @@ async function markPaidByAdmin(
   await onOrderPaid(ctx, orderId);
 
   // Refer & earn: rewards credited on payment when the store's rule says so.
-  await rewardPaidReferral(ctx, order, `admin:${actorId}`);
+  await rewardPaidReferral(ctx, { ...order, status: newStatus }, `admin:${actorId}`);
 
   await audit(ctx, {
     orgId: order.orgId,
@@ -71,7 +77,7 @@ async function markPaidByAdmin(
     action: auditAction,
     targetType: "order",
     targetId: orderId,
-    payload: { reference, note },
+    payload: { reference, note, previousStatus, newStatus },
   });
 }
 
@@ -91,9 +97,37 @@ export const markPaid = mutation({
     if (["refunded", "voided"].includes(order.status))
       throw new ConvexError({ code: "ORDER_NOT_PAYABLE", status: order.status });
     if (order.walletDebitPaise > 0 && order.walletRefundedAt)
-      throw new ConvexError({ code: "WALLET_PORTION_ALREADY_REFUNDED" });
+      throw new ConvexError({
+        code: "WALLET_PORTION_ALREADY_REFUNDED",
+        message: "The wallet part of this order was already returned to the customer.",
+      });
 
-    await markPaidByAdmin(ctx, order, actorId, reference, note, "order.mark_paid");
+    // Payment window timed out but the customer paid. If they already placed a
+    // retry that is pending or paid, marking this one paid would count the
+    // same payment twice: handle the retry instead.
+    const afterTimeout = order.status === "expired" || order.status === "cancelled";
+    if (afterTimeout) {
+      const retries = await ctx.db
+        .query("orders")
+        .withIndex("by_retry_of", (q) => q.eq("retryOfOrderId", orderId))
+        .collect();
+      const live = retries.find((r) => ["pending", "paid", "late_paid"].includes(r.status));
+      if (live)
+        throw new ConvexError({
+          code: "RETRY_ORDER_EXISTS",
+          message: `The customer already placed a retry for this order (${orderNumberOf(live) !== undefined ? `#${orderNumberOf(live)}` : "see their orders"}, ${live.status}). Mark that one paid instead.`,
+          retryOrderId: live._id,
+        });
+    }
+
+    await markPaidByAdmin(
+      ctx,
+      order,
+      actorId,
+      reference,
+      note,
+      afterTimeout ? "order.mark_paid_after_timeout" : "order.mark_paid",
+    );
   },
 });
 

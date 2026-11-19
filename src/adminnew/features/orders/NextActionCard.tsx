@@ -7,6 +7,7 @@ import {
   ConfirmDialog,
   Dialog,
   ErrorBanner,
+  isTimedOutUnpaid,
   ORDER_ACTION_LABEL,
   nextOrderActions,
   STAGE_LABEL,
@@ -33,7 +34,8 @@ export function NextActionCard({ order, stage }: { order: OrderDoc; stage: Order
   const runner = useActionRunner();
 
   const [tracking, setTracking] = useState<TrackingValues>(() => trackingFrom(order));
-  const [confirm, setConfirm] = useState<'cancel' | 'mark_returned' | null>(null);
+  const [confirm, setConfirm] = useState<'cancel' | 'mark_returned' | 'mark_paid_late' | null>(null);
+  const timedOut = isTimedOutUnpaid(order);
   const [refundOpen, setRefundOpen] = useState(false);
   const [restock, setRestock] = useState(false);
 
@@ -89,6 +91,8 @@ export function NextActionCard({ order, stage }: { order: OrderDoc; stage: Order
       return <Button key={action} {...common} onClick={() => setConfirm('cancel')}>{label}</Button>;
     if (action === 'mark_returned')
       return <Button key={action} {...common} onClick={() => setConfirm('mark_returned')}>{label}</Button>;
+    if (action === 'mark_paid' && timedOut)
+      return <Button key={action} {...common} onClick={() => setConfirm('mark_paid_late')}>{label}</Button>;
     if (action === 'refund')
       return <Button key={action} {...common} onClick={() => setRefundOpen(true)}>{label}</Button>;
     return (
@@ -107,6 +111,12 @@ export function NextActionCard({ order, stage }: { order: OrderDoc; stage: Order
           </p>
         ) : (
           <div className="flex flex-col gap-3">
+            {timedOut && (
+              <p className="text-sm text-muted-foreground">
+                The payment window {order.status === 'expired' ? 'expired' : 'closed'}. If the customer's payment reached
+                you anyway, mark the order as paid.
+              </p>
+            )}
             {!refundOpen && <ErrorBanner error={runner.error} />}
             {actions.includes('mark_shipped') && (
               <TrackingFields value={tracking} onChange={setTracking} disabled={runner.busy} />
@@ -126,6 +136,16 @@ export function NextActionCard({ order, stage }: { order: OrderDoc; stage: Order
         cancelLabel="Keep order"
         critical
         onConfirm={() => voidOrder({ orderId, reason: 'admin void from order page' })}
+      />
+
+      <ConfirmDialog
+        open={confirm === 'mark_paid_late'}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title="Mark as paid?"
+        description="Confirm that the customer's payment for this order was received. The order moves to paid (late) and is ready to prepare. Stock is taken for the items."
+        confirmLabel="Payment received, mark paid"
+        cancelLabel="Not yet"
+        onConfirm={() => markPaid({ orderId, reference: `admin_after_timeout:${new Date().toISOString()}` })}
       />
 
       <ConfirmDialog

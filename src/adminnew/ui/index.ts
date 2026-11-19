@@ -72,6 +72,7 @@ export {
 export {
   deriveOrderStage,
   nextOrderActions,
+  isTimedOutUnpaid,
   STAGE_LABEL,
   STAGE_TONE,
   STAGE_ACTIONS,

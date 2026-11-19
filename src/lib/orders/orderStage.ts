@@ -106,14 +106,15 @@ export const STAGE_TONE: Record<OrderStage, StageTone> = {
   preparing: 'info',
   shipped: 'info',
   delivered: 'success',
-  cancelled: 'neutral',
+  cancelled: 'critical',
   refunded: 'neutral',
   returned: 'critical',
 };
 
 /**
  * Next actions an admin can take per stage. Ids map to Convex mutations:
- *   mark_paid       -> admin.markPaid
+ *   mark_paid       -> admin.markPaid (also for expired/cancelled orders the
+ *                      customer paid after the window timed out: late_paid)
  *   cancel          -> admin.voidOrder
  *   start_preparing -> admin.updateShipping { shippingStatus: 'processing' }
  *   mark_shipped    -> admin.updateShipping { shippingStatus: 'shipped' }
@@ -153,7 +154,16 @@ export const STAGE_ACTIONS: Record<OrderStage, readonly OrderAction[]> = {
 };
 
 export function nextOrderActions(order: OrderStageInput): readonly OrderAction[] {
+  // Expired or cancelled (not voided): the payment window timed out, but the
+  // customer may still have paid. Voided orders stay closed.
+  if (isTimedOutUnpaid(order)) return ['mark_paid'];
   return STAGE_ACTIONS[deriveOrderStage(order)];
+}
+
+/** Payment status expired or cancelled: closed by the payment timeout, not by an admin void. */
+export function isTimedOutUnpaid(order: OrderStageInput): boolean {
+  const payment = order.paymentStatus ?? order.status;
+  return payment === 'expired' || payment === 'cancelled';
 }
 
 /** True once the order needs no more work (cancelled, refunded, delivered). */
