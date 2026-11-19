@@ -13,7 +13,9 @@ const Footer = () => {
   const { slug } = useOrgInfo();
   const [brands, setBrands] = useState<FooterBrand[]>([]);
   // Wave 3: footer brand list from the Convex catalog.
-  const { brands: catalogBrands, loading } = useFullCatalog();
+  const { brands: catalogBrands, categories: catalogCategories, loading } = useFullCatalog();
+  // Shop links only point at categories this store actually has (stores differ).
+  const categorySlugs = new Set((catalogCategories as any[]).filter((c: any) => c.isActive !== false).map((c: any) => c.slug));
   useEffect(() => {
     if (loading) return;
     // Transition: this effect runs right after hydration starts; a plain update
@@ -71,12 +73,16 @@ const Footer = () => {
                     <Link to="/categories" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
                       Categories
                     </Link>
-                    <Link to="/category/cigarettes" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Cigarettes
-                    </Link>
-                    <Link to="/category/rolling-stuff" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
-                      Rolling Papers
-                    </Link>
+                    {categorySlugs.has('cigarettes') && (
+                      <Link to="/category/cigarettes" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                        Cigarettes
+                      </Link>
+                    )}
+                    {categorySlugs.has('rolling-stuff') && (
+                      <Link to="/category/rolling-stuff" className="block text-dark hover:text-canyon transition-colors text-base leading-relaxed">
+                        Rolling Papers
+                      </Link>
+                    )}
                   </div>
                 </div>
 
