@@ -19,6 +19,8 @@ import {
 } from "./_generated/server";
 import { LEGACY_ORG_SLUG, RENAME_MIGRATION, renameDone } from "./lib/legacyOrg";
 import { OLDSMOKESHOP_MOVED_IMAGE_KEYS } from "./lib/oldsmokeshopMovedImages";
+import { STORAGE_KEY_MAP } from "./lib/storageKeyMap";
+import { rewriteStorageDeep } from "./lib/storageKeys";
 import { genOrderNumberCandidate, isValidOrderNumber } from "./lib/ids";
 import { cleanDescription } from "./lib/cleanDescription";
 
@@ -210,6 +212,12 @@ const MIGRATIONS: Migration[] = [
     // Old store images copied out of orgs/smokeshop/. v2 also covers subfolders (blogs/).
     name: "moveOldsmokeshopImages-v2",
     run: async (ctx) => await runMoveOldsmokeshopImages(ctx),
+  },
+  {
+    // Pre-restructure image keys → <store>/images/ (copies made by scripts/r2-restructure/copy.ts).
+    // Literal name: the exported const below is declared after this array.
+    name: "restructureStorageKeys-v1",
+    run: async (ctx) => await runRestructureStorageKeys(ctx),
   },
 ];
 
@@ -486,6 +494,76 @@ async function runMoveOldsmokeshopImages(ctx: ActionCtx) {
     let isDone = false;
     while (!isDone) {
       const r: CleanBatchResult = await ctx.runMutation(moveOldsmokeshopImagesBatchRef, { table, cursor });
+      totals[table].scanned += r.scanned;
+      totals[table].changed += r.changed;
+      cursor = r.continueCursor;
+      isDone = r.isDone;
+    }
+  }
+  return totals;
+}
+
+// ---------------------------------------------------------------------------
+// restructureStorageKeys-v1: stored image references move from the pre-restructure
+// keys (asset_images/orgs/<slug>/<folder>/…, asset_images/…) to the new layout
+// (<slug>/images/…). The objects are copied first by scripts/r2-restructure/copy.ts,
+// which writes convex/lib/storageKeyMap.ts. Old objects stay in R2, so old URLs
+// (cached copies, Google's index, order history) keep working. Orders are not
+// rewritten. Idempotent: once a reference is rewritten it no longer matches a key.
+// ---------------------------------------------------------------------------
+
+export const RESTRUCTURE_STORAGE_KEYS_MIGRATION = "restructureStorageKeys-v1";
+// Every table that stores image references (orders excluded on purpose).
+const RESTRUCTURE_TABLES = [...IMAGE_TABLES, "organizations", "carts"] as const;
+const RESTRUCTURE_BATCH_SIZE = 100;
+
+export const restructureStorageKeysBatch = internalMutation({
+  args: { table: v.string(), cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { table, cursor }): Promise<CleanBatchResult> => {
+    if (Object.keys(STORAGE_KEY_MAP).length === 0) {
+      throw new Error("storageKeyMap is empty: run scripts/r2-restructure/copy.ts first");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page = await (ctx.db.query(table as any) as any).paginate({ cursor, numItems: RESTRUCTURE_BATCH_SIZE });
+    let changed = 0;
+    for (const row of page.page as Record<string, unknown>[]) {
+      const patch: Record<string, unknown> = {};
+      for (const [field, value] of Object.entries(row)) {
+        if (field === "_id" || field === "_creationTime") continue;
+        const r = rewriteStorageDeep(value, STORAGE_KEY_MAP);
+        if (r.changed) patch[field] = r.value;
+      }
+      if (Object.keys(patch).length === 0) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.db.patch(row._id as any, patch);
+      changed++;
+    }
+    return {
+      scanned: page.page.length,
+      changed,
+      continueCursor: page.continueCursor,
+      isDone: page.isDone,
+    };
+  },
+});
+
+const restructureStorageKeysBatchRef = makeFunctionReference<
+  "mutation",
+  { table: string; cursor: string | null },
+  CleanBatchResult
+>("migrations:restructureStorageKeysBatch");
+
+async function runRestructureStorageKeys(ctx: ActionCtx): Promise<unknown> {
+  if (Object.keys(STORAGE_KEY_MAP).length === 0) {
+    throw new Error("storageKeyMap is empty: run scripts/r2-restructure/copy.ts first");
+  }
+  const totals: Record<string, { scanned: number; changed: number }> = {};
+  for (const table of RESTRUCTURE_TABLES) {
+    totals[table] = { scanned: 0, changed: 0 };
+    let cursor: string | null = null;
+    let isDone = false;
+    while (!isDone) {
+      const r: CleanBatchResult = await ctx.runMutation(restructureStorageKeysBatchRef, { table, cursor });
       totals[table].scanned += r.scanned;
       totals[table].changed += r.changed;
       cursor = r.continueCursor;
