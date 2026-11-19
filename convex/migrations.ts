@@ -218,6 +218,11 @@ const MIGRATIONS: Migration[] = [
     name: "restructureStorageKeys-v1",
     run: async (ctx) => await runRestructureStorageKeys(ctx),
   },
+  {
+    // Same moves for order history: only each item's image snapshot, nothing else on the order.
+    name: "restructureOrderImages-v1",
+    run: async (ctx) => await runRestructureStorageKeys(ctx, ["orders"], ["items"]),
+  },
 ];
 
 // Never throws: each migration is isolated, and failures are recorded.
@@ -508,8 +513,8 @@ async function runMoveOldsmokeshopImages(ctx: ActionCtx) {
 // (<slug>/images/…). The objects are copied first from /sa (Platform config →
 // Storage restructure → Copy images), which records each move in the
 // storageKeyMoves table. Old objects stay in R2, so old URLs
-// (cached copies, Google's index, order history) keep working. Orders are not
-// rewritten. Idempotent: once a reference is rewritten it no longer matches a key.
+// (cached copies, Google's index) keep working. Orders are rewritten separately by
+// restructureOrderImages-v1, which touches only items[].image. Idempotent: once a reference is rewritten it no longer matches a key.
 // ---------------------------------------------------------------------------
 
 export const RESTRUCTURE_STORAGE_KEYS_MIGRATION = "restructureStorageKeys-v1";
@@ -523,8 +528,10 @@ export const restructureStorageKeysBatch = internalMutation({
     cursor: v.union(v.string(), v.null()),
     // Copied moves, loaded once per run by the action (storageKeyMoves:loadCopiedMap).
     map: v.record(v.string(), v.string()),
+    // Only these fields are rewritten; absent = every field.
+    fields: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { table, cursor, map }): Promise<CleanBatchResult> => {
+  handler: async (ctx, { table, cursor, map, fields }): Promise<CleanBatchResult> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page = await (ctx.db.query(table as any) as any).paginate({ cursor, numItems: RESTRUCTURE_BATCH_SIZE });
     let changed = 0;
@@ -532,6 +539,7 @@ export const restructureStorageKeysBatch = internalMutation({
       const patch: Record<string, unknown> = {};
       for (const [field, value] of Object.entries(row)) {
         if (field === "_id" || field === "_creationTime") continue;
+        if (fields && !fields.includes(field)) continue;
         const r = rewriteStorageDeep(value, map);
         if (r.changed) patch[field] = r.value;
       }
@@ -551,25 +559,29 @@ export const restructureStorageKeysBatch = internalMutation({
 
 const restructureStorageKeysBatchRef = makeFunctionReference<
   "mutation",
-  { table: string; cursor: string | null; map: Record<string, string> },
+  { table: string; cursor: string | null; map: Record<string, string>; fields?: string[] },
   CleanBatchResult
 >("migrations:restructureStorageKeysBatch");
 const loadCopiedMapRef = makeFunctionReference<"query", Record<string, never>, Record<string, string>>(
   "storageKeyMoves:loadCopiedMap",
 );
 
-async function runRestructureStorageKeys(ctx: ActionCtx): Promise<unknown> {
+async function runRestructureStorageKeys(
+  ctx: ActionCtx,
+  tables: readonly string[] = RESTRUCTURE_TABLES,
+  fields?: string[],
+): Promise<unknown> {
   const map = await ctx.runQuery(loadCopiedMapRef, {});
   if (Object.keys(map).length === 0) {
     throw new Error("no storage moves recorded: run Copy images on /sa (Platform config) first");
   }
   const totals: Record<string, { scanned: number; changed: number }> = {};
-  for (const table of RESTRUCTURE_TABLES) {
+  for (const table of tables) {
     totals[table] = { scanned: 0, changed: 0 };
     let cursor: string | null = null;
     let isDone = false;
     while (!isDone) {
-      const r: CleanBatchResult = await ctx.runMutation(restructureStorageKeysBatchRef, { table, cursor, map });
+      const r: CleanBatchResult = await ctx.runMutation(restructureStorageKeysBatchRef, { table, cursor, map, fields });
       totals[table].scanned += r.scanned;
       totals[table].changed += r.changed;
       cursor = r.continueCursor;
