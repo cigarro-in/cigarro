@@ -154,12 +154,16 @@ export function StorageRestructureCard({ token, writeOpen }: { token: string; wr
             const row = byStore.get(s.slug);
             return (
               <li key={s._id} className="flex flex-wrap items-center justify-between gap-2">
-                <Checkbox
-                  checked={!!picked?.[s._id]}
-                  onCheckedChange={(v) => setPicked((prev) => ({ ...(prev ?? {}), [s._id]: v }))}
-                  label={s.name || s.slug}
-                  disabled={running}
-                />
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!picked?.[s._id]}
+                    onCheckedChange={(v) => setPicked((prev) => ({ ...(prev ?? {}), [s._id]: v }))}
+                    label={s.name || s.slug}
+                    disabled={running}
+                  />
+                  <span>{s.name || s.slug}</span>
+                  <span className="font-mono text-xs text-[var(--admin-text-muted)]">{s.slug}</span>
+                </label>
                 <span className="font-mono text-xs text-[var(--admin-text-muted)]">
                   {row ? `${formatCount(row.copied)} copied · ${formatCount(row.conflict)} conflicts · ${formatCount(row.failed)} failed` : 'Not copied yet'}
                 </span>
