@@ -22,12 +22,29 @@ export function isFaviconPath(pathname) {
 
 // Store icon candidates in preference order. 192px is a multiple of 48 (Google's
 // favicon size rule), so it comes first; 512px is only a fallback for /favicon.ico.
-function storeIconCandidates(pathname, appIcons) {
-  if (!appIcons) return [];
-  const list = pathname === FAVICON_PNG_PATH
-    ? [appIcons.icon192]
-    : [appIcons.icon192, appIcons.icon512];
-  return list.filter(Boolean);
+// After the generated PNGs comes the store's own uploaded site icon (any image
+// format), so a store never shows the platform icon while it has one of its own.
+function storeIconCandidates(brand) {
+  const appIcons = brand?.appIcons || {};
+  const list = [appIcons.icon192, appIcons.icon512];
+  return [...list.filter(Boolean).map((url) => ({ url, png: true })),
+    ...(brand?.faviconUrl ? [{ url: brand.faviconUrl, png: false }] : [])];
+}
+
+// Fetches the store's uploaded icon (webp, png, ico, svg...). Returns
+// { bytes, contentType } or null.
+async function fetchAnyImage(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!res.ok) return null;
+    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim();
+    if (!contentType.startsWith('image/')) return null;
+    const bytes = await res.arrayBuffer();
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) return null;
+    return { bytes, contentType };
+  } catch {
+    return null;
+  }
 }
 
 // Fetches a store PNG and checks its signature. Returns the bytes or null.
@@ -79,10 +96,15 @@ export async function serveFavicon(context, org) {
 
   try {
     const brand = await resolveStoreBrand(env, org);
-    for (const url of storeIconCandidates(pathname, brand?.appIcons)) {
-      const bytes = await fetchStoreIcon(url);
-      // Store icons are PNG (signature checked above), even when served at /favicon.ico.
-      if (bytes) return iconResponse(request, bytes, 'image/png');
+    for (const { url, png } of storeIconCandidates(brand)) {
+      if (png) {
+        const bytes = await fetchStoreIcon(url);
+        // Generated icons are PNG (signature checked above), even at /favicon.ico.
+        if (bytes) return iconResponse(request, bytes, 'image/png');
+      } else {
+        const image = await fetchAnyImage(url);
+        if (image) return iconResponse(request, image.bytes, image.contentType);
+      }
     }
   } catch (error) {
     console.error('Favicon: store icon unavailable, using platform icon:', error instanceof Error ? error.message : error);

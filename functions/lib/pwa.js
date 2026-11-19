@@ -221,7 +221,7 @@ export function rewriteStorefrontHead(res, org, brand) {
   const appIcon = brand.icon ? brand.icon.url : '/icons/apple-touch-icon.png';
   // Fixed, same-origin favicon URLs (functions/lib/favicon.js serves them per store).
   // The stored faviconUrl (a webp) is never a favicon link: Google needs square PNG/ICO.
-  const favicon = '<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">';
+  const favicon = '<link rel="icon" href="/favicon.ico"><link rel="icon" href="/favicon-192.png" sizes="192x192">';
   const tags = [
     `<link rel="manifest" href="${MANIFEST_PATH}">`,
     favicon,
