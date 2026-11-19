@@ -1934,6 +1934,8 @@ export const saveSiteSettings = mutation({
     }
     if (rest.brand?.brandColor && !/^#[0-9a-fA-F]{6}$/.test(rest.brand.brandColor))
       throw new ConvexError({ code: "INVALID_BRAND_COLOR" });
+    if (rest.brand?.shareImageUrl && !/^https:\/\/[^\s"'<>]+$/i.test(rest.brand.shareImageUrl.trim()))
+      throw new ConvexError({ code: "INVALID_SHARE_IMAGE" });
     if (rest.ageGate) {
       const ages = [rest.ageGate.minAge, ...rest.ageGate.stateMinAge.map((s) => s.minAge)];
       if (ages.some((a) => !Number.isInteger(a) || a < 0 || a > 100))

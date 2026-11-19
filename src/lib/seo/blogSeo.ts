@@ -16,7 +16,19 @@ export interface BlogPostSeoInput {
   updatedAt?: number | null;
 }
 
-export function blogPostSeo(post: BlogPostSeoInput, siteName: string, primaryHost: string) {
+export interface BlogPostSeoStore {
+  /** The store's logo (brand.logoUrl). Omitted from the publisher when absent. */
+  logoUrl?: string | null;
+  /** The store's share image, used when the post has no featured image. */
+  shareImage?: string | null;
+}
+
+export function blogPostSeo(
+  post: BlogPostSeoInput,
+  siteName: string,
+  primaryHost: string,
+  store: BlogPostSeoStore = {},
+) {
   const site = `https://${primaryHost}`;
   const canonical = `${site}/blog/${post.slug}`;
   const title = post.metaTitle || `${post.title} | ${siteName} Blog`;
@@ -25,7 +37,7 @@ export function blogPostSeo(post: BlogPostSeoInput, siteName: string, primaryHos
   const author = post.authorName || siteName;
   const published = post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined;
   const modified = post.updatedAt ? new Date(post.updatedAt).toISOString() : published;
-  const image = post.featuredImage || undefined;
+  const image = post.featuredImage || store.shareImage || undefined;
   const crumbs = [
     { name: 'Home', url: `${site}/` },
     { name: 'Blog', url: `${site}/blogs` },
@@ -43,7 +55,7 @@ export function blogPostSeo(post: BlogPostSeoInput, siteName: string, primaryHos
     publisher: {
       '@type': 'Organization',
       name: siteName,
-      logo: { '@type': 'ImageObject', url: `${site}/icons/android-chrome-512x512.png` },
+      ...(store.logoUrl ? { logo: { '@type': 'ImageObject', url: store.logoUrl } } : {}),
     },
     mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
   };

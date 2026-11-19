@@ -1,6 +1,8 @@
 import { requiredConvexUrl } from './lib/env.js';
 import { getRequestOrg, brandName } from './lib/org.js';
 import { cleanImageUrl, cleanImageUrls } from './lib/images.js';
+import { resolveStoreBrand, storeHomeTitle } from './lib/pwa.js';
+import { LEGACY_ORG_SLUG } from './lib/legacyOrg.js';
 // SSR Middleware for Cloudflare Pages
 // Serves pre-rendered HTML to search engine bots while maintaining SPA for users
 // This solves the "duplicate canonical" and indexing issues
@@ -50,9 +52,25 @@ function isBot(userAgent) {
   return BOT_USER_AGENTS.some(bot => ua.includes(bot));
 }
 
-// A2: default share image — real 1200x630 JPEG shipped from public/og-default.jpg.
-function ogDefaultImage(cx) {
-  return `${cx.site}/og-default.jpg`;
+// Link-preview images. cx.shareImage is the store's own share image (pwa.js
+// resolveStoreBrand); null when the store has none, and then the page carries no
+// og:image / twitter:image. Only the legacy store's default file has a known 1200x630 size.
+function ogImageBlock(cx, imageUrl, alt) {
+  if (!imageUrl) return '';
+  const dims = imageUrl === `${cx.site}/og-default.jpg`
+    ? '\n  <meta property="og:image:width" content="1200">\n  <meta property="og:image:height" content="630">'
+    : '';
+  return `<meta property="og:image" content="${imageUrl}">${dims}\n  <meta property="og:image:alt" content="${escapeHtml(alt)}">`;
+}
+
+function twitterImageBlock(imageUrl, alt) {
+  if (!imageUrl) return '';
+  return `<meta name="twitter:image" content="${imageUrl}">\n  <meta name="twitter:image:alt" content="${escapeHtml(alt)}">`;
+}
+
+// The apple-touch-icon is the store's own icon; omitted when the store has none.
+function appleIconTag(href) {
+  return href ? `<link rel="apple-touch-icon" href="${href}">` : '';
 }
 
 // Function responses bypass Cloudflare Pages `_headers`, so prerendered bot
@@ -249,10 +267,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
       ? activeVariants.find(v => v !== defaultVariant &&
           (v.track_inventory === false || Number(v.stock ?? 0) > 0))
       : null;
-    const imageUrl = variantImages[0] || ogDefaultImage(cx);
-    const imageDims = imageUrl === ogDefaultImage(cx)
-      ? `\n  <meta property="og:image:width" content="1200">\n  <meta property="og:image:height" content="630">`
-      : '';
+    const imageUrl = variantImages[0] || cx.shareImage || null;
     const title = product.meta_title || `${product.name} | ${cx.name}`;
     const description = product.meta_description || product.short_description || product.description?.substring(0, 160) || '';
     // Related discovery: same-brand first, fill with other active products (avoids thin
@@ -304,7 +319,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
   <!-- Favicon (Dynamic from Admin Settings) -->
   <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
   <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" href="${faviconUrl}">
+  ${appleIconTag(faviconUrl)}
   
   <!-- Primary Meta Tags -->
   <title>${escapeHtml(title)}</title>
@@ -320,19 +335,17 @@ async function generateProductHTML(slug, faviconUrl, cx) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${imageUrl}">
-  <meta property="og:image:alt" content="${escapeHtml(product.name)}">${imageDims}
+  ${ogImageBlock(cx, imageUrl, product.name)}
   <meta property="og:site_name" content="${cx.name}">
   ${price != null ? `<meta property="product:price:amount" content="${price}">
   <meta property="product:price:currency" content="INR">` : ''}
-  
+
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="${canonicalUrl}">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${imageUrl}">
-  <meta name="twitter:image:alt" content="${escapeHtml(product.name)}">
+  ${twitterImageBlock(imageUrl, product.name)}
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -341,7 +354,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
       '@type': 'Product',
       name: product.name,
       description: description,
-      image: variantImages.length > 0 ? variantImages.slice(0, 5) : imageUrl,
+      ...((variantImages.length > 0 || imageUrl) ? { image: variantImages.length > 0 ? variantImages.slice(0, 5) : imageUrl } : {}),
       brand: {
         '@type': 'Brand',
         name: product.brand?.name || `${cx.name}`
@@ -418,7 +431,7 @@ async function generateProductHTML(slug, faviconUrl, cx) {
   ${breadcrumbNavHtml(crumbItems)}
   <h1>${escapeHtml(product.name)}</h1>
   <p>${escapeHtml(description)}</p>
-  <img src="${imageUrl}" alt="${escapeHtml(product.name)}">
+  ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}">` : ''}
   ${price != null ? `<p>Price: ₹${price}${defaultVariantLabel ? ` (${escapeHtml(defaultVariantLabel)})` : ''} — ${defaultInStock ? 'In stock' : 'Out of stock'}</p>` : ''}
   ${hasDiscount ? `<p>MRP: <s>₹${mrp}</s> — ${discountPct}% off (you save ₹${mrp - price})</p>` : ''}
   ${cartonVariant ? `<p>Carton (${cartonVariant.units_contained || 10} ${escapeHtml(cartonVariant.unit || 'packets')}): ₹${cartonVariant.price} <s>MRP ₹${cartonVariant.compare_at_price}</s> — ${cartonPct}% off (you save ₹${Number(cartonVariant.compare_at_price) - Number(cartonVariant.price)})</p>` : ''}
@@ -705,14 +718,10 @@ async function generateCategoryHTML(slug, faviconUrl, cx) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${ogDefaultImage(cx)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="${escapeHtml(title)}">
+  ${ogImageBlock(cx, cx.shareImage, title)}
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${ogDefaultImage(cx)}">
-  <meta name="twitter:image:alt" content="${escapeHtml(title)}">
-  
+  ${twitterImageBlock(cx.shareImage, title)}
+
   <script type="application/ld+json">
   ${JSON.stringify({
       '@context': 'https://schema.org',
@@ -803,15 +812,10 @@ async function generateBrandHTML(slug, faviconUrl, cx) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  ${brand.logo_url ? `<meta property="og:image" content="${brand.logo_url}">
-  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">` : `<meta property="og:image" content="${ogDefaultImage(cx)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="${escapeHtml(brand.name)}">`}
+  ${ogImageBlock(cx, brand.logo_url || cx.shareImage, brand.name)}
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${brand.logo_url || ogDefaultImage(cx)}">
-  <meta name="twitter:image:alt" content="${escapeHtml(brand.name)}">
-  
+  ${twitterImageBlock(brand.logo_url || cx.shareImage, brand.name)}
+
   <script type="application/ld+json">
   ${JSON.stringify({
     '@context': 'https://schema.org',
@@ -959,14 +963,10 @@ async function generateCategoryBrandHTML(categorySlug, brandSlug, faviconUrl, cx
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${ogDefaultImage(cx)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="${escapeHtml(heading)}">
+  ${ogImageBlock(cx, cx.shareImage, heading)}
   <meta property="og:site_name" content="${cx.name}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${ogDefaultImage(cx)}">
-  <meta name="twitter:image:alt" content="${escapeHtml(heading)}">
+  ${twitterImageBlock(cx.shareImage, heading)}
 
   <script type="application/ld+json">
   ${jsonLd({
@@ -1098,7 +1098,7 @@ async function hubContent(pathname, cx) {
 async function generateHomepageHTML(faviconUrl, cx) {
   const hub = await hubContent('/', cx);
   const canonicalUrl = `${cx.site}/`;
-  const title = `${cx.name} | Cigarettes and Tobacco Products Online`;
+  const title = storeHomeTitle(cx.name, cx.metaTitle);
   const description = `Browse cigarette brands, variants, pack options and related tobacco products online at ${cx.name}. For adults of legal smoking age only.`;
 
   return `<!DOCTYPE html>
@@ -1110,7 +1110,7 @@ async function generateHomepageHTML(faviconUrl, cx) {
   <!-- Favicon -->
   <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
   <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" href="${faviconUrl}">
+  ${appleIconTag(faviconUrl)}
   
   <!-- Primary Meta Tags -->
   <title>${escapeHtml(title)}</title>
@@ -1124,19 +1124,15 @@ async function generateHomepageHTML(faviconUrl, cx) {
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:image" content="${ogDefaultImage(cx)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="${escapeHtml(title)}">
+  ${ogImageBlock(cx, cx.shareImage, title)}
   <meta property="og:site_name" content="${cx.name}">
-  
+
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="${canonicalUrl}">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${ogDefaultImage(cx)}">
-  <meta name="twitter:image:alt" content="${escapeHtml(title)}">
+  ${twitterImageBlock(cx.shareImage, title)}
   
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -1150,10 +1146,7 @@ async function generateHomepageHTML(faviconUrl, cx) {
       '@type': 'Organization',
       name: `${cx.name}`,
       url: canonicalUrl,
-      logo: {
-        '@type': 'ImageObject',
-        url: faviconUrl
-      }
+      ...(cx.logo ? { logo: { '@type': 'ImageObject', url: cx.logo } } : {})
     },
     potentialAction: {
       '@type': 'SearchAction',
@@ -1198,8 +1191,8 @@ async function generateBlogHTML(slug, faviconUrl, cx) {
     };
 
     const canonicalUrl = `${cx.site}/blog/${slug}`;
-    // A2: no featured image → omit og:image entirely (never substitute a logo).
-    const imageUrl = post.featured_image || null;
+    // The post's featured image, else the store share image (null: no og:image).
+    const imageUrl = post.featured_image || cx.shareImage || null;
     const title = post.meta_title || `${post.title} | ${cx.name} Blog`;
     const description = post.meta_description || post.excerpt || post.content?.substring(0, 160) || '';
     const authorName = post.author?.name || `${cx.name}`;
@@ -1258,10 +1251,7 @@ async function generateBlogHTML(slug, faviconUrl, cx) {
       publisher: {
         '@type': 'Organization',
         name: `${cx.name}`,
-        logo: {
-          '@type': 'ImageObject',
-          url: faviconUrl
-        }
+        ...(cx.logo ? { logo: { '@type': 'ImageObject', url: cx.logo } } : {})
       },
       mainEntityOfPage: {
         '@type': 'WebPage',
@@ -1574,16 +1564,25 @@ export async function onRequest(context) {
   try {
     // All catalog reads (bot HTML + search + ?format= feeds) come from Convex.
     const org = getRequestOrg(context);
+    const site = `https://${org.primaryHost}`;
+    // The store's own brand facts (settings + hero slides, cached per day). Platform
+    // icons and images appear only for the legacy store.
+    const legacy = org.slug === LEGACY_ORG_SLUG;
+    const brand = await resolveStoreBrand(env, org);
     const cx = {
       url: requiredConvexUrl(env),
       orgSlug: org.slug,
       name: brandName(org),
       primaryHost: org.primaryHost,
-      site: `https://${org.primaryHost}`,
+      site,
+      metaTitle: brand.metaTitle,
+      shareImage: brand.shareImage,
+      logo: brand.logoUrl || (legacy ? `${site}/icons/android-chrome-512x512.png` : null),
+      appIcon: brand.appIcons?.apple180 || brand.icon?.url || (legacy ? `${site}/icons/android-chrome-512x512.png` : null),
     };
 
-    // Use static favicon path (no database fetch needed)
-    const faviconUrl = `${cx.site}/icons/android-chrome-512x512.png`;
+    // The store's apple icon (or null), used by the page heads below.
+    const faviconUrl = cx.appIcon;
 
     // Explicit agent formats first (any UA, catalog routes only)
     if (wantsAgentFormat) {

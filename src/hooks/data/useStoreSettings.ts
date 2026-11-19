@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { usePreloadedOrLive } from '../../lib/ssr/preload';
 import { api } from '../../../convex/_generated/api';
 import { useOrgInfo } from '../../lib/org/OrgContext';
-import { resolveStoreSettings, type RawStoreSettings, type StoreSettings } from '../../lib/storeSettings';
+import { resolveShareImage, resolveStoreSettings, type RawStoreSettings, type StoreSettings } from '../../lib/storeSettings';
+import { useHeroSlides } from './useContent';
 
 export type { StoreSettings, StoreAddress, StoreStateMinAge, RawStoreSettings } from '../../lib/storeSettings';
 export { resolveStoreSettings } from '../../lib/storeSettings';
@@ -26,5 +27,27 @@ export function useStoreSettings(): { settings: StoreSettings; loading: boolean 
       loading: row === undefined,
     }),
     [row, orgSlug, storeName],
+  );
+}
+
+// The store's link-preview image (absolute https URL or null). Resolution order
+// lives in resolveShareImage (src/lib/storeSettings.ts): brand.shareImageUrl, the
+// first hero slide, the logo, the site icon; /og-default.jpg only for the legacy store.
+export function useStoreShareImage(): string | null {
+  const org = useOrgInfo();
+  const { settings } = useStoreSettings();
+  const { slides } = useHeroSlides();
+  return useMemo(
+    () =>
+      resolveShareImage(
+        {
+          shareImageUrl: settings.brand.shareImageUrl,
+          heroImageUrl: slides[0]?.image_url ?? null,
+          logoUrl: settings.brand.logoUrl,
+          faviconUrl: settings.brand.faviconUrl,
+        },
+        { slug: org.slug, primaryHost: org.primaryHost },
+      ),
+    [settings.brand.shareImageUrl, settings.brand.logoUrl, settings.brand.faviconUrl, slides, org.slug, org.primaryHost],
   );
 }

@@ -8,7 +8,8 @@ import type { BlogPost as BlogPostType } from '../../types/blog';
 import { sanitizeBlogBody, formatBlogDate } from '../../lib/blog/blogRender';
 import { blogPostSeo } from '../../lib/seo/blogSeo';
 import { BreadcrumbNav } from '../../components/layout/BreadcrumbNav';
-import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useStoreSettings, useStoreShareImage } from '../../hooks/data/useStoreSettings';
+import { isLegacyStoreSlug } from '../../lib/storeSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useBlogPosts, useBlogPost, useRelatedPosts } from '../../hooks/data/useContent';
 import { hubSeo, hubItemListJsonLd } from '../../lib/seo/hubSeo';
@@ -189,7 +190,8 @@ export function BlogPost() {
   );
   const isLoading = loading;
   const { settings: store } = useStoreSettings();
-  const { primaryHost } = useOrgInfo();
+  const shareImage = useStoreShareImage();
+  const { primaryHost, slug: orgSlug } = useOrgInfo();
   // Sanitize, then index h2/h3 and set their ids. Runs in the SSR render too, so the
   // heading ids are in the server HTML.
   const body = useMemo(() => buildToc(sanitizeBlogBody(post?.content)), [post?.content]);
@@ -234,6 +236,11 @@ export function BlogPost() {
     },
     store.name,
     primaryHost,
+    {
+      // Only the legacy store publishes the platform icon as its logo.
+      logoUrl: store.brand.logoUrl || (isLegacyStoreSlug(orgSlug) ? `https://${primaryHost}/icons/android-chrome-512x512.png` : null),
+      shareImage,
+    },
   );
 
   return (

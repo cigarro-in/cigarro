@@ -5,6 +5,7 @@
 // Any fetch or parse failure falls back to the platform icon.
 
 import { resolveStoreBrand } from './pwa.js';
+import { LEGACY_ORG_SLUG } from './legacyOrg.js';
 
 export const FAVICON_ICO_PATH = '/favicon.ico';
 export const FAVICON_PNG_PATH = '/favicon-192.png';
@@ -110,7 +111,9 @@ export async function serveFavicon(context, org) {
     console.error('Favicon: store icon unavailable, using platform icon:', error instanceof Error ? error.message : error);
   }
 
-  const fallback = await platformIcon(context, pathname);
+  // The platform icon is served only for the legacy store. Any other store gets a
+  // 404 rather than another brand's icon.
+  const fallback = org?.slug === LEGACY_ORG_SLUG ? await platformIcon(context, pathname) : null;
   if (fallback) return fallback;
   return new Response('Not found', {
     status: 404,

@@ -19,6 +19,9 @@ export const storeBrandV = v.object({
   logoUrl: v.optional(v.string()),
   faviconUrl: v.optional(v.string()),
   brandColor: v.optional(v.string()), // #rrggbb
+  // Link-preview image (Open Graph / Twitter), 1200x630, https. Optional: when
+  // absent the store's first hero slide, then its logo, is used.
+  shareImageUrl: v.optional(v.string()),
 });
 
 export const storeBusinessV = v.object({

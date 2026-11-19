@@ -5,6 +5,7 @@ import { CategoriesScroller } from './CategoriesScroller';
 import { useHomepageData } from '../../hooks/useHomepageData';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { storeHomeTitle } from '../../lib/storeSettings';
 import { DEFAULT_SECTION_ORDER } from '../../lib/homepage/sectionOrder';
 
 // The page's only h1 (logos in the headers are not headings). Visually hidden:
@@ -29,7 +30,7 @@ export function HomePage() {
   const { data, isLoading } = useHomepageData();
   const { settings: store } = useStoreSettings();
   const { primaryHost } = useOrgInfo();
-  const homeTitle = `${store.name} | Cigarettes and Tobacco Products Online`;
+  const homeTitle = storeHomeTitle(store.name, store.metaTitle);
   const homeDescription = `Browse cigarette brands, variants, pack options and related tobacco products online at ${store.name}. For adults of legal smoking age only.`;
   // Admin Homepage toggles; absent row = enabled (existing installs unaffected).
   const on = (name: string) => data?.sectionsEnabled?.[name] !== false;
@@ -124,7 +125,6 @@ export function HomePage() {
         url="/"
         type="website"
         keywords={['cigarettes online', 'cigarette brands India', 'tobacco products India', 'rolling papers India']}
-        image={data?.heroSlides?.[0]?.image_url}
         extraJsonLd={latestItemList ? [latestItemList] : undefined}
       />
       <h1 className="sr-only">{homeTitle}</h1>

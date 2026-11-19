@@ -42,7 +42,7 @@ export interface StoreSettings {
   name: string;
   metaTitle: string;
   metaDescription: string;
-  brand: { logoUrl: string; faviconUrl: string; brandColor: string };
+  brand: { logoUrl: string; faviconUrl: string; brandColor: string; shareImageUrl: string };
   business: {
     legalName: string;
     gstin: string;
@@ -170,6 +170,7 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null, ctx?: StoreS
       logoUrl: str(raw?.brand?.logoUrl),
       faviconUrl: str(raw?.brand?.faviconUrl, str(raw?.faviconUrl)),
       brandColor: str(raw?.brand?.brandColor, d.theme.primaryColor),
+      shareImageUrl: str(raw?.brand?.shareImageUrl),
     },
     business: {
       legalName: str(raw?.business?.legalName),
@@ -217,6 +218,57 @@ export function resolveStoreSettings(raw?: RawStoreSettings | null, ctx?: StoreS
 }
 
 export const DEFAULT_AGE_GATE = resolveStoreSettings().ageGate;
+
+// ---------- Link previews (Open Graph / Twitter) ----------
+// Mirrored on the edge in functions/lib/pwa.js (resolveShareImage, storeHomeTitle).
+// Keep the two in step.
+
+const HTTPS_URL = /^https:\/\/[^\s"'<>]+$/i;
+const httpsOnly = (v: unknown): string | null =>
+  typeof v === 'string' && HTTPS_URL.test(v.trim()) && v.trim().length <= 2048 ? v.trim() : null;
+
+/** Only oldsmokeshop (the legacy store) may use a Cigarro asset as its share image. */
+export function isLegacyStoreSlug(slug: string | undefined): boolean {
+  return slug === LEGACY_ORG_SLUG;
+}
+
+export interface ShareImageInputs {
+  shareImageUrl?: string | null;
+  /** URL of the store's first active hero slide (desktop image). */
+  heroImageUrl?: string | null;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
+}
+
+/**
+ * The store's share image, in priority order: brand.shareImageUrl, the first
+ * hero slide, the logo, the site icon. Only the legacy store falls back to the
+ * platform /og-default.jpg. Returns an absolute https URL, or null (no og:image).
+ */
+export function resolveShareImage(
+  input: ShareImageInputs,
+  opts: { slug?: string; primaryHost: string },
+): string | null {
+  const picked =
+    httpsOnly(input.shareImageUrl) ??
+    httpsOnly(input.heroImageUrl) ??
+    httpsOnly(input.logoUrl) ??
+    httpsOnly(input.faviconUrl);
+  if (picked) return picked;
+  return isLegacyStoreSlug(opts.slug) ? `https://${opts.primaryHost}/og-default.jpg` : null;
+}
+
+/**
+ * Store home title. A store with its own meta title uses "<name> | <meta title>"
+ * (or the meta title alone when it already names the store). Otherwise the
+ * "<name> | Cigarettes and Tobacco Products Online" pattern.
+ */
+export function storeHomeTitle(name: string, metaTitle: string | null | undefined): string {
+  const custom = typeof metaTitle === 'string' ? metaTitle.trim() : '';
+  if (!name) return custom || 'Cigarettes and Tobacco Products Online';
+  if (custom && custom !== name) return custom.includes(name) ? custom : `${name} | ${custom}`;
+  return `${name} | Cigarettes and Tobacco Products Online`;
+}
 
 // "18" or "18 (21 for Karnataka)" for copy such as "over 18 years".
 export function ageRuleLabel(gate: { minAge: number; stateMinAge: StoreStateMinAge[] }): string {

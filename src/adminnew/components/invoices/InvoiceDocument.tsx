@@ -54,7 +54,6 @@ export function InvoiceDocument({ invoice }: { invoice: PrintableInvoice }) {
           <div className="absolute bottom-0 left-0 h-1.5 w-full bg-[var(--invoice-accent)]" />
           <div className="relative flex items-start justify-between gap-8">
             <div className="flex items-center gap-4">
-              <img src="/icons/android-chrome-192x192.png" alt="" className="h-14 w-14 rounded-2xl border border-white/15 object-cover" />
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-white/50">Premium retail</div>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight">{invoice.seller.businessName}</h1>

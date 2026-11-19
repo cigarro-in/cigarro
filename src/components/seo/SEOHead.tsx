@@ -1,7 +1,8 @@
 import { truncateAtWord } from '../../lib/seo/text';
 import { Helmet } from 'react-helmet-async';
-import { useStoreSettings } from '../../hooks/data/useStoreSettings';
+import { useStoreSettings, useStoreShareImage } from '../../hooks/data/useStoreSettings';
 import { useOrgInfo } from '../../lib/org/OrgContext';
+import { isLegacyStoreSlug, storeHomeTitle } from '../../lib/storeSettings';
 
 interface SEOHeadProps {
   title?: string;
@@ -89,15 +90,15 @@ export function SEOHead({
   titleVerbatim = false,
   forceCanonical = false,
 }: SEOHeadProps) {
-  // A2 share-image defaults. og-default.jpg is a real 1200x630 JPEG in public/.
-  // The 512px icon is a valid image for Organization/publisher logos (never a share image).
-  const { primaryHost } = useOrgInfo();
+  // Every store's identity comes from its own settings. The platform icon is a
+  // logo only for the legacy store (oldsmokeshop); other stores have no logo unless set.
+  const { primaryHost, slug } = useOrgInfo();
   const SITE_ORIGIN = `https://${primaryHost}`;
-  const DEFAULT_SHARE_IMAGE = `${SITE_ORIGIN}/og-default.jpg`;
-  const SITE_LOGO_URL = `${SITE_ORIGIN}/icons/android-chrome-512x512.png`;
+  const legacy = isLegacyStoreSlug(slug);
+  const storeShareImage = useStoreShareImage();
   const { settings: store } = useStoreSettings();
   const siteName = store.name;
-  const title = titleProp ?? `${siteName} | Cigarettes and Tobacco Products Online`;
+  const title = titleProp ?? storeHomeTitle(siteName, store.metaTitle);
   const description =
     descriptionProp ??
     (store.seo.defaultDescription || `Browse ${siteName} products online.`);
@@ -133,15 +134,14 @@ export function SEOHead({
   // og:type only supports website/article/profile — never "product".
   // For products we emit website + product: namespace tags below.
   const ogType = type === 'article' ? 'article' : 'website';
-  // A2: articles with no featured/og image omit og:image entirely rather than
-  // substituting a logo. All other templates fall back to the default share image.
-  const omitImage = type === 'article' && !image && !ogImage && !twitterImage;
-  const resolvedImage = image ?? DEFAULT_SHARE_IMAGE;
-  const shareImage = omitImage ? undefined : (ogImage || resolvedImage);
-  const twitterShareImage = omitImage ? undefined : (twitterImage || ogImage || resolvedImage);
+  // Page image first (product, category, brand, blog), else the store share image.
+  // No image at all omits og:image / twitter:image; a platform image is never used.
+  const resolvedImage = image ?? storeShareImage ?? undefined;
+  const shareImage = ogImage || resolvedImage || undefined;
+  const twitterShareImage = twitterImage || ogImage || resolvedImage || undefined;
   const optimizedDescription = truncateAtWord(description, 160);
 
-  const logoUrl = store.brand.logoUrl || SITE_LOGO_URL;
+  const logoUrl = store.brand.logoUrl || (legacy ? `${SITE_ORIGIN}/icons/android-chrome-512x512.png` : '');
   const addr = store.business.address;
   const postalAddress = {
     '@type': 'PostalAddress',
@@ -151,25 +151,33 @@ export function SEOHead({
     ...(addr.pincode ? { postalCode: addr.pincode } : {}),
     addressCountry: 'IN'
   };
+  const hasAddress = Boolean(addr.line1 || addr.line2 || addr.city || addr.state || addr.pincode);
+  const hasContact = Boolean(store.business.supportEmail || store.business.supportPhone);
+  const sameAs = Object.values(store.socials).filter((u) => u.startsWith('http'));
+  // Organization JSON-LD: only the fields this store actually has.
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: siteName,
     ...(store.business.legalName ? { legalName: store.business.legalName } : {}),
     url: SITE_ORIGIN,
-    logo: logoUrl,
-    description: store.seo.defaultDescription,
-    address: postalAddress,
-    contactPoint: {
-      '@type': 'ContactPoint',
-      contactType: 'Customer Service',
-      availableLanguage: ['English', 'Hindi'],
-      ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
-      ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {})
-    },
+    ...(logoUrl ? { logo: logoUrl } : {}),
+    ...(store.seo.defaultDescription ? { description: store.seo.defaultDescription } : {}),
+    ...(hasAddress ? { address: postalAddress } : {}),
+    ...(hasContact
+      ? {
+          contactPoint: {
+            '@type': 'ContactPoint',
+            contactType: 'Customer Service',
+            availableLanguage: ['English', 'Hindi'],
+            ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
+            ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {})
+          }
+        }
+      : {}),
     ...(store.business.supportEmail ? { email: store.business.supportEmail } : {}),
     ...(store.business.supportPhone ? { telephone: store.business.supportPhone } : {}),
-    sameAs: Object.values(store.socials).filter((u) => u.startsWith('http'))
+    ...(sameAs.length > 0 ? { sameAs } : {})
   };
 
   // Generate structured data based on type
@@ -180,7 +188,7 @@ export function SEOHead({
       name: fullTitle,
       description: optimizedDescription,
       url: canonicalUrl,
-      image: shareImage
+      ...(shareImage ? { image: shareImage } : {})
     };
 
     if (type === 'product' && price) {
@@ -276,10 +284,7 @@ export function SEOHead({
         publisher: {
           '@type': 'Organization',
           name: siteName,
-          logo: {
-            '@type': 'ImageObject',
-            url: logoUrl
-          }
+          ...(logoUrl ? { logo: { '@type': 'ImageObject', url: logoUrl } } : {})
         },
         datePublished: publishedTime,
         dateModified: modifiedTime || publishedTime
@@ -293,10 +298,7 @@ export function SEOHead({
         '@type': 'Organization',
         name: siteName,
         url: SITE_ORIGIN,
-        logo: {
-          '@type': 'ImageObject',
-          url: logoUrl
-        }
+        ...(logoUrl ? { logo: { '@type': 'ImageObject', url: logoUrl } } : {})
       },
       potentialAction: {
         '@type': 'SearchAction',
@@ -309,7 +311,7 @@ export function SEOHead({
   return (
     <Helmet>
       {/* Preload LCP image if provided */}
-      {shareImage && shareImage !== DEFAULT_SHARE_IMAGE && (
+      {shareImage && shareImage !== storeShareImage && (
         <link rel="preload" as="image" href={shareImage} fetchPriority="high" />
       )}
 
@@ -329,9 +331,9 @@ export function SEOHead({
       {/* No Fragments here: react-helmet-async drops tags nested in a Fragment. */}
       {shareImage && <meta property="og:image" content={shareImage} />}
       {shareImage && <meta property="og:image:alt" content={imageAlt || ogTitle || fullTitle} />}
-      {/* Dimensions are only known for the shipped 1200x630 default share image. */}
-      {shareImage && shareImage === DEFAULT_SHARE_IMAGE && <meta property="og:image:width" content="1200" />}
-      {shareImage && shareImage === DEFAULT_SHARE_IMAGE && <meta property="og:image:height" content="630" />}
+      {/* Dimensions are only known for the legacy store's shipped 1200x630 default image. */}
+      {shareImage && shareImage === `${SITE_ORIGIN}/og-default.jpg` && <meta property="og:image:width" content="1200" />}
+      {shareImage && shareImage === `${SITE_ORIGIN}/og-default.jpg` && <meta property="og:image:height" content="630" />}
       <meta property="og:site_name" content={siteName} />
       {store.seo.googleSiteVerification && (
         <meta name="google-site-verification" content={store.seo.googleSiteVerification} />

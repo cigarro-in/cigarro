@@ -1,6 +1,7 @@
 import { useMutation } from 'convex/react';
 import { Button, Card, ErrorBanner, Input, Label, useButtonFeedback } from '../../ui';
 import { SingleImagePicker } from '../../components/shared/ImagePicker';
+import { InlineStatus, useInlineStatus } from '../../../components/common/InlineStatus';
 import { siteConfig } from '../../../config/site';
 import { api } from '../../../../convex/_generated/api';
 import { ORG_SLUG } from '../../../lib/convex/org';
@@ -11,6 +12,8 @@ import { FieldGrid } from './FieldGrid';
 import { useSettingsDraft } from './useSettingsDraft';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+// Link-preview image: 1200 x 630 (Open Graph / Twitter large card).
+const SHARE_IMAGE_RATIO = 1200 / 630;
 
 /** Store name, logo, site icon, brand colour, contact, address and social links. */
 export function StoreDetailsSection({ live }: SectionProps) {
@@ -18,6 +21,7 @@ export function StoreDetailsSection({ live }: SectionProps) {
   const setAppIcons = useMutation(api.adminCatalog.saveSiteSettings);
   // App icon generation and upload (home screen icon, maskable, apple touch).
   const iconFeedback = useButtonFeedback();
+  const shareFeedback = useInlineStatus();
   if (!draft) return null;
 
   const setBrand = (patch: Partial<typeof draft.brand>) =>
@@ -28,6 +32,15 @@ export function StoreDetailsSection({ live }: SectionProps) {
     update((d) => ({ ...d, business: { ...d.business, address: { ...d.business.address, ...patch } } }));
   const setSocial = (patch: Partial<typeof draft.socials>) =>
     update((d) => ({ ...d, socials: { ...d.socials, ...patch } }));
+  const onShareImageChange = (url: string | null) => {
+    const next = url || '';
+    if (next && !/^https:\/\//i.test(next)) {
+      shareFeedback.setError('The share image must be an https address.');
+      return;
+    }
+    shareFeedback.clear();
+    setBrand({ shareImageUrl: next });
+  };
 
   // Saving a new site icon or logo regenerates the app icons with the same save.
   const onSave = async () => {
@@ -45,6 +58,7 @@ export function StoreDetailsSection({ live }: SectionProps) {
           logoUrl: d.brand.logoUrl.trim() || undefined,
           faviconUrl: d.brand.faviconUrl.trim() || undefined,
           brandColor: color || undefined,
+          shareImageUrl: d.brand.shareImageUrl.trim() || undefined,
         },
         // Legal name and GSTIN are edited in the Legal section: keep the live values.
         business: {
@@ -115,6 +129,23 @@ export function StoreDetailsSection({ live }: SectionProps) {
               <p className="text-xs text-muted-foreground">32 x 32 or 64 x 64 px, PNG or ICO.</p>
             </div>
           </FieldGrid>
+          <div className="flex flex-col gap-1.5">
+            <Label>Share image (link previews, 1200×630)</Label>
+            <SingleImagePicker
+              value={draft.brand.shareImageUrl || null}
+              onChange={onShareImageChange}
+              searchHint={draft.name ? `${draft.name} store` : undefined}
+              cropRatio={SHARE_IMAGE_RATIO}
+              cropPresets={[
+                { label: '1200 x 630', ratio: SHARE_IMAGE_RATIO },
+                { label: 'Original', ratio: 'original' },
+              ]}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown when the store link is shared on WhatsApp, social media or search. Left empty, the first hero slide is used.
+            </p>
+            <InlineStatus status={shareFeedback.status} onDismiss={shareFeedback.clear} />
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="brand_color">Brand colour</Label>
             <div className="flex max-w-md items-center gap-2">

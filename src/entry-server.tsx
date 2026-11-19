@@ -482,11 +482,21 @@ export function planSsrRoute(pathname: string, org: OrgInfo, search = '') {
   // The query string travels with the route params (routes that read it: /products).
   const { route } = hit;
   const params = { ...hit.params, search };
+  // Every storefront page's social tags use the store share image, which falls
+  // back to the first hero slide: preload it on every route, and keep it through
+  // each route's trim (some trims rebuild the map from a whitelist).
+  const heroKey = preloadKey('content:listHeroSlides', { orgSlug: org.slug });
+  const requests = route.preloadRequests(params, org);
+  const hasHero = requests.some((r) => preloadKey(r.fnName, r.args) === heroKey);
   return {
     id: route.id,
-    requests: route.preloadRequests(params, org),
+    requests: hasHero ? requests : [...requests, { fnName: 'content:listHeroSlides', args: { orgSlug: org.slug } }],
     followUpRequests: (preload: PreloadMap) => route.followUpRequests?.(preload, params, org) ?? [],
-    trimPreload: (preload: PreloadMap) => route.trimPreload(preload, params),
+    trimPreload: (preload: PreloadMap) => {
+      const out = route.trimPreload(preload, params);
+      if (preload[heroKey] !== undefined && out[heroKey] === undefined) out[heroKey] = preload[heroKey];
+      return out;
+    },
   };
 }
 
