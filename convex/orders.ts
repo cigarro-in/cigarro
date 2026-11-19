@@ -23,6 +23,7 @@ import { isLegacyOrg } from "./lib/legacyOrg";
 import { assertCheckoutConsent } from "./consent";
 import { linkEarlierBankMessage } from "./payments";
 import { assertCheckoutOpen } from "./platformFees";
+import { payingVpaOf } from "./lib/payingVpa";
 
 function computeCartTotal(items: Doc<"orders">["items"]): number {
   return items.reduce((sum, it) => {
@@ -663,14 +664,9 @@ export const createOrder = mutation({
     // Slot tables stay only for legacy rows.
     const finalAmount = baseAmount;
 
-    // Pick a VPA — prefer active entry in paymentVpas, fall back to org.upiVpa.
-    const activeVpa = await ctx.db
-      .query("paymentVpas")
-      .withIndex("by_org_active", (q) =>
-        q.eq("orgId", args.orgId).eq("active", true),
-      )
-      .first();
-    const payingVpa = activeVpa?.vpa ?? org.upiVpa;
+    // assertCheckoutOpen already refused a store with no UPI ID; re-check for the type.
+    const { vpa: payingVpa, activeVpa } = await payingVpaOf(ctx, org);
+    if (!payingVpa) throw new ConvexError({ code: "PAYMENTS_UNAVAILABLE" });
 
     const upiUrl = buildUpiUrl({
       vpa: payingVpa,

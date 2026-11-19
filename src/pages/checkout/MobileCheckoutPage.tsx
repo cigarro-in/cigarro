@@ -10,7 +10,7 @@ import { InlineStatus } from '../../components/common/InlineStatus';
 import { formatINR } from '../../utils/currency';
 import { getProductImageUrl } from '../../lib/images/urls';
 import { OrderConsentSheet } from '../../components/checkout/OrderConsentSheet';
-import { STORE_CLOSED_MESSAGE, useCheckoutModel } from './useCheckoutModel';
+import { useCheckoutModel } from './useCheckoutModel';
 
 // Helper function to safely get brand name from various formats
 const getBrandName = (brand: any): string => {
@@ -38,7 +38,7 @@ export function MobileCheckoutPage() {
     walletBalance, walletAmountToUse, setWalletAmountToUse,
     savedAddresses, selectedAddress, selectAddress: handleAddressSelect, refreshAddresses, addressAttention,
     consentSheetOpen, setConsentSheetOpen, confirmConsent: handleConsentConfirm,
-    getFinalTotal, isProcessing, placeOrder: handlePayment, storeClosed,
+    getFinalTotal, isProcessing, placeOrder: handlePayment, storeClosed, storeClosedMessage,
   } = useCheckoutModel({ openUpiApp: true, syncSelectedAddress: false });
   const {
     visible: showReferral,
@@ -258,7 +258,7 @@ export function MobileCheckoutPage() {
         <div className="px-4 py-3">
           {storeClosed && (
             <p className="mb-3 text-center text-sm text-muted-foreground" role="status">
-              {STORE_CLOSED_MESSAGE}
+              {storeClosedMessage}
             </p>
           )}
           <Button

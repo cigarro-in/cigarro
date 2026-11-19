@@ -4,6 +4,7 @@ import { useStoreSettings } from '../../hooks/data/useStoreSettings';
 import { useOrg } from '../../lib/convex/useOrg';
 import { AdminSidebar } from './AdminSidebar';
 import { GmailBanner } from './GmailBanner';
+import { NoUpiBanner } from './NoUpiBanner';
 import '../features/overview/installPrompt';
 import { StoreIcon } from './AdminStoreMenu';
 
@@ -29,6 +30,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <StoreIcon name={name} iconUrl={store.brand.faviconUrl || store.brand.logoUrl || undefined} size="sm" />
           <span className="min-w-0 truncate text-sm font-semibold">{name}</span>
         </header>
+        <NoUpiBanner />
         <GmailBanner />
         <main className="min-w-0 flex-1">{children}</main>
       </SidebarInset>

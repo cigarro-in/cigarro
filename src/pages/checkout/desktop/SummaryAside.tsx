@@ -5,7 +5,7 @@ import { Input } from '../../../components/ui/input';
 import { Skeleton } from '../../../components/ui/skeleton';
 import { OrderSummary } from '../../../components/checkout';
 import { formatINR } from '../../../utils/currency';
-import { STORE_CLOSED_MESSAGE, type CheckoutModel } from '../useCheckoutModel';
+import { type CheckoutModel } from '../useCheckoutModel';
 
 // Sticky right column: offers, totals (shared OrderSummary: lucky, coupon,
 // shipping, wallet) and the one Pay button.
@@ -15,7 +15,7 @@ export function SummaryAside({ model }: { model: CheckoutModel }) {
     appliedDiscount, couponCode, setCouponCode, isValidatingCoupon, applyCoupon,
     referral, getShippingCost, getFinalTotal,
     walletBalance, isWalletLoading, walletAmountToUse, setWalletAmountToUse,
-    selectedAddress, amountDue, isProcessing, placeOrder, storeClosed,
+    selectedAddress, amountDue, isProcessing, placeOrder, storeClosed, storeClosedMessage,
   } = model;
   const [referralOpen, setReferralOpen] = useState(false);
 
@@ -119,7 +119,7 @@ export function SummaryAside({ model }: { model: CheckoutModel }) {
 
         {storeClosed && (
           <p className="mt-3 text-center text-sm text-muted-foreground" role="status">
-            {STORE_CLOSED_MESSAGE}
+            {storeClosedMessage}
           </p>
         )}
         <Button

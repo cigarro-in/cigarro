@@ -49,6 +49,12 @@ const backfillPlatformFeesRef = makeFunctionReference<
   unknown
 >("platformFees:backfillPlatformFees");
 
+const clearRemovedUpiIdRef = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  string
+>("migrations:clearRemovedUpiId");
+
 const writeRowRef = makeFunctionReference<
   "mutation",
   { name: string; status: "done" | "failed"; result?: string; updatedAt: number },
@@ -78,6 +84,27 @@ export const listRows = internalQuery({
 });
 
 // Upsert one row. `runs` is incremented here, once per attempt.
+// clearRemovedUpiId-v1: clears smokeshop's leftover organizations.upiVpa when it
+// has no active UPI ID row. Leaves it alone if an active row exists.
+export const clearRemovedUpiId = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db
+      .query("organizations")
+      .withIndex("by_slug", (q) => q.eq("slug", "smokeshop"))
+      .unique();
+    if (!org) return "smokeshop not found";
+    const active = await ctx.db
+      .query("paymentVpas")
+      .withIndex("by_org_active", (q) => q.eq("orgId", org._id).eq("active", true))
+      .first();
+    if (active) return `kept: active UPI ID ${active.vpa}`;
+    if (!org.upiVpa) return "already clear";
+    await ctx.db.patch(org._id, { upiVpa: "" });
+    return `cleared ${org.upiVpa}`;
+  },
+});
+
 export const writeRow = internalMutation({
   args: {
     name: v.string(),
@@ -227,6 +254,12 @@ const MIGRATIONS: Migration[] = [
     // Tables v1 missed (RESTRUCTURE_V2_TABLES). Same copied map; every field of those rows.
     name: "restructureStorageKeys-v2",
     run: async (ctx) => await runRestructureStorageKeys(ctx, RESTRUCTURE_V2_TABLES),
+  },
+  {
+    // smokeshop's UPI ID was removed in admin, but deleting the last paymentVpas row
+    // used to leave organizations.upiVpa set, and checkout kept paying to it.
+    name: "clearRemovedUpiId-v1",
+    run: async (ctx) => await ctx.runMutation(clearRemovedUpiIdRef, {}),
   },
 ];
 

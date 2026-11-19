@@ -39,6 +39,7 @@ import { requireOrgAdmin, requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { resolveOrg } from "./lib/org";
 import { buildUpiUrl } from "./lib/upi";
+import { payingVpaOf } from "./lib/payingVpa";
 import { buildOrderPollOffsets } from "./lib/pollSchedule";
 import { genDisplayOrderId, orderNumberRef } from "./lib/ids";
 import { pickUniqueBankAlias } from "./lib/bankAlias";
@@ -191,15 +192,6 @@ async function depositTerms(ctx: Ctx, org: Doc<"organizations">) {
   };
 }
 
-// The VPA new orders of an org embed (null = no UPI ID configured).
-async function payingVpaOf(ctx: Ctx, org: Doc<"organizations">) {
-  const active = await ctx.db
-    .query("paymentVpas")
-    .withIndex("by_org_active", (q) => q.eq("orgId", org._id).eq("active", true))
-    .first();
-  const vpa = active?.vpa ?? (org.upiVpa.trim() || null);
-  return { vpa, activeVpa: active };
-}
 
 // Auto payment confirmation: an active Gmail connection or a claimed SMS relay.
 async function autoConfirmOf(ctx: Ctx, orgId: Id<"organizations">) {
@@ -464,6 +456,8 @@ export async function computeSetupStatus(ctx: Ctx, org: Doc<"organizations">) {
 
 /** createOrder gate. Throws STORE_SETUP_INCOMPLETE for enforced, unfinished stores. */
 export async function assertCheckoutOpen(ctx: Ctx, org: Doc<"organizations">) {
+  // No UPI ID: closed for every store, waived or not, so no order can pay to a removed ID.
+  if (!(await payingVpaOf(ctx, org)).vpa) throw new ConvexError({ code: "PAYMENTS_UNAVAILABLE" });
   if (gateOf(org) === "waived") return;
   const s = await computeSetupStatus(ctx, org);
   if (!s.complete) throw new ConvexError({ code: "STORE_SETUP_INCOMPLETE" });
@@ -570,9 +564,10 @@ export const checkoutAvailability = query({
   args: { orgSlug: v.string() },
   handler: async (ctx, { orgSlug }) => {
     const org = await resolveOrg(ctx, orgSlug);
-    if (gateOf(org) === "waived") return { open: true };
+    if (!(await payingVpaOf(ctx, org)).vpa) return { open: false, reason: "no_upi" as const };
+    if (gateOf(org) === "waived") return { open: true, reason: null };
     const s = await computeSetupStatus(ctx, org);
-    return { open: s.complete };
+    return { open: s.complete, reason: s.complete ? null : ("setup" as const) };
   },
 });
 

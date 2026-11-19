@@ -235,14 +235,14 @@ export const deleteInbox = mutation({
 
 // Primary UPI ID = the active paymentVpas row with the lowest priority (checkout
 // reads the same row via by_org_active). Mirror it into organizations.upiVpa so
-// the legacy single field never disagrees with the primary. Leaves the field
-// alone when no VPA is active.
+// the legacy single field never disagrees with the primary. With no active VPA
+// the field is cleared, so a removed UPI ID is never used again (checkout closes).
 async function syncPrimaryVpa(ctx: MutationCtx, orgId: Id<"organizations">) {
   const primary = await ctx.db
     .query("paymentVpas")
     .withIndex("by_org_active", (q) => q.eq("orgId", orgId).eq("active", true))
     .first();
-  if (primary) await ctx.db.patch(orgId, { upiVpa: primary.vpa });
+  await ctx.db.patch(orgId, { upiVpa: primary?.vpa ?? "" });
 }
 
 // VPA functions take saToken for the platform org (lib/auth requirePaymentsAdmin).

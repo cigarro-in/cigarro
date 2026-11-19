@@ -25,6 +25,8 @@ import { formatOrderNumber } from '../../lib/orders/orderNumber';
 
 /** Shown when the store has not finished setup and cannot take orders yet. */
 export const STORE_CLOSED_MESSAGE = "This store isn't taking orders yet. Please check back soon.";
+// The store has no UPI ID (convex/lib/payingVpa.ts): checkout is closed.
+export const PAYMENTS_UNAVAILABLE_MESSAGE = "We're upgrading our payment system. Please check back later.";
 
 export interface CheckoutModelOptions {
   // Mobile hands off to the UPI app (result.upiUrl) after createOrder.
@@ -67,6 +69,8 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
   // Public gate: false while a store's setup is unfinished (createOrder throws STORE_SETUP_INCOMPLETE).
   const availability = useQuery(api.platformFees.checkoutAvailability, orgSlug ? { orgSlug } : 'skip');
   const storeClosed = availability?.open === false;
+  const storeClosedMessage =
+    availability?.reason === 'no_upi' ? PAYMENTS_UNAVAILABLE_MESSAGE : STORE_CLOSED_MESSAGE;
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, totalPrice: cartTotalPrice } = useCart();
   const { user, isLoading: authLoading } = useAuth();
@@ -327,7 +331,7 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
       return;
     }
     if (storeClosed) {
-      setOpError(STORE_CLOSED_MESSAGE);
+      setOpError(storeClosedMessage);
       return;
     }
     if (orderConsent.needed && !consentConfirmedRef.current) {
@@ -411,6 +415,8 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
           ? 'Store is currently unavailable.'
           : code === 'STORE_SETUP_INCOMPLETE'
           ? STORE_CLOSED_MESSAGE
+          : code === 'PAYMENTS_UNAVAILABLE'
+          ? PAYMENTS_UNAVAILABLE_MESSAGE
           : 'Payment failed. Please try again.',
       );
       isNavigatingRef.current = false;
@@ -467,6 +473,7 @@ export function useCheckoutModel({ openUpiApp = false, syncSelectedAddress = tru
     consentSheetOpen, setConsentSheetOpen, confirmConsent,
     getFinalTotal, amountDue, isProcessing, placeOrder,
     storeClosed,
+    storeClosedMessage,
   };
 }
 

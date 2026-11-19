@@ -8,6 +8,7 @@ import { role } from "./schema";
 import { adminStoresForPhone } from "./lib/adminStores";
 import { MAX_BANK_SENDERS, normalizeBankSenders } from "./lib/bankSenders";
 import { requireRealPersonName } from "./lib/personName";
+import { payingVpaOf } from "./lib/payingVpa";
 import { DEFAULT_MARKETPLACE_FEE_BPS } from "./lib/platformFeeDefaults";
 import { liveStoreHostname } from "./lib/storeHost";
 
@@ -49,11 +50,7 @@ export const getPaymentVpa = query({
   handler: async (ctx, { orgId }) => {
     const org = await ctx.db.get(orgId);
     if (!org || !org.active) return null;
-    const activeVpa = await ctx.db
-      .query("paymentVpas")
-      .withIndex("by_org_active", (q) => q.eq("orgId", orgId).eq("active", true))
-      .first();
-    return { vpa: activeVpa?.vpa ?? org.upiVpa };
+    return { vpa: (await payingVpaOf(ctx, org)).vpa };
   },
 });
 
