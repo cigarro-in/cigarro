@@ -1687,7 +1687,7 @@ export const saveBlogPost = mutation({
     const newId = await ctx.db.insert("blogPosts", {
       ...post,
       ...canonicalPatch,
-      authorName: post.authorName ?? "Cigarro",
+      authorName: post.authorName ?? org.name,
       title: post.title.trim(),
       slug: post.slug.trim(),
       orgId,

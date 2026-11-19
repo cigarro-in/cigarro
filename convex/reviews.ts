@@ -263,7 +263,7 @@ export const listReviewsPaged = query({
 
 // Owner-composed review (e.g. transcribing phone/WhatsApp feedback).
 // Goes live immediately — the author IS the moderator. userName defaults
-// to "Cigarro Team": attribute honestly, never as a fake customer.
+// to "<store name> Team": attribute honestly, never as a fake customer.
 export const createReview = mutation({
   args: {
     orgSlug: v.string(),
@@ -293,7 +293,7 @@ export const createReview = mutation({
       rating: Math.round(a.rating),
       title: a.title?.trim() || undefined,
       comment: a.comment?.trim() || undefined,
-      userName: a.userName?.trim() || "Cigarro Team",
+      userName: a.userName?.trim() || `${org.name} Team`,
       isApproved: true,
       createdAt: now,
       updatedAt: now,
