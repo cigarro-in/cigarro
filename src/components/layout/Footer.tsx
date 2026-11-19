@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, startTransition } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { useFullCatalog } from '../../hooks/data/useCatalog';
@@ -16,12 +16,14 @@ const Footer = () => {
   const { brands: catalogBrands, loading } = useFullCatalog();
   useEffect(() => {
     if (loading) return;
-    setBrands(
+    // Transition: this effect runs right after hydration starts; a plain update
+    // could reach a dehydrated Suspense boundary (React #421).
+    startTransition(() => setBrands(
       (catalogBrands as any[])
         .filter((b: any) => b.isActive)
         .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
         .map((b: any) => ({ id: b.supabaseId, name: b.name, slug: b.slug })),
-    );
+    ));
   }, [catalogBrands, loading]);
   return (
     <footer className="section bg-creme-light relative overflow-hidden z-10">
