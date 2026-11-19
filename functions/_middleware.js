@@ -181,7 +181,7 @@ async function handleRequest(context) {
     const redirected = await applyRedirect(request, org, env, {
       waitUntil: context.waitUntil.bind(context),
     });
-    if (redirected) return redirected;
+    if (redirected) return redirected.status === 404 ? notFoundShell(context) : redirected;
   }
 
   try {
@@ -270,6 +270,16 @@ async function saShell(context) {
     .on('meta[name="robots"]', { element: setNoindexMeta })
     .transform(new Response(res.body, { status: res.status, headers }));
   return rewritten;
+}
+
+// Dead URL with no live target: the store's own shell with a real 404 and
+// noindex, never a 200 soft 404.
+async function notFoundShell(context) {
+  const res = await nextWithOrg(context);
+  const headers = new Headers(res.headers);
+  headers.set('X-Robots-Tag', 'noindex, nofollow');
+  headers.set('Cache-Control', 'no-store');
+  return new Response(res.body, { status: 404, headers });
 }
 
 // Passes a request on to the static SPA. HTML documents get the store injected

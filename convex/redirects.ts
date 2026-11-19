@@ -1,13 +1,14 @@
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireOrgAdminBySlug } from "./lib/org";
 import { requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
 import { clampPaginationOpts } from "./lib/pagination";
 import { SMOKESHOP_SEED_REDIRECTS } from "./lib/smokeshopRedirects";
+import { LEGACY_STATIC_PAGES, fuzzyKey, legacyRule } from "./lib/legacyPaths";
 import {
   normalizeFromPath,
   normalizePath,
@@ -243,10 +244,66 @@ export const lookup = query({
         q.eq("orgId", org._id).eq("fromPath", p.path),
       )
       .unique();
-    if (!row) return null;
+    if (!row) return legacyResolve(ctx, org._id, p.path);
     return { toPath: row.toPath, status: row.status };
   },
 });
+
+// Dukaan-era URLs with no stored row. Resolved against the live catalog: a 301
+// to the live page, a 404 when nothing matches, or null (render the page as usual).
+async function legacyResolve(
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+  path: string,
+): Promise<{ toPath: string; status: 301 | 404 } | null> {
+  const rule = legacyRule(path);
+  if (!rule) return null;
+  const NOT_FOUND = { toPath: "", status: 404 as const };
+  const moved = (toPath: string) => ({ toPath, status: 301 as const });
+  // Active row by slug. Products carry a required isActive; the others optional.
+  const live = async (table: "catalogProducts" | "catalogCategories" | "catalogBrands", slug: string) => {
+    const row = await ctx.db
+      .query(table)
+      .withIndex("by_org_slug", (q) => q.eq("orgId", orgId).eq("slug", slug))
+      .first();
+    return row && (row as { isActive?: boolean }).isActive !== false ? row : null;
+  };
+  // The one active category whose fuzzy key matches, or null when none or several match.
+  const fuzzyCategory = async (slug: string) => {
+    const key = fuzzyKey(slug);
+    const cats = (await ctx.db
+      .query("catalogCategories")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect()).filter((c) => c.isActive !== false && fuzzyKey(c.slug) === key);
+    return cats.length === 1 ? cats[0] : null;
+  };
+  switch (rule.kind) {
+    case "bag":
+      return moved("/cart");
+    case "page": {
+      const to = LEGACY_STATIC_PAGES[rule.slug];
+      return to ? moved(to) : NOT_FOUND;
+    }
+    case "product":
+      return (await live("catalogProducts", rule.slug)) ? moved(`/product/${rule.slug}`) : NOT_FOUND;
+    case "categories":
+      if (await live("catalogCategories", rule.slug)) return moved(`/category/${rule.slug}`);
+      if (await live("catalogBrands", rule.slug)) return moved(`/brand/${rule.slug}`);
+      return NOT_FOUND;
+    case "brand":
+      if (await live("catalogBrands", rule.slug)) return null;
+      {
+        const cat = await fuzzyCategory(rule.slug);
+        return cat ? moved(`/category/${cat.slug}`) : NOT_FOUND;
+      }
+    case "category":
+      if (await live("catalogCategories", rule.slug)) return null;
+      {
+        const cat = await fuzzyCategory(rule.slug);
+        return cat ? moved(`/category/${cat.slug}`) : NOT_FOUND;
+      }
+  }
+}
 
 // Public, cheap: increments only when the redirect exists. Unknown paths are a
 // no-op, so this cannot create rows. The edge should throttle its calls.

@@ -91,7 +91,8 @@ function gonePage() {
   });
 }
 
-// Returns a 301/302/410 Response for a redirected path, or null (render normally).
+// Returns a 301/302/410 Response for a redirected path, a bare 404 for a dead
+// legacy URL, or null (render normally).
 export async function applyRedirect(request, org, env, options = {}) {
   try {
     if (!request || (request.method !== 'GET' && request.method !== 'HEAD')) return null;
@@ -114,6 +115,8 @@ export async function applyRedirect(request, org, env, options = {}) {
     }
 
     if (rule.status === 410) return gonePage();
+    // Dead legacy URL (no live target): the caller serves the store's not-found page.
+    if (rule.status === 404) return new Response(null, { status: 404 });
 
     // Preserve the request query string on the target.
     const dest = new URL(rule.toPath, url.origin);
