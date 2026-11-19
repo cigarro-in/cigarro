@@ -17,6 +17,7 @@ import { api } from '../../../convex/_generated/api';
 import { useSa } from '../SuperGate';
 import { runSa, formatCount, formatDateTime, migrationLabel, relativeTime } from '../saUi';
 import { listMigrationsRef, runPendingMigrationsRef } from '../refs';
+import { StorageRestructureCard } from '../StorageRestructureCard';
 
 // What the runner reports per migration (convex/migrations.ts runPending).
 const RUN_OUTCOME: Record<string, { label: string; tone: BadgeTone }> = {
@@ -54,9 +55,10 @@ export function PlatformConfigPage() {
   return (
     <Page title="Platform config">
       <div className="grid items-start gap-3 lg:grid-cols-2">
+        <StorageRestructureCard token={token} writeOpen={writeOpen} />
         <Card title="Data updates">
           <p className="max-w-prose text-[13px] text-[var(--admin-text-muted)]">
-            Some releases need a one-time fix to stored data. Press the button after a release. Updates already applied are skipped.
+            Some releases need a one-time fix to stored data. Press the button after a release. Updates already applied are skipped. After Copy images has finished, this rewrites the stored image links to the new copies.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="primary" state={runFb.state} disabled={!writeOpen || runFb.busy} onClick={() => void onRun()}>

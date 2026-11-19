@@ -267,3 +267,14 @@ export const storeSummaryRef = makeFunctionReference<
   { saToken: string; orgId: Id<'organizations'> },
   StoreSummary
 >('platform:storeSummary');
+
+// R2 restructure ledger (convex/storageKeyMoves.ts): copied / conflict / failed per store.
+export interface StorageSummaryRow {
+  orgSlug: string;
+  copied: number;
+  conflict: number;
+  failed: number;
+}
+export const storageSummaryRef = makeFunctionReference<'query', { saToken: string }, StorageSummaryRow[]>(
+  'storageKeyMoves:summary',
+);
