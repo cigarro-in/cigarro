@@ -1,6 +1,6 @@
 // Store app icons for the installed admin PWA and push notifications.
 // Generated in the browser from the store's site icon (fallback: logo) on a canvas,
-// then uploaded to R2 under asset_images/orgs/<slug>/app_icons/ with a version
+// then uploaded to R2 under <store>/images/ with a version
 // suffix, so every set is new (create-only uploads, nothing overwritten).
 
 import { fetchRemoteBytes, uploadPngToR2 } from './upload';
@@ -73,12 +73,11 @@ export async function generateAndUploadAppIcons(sourceUrl: string, brandColor?: 
   const source = await fetchRemoteBytes(sourceUrl);
   const icons = await renderAppIcons(source, brandColor);
   const version = Date.now().toString(36);
-  const folder = 'app_icons';
   const [a, b, c, d] = await Promise.all([
-    uploadPngToR2(icons.icon192, { folder, slug: `icon-192-${version}` }),
-    uploadPngToR2(icons.icon512, { folder, slug: `icon-512-${version}` }),
-    uploadPngToR2(icons.maskable512, { folder, slug: `maskable-512-${version}` }),
-    uploadPngToR2(icons.apple180, { folder, slug: `apple-180-${version}` }),
+    uploadPngToR2(icons.icon192, { slug: `icon-192-${version}` }),
+    uploadPngToR2(icons.icon512, { slug: `icon-512-${version}` }),
+    uploadPngToR2(icons.maskable512, { slug: `maskable-512-${version}` }),
+    uploadPngToR2(icons.apple180, { slug: `apple-180-${version}` }),
   ]);
   return { icon192: a.url, icon512: b.url, maskable512: c.url, apple180: d.url, version };
 }

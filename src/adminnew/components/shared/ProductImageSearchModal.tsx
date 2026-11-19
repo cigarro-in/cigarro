@@ -100,9 +100,8 @@ async function uploadImageFromUrl(
     try {
         // Bytes via the admin-gated fetch proxy (no browser CORS risk), then
         // the SAME WebP pipeline as local upload: square-crop → WebP →
-        // SEO filename → R2. Folder keeps product images together.
+        // SEO filename → R2.
         const uploaded = await importRemoteImageToR2(imageUrl, {
-            folder: 'product_images',
             slug: productName,
             alt: productName,
         });

@@ -1,7 +1,7 @@
 // Image URL helper (R2/CDN only).
 //
 // Absolute URLs pass through untouched. Relative keys resolve under
-// `asset_images/` on the CDN.
+// `asset_images/` on the CDN: legacy bare names only. New keys are `<store>/images/…`.
 //
 // Foreign placeholders: rows imported from Dukaan can still point at
 // api.mydukaan.io / dms.mydukaan.io (their default "category" image and

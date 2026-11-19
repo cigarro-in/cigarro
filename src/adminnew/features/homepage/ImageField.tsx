@@ -92,7 +92,6 @@ export function ImageField({
         onOpenChange={setOpen}
         multiple={false}
         title={label}
-        defaultFolder="homepage"
         cropRatio={cropRatio}
         cropPresets={cropPresets}
         maxDim={2400}

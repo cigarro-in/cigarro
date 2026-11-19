@@ -12,7 +12,6 @@ import {
   Banner,
   Button,
   ErrorBanner,
-  FilterSelect,
   Skeleton,
   toActionError,
   useImageCrop,
@@ -41,13 +40,6 @@ const PAGE = 60;
 const MAX_INPUT_BYTES = 15 * 1024 * 1024;
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 
-function folderLabel(name: string) {
-  if (!name) return 'All assets';
-  if (name === 'product_images') return 'Product images';
-  if (name === 'brand_logos') return 'Brand logos';
-  return name.replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
-}
-
 /**
  * Media library for product images: the store's R2 assets in a searchable,
  * infinitely scrolling grid, multi-select with numbered selection order, and
@@ -63,7 +55,6 @@ export function MediaLibraryDialog({
   existing = [],
   multiple = true,
   uploadSlug,
-  defaultFolder = 'product_images',
   cropRatio = 1,
   cropPresets,
   maxDim = 1600,
@@ -77,7 +68,6 @@ export function MediaLibraryDialog({
   multiple?: boolean;
   /** SEO filename stem for uploads (e.g. the product title). */
   uploadSlug?: string;
-  defaultFolder?: string;
   /** Crop frame each upload opens with. Default: square (catalog tiles). */
   cropRatio?: CropRatio;
   /** Aspect choices in the cropper. Default: Square 1:1 and Original. */
@@ -88,8 +78,6 @@ export function MediaLibraryDialog({
   /** Files dropped elsewhere (e.g. on the product media card): uploaded as soon as the dialog opens. */
   initialFiles?: File[];
 }) {
-  const [folders, setFolders] = useState<string[]>([]);
-  const [folder, setFolder] = useState<string | null>(null);
   const [images, setImages] = useState<LibraryImage[] | undefined>(undefined);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -110,12 +98,12 @@ export function MediaLibraryDialog({
 
   const existingSet = useMemo(() => new Set(existing), [existing]);
 
-  const loadPage = useCallback(async (target: string, next?: string) => {
+  const loadPage = useCallback(async (next?: string) => {
     const req = ++requestRef.current;
     if (next) setLoadingMore(true);
     setLoadError(null);
     try {
-      const page = await listR2Images(`asset_images/${target ? `${target}/` : ''}`, next);
+      const page = await listR2Images('images', next);
       if (req !== requestRef.current) return null;
       const items = page.images.map((i) => ({ key: i.path, name: i.name, url: i.url, createdAt: i.createdAt }));
       setImages((prev) => (next ? [...(prev ?? []), ...items] : items));
@@ -132,7 +120,7 @@ export function MediaLibraryDialog({
     }
   }, []);
 
-  // Open: discover folders at the library root, then show the default folder.
+  // Open: list the store's flat image library.
   useEffect(() => {
     if (!open) return;
     setPicked([]);
@@ -143,33 +131,12 @@ export function MediaLibraryDialog({
     setImages(undefined);
     let cancelled = false;
     if (initialFiles?.length) void startUploadsRef.current(initialFiles);
-    void (async () => {
-      const root = await loadPage('');
-      if (cancelled || !root) return;
-      const names = root.folders.map((f) => f.name).filter((n) => n && n !== 'orgs');
-      setFolders(names);
-      if (names.includes(defaultFolder)) {
-        setFolder(defaultFolder);
-        setImages(undefined);
-        await loadPage(defaultFolder);
-      } else {
-        setFolder('');
-      }
-    })();
+    void loadPage();
     return () => {
       cancelled = true;
     };
     // initialFiles is read once per open on purpose (not a dependency).
-  }, [open, defaultFolder, loadPage]);
-
-  const switchFolder = (next: string) => {
-    if (next === folder) return;
-    setFolder(next);
-    setImages(undefined);
-    setCursor(undefined);
-    setVisible(PAGE);
-    void loadPage(next);
-  };
+  }, [open, loadPage]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -189,13 +156,13 @@ export function MediaLibraryDialog({
       (entries) => {
         if (!entries.some((e) => e.isIntersecting)) return;
         if (visible < filtered.length) setVisible((v) => v + PAGE);
-        else if (cursor && !loadingMore && folder !== null) void loadPage(folder, cursor);
+        else if (cursor && !loadingMore) void loadPage(cursor);
       },
       { root, rootMargin: '400px' },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [open, visible, filtered.length, cursor, loadingMore, folder, loadPage]);
+  }, [open, visible, filtered.length, cursor, loadingMore, loadPage]);
 
   const toggle = (url: string) => {
     if (existingSet.has(url)) return;
@@ -227,7 +194,6 @@ export function MediaLibraryDialog({
     }));
     previewsRef.current.push(...batch.map((b) => b.preview));
     setUploads((prev) => [...batch, ...prev]);
-    const target = folder ?? defaultFolder;
     const patch = (id: string, p: Partial<UploadItem>) =>
       setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...p } : u)));
 
@@ -240,7 +206,6 @@ export function MediaLibraryDialog({
         patch(item.id, { status: 'uploading' });
         try {
           const res = await uploadImageToR2(cropped[idx].blob, {
-            folder: target || undefined,
             slug: uploadSlug || undefined,
             filename: cropped[idx].file.name,
             keepOriginalResolution: true,
@@ -291,11 +256,6 @@ export function MediaLibraryDialog({
     onOpenChange(false);
   };
 
-  const folderOptions = [
-    { value: '', label: folderLabel('') },
-    ...folders.map((f) => ({ value: f, label: folderLabel(f) })),
-  ];
-
   return (
     <>
     <DialogRoot open={open} onOpenChange={(o) => !inFlight && onOpenChange(o)}>
@@ -319,9 +279,6 @@ export function MediaLibraryDialog({
                 className="h-9 w-full rounded-[var(--admin-radius)] border border-[var(--admin-border-strong)] bg-[var(--admin-surface)] pl-8 pr-3 text-base text-[var(--admin-text)] placeholder:text-[var(--admin-text-subtle)] focus:border-[var(--admin-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-focus)]/20 md:text-sm"
               />
             </div>
-            {folder !== null && (
-              <FilterSelect label="Folder" value={folder} options={folderOptions} onChange={switchFolder} />
-            )}
             <Button variant="primary" size="md" icon={<Upload aria-hidden />} onClick={() => fileRef.current?.click()}>
               Upload
             </Button>
@@ -444,14 +401,14 @@ export function MediaLibraryDialog({
                   <div className="flex size-10 items-center justify-center rounded-full bg-[var(--admin-neutral-soft)] text-[var(--admin-text-muted)]">
                     <ImageIcon className="size-5" aria-hidden />
                   </div>
-                  <p className="text-sm font-semibold text-[var(--admin-text)]">{q ? 'No images match' : 'No images in this folder'}</p>
+                  <p className="text-sm font-semibold text-[var(--admin-text)]">{q ? 'No images match' : 'No images in the library'}</p>
                   <p className="text-sm text-[var(--admin-text-muted)]">Drop files here or use Upload.</p>
                 </div>
               )}
               <div ref={sentinelRef} className="h-px" aria-hidden />
               {(loadingMore || (cursor && visible >= filtered.length)) && (
                 <div className="flex justify-center py-4">
-                  <Button variant="secondary" size="sm" loading={loadingMore} onClick={() => folder !== null && void loadPage(folder, cursor)}>
+                  <Button variant="secondary" size="sm" loading={loadingMore} onClick={() => void loadPage(cursor)}>
                     Load more
                   </Button>
                 </div>

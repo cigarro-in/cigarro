@@ -48,8 +48,6 @@ export interface ImagePickerProps {
   maxImages?: number;
   /** Storage bucket to use */
   bucket?: string;
-  /** Folder path within bucket */
-  folder?: string;
   /** Allowed file types */
   allowedTypes?: string[];
   /** Maximum file size in bytes */
@@ -110,7 +108,6 @@ export function ImagePicker({
   multiple = false,
   maxImages = 10,
   bucket = DEFAULT_BUCKET,
-  folder = '',
   allowedTypes = DEFAULT_ALLOWED_TYPES,
   maxFileSize = DEFAULT_MAX_FILE_SIZE,
   mode = 'modal',
@@ -184,9 +181,8 @@ export function ImagePicker({
   const loadImages = async () => {
     setLoading(true);
     try {
-      // R2 library (admin-gated edge endpoint). `folder` maps under asset_images/.
-      const prefix = `asset_images/${folder ? `${folder}/` : ''}`;
-      const { images: r2images } = await listR2Images(prefix);
+      // R2 library (admin-gated edge endpoint): the store's flat image list.
+      const { images: r2images } = await listR2Images('images');
       setImages(
         r2images.map((item) => ({
           id: item.id || item.name,
@@ -263,7 +259,6 @@ export function ImagePicker({
           // The crop above already framed the image. searchHint (e.g. product
           // name) becomes the SEO filename when set.
           const uploaded = await uploadImageToR2(blob, {
-            folder: folder || undefined,
             slug: searchHint || undefined,
             filename: file.name,
             keepOriginalResolution: true,
@@ -415,7 +410,6 @@ export function ImagePicker({
           const source = fetched.find((f) => f.file === file)?.url ?? file.name;
           try {
             const uploaded = await uploadImageToR2(blob, {
-              folder: folder || undefined,
               slug: searchHint || undefined,
               alt: searchHint || undefined,
               filename: file.name,
@@ -1008,7 +1002,6 @@ export interface SingleImagePickerProps {
   value: string | null;
   onChange: (url: string | null) => void;
   bucket?: string;
-  folder?: string;
   disabled?: boolean;
   className?: string;
   /** Context for web search + SEO filename (e.g., brand/category/hero name) */
@@ -1022,7 +1015,6 @@ export function SingleImagePicker({
   value,
   onChange,
   bucket,
-  folder,
   disabled,
   className,
   searchHint = '',
@@ -1080,7 +1072,6 @@ export function SingleImagePicker({
         onChange={(v) => onChange(typeof v === 'string' ? v : v[0] || null)}
         multiple={false}
         bucket={bucket}
-        folder={folder}
         mode="modal"
         open={open}
         onOpenChange={setOpen}
@@ -1102,7 +1093,6 @@ export interface MultipleImagePickerProps {
   onChange: (urls: string[]) => void;
   maxImages?: number;
   bucket?: string;
-  folder?: string;
   disabled?: boolean;
   className?: string;
   /** Hint for web search (e.g., product name) */
@@ -1116,7 +1106,6 @@ export function MultipleImagePicker({
   onChange,
   maxImages = 10,
   bucket,
-  folder,
   disabled,
   className,
   searchHint = '',
@@ -1205,7 +1194,6 @@ export function MultipleImagePicker({
         multiple={true}
         maxImages={maxImages}
         bucket={bucket}
-        folder={folder}
         mode="modal"
         open={open}
         onOpenChange={setOpen}

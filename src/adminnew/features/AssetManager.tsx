@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useConvex } from 'convex/react';
-import { Archive, ChevronRight, Copy, Download, File as FileIcon, FileText, Film, Folder, Image as ImageIcon, Music, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Archive, Copy, Download, File as FileIcon, FileText, Film, Image as ImageIcon, Music, RefreshCw, Trash2, Upload } from 'lucide-react';
 import {
   Banner,
   BulkActionBar,
@@ -11,13 +11,11 @@ import {
   Dialog,
   EmptyState,
   FilterBar,
-  FilterChip,
   FilterSelect,
   Input,
   Page,
   Pagination,
   Skeleton,
-  Tabs,
   toActionError,
   useButtonFeedback,
   useImageCrop,
@@ -35,22 +33,32 @@ import { useClientPages } from '../hooks/usePagination';
 /* eslint-disable shadcn/no-inline-styles */
 
 const UPLOAD_CONCURRENCY = 3;
-const ROOT = 'asset_images/';
-
-type CategoryId = 'all' | 'products' | 'brands';
-const CATEGORY_TABS: { id: CategoryId; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'products', label: 'Product images' },
-  { id: 'brands', label: 'Brand logos' },
+// "Where used" groups, from the DB references (imageUsageBatch), not from folders.
+type UsageGroup = 'all' | 'products' | 'brands' | 'categories' | 'blogs' | 'site' | 'history' | 'unused';
+const USAGE_GROUP_OPTIONS: { value: UsageGroup; label: string }[] = [
+  { value: 'all', label: 'Everywhere' },
+  { value: 'products', label: 'Products' },
+  { value: 'brands', label: 'Brands' },
+  { value: 'categories', label: 'Categories' },
+  { value: 'blogs', label: 'Blogs' },
+  { value: 'site', label: 'Site content' },
+  { value: 'history', label: 'Order history only' },
+  { value: 'unused', label: 'Unused' },
 ];
-const CATEGORY_PREFIX: Record<CategoryId, string> = {
-  all: '',
-  products: 'product_images/',
-  brands: 'brand_logos/',
+const KIND_GROUP: Record<string, UsageGroup> = {
+  variant: 'products',
+  combo: 'products',
+  brand: 'brands',
+  category: 'categories',
+  collection: 'categories',
+  blog: 'blogs',
+  hero: 'site',
+  section: 'site',
+  site: 'site',
+  'homepage-config': 'site',
+  cart: 'site',
+  order: 'history',
 };
-// Folders owned by the category tabs. Hidden from the root folder list.
-const RESERVED_ROOT_FOLDERS = new Set(['product_images', 'brand_logos']);
-
 type TypeFilter = 'all' | 'image' | 'video' | 'document' | 'other';
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All types' },
@@ -59,11 +67,6 @@ const TYPE_OPTIONS = [
   { value: 'document', label: 'Documents' },
   { value: 'other', label: 'Other files' },
 ];
-
-interface LibraryFolder {
-  name: string;
-  path: string;
-}
 
 interface UploadItem {
   id: string;
@@ -80,14 +83,20 @@ interface Notice {
 interface DeletePlan {
   deletable: R2Image[];
   blocked: R2Image[];
-  /** Cleanup across all folders has no selection context. */
+  /** Cleanup across the whole library has no selection context. */
   scope: 'selected' | 'all';
 }
 
-function categoryOf(folder: string): CategoryId {
-  if (folder.startsWith('product_images/')) return 'products';
-  if (folder.startsWith('brand_logos/')) return 'brands';
-  return 'all';
+/** Groups an asset falls in, from its DB usage contexts (unknown usage: none). */
+function groupsOf(u: AssetUsage | undefined): Set<UsageGroup> {
+  const groups = new Set<UsageGroup>();
+  if (!u) return groups;
+  if (u.total === 0) groups.add('unused');
+  for (const c of u.contexts) {
+    const g = KIND_GROUP[c.kind];
+    if (g) groups.add(g);
+  }
+  return groups;
 }
 
 function matchesType(contentType: string, filter: TypeFilter) {
@@ -118,9 +127,8 @@ export function AssetManager() {
   const convex = useConvex();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [currentFolder, setCurrentFolder] = useState('');
+  const [usageGroup, setUsageGroup] = useState<UsageGroup>('all');
   const [assets, setAssets] = useState<R2Image[]>([]);
-  const [folders, setFolders] = useState<LibraryFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [usage, setUsage] = useState<Map<string, AssetUsage>>(new Map());
   const [usageLoading, setUsageLoading] = useState(false);
@@ -153,19 +161,19 @@ export function AssetManager() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // The store's flat library: every image, then every document.
       const images: R2Image[] = [];
-      const folderNames = new Set<string>();
-      let cursor: string | undefined;
-      do {
-        const pageResult = await listR2Images(`${ROOT}${currentFolder}`, cursor);
-        images.push(...pageResult.images);
-        pageResult.folders.forEach((f) => folderNames.add(f.name));
-        cursor = pageResult.cursor;
-      } while (cursor);
+      for (const kind of ['images', 'documents'] as const) {
+        let cursor: string | undefined;
+        do {
+          const pageResult = await listR2Images(kind, cursor);
+          images.push(...pageResult.images);
+          cursor = pageResult.cursor;
+        } while (cursor);
+      }
       setAssets(images);
-      setFolders([...folderNames].map((name) => ({ name, path: `${currentFolder}${name}/` })));
       setSelected((prev) => new Set([...prev].filter((id) => images.some((i) => i.id === id))));
-      // One batch usage round trip for the visible folder. Unknown usage blocks deletes.
+      // One batch usage round trip for the library. Unknown usage blocks deletes.
       setUsageLoading(true);
       try {
         setUsage(await fetchUsageBatch(convex, images.map((i) => ({ key: i.path, url: i.url }))));
@@ -178,30 +186,30 @@ export function AssetManager() {
     } finally {
       setLoading(false);
     }
-  }, [currentFolder, convex, setSelected]);
+  }, [convex, setSelected]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // A new folder, search or type filter clears the selection. Paging resets in the hook.
+  // A new group, search or type filter clears the selection. Paging resets in the hook.
   useEffect(() => {
     setSelected(new Set());
-  }, [currentFolder, query, typeFilter, setSelected]);
-
-  const visibleFolders = currentFolder === '' ? folders.filter((f) => !RESERVED_ROOT_FOLDERS.has(f.name)) : folders;
-  const segments = currentFolder.split('/').filter(Boolean);
-  const category = categoryOf(currentFolder);
+  }, [usageGroup, query, typeFilter, setSelected]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return assets.filter((a) => (!q || a.name.toLowerCase().includes(q)) && matchesType(a.contentType || '', typeFilter));
-  }, [assets, query, typeFilter]);
+    return assets.filter((a) => {
+      if (q && !a.name.toLowerCase().includes(q)) return false;
+      if (!matchesType(a.contentType || '', typeFilter)) return false;
+      return usageGroup === 'all' || groupsOf(usage.get(a.path)).has(usageGroup);
+    });
+  }, [assets, query, typeFilter, usageGroup, usage]);
 
   const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
     filtered,
     'assets',
-    JSON.stringify([currentFolder, query, typeFilter]),
+    JSON.stringify([usageGroup, query, typeFilter]),
   );
   const selectedAssets = assets.filter((a) => sel.isSelected(a.id));
 
@@ -210,7 +218,6 @@ export function AssetManager() {
 
   const uploadFiles = async (files: File[]) => {
     if (files.length === 0 || uploading) return;
-    const folder = currentFolder.replace(/\/$/, '') || undefined;
     // Each image is framed first; cancelling the batch uploads nothing.
     const imageFiles = files.filter((f) => f.type.startsWith('image/'));
     const cropped = imageFiles.length ? await crop.cropAll(imageFiles) : [];
@@ -231,9 +238,9 @@ export function AssetManager() {
         try {
           const blob = croppedBlobs.get(file);
           if (blob) {
-            await uploadImageToR2(blob, { folder, slug: file.name, filename: file.name, keepOriginalResolution: true, maxDim: 2400 });
+            await uploadImageToR2(blob, { slug: file.name, filename: file.name, keepOriginalResolution: true, maxDim: 2400 });
           } else {
-            await uploadRawToR2(file, { folder });
+            await uploadRawToR2(file);
           }
           setItem(id, { state: 'done' });
         } catch (err) {
@@ -329,7 +336,7 @@ export function AssetManager() {
       }
       const unused = all.filter((a) => fresh.get(a.path)?.total === 0);
       if (unused.length === 0) {
-        setNotice({ tone: 'success', text: 'No unused assets across all folders.' });
+        setNotice({ tone: 'success', text: 'No unused assets in the library.' });
         return;
       }
       setDeletePlan({ deletable: unused, blocked: [], scope: 'all' });
@@ -347,7 +354,7 @@ export function AssetManager() {
     setNotice(
       failed > 0
         ? { tone: 'warning', text: `Deleted ${removed} of ${deletePlan.deletable.length} unused asset(s). The rest were blocked or failed.` }
-        : { tone: 'success', text: `Deleted ${removed} unused asset${removed === 1 ? '' : 's'} across all folders.` },
+        : { tone: 'success', text: `Deleted ${removed} unused asset${removed === 1 ? '' : 's'} across the library.` },
     );
   };
 
@@ -432,7 +439,7 @@ export function AssetManager() {
       secondaryActions={[
         { label: 'Refresh', icon: <RefreshCw />, onClick: () => void load(), disabled: loading },
         { label: 'Select unused', onClick: () => setSelected(new Set(unusedVisible.map((a) => a.id))), disabled: unusedVisible.length === 0 },
-        { label: 'Clean unused (all folders)', onClick: () => void planCleanUnused(), loading: cleanPlanning, disabled: reprocessing },
+        { label: 'Clean unused', onClick: () => void planCleanUnused(), loading: cleanPlanning, disabled: reprocessing },
         { label: 'Reprocess to WebP', onClick: () => void planReprocess(), disabled: reprocessing },
       ]}
     >
@@ -503,41 +510,15 @@ export function AssetManager() {
       )}
 
       <Card padding="none">
-        <nav aria-label="Library location" className="flex flex-wrap items-center gap-1 border-b border-border px-4 py-2.5 text-sm">
-          <button type="button" onClick={() => setCurrentFolder('')} className="font-medium text-foreground hover:underline">
-            Library
-          </button>
-          {segments.map((seg, i) => (
-            <span key={`${seg}-${i}`} className="flex items-center gap-1">
-              <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
-              <button
-                type="button"
-                onClick={() => setCurrentFolder(`${segments.slice(0, i + 1).join('/')}/`)}
-                className="text-muted-foreground hover:text-foreground hover:underline"
-              >
-                {seg}
-              </button>
-            </span>
-          ))}
-        </nav>
-        <Tabs
-          value={category}
-          onChange={(id) => setCurrentFolder(CATEGORY_PREFIX[id])}
-          tabs={CATEGORY_TABS.map((t) => ({ id: t.id, label: t.label }))}
-        />
         <FilterBar
           search={{ value: query, onChange: setQuery, placeholder: 'Search by file name' }}
           end={
-            <FilterSelect label="Type" value={typeFilter} options={TYPE_OPTIONS} onChange={(v) => setTypeFilter(v as TypeFilter)} />
+            <>
+              <FilterSelect label="Used in" value={usageGroup} options={USAGE_GROUP_OPTIONS} onChange={(v) => setUsageGroup(v as UsageGroup)} />
+              <FilterSelect label="Type" value={typeFilter} options={TYPE_OPTIONS} onChange={(v) => setTypeFilter(v as TypeFilter)} />
+            </>
           }
         />
-        {visibleFolders.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-            {visibleFolders.map((f) => (
-              <FilterChip key={f.path} label={<span className="inline-flex items-center gap-1.5"><Folder className="size-3.5" aria-hidden />{f.name}</span>} active={false} onClick={() => setCurrentFolder(f.path)} />
-            ))}
-          </div>
-        )}
 
         <div
           onDragOver={(e) => {
@@ -561,11 +542,11 @@ export function AssetManager() {
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<Upload />}
-              title={assets.length === 0 && !query && typeFilter === 'all' ? 'This folder is empty' : 'No files match these filters'}
+              title={assets.length === 0 && !query && typeFilter === 'all' ? 'The library is empty' : 'No files match these filters'}
               description={
                 assets.length === 0 && !query && typeFilter === 'all'
                   ? 'Drop files here or use Upload. Images are converted to WebP on the way in.'
-                  : 'Clear the search or type filter to see everything in this folder.'
+                  : 'Clear the search or filters to see everything in the library.'
               }
               action={
                 assets.length === 0 && !query && typeFilter === 'all' ? (

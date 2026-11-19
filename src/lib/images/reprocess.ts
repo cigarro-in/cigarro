@@ -27,27 +27,15 @@ export interface ReprocessResult {
   reason?: string;
 }
 
-/** Walk the whole library (root + subfolders, all pages). */
+/** Walk the store's whole image library (flat, all pages). */
 export async function collectAllR2Images(): Promise<R2Image[]> {
   const all: R2Image[] = [];
-  const queue = ["asset_images/"];
-  const seen = new Set(queue);
-  while (queue.length > 0) {
-    const prefix = queue.shift()!;
-    let cursor: string | undefined;
-    do {
-      const page = await listR2Images(prefix, cursor);
-      all.push(...page.images);
-      for (const f of page.folders) {
-        const sub = f.path.startsWith("asset_images/") ? f.path : `asset_images/${f.path}`;
-        if (!seen.has(sub)) {
-          seen.add(sub);
-          queue.push(sub);
-        }
-      }
-      cursor = page.cursor;
-    } while (cursor);
-  }
+  let cursor: string | undefined;
+  do {
+    const page = await listR2Images("images", cursor);
+    all.push(...page.images);
+    cursor = page.cursor;
+  } while (cursor);
   return [...new Map(all.map((asset) => [asset.id, asset])).values()];
 }
 
@@ -75,13 +63,8 @@ export async function reprocessOne(
     if (!newUrl) {
       const bytes = await fetchRemoteBytes(asset.url);
       const banner = isBannerContext(contexts);
-      const tenantPrefix = `asset_images/orgs/${ORG_SLUG}/`;
-      const folder = asset.path.startsWith(tenantPrefix)
-        ? asset.path.slice(tenantPrefix.length).split("/").slice(0, -1).join("/")
-        : asset.path.slice("asset_images/".length).split("/").slice(0, -1).join("/");
       const stem = slugFromContexts(contexts.filter((c) => c.mutable), asset.name).slice(0, 30);
       const uploaded = await uploadImageToR2(bytes, {
-        folder: folder || undefined,
         slug: stem,
         alt: contexts[0]?.label || asset.name,
         filename: asset.name,

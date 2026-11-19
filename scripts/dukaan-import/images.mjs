@@ -3,7 +3,7 @@
 //   - WebP quality 82, longest side capped at 1600px, metadata stripped
 //   - catalog images (products, variants, categories, logo) center-cropped to a square
 //   - banners and blog covers keep their aspect ratio
-//   - key: asset_images/orgs/<store>/<folder>/<stem>.webp, stem = slug, -2, -3 for more
+//   - key: <store>/images/<stem>.webp, stem = slug, -2, -3 for more (the endpoint ignores folders)
 //
 //   node scripts/dukaan-import/images.mjs download <normalized.json> <originalsDir> <outDir>
 //       Downloads each unique source image (polite delay), converts it, writes

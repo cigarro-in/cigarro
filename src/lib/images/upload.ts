@@ -78,7 +78,6 @@ export interface R2UploadResult {
 export async function uploadImageToR2(
   input: File | Blob,
   opts: {
-    folder?: string;
     alt?: string;
     filename?: string;
     slug?: string;
@@ -97,7 +96,6 @@ export async function uploadImageToR2(
   const fallbackName = (input instanceof File ? input.name : '') || opts.filename || 'image';
   const form = new FormData();
   form.append('file', webp, 'image.webp');
-  if (opts.folder) form.append('folder', opts.folder);
   // SEO filename: item slug → `camel-yellow-packet-a1b2c3.webp`.
   if (opts.slug || fallbackName) form.append('slug', opts.slug || fallbackName);
   if (opts.pipelineSource) form.append('pipelineSource', opts.pipelineSource);
@@ -124,14 +122,13 @@ export async function uploadImageToR2(
  */
 export async function uploadPngToR2(
   input: Blob,
-  opts: { folder: string; slug: string },
+  opts: { slug: string },
 ): Promise<{ url: string; key: string; size: number }> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
   const form = new FormData();
   form.append('file', input, `${opts.slug}.png`);
   form.append('png', 'true');
-  form.append('folder', opts.folder);
   form.append('slug', opts.slug);
   const res = await fetch('/api/images/upload', {
     method: 'POST',
@@ -146,14 +143,12 @@ export async function uploadPngToR2(
 /** Upload a non-image asset (video/pdf/zip) untouched via raw passthrough. */
 export async function uploadRawToR2(
   input: File,
-  opts: { folder?: string } = {},
 ): Promise<{ url: string; key: string; size: number }> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
   const form = new FormData();
   form.append('file', input, input.name || 'file');
   form.append('raw', 'true');
-  if (opts.folder) form.append('folder', opts.folder);
   const res = await fetch('/api/images/upload', {
     method: 'POST',
     headers: storeAuthHeaders(token),
@@ -192,11 +187,10 @@ export async function fetchRemoteBytes(url: string): Promise<Blob> {
  */
 export async function importRemoteImageToR2(
   url: string,
-  opts: { folder?: string; slug?: string; alt?: string; keepOriginalResolution?: boolean } = {},
+  opts: { slug?: string; alt?: string; keepOriginalResolution?: boolean } = {},
 ): Promise<R2UploadResult> {
   const bytes = await fetchRemoteBytes(url);
   return uploadImageToR2(bytes, {
-    folder: opts.folder,
     slug: opts.slug || url.split('/').pop() || 'image',
     alt: opts.alt || (opts.slug ? humanizeAlt(opts.slug) : humanizeAlt(url.split('/').pop() || '')),
     filename: url.split('/').pop() || 'image.jpg',
@@ -215,22 +209,24 @@ export interface R2Image {
   metadata?: Record<string, string>;
 }
 
-/** List the R2 image library (admin-gated). Pass cursor for next page. */
-export async function listR2Images(prefix = 'asset_images/', cursor?: string): Promise<{
-  images: R2Image[];
-  folders: { name: string; path: string }[];
-  cursor?: string;
-}> {
+/**
+ * List the store's R2 library (admin-gated), flat: every image of the store is
+ * under <store>/images/. Pass cursor for the next page.
+ */
+export async function listR2Images(
+  kind: 'images' | 'documents' = 'images',
+  cursor?: string,
+): Promise<{ images: R2Image[]; cursor?: string }> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
-  const qs = new URLSearchParams({ prefix });
+  const qs = new URLSearchParams({ kind });
   if (cursor) qs.set('cursor', cursor);
   const res = await fetch(`/api/images/upload?${qs.toString()}`, {
     headers: storeAuthHeaders(token),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Library unavailable');
-  return { images: body.images || [], folders: body.folders || [], cursor: body.cursor };
+  return { images: body.images || [], cursor: body.cursor };
 }
 
 /** Delete one R2 object by key (admin-gated). */

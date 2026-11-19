@@ -48,7 +48,7 @@ const upload = async (type: string, bytes: Uint8Array) => {
 assert.equal((await upload('image/webp', new TextEncoder().encode('not a webp'))).status, 400);
 assert.equal((await upload('image/jpeg', new TextEncoder().encode('jpeg bytes'))).status, 400);
 assert.equal((await upload('image/webp', new TextEncoder().encode('RIFFxxxxWEBPimage'))).status, 200);
-assert.match(storedKey, /^asset_images\/camel-yellow-packet-[a-z0-9]+\.webp$/);
+assert.match(storedKey, /^[a-z0-9-]+\/images\/camel-yellow-packet\.webp$/);
 console.log('Image crop, original dimensions, and remote URL guards passed');
 }
 
