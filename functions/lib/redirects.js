@@ -4,14 +4,15 @@
 // { waitUntil: context.waitUntil.bind(context) } as the 4th argument so the hit
 // counter write finishes after the response is sent.
 //
-// Lookups go to Convex redirects:lookup, cached for a day in the Cache API
-// (misses are cached too). Any failure returns null, so the page renders as usual.
+// Lookups go to Convex redirects:lookup, cached in the Cache API: a day for a
+// redirect, 10 minutes for a miss. Any failure returns null, so the page renders as usual.
 
 import { requiredConvexUrl } from './env.js';
 
 // A redirect edit can lag up to this long per colo; that beats paying a Convex
 // round trip (~300ms) on nearly every request from a low-traffic store.
 const CACHE_SECONDS = 86400;
+const MISS_CACHE_SECONDS = 600;
 const CACHE_HOST = 'https://redirect-cache.internal';
 const HIT_THROTTLE_MS = 60_000;
 const HIT_THROTTLE_MAX_KEYS = 5000;
@@ -53,8 +54,9 @@ async function convexCall(env, kind, path, args) {
 
 async function cachedLookup(env, orgSlug, path) {
   const cache = globalThis.caches?.default;
+  // v2: drops entries cached before the legacy Dukaan rules existed.
   const key = new Request(
-    `${CACHE_HOST}/${encodeURIComponent(orgSlug)}?p=${encodeURIComponent(path)}`,
+    `${CACHE_HOST}/v2/${encodeURIComponent(orgSlug)}?p=${encodeURIComponent(path)}`,
   );
   if (cache) {
     const cached = await cache.match(key);
@@ -67,7 +69,8 @@ async function cachedLookup(env, orgSlug, path) {
       new Response(JSON.stringify(value), {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': `max-age=${CACHE_SECONDS}`,
+          // A miss is kept briefly, so a new redirect or rule takes effect within minutes.
+          'Cache-Control': `max-age=${value ? CACHE_SECONDS : MISS_CACHE_SECONDS}`,
         },
       }),
     );
