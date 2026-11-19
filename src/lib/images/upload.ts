@@ -174,7 +174,7 @@ export async function fetchRemoteBytes(url: string): Promise<Blob> {
   const token = await sessionToken();
   if (!token) throw new Error('Not signed in');
   const res = await fetch(`/api/images/fetch?url=${encodeURIComponent(url)}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: storeAuthHeaders(token),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

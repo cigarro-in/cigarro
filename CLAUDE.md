@@ -103,6 +103,7 @@ Themes own:
 - DNS automation: adding the CNAME for custom domains and subdomains is manual.
 - Admin title shows "Cigarro Admin" instead of the store name (`src/App.tsx`, `src/adminnew/StorePicker.tsx`).
 - Old images are still under `asset_images/` and not yet moved to `orgs/oldsmokeshop`.
+- Storage restructure (backlog): move R2 to a flat `<store>/images/` and `<store>/documents/` layout, with the admin grouping images by where they are used. Audit, target layout and migration plan in `docs/storage-structure.md`. Nothing has been moved.
 - No media table or srcset / responsive image variants yet.
 - Vivid hub pages are not server-rendered yet.
 - `functions/ssr-middleware.js` (bot-only renderer) is still in place. It now serves bots only when SSR is switched off (`SSR_ROUTES=off`) or fails on a route. Remove it once SSR has run without needing the kill switch.

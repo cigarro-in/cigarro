@@ -88,7 +88,12 @@ export async function onRequest(context) {
   if (request.method === 'OPTIONS') return json({}, 200);
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
-  const gate = await requireAdmin(request, env, getRequestOrg(context).slug);
+  // On the admin host the store comes from X-Store (the store being edited),
+  // the same rule as images/upload; elsewhere it is the request's own store.
+  const org = getRequestOrg(context);
+  const named = (request.headers.get('X-Store') || '').trim().toLowerCase();
+  const orgSlug = org.admin && /^[a-z0-9-]{1,50}$/.test(named) ? named : String(org.slug);
+  const gate = await requireAdmin(request, env, orgSlug);
   if (!gate.ok) return json({ error: gate.error || 'Unauthorized' }, 401);
 
   const target = new URL(request.url).searchParams.get('url') || '';
