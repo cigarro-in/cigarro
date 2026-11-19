@@ -102,7 +102,7 @@ Themes own:
 
 - DNS automation: adding the CNAME for custom domains and subdomains is manual.
 - Admin title shows "Cigarro Admin" instead of the store name (`src/App.tsx`, `src/adminnew/StorePicker.tsx`).
-- Pre-restructure R2 objects (`asset_images/…`) are still in the bucket, kept so old URLs keep working. Delete them once the restructure is verified on PROD and no references remain.
+- Old image cleanup (backlog): pre-restructure R2 objects (`asset_images/…`) are still in the bucket so old URLs keep working (Google image index, links already shared). The restructure is verified on PROD and `/sa` shows 0 old links left. When doing it, delete only keys with a `copied` row in `storageKeyMoves`, leave non-image files and anything uncopied, and drop the bare-name `asset_images/` fallback in `src/lib/images/urls.ts` at the same time.
 - No media table or srcset / responsive image variants yet.
 - Vivid hub pages are not server-rendered yet.
 - `functions/ssr-middleware.js` (bot-only renderer) is still in place. It now serves bots only when SSR is switched off (`SSR_ROUTES=off`) or fails on a route. Remove it once SSR has run without needing the kill switch.
