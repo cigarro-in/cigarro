@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
@@ -6,13 +6,14 @@ import { api } from '../../../../convex/_generated/api';
 import { useOrg } from '../../../lib/convex/useOrg';
 import { paiseToRupees } from '../../../lib/convex/money';
 import { formatINR } from '../../../utils/currency';
+import { usePageSize, useCursorPages } from '../../hooks/usePagination';
 import {
-  Button,
   Card,
   DataTable,
   DateRangePresets,
   EmptyState,
   FilterBar,
+  Pagination,
   formatOrderDate,
   formatOrderNumber,
   getDateRange,
@@ -23,8 +24,6 @@ import { moneyPaise, type OrderFeeView } from './platformFeeFormat';
 
 type Statement = FunctionReturnType<typeof api.payments.listStatement>;
 type Entry = Statement['entries'][number];
-
-const PAGE_SIZE = 50;
 
 /** Bank-statement view of credits (orders paid by bank email) and refunds (debits). */
 export function StatementTab() {
@@ -42,11 +41,8 @@ function StatementList({
 }) {
   const org = useOrg();
   const range = getDateRange(preset);
-
-  // Cursor chain: '' is the first page. Each "Load more" appends the next cursor.
-  const [chain, setChain] = useState<string[]>(['']);
-  const [pages, setPages] = useState<Record<string, Statement>>({});
-  const cursor = chain[chain.length - 1];
+  const [pageSize, setPageSize] = usePageSize('paymentsStatement');
+  const pages = useCursorPages(JSON.stringify({ preset, pageSize }));
 
   const data = useQuery(
     api.payments.listStatement,
@@ -56,37 +52,24 @@ function StatementList({
           from: range.from ?? undefined,
           // Range `to` is exclusive in the UI; the statement query is inclusive.
           to: range.to !== null ? range.to - 1 : undefined,
-          cursor: cursor || undefined,
-          limit: PAGE_SIZE,
+          cursor: pages.cursor ?? undefined,
+          limit: pageSize,
         }
       : 'skip',
   );
 
-  useEffect(() => {
-    if (!data) return;
-    setPages((prev) => (prev[cursor] === data ? prev : { ...prev, [cursor]: data }));
-  }, [data, cursor]);
+  const rows: Entry[] | undefined = data?.entries;
+  const next = data?.nextCursor ?? null;
+  const totals = data?.totals;
 
-  const pageFor = (c: string): Statement | undefined => (c === cursor && data) || pages[c];
-  const current = pageFor(cursor);
-  const head = pageFor('');
-
-  const seen = new Set<string>();
-  const rows: Entry[] = [];
-  for (const c of chain) {
-    for (const e of pageFor(c)?.entries ?? []) {
-      if (seen.has(e.key)) continue;
-      seen.add(e.key);
-      rows.push(e);
-    }
-  }
-
-  const next = current?.nextCursor ?? null;
-  const totals = head?.totals;
+  const onPageChange = (target: number) => {
+    if (target > pages.page && next) pages.next(next);
+    else if (target < pages.page) pages.prev();
+  };
 
   // Marketplace fee per credited sale on the loaded rows (paid orders only).
   const feeOrderIds = Array.from(
-    new Set(rows.filter((e) => e.kind === 'order_credit').map((e) => e.orderId)),
+    new Set((rows ?? []).filter((e) => e.kind === 'order_credit').map((e) => e.orderId)),
   ).slice(0, 200);
   const fees = useQuery(
     api.platformFees.getOrderFees,
@@ -158,23 +141,19 @@ function StatementList({
 
       <DataTable
         columns={columns}
-        rows={head === undefined ? undefined : rows}
+        rows={rows}
         getRowId={(e) => e.key}
         empty={<EmptyState title="No payments in this period" />}
       />
 
-      {head !== undefined && (next || current === undefined) && (
-        <div className="flex justify-center border-t border-border p-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={current === undefined}
-            loading={current === undefined}
-            onClick={() => next && setChain((c) => [...c, next])}
-          >
-            Load more
-          </Button>
-        </div>
+      {rows && rows.length > 0 && (
+        <Pagination
+          page={pages.page}
+          hasNext={!!next}
+          onPageChange={onPageChange}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+        />
       )}
     </Card>
   );

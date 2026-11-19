@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { onOrderPaid } from "./platformFees";
-import { paginationOptsValidator } from "convex/server";
+import { clampPageSize, clampPaginationOpts, pageArgs } from "./lib/pagination";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, internalMutation, query } from "./_generated/server";
@@ -882,11 +882,11 @@ export const listStatement = query({
     from: v.optional(v.number()),
     to: v.optional(v.number()),
     cursor: v.optional(v.string()),
-    limit: v.number(),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, { orgId, from, to, cursor, limit }) => {
     await requireOrgAdmin(ctx, orgId);
-    const pageSize = Math.min(Math.max(Math.floor(limit), 1), 100);
+    const pageSize = clampPageSize(limit);
     const lower = from ?? 0;
     const upperRange = to ?? NO_UPPER;
 
@@ -1028,9 +1028,9 @@ export const listStatement = query({
 export const listMatchedEmails = query({
   args: {
     orgId: v.id("organizations"),
-    paginationOpts: paginationOptsValidator,
+    ...pageArgs,
   },
-  handler: async (ctx, { orgId, paginationOpts }) => {
+  handler: async (ctx, { orgId, cursor, pageSize }) => {
     await requireOrgAdmin(ctx, orgId);
     const page = await ctx.db
       .query("bankEmails")
@@ -1038,7 +1038,7 @@ export const listMatchedEmails = query({
         q.eq("orgId", orgId).eq("status", "matched"),
       )
       .order("desc")
-      .paginate(paginationOpts);
+      .paginate(clampPaginationOpts({ numItems: clampPageSize(pageSize), cursor: cursor ?? null }));
     const rows = await Promise.all(
       page.page.map(async (e) => {
         const order = e.matchedOrderId ? await ctx.db.get(e.matchedOrderId) : null;

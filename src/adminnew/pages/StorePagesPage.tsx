@@ -18,11 +18,13 @@ import {
   FilterBar,
   FilterSelect,
   Page,
+  Pagination,
   useButtonFeedback,
   useRowSelection,
   type BadgeTone,
   type Column,
 } from '../ui';
+import { useClientPages } from '../hooks/usePagination';
 
 // live: published. default: built-in page with no saved version (storefront shows
 // the default text). draft: saved built-in version not published (default still live).
@@ -122,6 +124,12 @@ export function StorePagesPage() {
     );
   }, [pages, query, state]);
 
+  const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
+    visible,
+    'storePages',
+    JSON.stringify([query, state]),
+  );
+
   useEffect(() => {
     sel.clear();
   }, [query, state]);
@@ -187,7 +195,7 @@ export function StorePagesPage() {
         </FilterBar>
         <DataTable
           columns={columns}
-          rows={visible}
+          rows={pageItems}
           getRowId={(p) => p.slug}
           selection={sel}
           onRowClick={(p) => navigate(`/pages/${p.slug}`)}
@@ -201,6 +209,16 @@ export function StorePagesPage() {
             />
           }
         />
+        {visible !== undefined && visible.length > 0 && (
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            summary={summary}
+          />
+        )}
       </Card>
 
       <BulkActionBar

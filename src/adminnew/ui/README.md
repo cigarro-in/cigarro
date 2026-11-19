@@ -65,6 +65,7 @@ const range = getDateRange(preset);
 - `DateRangePresets` presets: Today, Yesterday, Last 7 days, This month, Last month, All time. `getDateRange(preset)` returns `{ from, to }` ms timestamps (`to` exclusive, `null` = open). `inDateRange(ts, range)` filters client-side.
 - `BulkActionBar` is fixed to the bottom of the viewport and renders only while `count > 0`.
 - `paginate(items, page, pageSize)` slices client-side lists.
+- Pagination: always pass `pageSize` and `onPageSizeChange` to `Pagination`. Server lists: `pageArgs` + `clampPageSize` / `scanPage` (`convex/lib/pagination.ts`) with `useCursorPages(resetKey)` in the client. Small client lists: `useClientPages(items, listKey, resetKey)` (`src/adminnew/hooks/usePagination.ts`), which persists the size per `listKey`.
 
 ## Buttons and feedback
 

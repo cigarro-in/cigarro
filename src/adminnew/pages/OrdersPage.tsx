@@ -6,6 +6,7 @@ import { cn } from '../../components/ui/utils';
 import { useOrg } from '../../lib/convex/useOrg';
 import { deriveOrderStage, type OrderStage } from '../../lib/orders/orderStage';
 import { formatINR } from '../../utils/currency';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 import {
   BulkActionBar,
   Button,
@@ -24,7 +25,6 @@ import {
   formatOrderDate,
   getDateRange,
   inDateRange,
-  paginate,
   useRowSelection,
   type Column,
   type DateRangePreset,
@@ -36,16 +36,12 @@ import {
   itemsSummary,
   matchesStageFilter,
   orderNumberLabel,
-  orderSearchText,
   orderTotalRupees,
   stageFilterFromParam,
   type OrderDoc,
   type StageFilter,
 } from '../features/orders/orderModel';
 import { useActionRunner } from '../features/orders/useActionRunner';
-
-const PAGE_SIZE = 25;
-const LOAD_LIMIT = 200;
 
 interface Entry {
   order: OrderDoc;
@@ -59,19 +55,34 @@ export function OrdersPage() {
   const [searchParams] = useSearchParams();
   const org = useOrg();
 
-  const convexOrders = useQuery(
-    api.admin.listRecentOrders,
-    org ? { orgId: org._id, limit: LOAD_LIMIT } : 'skip',
-  );
-
   const [search, setSearch] = useState('');
   const [stage, setStage] = useState<StageFilter>(() => stageFilterFromParam(searchParams.get('status')));
   const [preset, setPreset] = useState<DateRangePreset>('all');
-  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize('orders');
 
-  // A five-digit search is looked up directly, so an order older than the
-  // loaded window is still found.
+  const range = useMemo(() => getDateRange(preset), [preset]);
   const trimmed = search.trim();
+
+  const pages = useCursorPages(JSON.stringify({ orgId: org?._id ?? null, stage, preset, search: trimmed, pageSize }));
+
+  const pageData = useQuery(
+    api.admin.listOrdersPage,
+    org
+      ? {
+          orgId: org._id,
+          stage: stage === 'all' ? undefined : stage,
+          from: range.from ?? undefined,
+          to: range.to ?? undefined,
+          search: trimmed || undefined,
+          cursor: pages.cursor,
+          pageSize,
+        }
+      : 'skip',
+  );
+
+  // A five-digit search is looked up directly, so an order outside the
+  // scanned pages is still found. It is shown on top of page 1 when it
+  // passes the same filters as the rest of the list.
   const orderNumberQuery = /^#?\d{5}$/.test(trimmed) ? Number(trimmed.replace('#', '')) : undefined;
   const foundByNumber = useQuery(
     api.admin.findOrderByNumber,
@@ -81,40 +92,40 @@ export function OrdersPage() {
   const updateShipping = useMutation(api.admin.updateShipping);
   const sel = useRowSelection();
   const bulk = useActionRunner();
+  const { clear: clearSelection } = sel;
 
-  const loading = convexOrders === undefined;
+  // Selection applies to the visible page only: drop it when the page changes.
+  const pageKey = `${JSON.stringify([stage, preset, trimmed, pageSize])}|${pages.cursor ?? ''}`;
+  useEffect(() => {
+    clearSelection();
+  }, [pageKey, clearSelection]);
+
+  const loading = pageData === undefined;
 
   const entries: Entry[] = useMemo(() => {
-    if (!convexOrders) return [];
-    const rows: OrderDoc[] = [...convexOrders];
-    if (foundByNumber && !rows.some((o) => o._id === foundByNumber._id)) rows.unshift(foundByNumber);
-    return rows.map((order) => ({ order, stage: deriveOrderStage(order) }));
-  }, [convexOrders, foundByNumber]);
-
-  const counts = useMemo(() => {
-    const out = {} as Record<StageFilter, number>;
-    for (const f of STAGE_FILTERS) {
-      out[f.id] = entries.filter((e) => matchesStageFilter(f.id, e.stage)).length;
+    if (!pageData) return [];
+    const rows: OrderDoc[] = [...pageData.page];
+    if (
+      pages.page === 1 &&
+      foundByNumber &&
+      !rows.some((o) => o._id === foundByNumber._id) &&
+      matchesStageFilter(stage, deriveOrderStage(foundByNumber)) &&
+      inDateRange(foundByNumber.createdAt, range)
+    ) {
+      rows.unshift(foundByNumber);
     }
-    return out;
-  }, [entries]);
+    return rows.map((order) => ({ order, stage: deriveOrderStage(order) }));
+  }, [pageData, foundByNumber, pages.page, stage, range]);
 
-  const filtered = useMemo(() => {
-    const q = trimmed.toLowerCase();
-    const range = getDateRange(preset);
-    return entries.filter(({ order, stage: s }) => {
-      if (!matchesStageFilter(stage, s)) return false;
-      if (!inDateRange(order.createdAt, range)) return false;
-      return q === '' || orderSearchText(order).includes(q);
-    });
-  }, [entries, stage, preset, trimmed]);
+  const hasNext = pageData ? !pageData.isDone : false;
+  const goToPage = (p: number) => {
+    if (p > pages.page) {
+      if (pageData?.continueCursor) pages.next(pageData.continueCursor);
+    } else {
+      pages.prev();
+    }
+  };
 
-  useEffect(() => setPage(1), [search, stage, preset]);
-
-  const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
-  const current = Math.min(page, pageCount);
-  const firstShown = filtered.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1;
-  const lastShown = Math.min(current * PAGE_SIZE, filtered.length);
   const filtersActive = trimmed !== '' || stage !== 'all' || preset !== 'all';
 
   // Bulk shipping steps, limited to the orders each step applies to.
@@ -201,7 +212,6 @@ export function OrdersPage() {
             <FilterChip
               key={f.id}
               label={f.label}
-              count={counts[f.id]}
               active={stage === f.id}
               onClick={() => setStage(f.id)}
             />
@@ -212,7 +222,7 @@ export function OrdersPage() {
         <div className="hidden md:block">
           <DataTable<Entry>
             columns={columns}
-            rows={loading ? undefined : pageItems}
+            rows={loading ? undefined : entries}
             getRowId={(e) => e.order._id}
             selection={sel}
             onRowClick={(e) => navigate(`/orders/${e.order._id}`)}
@@ -224,10 +234,10 @@ export function OrdersPage() {
         {/* Phones: one card per order. */}
         <div className="md:hidden">
           {loading && <SkeletonTable rows={5} columns={2} />}
-          {!loading && pageItems.length === 0 && emptyState}
-          {!loading && pageItems.length > 0 && (
+          {!loading && entries.length === 0 && emptyState}
+          {!loading && entries.length > 0 && (
             <ul className="divide-y divide-border">
-              {pageItems.map(({ order, stage: s }) => {
+              {entries.map(({ order, stage: s }) => {
                 const id = order._id;
                 const isSel = sel.isSelected(id);
                 return (
@@ -261,12 +271,13 @@ export function OrdersPage() {
           )}
         </div>
 
-        {!loading && filtered.length > 0 && (
+        {!loading && entries.length > 0 && (
           <Pagination
-            page={current}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            summary={`${firstShown}–${lastShown} of ${filtered.length}`}
+            page={pages.page}
+            hasNext={hasNext}
+            onPageChange={goToPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         )}
       </Card>

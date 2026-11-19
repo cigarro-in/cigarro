@@ -9,6 +9,7 @@ import {
   resolveOrg,
 } from "./lib/org";
 import { isLegacyOrg } from "./lib/legacyOrg";
+import { pageArgs, scanPage } from "./lib/pagination";
 
 // ---------- Wave 10: product reviews, Convex-native ----------
 // ORG-SCOPED, like catalog. Only approved rows are public. One review per
@@ -202,6 +203,63 @@ export const submitReview = mutation({
 });
 
 // ---------- Admin moderation ----------
+
+// Paged admin list, newest first. Filters (approved, rating) and the search
+// text (product name, reviewer, title, comment) are applied on the server.
+// Scans only this org's by_org index; legacy null-orgId rows are not included
+// (assumes the orgId backfill has run).
+export const listReviewsPaged = query({
+  args: {
+    orgSlug: v.string(),
+    approved: v.optional(v.boolean()),
+    rating: v.optional(v.number()),
+    search: v.optional(v.string()),
+    ...pageArgs,
+  },
+  handler: async (ctx, { orgSlug, approved, rating, search, cursor, pageSize }) => {
+    const { org } = await requireOrgAdminBySlug(ctx, orgSlug);
+    const term = search?.trim().toLowerCase() ?? "";
+    const names = new Map<string, string>();
+    const nameOf = async (productSupabaseId: string): Promise<string> => {
+      const hit = names.get(productSupabaseId);
+      if (hit !== undefined) return hit;
+      const product = await findOrgDocBySupabase(ctx, "catalogProducts", org, productSupabaseId);
+      const name = product && inOrg(product, org) ? product.name : productSupabaseId;
+      names.set(productSupabaseId, name);
+      return name;
+    };
+    const result = await scanPage({
+      cursor,
+      pageSize,
+      build: (after) =>
+        ctx.db
+          .query("productReviews")
+          .withIndex("by_org", (q) =>
+            after ? q.eq("orgId", org._id).lte("_creationTime", after.key) : q.eq("orgId", org._id),
+          )
+          .order("desc"),
+      keyOf: (r) => r._creationTime,
+      match: async (r) => {
+        if (approved !== undefined && r.isApproved !== approved) return false;
+        if (rating !== undefined && r.rating !== rating) return false;
+        if (!term) return true;
+        const name = await nameOf(r.productSupabaseId);
+        return `${name} ${r.userName ?? "A customer"} ${r.title ?? ""} ${r.comment ?? ""}`
+          .toLowerCase()
+          .includes(term);
+      },
+    });
+    const page = [];
+    for (const r of result.page) {
+      page.push({
+        ...reviewShape(r),
+        isApproved: r.isApproved,
+        productName: await nameOf(r.productSupabaseId),
+      });
+    }
+    return { page, continueCursor: result.continueCursor, isDone: result.isDone };
+  },
+});
 
 // Owner-composed review (e.g. transcribing phone/WhatsApp feedback).
 // Goes live immediately — the author IS the moderator. userName defaults

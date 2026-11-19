@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { FileSpreadsheet, MoreHorizontal, Package, Plus } from 'lucide-react';
 import { api } from '../../../convex/_generated/api';
-import { useOrg } from '../../lib/convex/useOrg';
 import { useOrgInfo } from '../../lib/org/OrgContext';
 import { formatINR } from '../../utils/currency';
 import { cn } from '../../components/ui/utils';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 import { ProductImportExport } from '../features/ProductImportExport';
 import { CategoryPicker, CollectionPicker, useCatalogTaxonomy } from '../features/products';
 import {
@@ -26,7 +26,6 @@ import {
   Page,
   Pagination,
   Tabs,
-  paginate,
   useButtonFeedback,
   useRowSelection,
   type Column,
@@ -50,10 +49,7 @@ interface ProductRow {
   variantCount: number;
   /** null when no option tracks stock. */
   stock: number | null;
-  searchText: string;
 }
-
-const PAGE_SIZE = 50;
 
 function StockCell({ stock }: { stock: number | null }) {
   if (stock === null) return <span className="text-[var(--admin-text-muted)]">-</span>;
@@ -82,17 +78,8 @@ function StatusPill({ active }: { active: boolean }) {
 
 export function ProductsPage() {
   const navigate = useNavigate();
-  const org = useOrg();
   const { slug: orgSlug } = useOrgInfo();
   const taxonomy = useCatalogTaxonomy(orgSlug);
-
-  // Convex is the catalog source of truth; reactive, so imports and edits
-  // refresh the list with no manual refetch.
-  const rows = useQuery(api.adminCatalog.listProductsForAdmin, { orgSlug });
-  const inventoryRows = useQuery(api.inventory.list, org ? { orgId: org._id, orgSlug } : 'skip');
-  const deleteProduct = useMutation(api.adminCatalog.deleteProduct);
-  const setActive = useMutation(api.adminCatalog.setProductsActive);
-  const setMembership = useMutation(api.adminProducts.setProductsGroupMembership);
 
   const [view, setView] = useState<StatusView>('all');
   const [q, setQ] = useState('');
@@ -100,28 +87,47 @@ export function ProductsPage() {
   const [category, setCategory] = useState('all');
   const [collection, setCollection] = useState('all');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
-  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize('products');
   const [importOpen, setImportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [groupDialog, setGroupDialog] = useState<{ kind: GroupKind; mode: 'add' | 'remove' } | null>(null);
   const [groupIds, setGroupIds] = useState<string[]>([]);
+
+  const search = q.trim();
+  const pages = useCursorPages(
+    JSON.stringify({ view, search, brand, category, collection, stockFilter, pageSize }),
+  );
+
+  // Convex is the catalog source of truth; reactive, so imports and edits
+  // refresh the list with no manual refetch. Filtering and stock run server-side.
+  const result = useQuery(api.adminCatalog.listProductsPageForAdmin, {
+    orgSlug,
+    view,
+    search: search || undefined,
+    brand: brand === 'all' ? undefined : brand,
+    category: category === 'all' ? undefined : category,
+    collection: collection === 'all' ? undefined : collection,
+    stock: stockFilter,
+    pageSize,
+    cursor: pages.cursor,
+  });
+  // Full list is only needed by the import/export dialog.
+  const allRows = useQuery(api.adminCatalog.listProductsForAdmin, importOpen ? { orgSlug } : 'skip');
+  const deleteProduct = useMutation(api.adminCatalog.deleteProduct);
+  const setActive = useMutation(api.adminCatalog.setProductsActive);
+  const setMembership = useMutation(api.adminProducts.setProductsGroupMembership);
 
   const sel = useRowSelection();
   const activateFb = useButtonFeedback();
   const draftFb = useButtonFeedback();
   const groupFb = useButtonFeedback();
 
-  // Boundary normalization: Convex (camelCase, rupees) → list rows.
+  // Boundary normalization: Convex page rows (camelCase, rupees) → list rows.
   const products = useMemo<ProductRow[] | undefined>(() => {
-    if (!rows) return undefined;
-    const available = new Map((inventoryRows ?? []).map((r: any) => [r.variantSupabaseId as string, r.available as number]));
-    return rows.map((p: any) => {
+    if (!result) return undefined;
+    return result.page.map((p: any) => {
       const variants: any[] = p.product_variants ?? [];
       const def = variants.find((v) => v.isDefault) ?? variants[0];
-      const tracked = variants.filter((v) => v.trackInventory !== false && v.isActive !== false);
-      const stock = tracked.length
-        ? tracked.reduce((sum, v) => sum + (available.get(v.supabaseId) ?? v.stock ?? 0), 0)
-        : null;
       return {
         id: p.supabaseId,
         name: p.name,
@@ -134,42 +140,11 @@ export function ProductsPage() {
         image: def?.images?.[0] ?? variants.find((v) => v.images?.length)?.images?.[0] ?? null,
         price: def ? def.priceRupees : null,
         variantCount: variants.length,
-        stock,
-        searchText: [p.name, p.slug, p.brand?.name, ...variants.map((v) => v.variantName)].join(' ').toLowerCase(),
+        stock: p.stock ?? null,
       };
     });
-  }, [rows, inventoryRows]);
+  }, [result]);
 
-  const counts = useMemo(
-    () => ({
-      all: products?.length ?? 0,
-      active: products?.filter((p) => p.isActive).length ?? 0,
-      draft: products?.filter((p) => !p.isActive).length ?? 0,
-    }),
-    [products],
-  );
-
-  const filtered = useMemo(() => {
-    if (!products) return undefined;
-    const needle = q.trim().toLowerCase();
-    return products.filter((p) => {
-      if (view === 'active' && !p.isActive) return false;
-      if (view === 'draft' && p.isActive) return false;
-      if (needle && !p.searchText.includes(needle)) return false;
-      if (brand !== 'all' && (brand === 'none' ? p.brandId : p.brandId !== brand)) return false;
-      if (category !== 'all' && (category === 'none' ? p.categoryIds.length : !p.categoryIds.includes(category))) return false;
-      if (collection !== 'all' && (collection === 'none' ? p.collectionIds.length : !p.collectionIds.includes(collection)))
-        return false;
-      if (stockFilter === 'untracked' && p.stock !== null) return false;
-      if (stockFilter === 'in' && !(p.stock !== null && p.stock > 0)) return false;
-      if (stockFilter === 'out' && !(p.stock !== null && p.stock <= 0)) return false;
-      return true;
-    });
-  }, [products, view, q, brand, category, collection, stockFilter]);
-
-  useEffect(() => setPage(1), [view, q, brand, category, collection, stockFilter]);
-
-  const { pageItems, pageCount } = paginate(filtered ?? [], page, PAGE_SIZE);
   const filtersActive = view !== 'all' || !!q || brand !== 'all' || category !== 'all' || collection !== 'all' || stockFilter !== 'all';
   const clearFilters = () => {
     setView('all');
@@ -249,7 +224,26 @@ export function ProductsPage() {
     },
   ];
 
-  const loading = filtered === undefined;
+  const loading = products === undefined;
+  const rows = products ?? [];
+  const hasNext = !!result && !result.isDone;
+  // Next uses the cursor the server returned for this page; prev pops the stack.
+  const goToPage = (target: number) => {
+    if (target > pages.page) {
+      if (result?.continueCursor) pages.next(result.continueCursor);
+    } else {
+      pages.prev();
+    }
+  };
+
+  // A sparse filter can scan maxScan docs with no match and return an empty
+  // page that is not the last. Keep advancing so the user never sees that gap.
+  useEffect(() => {
+    if (!loading && rows.length === 0 && result && !result.isDone && result.continueCursor) {
+      pages.next(result.continueCursor);
+    }
+  }, [loading, rows.length, result, pages.next]);
+
   const empty = (
     <EmptyState
       icon={<Package />}
@@ -284,9 +278,9 @@ export function ProductsPage() {
           value={view}
           onChange={setView}
           tabs={[
-            { id: 'all', label: 'All', count: products ? counts.all : undefined },
-            { id: 'active', label: 'Active', count: products ? counts.active : undefined },
-            { id: 'draft', label: 'Draft', count: products ? counts.draft : undefined },
+            { id: 'all', label: 'All' },
+            { id: 'active', label: 'Active' },
+            { id: 'draft', label: 'Draft' },
           ]}
         />
         <FilterBar
@@ -324,11 +318,11 @@ export function ProductsPage() {
         <div className="border-t border-[var(--admin-border)] sm:hidden">
           {loading ? (
             <DataTable columns={columns} rows={undefined} getRowId={(p) => p.id} />
-          ) : pageItems.length === 0 ? (
+          ) : rows.length === 0 ? (
             empty
           ) : (
             <ul className="divide-y divide-[var(--admin-border)]">
-              {pageItems.map((p) => {
+              {rows.map((p) => {
                 const isSel = sel.isSelected(p.id);
                 return (
                   <li
@@ -364,7 +358,7 @@ export function ProductsPage() {
         <div className="hidden border-t border-[var(--admin-border)] sm:block">
           <DataTable
             columns={columns}
-            rows={loading ? undefined : pageItems}
+            rows={loading ? undefined : rows}
             getRowId={(p) => p.id}
             selection={sel}
             onRowClick={(p) => navigate(`/products/${p.id}`)}
@@ -373,12 +367,13 @@ export function ProductsPage() {
           />
         </div>
 
-        {!loading && (filtered?.length ?? 0) > PAGE_SIZE && (
+        {!loading && (rows.length > 0 || pages.page > 1) && (
           <Pagination
-            page={page}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            summary={`${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered!.length)} of ${filtered!.length}`}
+            page={pages.page}
+            hasNext={hasNext}
+            onPageChange={goToPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         )}
       </Card>
@@ -471,7 +466,7 @@ export function ProductsPage() {
 
       <Dialog open={importOpen} onOpenChange={setImportOpen} title="Import / Export products" size="lg">
         <div className="max-h-[70vh] overflow-y-auto">
-          <ProductImportExport products={rows || []} />
+          <ProductImportExport products={allRows || []} />
         </div>
       </Dialog>
     </Page>

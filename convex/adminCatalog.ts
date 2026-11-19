@@ -17,6 +17,7 @@ import { matchesRef, replaceDeepRefs, replaceEmbeddedRef, type UsageContext } fr
 import { storeAgeGateV, storeAppIconsV, storeBrandV, storeBusinessV, storeReferralV, readOrgSiteSettings, storeSeoV, storeSocialsV } from "./lib/siteSettings";
 import { isLegacyOrg, LEGACY_ORG_SLUG } from "./lib/legacyOrg";
 import { orderNumberOf } from "./lib/ids";
+import { mergeDesc, pageArgs, scanPage } from "./lib/pagination";
 
 // ---------- Wave 5: catalog + content authorship (Supabase -> Convex) ----------
 // Catalog/content tables are ORG-SCOPED. Every read/write takes orgSlug,
@@ -222,6 +223,173 @@ export const listProductsForAdmin = query({
       });
     }
     return out;
+  },
+});
+
+// Per-request memo for async lookups keyed by a string (product supabaseId).
+function memoByKey<T>(fn: (key: string) => Promise<T>): (key: string) => Promise<T> {
+  const cache = new Map<string, Promise<T>>();
+  return (key) => {
+    let hit = cache.get(key);
+    if (hit === undefined) {
+      hit = fn(key);
+      cache.set(key, hit);
+    }
+    return hit;
+  };
+}
+
+// Product stock as the admin list shows it: each tracked, active variant
+// contributes balance onHand - reserved, or max(0, variant.stock) when it has
+// no balance row (same rule as inventory.list). null when no option tracks stock.
+async function productStockFor(ctx: any, org: any, variants: any[]): Promise<number | null> {
+  const tracked = variants.filter((x) => x.trackInventory !== false && x.isActive !== false);
+  if (!tracked.length) return null;
+  let total = 0;
+  for (const x of tracked) {
+    const balance = await findVariantInventoryBalance(ctx, org._id, x.supabaseId);
+    total += balance
+      ? balance.onHand - (balance.reserved ?? 0)
+      : Math.max(0, Math.floor(x.stock ?? 0));
+  }
+  return total;
+}
+
+const PRODUCT_VIEW = v.union(v.literal("all"), v.literal("active"), v.literal("draft"));
+const PRODUCT_STOCK = v.union(
+  v.literal("all"),
+  v.literal("in"),
+  v.literal("out"),
+  v.literal("untracked"),
+);
+
+// One page of the admin product list. Filters run on the server over a
+// newest-first scan capped at maxScan docs per call, so a sparse filter can
+// return a short page with isDone false; keep paging with continueCursor.
+// Row shape matches listProductsForAdmin, plus `stock` (number | null).
+// Filter values: brand/category/collection take an id, "none" (no value) or
+// omitted/"all" (no filter).
+export const listProductsPageForAdmin = query({
+  args: {
+    orgSlug: v.string(),
+    view: v.optional(PRODUCT_VIEW),
+    search: v.optional(v.string()),
+    brand: v.optional(v.string()),
+    category: v.optional(v.string()),
+    collection: v.optional(v.string()),
+    stock: v.optional(PRODUCT_STOCK),
+    ...pageArgs,
+  },
+  handler: async (ctx, args) => {
+    const { org } = await requireOrgAdminBySlug(ctx, args.orgSlug);
+    const view = args.view ?? "all";
+    const stockFilter = args.stock ?? "all";
+    const needle = args.search?.trim().toLowerCase() ?? "";
+    const brandArg = args.brand && args.brand !== "all" ? args.brand : null;
+    const categoryArg = args.category && args.category !== "all" ? args.category : null;
+    const collectionArg = args.collection && args.collection !== "all" ? args.collection : null;
+
+    const brands = await collectInOrg(ctx, "catalogBrands", org);
+    const brandBySupabaseId = new Map<string, any>(brands.map((b: any) => [b.supabaseId, b]));
+    const brandNameOf = (p: any): string | null =>
+      p.brandSupabaseId ? (brandBySupabaseId.get(p.brandSupabaseId)?.name ?? null) : null;
+
+    const variantsOf = memoByKey((id) => orgVariantsByProduct(ctx, org, id));
+    const catsOf = memoByKey((id) =>
+      orgJoinRows(ctx, org, "catalogProductCategories", "by_org_product", "by_product", "productSupabaseId", id).then(
+        (rs) => rs.map((r: any) => r.categorySupabaseId as string),
+      ),
+    );
+    const colsOf = memoByKey((id) =>
+      orgJoinRows(ctx, org, "catalogCollectionProducts", "by_org_product", "by_product", "productSupabaseId", id).then(
+        (rs) => rs.map((r: any) => r.collectionSupabaseId as string),
+      ),
+    );
+    const stockOf = memoByKey(async (id) => productStockFor(ctx, org, await variantsOf(id)));
+
+    const keyOf = (p: any): number => (view === "all" ? p._creationTime : (p.createdAt ?? 0));
+    // One org's products (orgId undefined = legacy rows), newest first, below `after`.
+    const productsByOrgDesc = (orgId: any, after: { key: number; id: string } | null): AsyncIterable<any> => {
+      if (view === "all") {
+        return ctx.db
+          .query("catalogProducts")
+          .withIndex("by_org", (q: any) =>
+            after
+              ? q.eq("orgId", orgId).lte("_creationTime", after.key)
+              : q.eq("orgId", orgId),
+          )
+          .order("desc");
+      }
+      return ctx.db
+        .query("catalogProducts")
+        .withIndex("by_org_active", (q: any) => {
+          const bounded = q.eq("orgId", orgId).eq("isActive", view === "active");
+          return after ? bounded.lte("createdAt", after.key) : bounded;
+        })
+        .order("desc");
+    };
+
+    const scan = await scanPage<any>({
+      cursor: args.cursor,
+      pageSize: args.pageSize,
+      maxScan: 400,
+      build: (after) => {
+        const scoped = productsByOrgDesc(org._id, after);
+        // The legacy store also reads rows with no orgId, merged by the same key.
+        if (!isLegacyOrg(org)) return scoped;
+        return mergeDesc(scoped, productsByOrgDesc(undefined, after), keyOf);
+      },
+      keyOf,
+      match: async (p) => {
+        // Cheap checks first: brand, then name/slug/brand name.
+        if (
+          brandArg !== null &&
+          (brandArg === "none" ? !!p.brandSupabaseId : p.brandSupabaseId !== brandArg)
+        )
+          return false;
+        if (needle && ![p.name, p.slug, brandNameOf(p)].join(" ").toLowerCase().includes(needle)) {
+          // Variant names need the variant rows.
+          const vs = await variantsOf(p.supabaseId);
+          const text = [p.name, p.slug, brandNameOf(p), ...vs.map((x: any) => x.variantName)]
+            .join(" ")
+            .toLowerCase();
+          if (!text.includes(needle)) return false;
+        }
+        // Joins, then stock (balance reads).
+        if (categoryArg !== null) {
+          const cats = await catsOf(p.supabaseId);
+          if (categoryArg === "none" ? cats.length > 0 : !cats.includes(categoryArg)) return false;
+        }
+        if (collectionArg !== null) {
+          const cols = await colsOf(p.supabaseId);
+          if (collectionArg === "none" ? cols.length > 0 : !cols.includes(collectionArg)) return false;
+        }
+        if (stockFilter !== "all") {
+          const s = await stockOf(p.supabaseId);
+          const keep =
+            stockFilter === "untracked"
+              ? s === null
+              : s !== null && (stockFilter === "in" ? s > 0 : s <= 0);
+          if (!keep) return false;
+        }
+        return true;
+      },
+    });
+
+    const rows = await Promise.all(
+      scan.page.map(async (p) => {
+        const variants = await variantsOf(p.supabaseId);
+        return {
+          ...p,
+          product_variants: variants,
+          brand: p.brandSupabaseId ? (brandBySupabaseId.get(p.brandSupabaseId) ?? null) : null,
+          categorySupabaseIds: await catsOf(p.supabaseId),
+          collectionSupabaseIds: await colsOf(p.supabaseId),
+          stock: await stockOf(p.supabaseId),
+        };
+      }),
+    );
+    return { page: rows, continueCursor: scan.continueCursor, isDone: scan.isDone };
   },
 });
 

@@ -10,6 +10,7 @@ import {
 } from "./lib/org";
 import { audit } from "./lib/audit";
 import { changeInventory } from "./lib/inventory";
+import { clampPageSize } from "./lib/pagination";
 
 export const list = query({
   args: { orgSlug: v.string(), orgId: v.id("organizations") },
@@ -64,6 +65,7 @@ export const history = query({
     const org = await resolveOrg(ctx, orgSlug);
     assertOrgMatch(orgId, org);
     await requireOrgAdmin(ctx, org._id);
+    const take = clampPageSize(limit ?? 50);
     if (variantSupabaseId) {
       return await ctx.db
         .query("inventoryMovements")
@@ -71,13 +73,13 @@ export const history = query({
           q.eq("orgId", org._id).eq("variantSupabaseId", variantSupabaseId),
         )
         .order("desc")
-        .take(Math.min(limit ?? 50, 200));
+        .take(take);
     }
     return await ctx.db
       .query("inventoryMovements")
       .withIndex("by_org_time", (q) => q.eq("orgId", org._id))
       .order("desc")
-      .take(Math.min(limit ?? 50, 200));
+      .take(take);
   },
 });
 

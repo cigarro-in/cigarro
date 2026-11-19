@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { Users } from 'lucide-react';
@@ -7,11 +7,8 @@ import { useOrg } from '../../lib/convex/useOrg';
 import { formatOrderDate } from '../../lib/orders/format';
 import { formatINR } from '../../utils/currency';
 import { CustomerCards } from '../features/customers/CustomerCards';
-import {
-  matchesCustomer,
-  sortByLastOrder,
-  type CustomerListRow,
-} from '../features/customers/customerModel';
+import type { CustomerListRow } from '../features/customers/customerModel';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 import {
   Badge,
   Card,
@@ -20,11 +17,10 @@ import {
   FilterBar,
   Page,
   Pagination,
-  paginate,
   type Column,
 } from '../ui';
 
-const PAGE_SIZE = 25;
+const LIST_KEY = 'customers';
 
 const COLUMNS: Column<CustomerListRow>[] = [
   {
@@ -66,80 +62,83 @@ const COLUMNS: Column<CustomerListRow>[] = [
   },
 ];
 
-/** Customers in this store with order count, lifetime spend and last order. */
+/**
+ * Customers in this store, newest signup first, with order count, lifetime
+ * spend and last order. Search matches name or phone on the server.
+ */
 export function CustomersPage() {
   const navigate = useNavigate();
   const org = useOrg();
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize(LIST_KEY);
 
-  const raw = useQuery(api.adminStats.listCustomersForAdmin, org ? { orgId: org._id } : 'skip');
+  const search = query.trim();
+  const pages = useCursorPages(JSON.stringify({ search, pageSize }));
 
-  const rows = useMemo<CustomerListRow[] | undefined>(() => {
-    if (raw === undefined) return undefined;
-    return sortByLastOrder(
-      raw.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        isAdmin: c.is_admin,
-        orderCount: c.orderCount,
-        totalSpent: c.totalSpent,
-        lastOrderDate: c.lastOrderDate ?? null,
-        createdAt: c.created_at,
-      })),
-    );
-  }, [raw]);
-
-  const filtered = useMemo(
-    () => (rows ?? []).filter((r) => matchesCustomer(r, query)),
-    [rows, query],
+  const result = useQuery(
+    api.adminStats.listCustomersPage,
+    org ? { orgId: org._id, search: search || undefined, cursor: pages.cursor, pageSize } : 'skip',
   );
-  const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
-  const currentPage = Math.min(page, pageCount);
-  const start = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const end = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
-  const onQuery = (value: string) => {
-    setQuery(value);
-    setPage(1);
+  const rows: CustomerListRow[] | undefined = result?.page.map((c) => ({
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    isAdmin: c.is_admin,
+    orderCount: c.orderCount,
+    totalSpent: c.totalSpent,
+    lastOrderDate: c.lastOrderDate ?? null,
+    createdAt: c.created_at,
+  }));
+
+  const loading = rows === undefined;
+  const empty = !loading && rows.length === 0;
+  const hasNext = result ? !result.isDone : false;
+
+  const onPageChange = (target: number) => {
+    if (target > pages.page && result?.continueCursor) pages.next(result.continueCursor);
+    else if (target < pages.page) pages.prev();
   };
   const open = (c: CustomerListRow) => navigate(`/customers/${c.id}`);
-  const loading = rows === undefined;
-  const nothing = !loading && filtered.length === 0;
 
   return (
     <Page title="Customers">
       <Card padding="none">
-        <FilterBar search={{ value: query, onChange: onQuery, placeholder: 'Search name or phone' }} />
-        {nothing ? (
+        <FilterBar
+          search={{ value: query, onChange: setQuery, placeholder: 'Search name or phone' }}
+        />
+        {empty && pages.page === 1 && result?.isDone ? (
           <EmptyState
             icon={<Users />}
-            title={query ? 'No customers match' : 'No customers yet'}
-            description={query ? 'Try a different name or phone number.' : 'Customers appear here after their first order or sign-in.'}
+            title={search ? 'No customers match' : 'No customers yet'}
+            description={
+              search ? 'Try a different name or phone number.' : 'Customers appear here after their first order or sign-in.'
+            }
           />
         ) : (
           <>
             <div className="md:hidden">
-              <CustomerCards rows={pageItems} loading={loading} onOpen={open} />
+              <CustomerCards rows={rows ?? []} loading={loading} onOpen={open} />
             </div>
             <div className="hidden md:block">
               <DataTable
                 columns={COLUMNS}
-                rows={loading ? undefined : pageItems}
+                rows={loading ? undefined : rows}
                 getRowId={(c) => c.id}
                 onRowClick={open}
                 rowLabel={(c) => `Open customer ${c.name}`}
+                empty={<EmptyState icon={<Users />} title={search ? 'No customers match' : 'No customers on this page'} />}
               />
             </div>
           </>
         )}
-        {!nothing && !loading && (
+        {!loading && (rows.length > 0 || pages.page > 1 || hasNext) && (
           <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            summary={`${start}–${end} of ${filtered.length}`}
+            page={pages.page}
+            hasNext={hasNext}
+            onPageChange={onPageChange}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         )}
       </Card>

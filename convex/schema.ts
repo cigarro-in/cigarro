@@ -873,7 +873,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_phone", ["phone"])
-    .index("by_org_phone", ["orgId", "phone"]),
+    .index("by_org_phone", ["orgId", "phone"])
+    .index("by_org_created", ["orgId", "createdAt"]),
 
   carts: defineTable({
     orgId: v.id("organizations"),

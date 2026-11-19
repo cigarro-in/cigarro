@@ -51,6 +51,7 @@ import { setupGate } from "./schema";
 import { insertOrganization } from "./organizations";
 import { allocateOrderNumber, applyPaymentClaim, chooseUniqueLuckyPaise } from "./orders";
 import { wakeOrderPolling } from "./gmail";
+import { clampPageSize } from "./lib/pagination";
 
 export { DEFAULT_MARKETPLACE_FEE_BPS, DEFAULT_SECURITY_DEPOSIT_PAISE, PLATFORM_ORG_SLUG };
 
@@ -474,9 +475,9 @@ async function statementPage(
   ctx: Ctx,
   orgId: Id<"organizations">,
   cursor: string | null | undefined,
-  limit: number,
+  limit: number | undefined,
 ) {
-  const numItems = Math.min(Math.max(Math.floor(limit), 1), 100);
+  const numItems = clampPageSize(limit);
   const page = await ctx.db
     .query("platformLedger")
     .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
@@ -599,7 +600,7 @@ export const listStatement = query({
   args: {
     orgId: v.id("organizations"),
     cursor: v.optional(v.union(v.string(), v.null())),
-    limit: v.number(),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, { orgId, cursor, limit }) => {
     const { org } = await requireMerchant(ctx, orgId);

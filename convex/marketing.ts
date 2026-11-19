@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/auth";
 import { liveStoreHostname } from "./lib/storeHost";
+import { pageArgs, scanPage } from "./lib/pagination";
 
 // Normalize Indian mobile to wa.me digits: "9188XXXXXXXX".
 // Accepts "+91-8892476825", "08892476825", "8892476825", "918892476825".
@@ -110,6 +111,38 @@ export const listContacts = query({
         r.name?.toLowerCase().includes(s) ||
         r.city?.toLowerCase().includes(s),
     );
+  },
+});
+
+// Paged contacts for the admin tables, newest first. Search is a substring
+// match on phone, name or city, so it runs as a scan rather than an index range.
+export const listContactsPaged = query({
+  args: {
+    orgId: v.id("organizations"),
+    search: v.optional(v.string()),
+    ...pageArgs,
+  },
+  handler: async (ctx, { orgId, search, cursor, pageSize }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const s = search?.trim().toLowerCase() ?? "";
+    return await scanPage({
+      cursor,
+      pageSize,
+      build: (after) =>
+        ctx.db
+          .query("marketingContacts")
+          .withIndex("by_org", (q) =>
+            after ? q.eq("orgId", orgId).lte("_creationTime", after.key) : q.eq("orgId", orgId),
+          )
+          .order("desc"),
+      keyOf: (r) => r._creationTime,
+      match: s
+        ? (r) =>
+            r.phone.includes(s) ||
+            (r.name?.toLowerCase().includes(s) ?? false) ||
+            (r.city?.toLowerCase().includes(s) ?? false)
+        : undefined,
+    });
   },
 });
 

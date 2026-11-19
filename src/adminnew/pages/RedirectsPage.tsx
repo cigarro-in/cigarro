@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useConvex, useMutation, usePaginatedQuery } from 'convex/react';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { makeFunctionReference } from 'convex/server';
 import type { PaginationOptions, PaginationResult } from 'convex/server';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
@@ -27,6 +27,8 @@ import {
 import { ORG_SLUG } from '../../lib/convex/org';
 import { InlineStatus, useInlineStatus, type InlineStatusState } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
+import { Pagination } from '../ui';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 
 // Typed references, not `api.redirects.*`: convex/_generated has no redirects
 // module until `npx convex dev` runs codegen. Paths must match convex/redirects.ts.
@@ -164,11 +166,20 @@ export function RedirectsPage() {
   const [search, setSearch] = useState('');
   const { status: opStatus, setError: setOpError, setOk: setOpOk } = useInlineStatus();
 
-  const {
-    results,
-    status: pageStatus,
-    loadMore,
-  } = usePaginatedQuery(listRef, { orgSlug: ORG_SLUG, search: search.trim() || undefined }, { initialNumItems: 50 });
+  const [pageSize, setPageSize] = usePageSize('redirects');
+  const pages = useCursorPages(JSON.stringify({ search: search.trim(), pageSize }));
+  const pageResult = useQuery(listRef, {
+    orgSlug: ORG_SLUG,
+    search: search.trim() || undefined,
+    paginationOpts: { numItems: pageSize, cursor: pages.cursor },
+  });
+  const goToPage = (p: number) => {
+    if (p > pages.page) {
+      if (pageResult?.continueCursor) pages.next(pageResult.continueCursor);
+    } else {
+      pages.prev();
+    }
+  };
   const upsert = useMutation(upsertRef);
   const remove = useMutation(removeRef);
   const importRows = useMutation(importRef);
@@ -184,7 +195,7 @@ export function RedirectsPage() {
   const [importStatus, setImportStatus] = useState<InlineStatusState>({ kind: null, message: '' });
 
   const parsedCount = useMemo(() => csvToImportRows(importText).length, [importText]);
-  const loading = pageStatus === 'LoadingFirstPage';
+  const loading = pageResult === undefined;
 
   const openNew = () => {
     setEditStatus({ kind: null, message: '' });
@@ -276,7 +287,7 @@ export function RedirectsPage() {
     }
   };
 
-  const rows = (results ?? []) as RedirectRow[];
+  const rows = (pageResult?.page ?? []) as RedirectRow[];
 
   return (
     <div className="min-h-screen bg-background">
@@ -381,15 +392,16 @@ export function RedirectsPage() {
               ))}
             </TableBody>
           </Table>
+          {pageResult && (rows.length > 0 || pages.page > 1) && (
+            <Pagination
+              page={pages.page}
+              hasNext={!pageResult.isDone}
+              onPageChange={goToPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </div>
-
-        {pageStatus === 'CanLoadMore' && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={() => loadMore(50)}>
-              Load more
-            </Button>
-          </div>
-        )}
       </div>
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>

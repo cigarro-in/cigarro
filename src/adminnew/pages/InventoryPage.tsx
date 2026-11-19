@@ -8,6 +8,8 @@ import { ORG_SLUG } from '../../lib/convex/org';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { PageHeader } from '../components/shared/PageHeader';
 import { AdminCard, AdminCardContent } from '../components/shared/AdminCard';
+import { Pagination } from '../ui';
+import { useClientPages } from '../hooks/usePagination';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -71,6 +73,7 @@ export function InventoryPage() {
       (!term || `${row.productName} ${row.variantName}`.toLowerCase().includes(term)),
     );
   }, [rows, search, lowOnly]);
+  const paging = useClientPages(rows === undefined ? undefined : filtered, 'inventory', JSON.stringify([search.trim(), lowOnly]));
   const tracked = (rows ?? []).filter((x) => x.trackInventory);
   const lowCount = tracked.filter((x) => x.lowStock).length;
   const totalAvailable = tracked.reduce((sum, x) => sum + x.available, 0);
@@ -142,7 +145,7 @@ export function InventoryPage() {
                     <TableRow><TableCell colSpan={6} className="py-16 text-center text-muted-foreground">Loading inventory…</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow><TableCell colSpan={6} className="py-16 text-center text-muted-foreground"><Search className="mx-auto mb-2 size-5" />No matching inventory</TableCell></TableRow>
-                  ) : filtered.map((row) => (
+                  ) : (paging.pageItems ?? []).map((row) => (
                     <TableRow key={row.variantSupabaseId}>
                       <TableCell><div className="font-medium">{row.productName}</div><div className="text-xs text-muted-foreground">{row.variantName}</div></TableCell>
                       <TableCell className="text-right font-mono">{row.trackInventory ? row.onHand : '—'}</TableCell>
@@ -154,6 +157,16 @@ export function InventoryPage() {
                   ))}
               </TableBody>
             </Table>
+            {rows !== undefined && filtered.length > 0 && (
+              <Pagination
+                page={paging.page}
+                pageCount={paging.pageCount}
+                summary={paging.summary}
+                onPageChange={paging.setPage}
+                pageSize={paging.pageSize}
+                onPageSizeChange={paging.setPageSize}
+              />
+            )}
           </AdminCardContent>
         </AdminCard>
       </div>

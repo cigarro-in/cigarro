@@ -17,6 +17,7 @@ import {
   FilterBar,
   FilterSelect,
   Page,
+  Pagination,
   useButtonFeedback,
   useRowSelection,
   type BadgeTone,
@@ -32,6 +33,7 @@ import {
   type DiscountStatus,
 } from '../features/discounts/discountRules';
 import { discountError } from '../features/discounts/discountErrors';
+import { useClientPages } from '../hooks/usePagination';
 
 const STATUS_TONE: Record<DiscountStatus, BadgeTone> = {
   active: 'success',
@@ -79,6 +81,12 @@ export function DiscountsPage() {
       return `${d.name} ${d.code ?? ''} ${d.summary}`.toLowerCase().includes(needle);
     });
   }, [all, query, statusFilter]);
+
+  const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
+    filtered,
+    'discounts',
+    JSON.stringify([query, statusFilter]),
+  );
 
   const setActive = (ids: string[], isActive: boolean, fb: typeof onFb) =>
     fb.run(async () => {
@@ -150,7 +158,7 @@ export function DiscountsPage() {
         </FilterBar>
         <DataTable<Row>
           columns={columns}
-          rows={filtered}
+          rows={pageItems}
           loading={loading}
           getRowId={(d) => d._id}
           selection={sel}
@@ -168,6 +176,16 @@ export function DiscountsPage() {
             )
           }
         />
+        {filtered !== undefined && filtered.length > 0 && (
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            summary={summary}
+          />
+        )}
       </Card>
 
       <BulkActionBar

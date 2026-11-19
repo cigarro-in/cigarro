@@ -17,10 +17,12 @@ import {
   FilterSelect,
   Menu,
   Page,
+  Pagination,
   useButtonFeedback,
   useRowSelection,
   type Column,
 } from '../ui';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 import { Stars } from '../features/reviews/Stars';
 import { AddReviewDialog } from '../features/reviews/AddReviewDialog';
 import { discountError } from '../features/discounts/discountErrors';
@@ -53,23 +55,34 @@ export function ReviewsPage() {
   const hideFb = useButtonFeedback();
   const delFb = useButtonFeedback();
 
-  const rows = useQuery(
-    api.reviews.listReviewsForAdmin,
-    orgSlug ? { orgSlug, approved: status === 'all' ? undefined : status === 'published' } : 'skip',
-  ) as ReviewRow[] | undefined;
+  const [pageSize, setPageSize] = usePageSize('reviews');
+  const searchText = query.trim();
+  const pages = useCursorPages(JSON.stringify({ status, ratingFilter, searchText, pageSize, orgSlug }));
+  const pageResult = useQuery(
+    api.reviews.listReviewsPaged,
+    orgSlug
+      ? {
+          orgSlug,
+          approved: status === 'all' ? undefined : status === 'published',
+          rating: ratingFilter === 'all' ? undefined : Number(ratingFilter),
+          search: searchText || undefined,
+          cursor: pages.cursor,
+          pageSize,
+        }
+      : 'skip',
+  );
+  const rows = pageResult?.page as ReviewRow[] | undefined;
   const products = useQuery(api.adminCatalog.listProductsForAdmin, orgSlug ? { orgSlug } : 'skip');
   const setApproved = useMutation(api.reviews.setReviewApproved);
   const removeReview = useMutation(api.reviews.deleteReview);
 
-  const filtered = useMemo(() => {
-    if (!rows) return undefined;
-    const needle = query.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (ratingFilter !== 'all' && r.rating !== Number(ratingFilter)) return false;
-      if (!needle) return true;
-      return `${r.productName} ${r.userName} ${r.title ?? ''} ${r.comment ?? ''}`.toLowerCase().includes(needle);
-    });
-  }, [rows, query, ratingFilter]);
+  const goToPage = (p: number) => {
+    if (p > pages.page) {
+      if (pageResult?.continueCursor) pages.next(pageResult.continueCursor);
+    } else {
+      pages.prev();
+    }
+  };
 
   const setPublished = (ids: string[], isApproved: boolean, fb: typeof showFb) =>
     fb.run(async () => {
@@ -143,7 +156,7 @@ export function ReviewsPage() {
   ];
 
   const loading = rows === undefined;
-  const hasAny = (rows?.length ?? 0) > 0;
+  const filtersActive = status !== 'all' || ratingFilter !== 'all' || searchText !== '';
   const error = showFb.error ?? hideFb.error ?? delFb.error;
   const productOptions = useMemo(
     () => (products ?? []).filter((p) => p.isActive).map((p) => ({ supabaseId: p.supabaseId, name: p.name })),
@@ -184,12 +197,12 @@ export function ReviewsPage() {
         </FilterBar>
         <DataTable<ReviewRow>
           columns={columns}
-          rows={filtered}
+          rows={rows}
           loading={loading}
           getRowId={(r) => r._id}
           selection={sel}
           empty={
-            hasAny ? (
+            filtersActive ? (
               <EmptyState title="No reviews match these filters" />
             ) : (
               <EmptyState
@@ -199,6 +212,15 @@ export function ReviewsPage() {
             )
           }
         />
+        {rows && (rows.length > 0 || pages.page > 1) && (
+          <Pagination
+            page={pages.page}
+            hasNext={!pageResult?.isDone}
+            onPageChange={goToPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </Card>
 
       <BulkActionBar

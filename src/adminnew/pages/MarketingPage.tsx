@@ -13,6 +13,8 @@ import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
+import { Pagination } from '../ui';
+import { useCursorPages, usePageSize } from '../hooks/usePagination';
 import { MessageCircle, Upload, Send, Plus, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -161,7 +163,33 @@ export function MarketingPage() {
   const sendBoxRef = useRef<HTMLTextAreaElement>(null);
 
   const contactCount = useQuery(api.marketing.countContacts, orgId ? { orgId } : 'skip');
-  const contacts = useQuery(api.marketing.listContacts, orgId ? { orgId, search: tab === 'send' ? sendSearch : search } : 'skip');
+  const [contactsPageSize, setContactsPageSize] = usePageSize('marketingContacts');
+  const contactsScope = tab === 'send' ? 'send' : 'contacts';
+  const contactsSearch = (contactsScope === 'send' ? sendSearch : search).trim();
+  const contactPages = useCursorPages(JSON.stringify({ scope: contactsScope, q: contactsSearch, pageSize: contactsPageSize }));
+  const contactsResult = useQuery(
+    api.marketing.listContactsPaged,
+    orgId
+      ? { orgId, search: contactsSearch || undefined, cursor: contactPages.cursor, pageSize: contactsPageSize }
+      : 'skip',
+  );
+  const contacts = contactsResult?.page;
+  const goToContactPage = (p: number) => {
+    if (p > contactPages.page) {
+      if (contactsResult?.continueCursor) contactPages.next(contactsResult.continueCursor);
+    } else {
+      contactPages.prev();
+    }
+  };
+  const contactPagination = contacts && (contacts.length > 0 || contactPages.page > 1) && (
+    <Pagination
+      page={contactPages.page}
+      hasNext={!contactsResult?.isDone}
+      onPageChange={goToContactPage}
+      pageSize={contactsPageSize}
+      onPageSizeChange={setContactsPageSize}
+    />
+  );
   const campaigns = useQuery(api.marketing.listCampaigns, orgId ? { orgId } : 'skip');
   const templates = useQuery(api.marketing.listTemplates, orgId ? { orgId } : 'skip');
   const discounts = useQuery(api.discounts.listDiscountsForAdmin, { orgSlug: ORG_SLUG });
@@ -383,6 +411,7 @@ export function MarketingPage() {
                 { key: 'totalOrders', label: 'Orders' },
               ]}
             />
+            {contactPagination}
           </>
         )}
 
@@ -690,6 +719,7 @@ export function MarketingPage() {
                 },
               ]}
             />
+            {contactPagination}
           </>
         )}
       </div>

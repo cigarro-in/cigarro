@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom';
-import { usePaginatedQuery } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useOrg } from '../../../lib/convex/useOrg';
 import { paiseToRupees } from '../../../lib/convex/money';
 import { formatINR } from '../../../utils/currency';
+import { useCursorPages, usePageSize } from '../../hooks/usePagination';
 import {
-  Button,
   Card,
   DataTable,
   EmptyState,
+  Pagination,
   formatOrderDate,
   formatOrderNumber,
   type Column,
@@ -26,18 +27,18 @@ type MatchedRow = {
   displayOrderId: string | null;
 };
 
-const PAGE_SIZE = 25;
-
-/** Bank emails that matched an order. Newest first. */
+/** Bank emails that matched an order. Newest first, one page at a time. */
 export function MatchedEmailsTab() {
   const org = useOrg();
-  const { results, status, loadMore } = usePaginatedQuery(
+  const [pageSize, setPageSize] = usePageSize('matchedEmails');
+  const pages = useCursorPages(JSON.stringify({ orgId: org?._id ?? null, pageSize }));
+
+  const data = useQuery(
     api.payments.listMatchedEmails,
-    org ? { orgId: org._id } : 'skip',
-    { initialNumItems: PAGE_SIZE },
+    org ? { orgId: org._id, cursor: pages.cursor, pageSize } : 'skip',
   );
 
-  const rows = results as MatchedRow[];
+  const rows: MatchedRow[] | undefined = data?.page;
 
   const columns: Column<MatchedRow>[] = [
     {
@@ -87,28 +88,28 @@ export function MatchedEmailsTab() {
     },
   ];
 
-  const loadingFirst = status === 'LoadingFirstPage';
-
   return (
     <Card padding="none">
       <DataTable
         columns={columns}
-        rows={loadingFirst ? undefined : rows}
+        rows={rows}
         getRowId={(r) => r._id}
         empty={<EmptyState title="No matched emails yet" description="Bank alerts appear here once they match an order." />}
       />
-      {(status === 'CanLoadMore' || status === 'LoadingMore') && (
-        <div className="flex justify-center border-t border-border p-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={status === 'LoadingMore'}
-            loading={status === 'LoadingMore'}
-            onClick={() => loadMore(PAGE_SIZE)}
-          >
-            Load more
-          </Button>
-        </div>
+      {data && rows && rows.length > 0 && (
+        <Pagination
+          page={pages.page}
+          hasNext={!data.isDone}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          onPageChange={(p) => {
+            if (p > pages.page) {
+              if (data.continueCursor) pages.next(data.continueCursor);
+            } else {
+              pages.prev();
+            }
+          }}
+        />
       )}
     </Card>
   );

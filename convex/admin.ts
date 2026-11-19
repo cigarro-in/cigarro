@@ -10,6 +10,9 @@ import { creditWallet } from "./wallet";
 import { commitOrderInventory, releaseOrderInventory, returnOrderInventory } from "./lib/inventory";
 import { rewardDeliveredReferral, rewardPaidReferral } from "./referrals";
 import { schedulePaidOrderPush } from "./push";
+import { clampPageSize, pageArgs, scanPage } from "./lib/pagination";
+import { deriveOrderStage, orderSearchTextServer, STAGE_FILTER_STAGES } from "./lib/orderStage";
+import { orderNumberOf } from "./lib/ids";
 
 // ---------- Mark a pending order as paid manually ----------
 
@@ -299,7 +302,7 @@ export const listRecentBankEmails = query({
   },
   handler: async (ctx, { orgId, limit }) => {
     await requireOrgAdmin(ctx, orgId);
-    const n = limit ?? 20;
+    const n = clampPageSize(limit);
     // Pull a wider window and sort in memory by receivedAt desc — bankEmails
     // doesn't have a by_org_receivedAt index but volume is small (shops
     // process hundreds/day max and we only show the tail).
@@ -315,8 +318,8 @@ export const listRecentBankEmails = query({
 });
 
 export const listUnmatchedEmails = query({
-  args: { orgId: v.id("organizations") },
-  handler: async (ctx, { orgId }) => {
+  args: { orgId: v.id("organizations"), limit: v.optional(v.number()) },
+  handler: async (ctx, { orgId, limit }) => {
     await requireOrgAdmin(ctx, orgId);
     // Every non-terminal email state: parse failures, close-but-no-match,
     // nothing-close, and legacy leftovers. Matched/duplicate/ignored are
@@ -327,7 +330,7 @@ export const listUnmatchedEmails = query({
       .order("desc")
       .take(300);
     const open = new Set(["no_match", "no_candidate", "parse_failed", "unmatched"]);
-    return rows.filter((r) => open.has(r.status)).slice(0, 100);
+    return rows.filter((r) => open.has(r.status)).slice(0, clampPageSize(limit));
   },
 });
 
@@ -404,6 +407,7 @@ export const listRecentOrders = query({
   },
   handler: async (ctx, { orgId, status, limit }) => {
     await requireOrgAdmin(ctx, orgId);
+    const n = clampPageSize(limit);
     if (status) {
       return await ctx.db
         .query("orders")
@@ -411,13 +415,65 @@ export const listRecentOrders = query({
           q.eq("orgId", orgId).eq("status", status),
         )
         .order("desc")
-        .take(limit ?? 50);
+        .take(n);
     }
     return await ctx.db
       .query("orders")
       .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
-      .take(limit ?? 50);
+      .take(n);
+  },
+});
+
+// Admin orders list, one page at a time. Newest first. Stage and search are
+// applied while scanning (a sparse filter may return a short page with
+// isDone false; keep calling with continueCursor). Dates: from inclusive, to
+// exclusive, both ms timestamps.
+export const listOrdersPage = query({
+  args: {
+    orgId: v.id("organizations"),
+    stage: v.optional(v.string()),
+    from: v.optional(v.number()),
+    to: v.optional(v.number()),
+    search: v.optional(v.string()),
+    ...pageArgs,
+  },
+  handler: async (ctx, { orgId, stage, from, to, search, cursor, pageSize }) => {
+    await requireOrgAdmin(ctx, orgId);
+    if (stage !== undefined && !Object.prototype.hasOwnProperty.call(STAGE_FILTER_STAGES, stage)) {
+      throw new ConvexError({ code: "BAD_STAGE" });
+    }
+    const stages = stage && stage !== "all" ? STAGE_FILTER_STAGES[stage] : null;
+    const q = (search ?? "").trim().toLowerCase();
+    const toInclusive = to !== undefined ? to - 1 : undefined;
+
+    return await scanPage<Doc<"orders">>({
+      cursor,
+      pageSize,
+      keyOf: (o) => o.createdAt,
+      build: (after) => {
+        const afterKey = after ? after.key : undefined;
+        const bound =
+          toInclusive === undefined
+            ? afterKey
+            : afterKey === undefined
+              ? toInclusive
+              : Math.min(toInclusive, afterKey);
+        return ctx.db
+          .query("orders")
+          .withIndex("by_org_created", (ix) => {
+            const lower = ix.eq("orgId", orgId).gte("createdAt", from ?? 0);
+            return bound === undefined ? lower : lower.lte("createdAt", bound);
+          })
+          .order("desc");
+      },
+      match: (o) => {
+        if (stages && !stages.includes(deriveOrderStage(o))) return false;
+        if (q === "") return true;
+        const num = orderNumberOf(o);
+        return orderSearchTextServer(o, num === undefined ? "" : String(num)).includes(q);
+      },
+    });
   },
 });
 

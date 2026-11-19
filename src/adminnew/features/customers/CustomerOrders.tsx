@@ -1,12 +1,12 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatINR } from '../../../utils/currency';
 import { formatOrderDate, formatOrderNumber } from '../../../lib/orders/format';
-import { Card, DataTable, EmptyState, Pagination, StatusBadge, paginate, type Column } from '../../ui';
+import { Card, DataTable, EmptyState, Pagination, StatusBadge, type Column } from '../../ui';
+import { useClientPages } from '../../hooks/usePagination';
 import { ShoppingBag } from 'lucide-react';
 import type { CustomerProfileOrder } from './customerModel';
 
-const PAGE_SIZE = 10;
+const LIST_KEY = 'customerOrders';
 const ITEMS_SHOWN = 2;
 
 function Items({ order }: { order: CustomerProfileOrder }) {
@@ -31,14 +31,10 @@ function Items({ order }: { order: CustomerProfileOrder }) {
   );
 }
 
-/** Every order of the customer, each row opens the order detail. */
+/** Every order of the customer (bounded by the profile query), each row opens the order detail. */
 export function CustomerOrders({ orders, ordersCapped }: { orders: CustomerProfileOrder[]; ordersCapped: boolean }) {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const { pageItems, pageCount } = paginate(orders, page, PAGE_SIZE);
-  const current = Math.min(page, pageCount);
-  const start = (current - 1) * PAGE_SIZE + 1;
-  const end = Math.min(current * PAGE_SIZE, orders.length);
+  const pages = useClientPages(orders, LIST_KEY, 'customer-orders');
 
   const columns: Column<CustomerProfileOrder>[] = [
     {
@@ -64,14 +60,21 @@ export function CustomerOrders({ orders, ordersCapped }: { orders: CustomerProfi
     <Card title="Orders" padding="none" actions={ordersCapped ? <span className="text-xs text-muted-foreground">Newest 200</span> : undefined}>
       <DataTable
         columns={columns}
-        rows={pageItems}
+        rows={pages.pageItems}
         getRowId={(o) => o.id}
         onRowClick={(o) => navigate(`/orders/${o.id}`)}
         rowLabel={(o) => `Open order ${formatOrderNumber(o.orderNumber) || ''}`.trim()}
         empty={<EmptyState icon={<ShoppingBag />} title="No orders yet" />}
       />
-      {orders.length > PAGE_SIZE && (
-        <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={`${start}–${end} of ${orders.length}`} />
+      {orders.length > 0 && (
+        <Pagination
+          page={pages.page}
+          pageCount={pages.pageCount}
+          onPageChange={pages.setPage}
+          summary={pages.summary}
+          pageSize={pages.pageSize}
+          onPageSizeChange={pages.setPageSize}
+        />
       )}
     </Card>
   );

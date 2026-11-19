@@ -15,16 +15,14 @@ import {
   FilterSelect,
   Page,
   Pagination,
-  paginate,
   SkeletonTable,
   useButtonFeedback,
   useRowSelection,
   type Column,
   type PageAction,
 } from '../../ui';
+import { useClientPages } from '../../hooks/usePagination';
 import { CatalogStatus, CatalogThumb, catalogError } from './catalogShared';
-
-const PAGE_SIZE = 25;
 
 export interface CatalogListRow {
   id: string;
@@ -77,7 +75,6 @@ export function CatalogListView<T extends CatalogListRow>({
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
-  const [page, setPage] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteCount, setDeleteCount] = useState(0);
   const sel = useRowSelection();
@@ -94,15 +91,16 @@ export function CatalogListView<T extends CatalogListRow>({
     );
   }, [rows, query, status]);
 
-  const { pageItems, pageCount } = paginate(filtered ?? [], page, PAGE_SIZE);
-  const current = Math.min(page, pageCount);
-  const from = filtered && filtered.length ? (current - 1) * PAGE_SIZE + 1 : 0;
-  const to = filtered ? Math.min(current * PAGE_SIZE, filtered.length) : 0;
+  const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
+    filtered,
+    `catalog.${plural}`,
+    JSON.stringify([query, status]),
+  );
+  const rowsOnPage = pageItems ?? [];
 
-  /** Changing the filter resets paging and drops selections that may be off-screen. */
+  /** Changing the filter resets paging (via the hook) and drops selections that may be off-screen. */
   const changeFilter = (apply: () => void) => {
     apply();
-    setPage(1);
     sel.clear();
   };
 
@@ -207,12 +205,12 @@ export function CatalogListView<T extends CatalogListRow>({
 
           {filtered === undefined ? (
             <SkeletonTable columns={4} />
-          ) : pageItems.length === 0 ? (
+          ) : rowsOnPage.length === 0 ? (
             emptyNode
           ) : (
             <>
               <ul className="divide-y divide-[var(--admin-border)] sm:hidden">
-                {pageItems.map((r) => (
+                {rowsOnPage.map((r) => (
                   <li
                     key={r.id}
                     className={cn(
@@ -241,7 +239,7 @@ export function CatalogListView<T extends CatalogListRow>({
               <div className="hidden sm:block">
                 <DataTable
                   columns={allColumns}
-                  rows={pageItems}
+                  rows={rowsOnPage}
                   getRowId={(r) => r.id}
                   selection={sel}
                   onRowClick={(r) => navigate(openPath(r.id))}
@@ -253,10 +251,12 @@ export function CatalogListView<T extends CatalogListRow>({
 
           {filtered !== undefined && filtered.length > 0 && (
             <Pagination
-              page={current}
+              page={page}
               pageCount={pageCount}
               onPageChange={setPage}
-              summary={`${from}–${to} of ${filtered.length}`}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              summary={summary}
             />
           )}
         </Card>

@@ -1,10 +1,12 @@
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { requireIdentity, requireOrgAdmin } from "./lib/auth";
 import { collectInOrg } from "./lib/org";
 import { isLegacyOrg } from "./lib/legacyOrg";
 import { orderNumberOf } from "./lib/ids";
 import { displayCustomerName } from "./lib/personName";
+import { mergeDesc, pageArgs, scanPage } from "./lib/pagination";
 
 // ---------- Wave 7: dashboard + customers reads (Supabase -> Convex) ----------
 // Org-scoped like the rest of the payments surface. Bounded take(1000) per
@@ -162,13 +164,119 @@ export const getDashboardStats = query({
   },
 });
 
-// Customer list with per-customer order aggregates (Convex users + orders).
-// No status/block toggle: Supabase profiles never had a status column, so
-// the old toggle always failed — dropped, not ported.
+// ---------- Store customers (users.orgId, indexed reads only) ----------
+// A customer belongs to a store when users.orgId is that store. Legacy rows
+// without orgId belong to the legacy store, so that store also reads them.
+// Newest signup first (by_org_created desc).
+
+type CustomerKey = { key: number; id: string };
+
+/** users rows with one orgId (undefined = legacy rows), newest first, resumable below `after`. */
+function usersByOrgDesc(
+  ctx: QueryCtx,
+  orgId: Id<"organizations"> | undefined,
+  after: CustomerKey | null,
+): AsyncIterable<Doc<"users">> {
+  return ctx.db
+    .query("users")
+    .withIndex("by_org_created", (q) => {
+      const base = q.eq("orgId", orgId);
+      return after ? base.lte("createdAt", after.key) : base;
+    })
+    .order("desc");
+}
+
+/** All customers of a store, newest first. */
+function storeCustomersDesc(
+  ctx: QueryCtx,
+  org: Doc<"organizations">,
+  after: CustomerKey | null,
+): AsyncIterable<Doc<"users">> {
+  const scoped = usersByOrgDesc(ctx, org._id, after);
+  if (!isLegacyOrg(org)) return scoped;
+  return mergeDesc(scoped, usersByOrgDesc(ctx, undefined, after), (u) => u.createdAt);
+}
+
+/** Per-customer order aggregates (bounded) and admin role for one store. */
+function customerSummary(
+  u: Doc<"users">,
+  orders: Array<Doc<"orders">>,
+  role: string | undefined,
+) {
+  const totalSpent = orders.reduce(
+    (s, o) => s + (PAID.includes(o.status) ? rupees(o.finalAmountPaise) : 0),
+    0,
+  );
+  const times = orders.map((o) => o.createdAt);
+  return {
+    id: u.userId,
+    name: displayCustomerName(u.name, u.phone),
+    phone: u.phone ?? "",
+    is_admin: role === "admin" || role === "owner",
+    orderCount: orders.length,
+    totalSpent,
+    averageOrderValue: orders.length > 0 ? totalSpent / orders.length : 0,
+    lastOrderDate: times.length ? Math.max(...times) : undefined,
+    firstOrderDate: times.length ? Math.min(...times) : undefined,
+    created_at: u.createdAt,
+    updated_at: u.updatedAt,
+  };
+}
+
+const CUSTOMER_ORDER_CAP = 500;
+
+async function customerRow(ctx: QueryCtx, orgId: Id<"organizations">, u: Doc<"users">) {
+  const orders = await ctx.db
+    .query("orders")
+    .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", u.userId))
+    .order("desc")
+    .take(CUSTOMER_ORDER_CAP);
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_org_user", (q) => q.eq("orgId", orgId).eq("userId", u.userId))
+    .first();
+  return customerSummary(u, orders, membership?.role);
+}
+
+/** One page of store customers, optionally filtered by name or phone (substring). */
+export const listCustomersPage = query({
+  args: { orgId: v.id("organizations"), search: v.optional(v.string()), ...pageArgs },
+  handler: async (ctx, { orgId, search, cursor, pageSize }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const org = await ctx.db.get(orgId);
+    if (!org) return { page: [], continueCursor: null, isDone: true };
+
+    const needle = (search ?? "").trim().toLowerCase().slice(0, 80);
+    const scan = await scanPage<Doc<"users">>({
+      cursor,
+      pageSize,
+      maxScan: 1000,
+      build: (after) => storeCustomersDesc(ctx, org, after),
+      keyOf: (u) => u.createdAt,
+      match: (u) =>
+        !needle ||
+        (u.name ?? "").toLowerCase().includes(needle) ||
+        (u.phone ?? "").toLowerCase().includes(needle),
+    });
+    const page = await Promise.all(scan.page.map((u) => customerRow(ctx, orgId, u)));
+    return { page, continueCursor: scan.continueCursor, isDone: scan.isDone };
+  },
+});
+
+// Customer list for pickers (DiscountFormPage). Newest 1000 store customers,
+// with order aggregates over the newest 1000 store orders.
 export const listCustomersForAdmin = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, { orgId }) => {
     await requireOrgAdmin(ctx, orgId);
+    const org = await ctx.db.get(orgId);
+    if (!org) return [];
+
+    const users: Doc<"users">[] = [];
+    for await (const u of storeCustomersDesc(ctx, org, null)) {
+      users.push(u);
+      if (users.length >= 1000) break;
+    }
 
     const orders = await ctx.db
       .query("orders")
@@ -180,39 +288,14 @@ export const listCustomersForAdmin = query({
       .withIndex("by_org_role", (q) => q.eq("orgId", orgId))
       .collect();
     const roleByUser = new Map(memberships.map((m) => [m.userId, m.role]));
-    const customerIds = new Set([
-      ...orders.map((o) => o.userId),
-      ...memberships.map((m) => m.userId),
-    ]);
-    const users = (await ctx.db.query("users").collect()).filter((u) =>
-      customerIds.has(u.userId),
-    );
 
-    return users
-      .slice()
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .map((u) => {
-        const mine = orders.filter((o) => o.userId === u.userId);
-        const totalSpent = mine.reduce(
-          (s, o) => s + (PAID.includes(o.status) ? rupees(o.finalAmountPaise) : 0),
-          0,
-        );
-        const times = mine.map((o) => o.createdAt);
-        const role = roleByUser.get(u.userId);
-        return {
-          id: u.userId,
-          name: displayCustomerName(u.name, u.phone),
-          phone: u.phone ?? "",
-          is_admin: role === "admin" || role === "owner",
-          orderCount: mine.length,
-          totalSpent,
-          averageOrderValue: mine.length > 0 ? totalSpent / mine.length : 0,
-          lastOrderDate: times.length ? Math.max(...times) : undefined,
-          firstOrderDate: times.length ? Math.min(...times) : undefined,
-          created_at: u.createdAt,
-          updated_at: u.updatedAt,
-        };
-      });
+    return users.map((u) =>
+      customerSummary(
+        u,
+        orders.filter((o) => o.userId === u.userId),
+        roleByUser.get(u.userId),
+      ),
+    );
   },
 });
 

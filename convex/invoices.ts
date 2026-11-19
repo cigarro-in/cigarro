@@ -5,6 +5,7 @@ import { audit } from "./lib/audit";
 import { changeInventory } from "./lib/inventory";
 import { findOrgDocBySupabase, inOrg } from "./lib/org";
 import { readOrgSiteSettings } from "./lib/siteSettings";
+import { pageArgs, scanPage } from "./lib/pagination";
 
 const paymentMethodV = v.union(
   v.literal("cash"),
@@ -142,6 +143,33 @@ export const list = query({
       .withIndex("by_org_created", (q) => q.eq("orgId", orgId))
       .order("desc")
       .take(Math.min(limit ?? 100, 300));
+  },
+});
+
+// Paged invoice list for the admin table, newest first. Without a search term
+// it is a plain index page; with one, a scan keeps rows whose number, customer
+// name or phone contains the text.
+export const listPaged = query({
+  args: { orgId: v.id("organizations"), search: v.optional(v.string()), ...pageArgs },
+  handler: async (ctx, { orgId, search, cursor, pageSize }) => {
+    await requireOrgAdmin(ctx, orgId);
+    const term = search?.trim().toLowerCase() ?? "";
+    const r = await scanPage({
+      cursor,
+      pageSize,
+      build: (after) =>
+        ctx.db
+          .query("invoices")
+          .withIndex("by_org_created", (q) =>
+            after ? q.eq("orgId", orgId).lte("createdAt", after.key) : q.eq("orgId", orgId),
+          )
+          .order("desc"),
+      keyOf: (d) => d.createdAt,
+      match: term
+        ? (d) => `${d.invoiceNumber} ${d.customerName} ${d.customerPhone ?? ""}`.toLowerCase().includes(term)
+        : undefined,
+    });
+    return r;
   },
 });
 

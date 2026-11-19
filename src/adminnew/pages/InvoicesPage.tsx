@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
-import { FilePlus2, FileText, ReceiptIndianRupee, Settings2 } from 'lucide-react';
+import { FilePlus2, FileText, Settings2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInlineStatus, InlineStatus } from '../../components/common/InlineStatus';
 import { api } from '../../../convex/_generated/api';
@@ -15,6 +15,8 @@ import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { AdminCard, AdminCardContent } from '../components/shared/AdminCard';
 import { PageHeader } from '../components/shared/PageHeader';
+import { Pagination } from '../ui';
+import { usePageSize, useCursorPages } from '../hooks/usePagination';
 
 type InvoiceSummary = {
   _id: string;
@@ -30,10 +32,16 @@ type InvoiceSummary = {
 export function InvoicesPage() {
   const org = useOrg();
   const navigate = useNavigate();
-  const invoices = useQuery(api.invoices.list, org ? { orgId: org._id, limit: 150 } : 'skip') as InvoiceSummary[] | undefined;
+  const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = usePageSize('invoices');
+  const pages = useCursorPages(JSON.stringify({ search: search.trim(), pageSize }));
+  const pageResult = useQuery(
+    api.invoices.listPaged,
+    org ? { orgId: org._id, search: search.trim() || undefined, cursor: pages.cursor, pageSize } : 'skip',
+  );
+  const invoices = pageResult?.page as InvoiceSummary[] | undefined;
   const settings = useQuery(api.invoices.getSettings, org ? { orgId: org._id } : 'skip');
   const saveSettings = useMutation(api.invoices.saveSettings);
-  const [search, setSearch] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -54,12 +62,13 @@ export function InvoicesPage() {
     });
   }, [settings]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (invoices ?? []).filter((invoice) => !term || `${invoice.invoiceNumber} ${invoice.customerName} ${invoice.customerPhone ?? ''}`.toLowerCase().includes(term));
-  }, [invoices, search]);
-  const paidTotal = (invoices ?? []).filter((x) => x.status === 'paid').reduce((sum, x) => sum + x.totalPaise, 0);
-  const dueTotal = (invoices ?? []).filter((x) => x.status === 'due').reduce((sum, x) => sum + x.totalPaise, 0);
+  const goToPage = (p: number) => {
+    if (p > pages.page) {
+      if (pageResult?.continueCursor) pages.next(pageResult.continueCursor);
+    } else {
+      pages.prev();
+    }
+  };
 
   const submitSettings = async () => {
     if (!org) return;
@@ -75,21 +84,26 @@ export function InvoicesPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      <PageHeader title="Invoices" description="Offline sales and printable receipts · latest 150 records" search={{ value: search, onChange: setSearch, placeholder: 'Search invoice or customer…' }}>
+      <PageHeader title="Invoices" description="Offline sales and printable receipts" search={{ value: search, onChange: setSearch, placeholder: 'Search invoice or customer…' }}>
         <Button variant="outline" onClick={() => setSettingsOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Invoice settings</Button>
         <Button onClick={() => navigate('/invoices/new')}><FilePlus2 className="mr-2 h-4 w-4" />New invoice</Button>
       </PageHeader>
       <div className="mx-auto max-w-400 space-y-5 px-6">
         <InlineStatus status={opStatus} />
         {message && <div className="rounded-lg border border-success-muted bg-success-muted px-4 py-3 text-sm text-success">{message}</div>}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Summary icon={FileText} label="Invoices shown" value={(invoices ?? []).length.toLocaleString('en-IN')} />
-          <Summary icon={ReceiptIndianRupee} label="Paid · shown" value={formatPaiseINR(paidTotal)} />
-          <Summary icon={ReceiptIndianRupee} label="Due · shown" value={formatPaiseINR(dueTotal)} warning={dueTotal > 0} />
-        </div>
         <AdminCard><AdminCardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-border bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Payment</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right"><span className="sr-only">Actions</span></th></tr></thead><tbody className="divide-y divide-border">
-          {invoices === undefined ? <tr><td colSpan={6} className="px-4 py-16 text-center text-muted-foreground">Loading invoices…</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} className="px-4 py-16 text-center text-muted-foreground"><FileText className="mx-auto mb-2 h-7 w-7" />No invoices yet</td></tr> : filtered.map((invoice) => <tr key={invoice._id} className="cursor-pointer hover:bg-white/50" onClick={() => navigate(`/invoices/${invoice._id}`)}><td className="px-4 py-3 font-semibold text-primary">{invoice.invoiceNumber}</td><td className="px-4 py-3"><div className="font-medium">{invoice.customerName}</div><div className="text-xs text-muted-foreground">{invoice.customerPhone}</div></td><td className="px-4 py-3 text-muted-foreground">{new Date(invoice.createdAt).toLocaleDateString('en-IN')}</td><td className="px-4 py-3"><Badge variant={invoice.status === 'voided' ? 'destructive' : 'secondary'} className={invoice.status === 'paid' ? 'bg-success-muted text-success' : invoice.status === 'due' ? 'bg-warning-muted text-warning' : ''}>{invoice.status}</Badge><span className="ml-2 text-xs capitalize text-muted-foreground">{invoice.paymentMethod.replace('_', ' ')}</span></td><td className="px-4 py-3 text-right font-semibold">{formatPaiseINR(invoice.totalPaise)}</td><td className="px-4 py-3 text-right"><Button size="sm" variant="ghost">View & print</Button></td></tr>)}
-        </tbody></table></div></AdminCardContent></AdminCard>
+          {invoices === undefined ? <tr><td colSpan={6} className="px-4 py-16 text-center text-muted-foreground">Loading invoices…</td></tr> : invoices.length === 0 ? <tr><td colSpan={6} className="px-4 py-16 text-center text-muted-foreground"><FileText className="mx-auto mb-2 h-7 w-7" />No invoices yet</td></tr> : invoices.map((invoice) =><tr key={invoice._id} className="cursor-pointer hover:bg-white/50" onClick={() => navigate(`/invoices/${invoice._id}`)}><td className="px-4 py-3 font-semibold text-primary">{invoice.invoiceNumber}</td><td className="px-4 py-3"><div className="font-medium">{invoice.customerName}</div><div className="text-xs text-muted-foreground">{invoice.customerPhone}</div></td><td className="px-4 py-3 text-muted-foreground">{new Date(invoice.createdAt).toLocaleDateString('en-IN')}</td><td className="px-4 py-3"><Badge variant={invoice.status === 'voided' ? 'destructive' : 'secondary'} className={invoice.status === 'paid' ? 'bg-success-muted text-success' : invoice.status === 'due' ? 'bg-warning-muted text-warning' : ''}>{invoice.status}</Badge><span className="ml-2 text-xs capitalize text-muted-foreground">{invoice.paymentMethod.replace('_', ' ')}</span></td><td className="px-4 py-3 text-right font-semibold">{formatPaiseINR(invoice.totalPaise)}</td><td className="px-4 py-3 text-right"><Button size="sm" variant="ghost">View & print</Button></td></tr>)}
+        </tbody></table></div>
+        {invoices && (invoices.length > 0 || pages.page > 1) && (
+          <Pagination
+            page={pages.page}
+            hasNext={!pageResult?.isDone}
+            onPageChange={goToPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+          />
+        )}
+        </AdminCardContent></AdminCard>
       </div>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Invoice settings</DialogTitle></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><Field label="Business name"><Input value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} /></Field><Field label="Invoice prefix"><Input value={form.prefix} maxLength={12} onChange={(e) => setForm({ ...form, prefix: e.target.value })} /></Field><Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field><Field label="Email"><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field><Field label="GSTIN"><Input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} /></Field><Field label="Accent colour"><div className="flex gap-2"><Input type="color" className="w-14 p-1" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} /><Input value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} /></div></Field></div><Field label="Business address"><Textarea rows={3} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field><Field label="Footer / terms"><Textarea rows={3} value={form.terms} onChange={(e) => setForm({ ...form, terms: e.target.value })} /></Field><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancel</Button><Button onClick={submitSettings} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Button></div></DialogContent></Dialog>
@@ -97,5 +111,4 @@ export function InvoicesPage() {
   );
 }
 
-function Summary({ icon: Icon, label, value, warning }: { icon: typeof FileText; label: string; value: string; warning?: boolean }) { return <AdminCard><AdminCardContent className="flex items-center gap-4 py-5"><div className={`rounded-xl p-3 ${warning ? 'bg-warning-muted text-warning' : 'bg-primary/10 text-primary'}`}><Icon className="h-5 w-5" /></div><div><div className="text-2xl font-bold">{value}</div><div className="text-sm text-muted-foreground">{label}</div></div></AdminCardContent></AdminCard>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }

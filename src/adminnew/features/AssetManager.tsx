@@ -18,7 +18,6 @@ import {
   Pagination,
   Skeleton,
   Tabs,
-  paginate,
   toActionError,
   useButtonFeedback,
   useImageCrop,
@@ -30,11 +29,11 @@ import { confirmImageDelete } from '../../lib/images/guard';
 import { fetchUsageBatch, usageSummary, type AssetUsage } from '../../lib/images/usage';
 import { collectAllR2Images, reprocessAll, type ReprocessProgress } from '../../lib/images/reprocess';
 import { formatFileSize } from '../components/shared/ImagePicker';
+import { useClientPages } from '../hooks/usePagination';
 
 /* Upload and reprocess progress widths are data-driven. */
 /* eslint-disable shadcn/no-inline-styles */
 
-const PAGE_SIZE = 48;
 const UPLOAD_CONCURRENCY = 3;
 const ROOT = 'asset_images/';
 
@@ -129,7 +128,6 @@ export function AssetManager() {
 
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [page, setPage] = useState(1);
   const [dragOver, setDragOver] = useState(false);
 
   const sel = useRowSelection();
@@ -186,9 +184,8 @@ export function AssetManager() {
     void load();
   }, [load]);
 
-  // A new folder, search or type filter starts again on page 1 with nothing selected.
+  // A new folder, search or type filter clears the selection. Paging resets in the hook.
   useEffect(() => {
-    setPage(1);
     setSelected(new Set());
   }, [currentFolder, query, typeFilter, setSelected]);
 
@@ -201,7 +198,11 @@ export function AssetManager() {
     return assets.filter((a) => (!q || a.name.toLowerCase().includes(q)) && matchesType(a.contentType || '', typeFilter));
   }, [assets, query, typeFilter]);
 
-  const { pageItems, pageCount } = paginate(filtered, page, PAGE_SIZE);
+  const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
+    filtered,
+    'assets',
+    JSON.stringify([currentFolder, query, typeFilter]),
+  );
   const selectedAssets = assets.filter((a) => sel.isSelected(a.id));
 
   const setItem = (id: string, patch: Partial<UploadItem>) =>
@@ -576,7 +577,7 @@ export function AssetManager() {
             />
           ) : (
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-              {pageItems.map((asset) => {
+              {(pageItems ?? []).map((asset) => {
                 const checked = sel.isSelected(asset.id);
                 const isImage = (asset.contentType || '').startsWith('image/');
                 const Icon = iconFor(asset.contentType || '');
@@ -616,12 +617,14 @@ export function AssetManager() {
           )}
         </div>
 
-        {!loading && filtered.length > PAGE_SIZE && (
+        {!loading && filtered.length > 0 && (
           <Pagination
             page={page}
             pageCount={pageCount}
             onPageChange={setPage}
-            summary={`${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            summary={summary}
           />
         )}
       </Card>

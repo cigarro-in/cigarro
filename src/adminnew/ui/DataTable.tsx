@@ -1,9 +1,14 @@
-import { useCallback, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { Check, ChevronLeft, ChevronRight, Minus } from 'lucide-react';
 import { cn } from '../../components/ui/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Button } from './Button';
 import { SkeletonTable } from './Feedback';
+
+/** Rows-per-page choices offered by Pagination and usePageSize. */
+export const PAGE_SIZE_OPTIONS = [15, 50, 100, 200] as const;
+export const DEFAULT_PAGE_SIZE = 15;
 
 /** Admin checkbox with an indeterminate state (header "select all"). */
 export function Checkbox({
@@ -201,6 +206,8 @@ export function DataTable<T>({
 /**
  * Prev/next pagination for cursor or page lists. Shows "Page x of y" when
  * pageCount is known, otherwise just the arrows (hasNext decides).
+ * Pass pageSize + onPageSizeChange to show a "Rows per page" control; the
+ * caller resets page to 1 when the size changes.
  */
 export function Pagination({
   page,
@@ -208,6 +215,8 @@ export function Pagination({
   hasNext,
   onPageChange,
   summary,
+  pageSize,
+  onPageSizeChange,
 }: {
   /** 1-based. */
   page: number;
@@ -216,25 +225,50 @@ export function Pagination({
   onPageChange: (page: number) => void;
   /** Optional left text, e.g. "1–50 of 312". */
   summary?: ReactNode;
+  /** Current rows per page; defaults to DEFAULT_PAGE_SIZE. */
+  pageSize?: number;
+  onPageSizeChange?: (n: number) => void;
 }) {
+  const sizeId = useId();
   const canNext = pageCount !== undefined ? page < pageCount : !!hasNext;
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-[var(--admin-border)] px-4 py-2.5 text-sm text-[var(--admin-text-muted)]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--admin-border)] px-4 py-2.5 text-sm text-[var(--admin-text-muted)]">
       <span className="tabular-nums">{summary ?? (pageCount ? `Page ${page} of ${pageCount}` : `Page ${page}`)}</span>
-      <div className="flex items-center gap-1">
-        <Button variant="secondary" size="icon" className="size-8" aria-label="Previous page" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          <ChevronLeft aria-hidden />
-        </Button>
-        <Button variant="secondary" size="icon" className="size-8" aria-label="Next page" disabled={!canNext} onClick={() => onPageChange(page + 1)}>
-          <ChevronRight aria-hidden />
-        </Button>
+      <div className="flex items-center gap-3">
+        {onPageSizeChange && (
+          <div className="flex items-center gap-2">
+            <label htmlFor={sizeId} className="hidden text-xs whitespace-nowrap sm:inline">
+              Rows per page
+            </label>
+            <Select value={String(pageSize ?? DEFAULT_PAGE_SIZE)} onValueChange={(v) => onPageSizeChange(Number(v))}>
+              <SelectTrigger id={sizeId} size="sm" aria-label="Rows per page" className="h-8 w-20 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="flex items-center gap-1">
+          <Button variant="secondary" size="icon" className="size-8" aria-label="Previous page" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+            <ChevronLeft aria-hidden />
+          </Button>
+          <Button variant="secondary" size="icon" className="size-8" aria-label="Next page" disabled={!canNext} onClick={() => onPageChange(page + 1)}>
+            <ChevronRight aria-hidden />
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
 /** Client-side paging helper: slice `items` into pages of `pageSize`. */
-export function paginate<T>(items: T[], page: number, pageSize = 50): { pageItems: T[]; pageCount: number } {
+export function paginate<T>(items: T[], page: number, pageSize = DEFAULT_PAGE_SIZE): { pageItems: T[]; pageCount: number } {
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const p = Math.min(Math.max(1, page), pageCount);
   return { pageItems: items.slice((p - 1) * pageSize, p * pageSize), pageCount };

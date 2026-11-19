@@ -31,7 +31,16 @@ export {
   type DateRangePreset,
 } from './DateRangePresets';
 export { BulkActionBar } from './BulkActionBar';
-export { DataTable, Pagination, paginate, Checkbox, useRowSelection, type Column } from './DataTable';
+export {
+  DataTable,
+  Pagination,
+  paginate,
+  Checkbox,
+  useRowSelection,
+  PAGE_SIZE_OPTIONS,
+  DEFAULT_PAGE_SIZE,
+  type Column,
+} from './DataTable';
 export { Menu, type MenuItem, type MenuSection } from './Menu';
 export { Dialog, ConfirmDialog, Sheet } from './Overlay';
 export { OtpInput } from './OtpInput';

@@ -18,12 +18,12 @@ import {
   FilterSelect,
   Page,
   Pagination,
-  paginate,
   useButtonFeedback,
   useRowSelection,
   type BadgeTone,
   type Column,
 } from '../ui';
+import { useClientPages } from '../hooks/usePagination';
 
 type PostStatus = 'draft' | 'published' | 'archived';
 
@@ -40,8 +40,6 @@ interface BlogRow {
   date: number;
   searchText: string;
 }
-
-const PAGE_SIZE = 25;
 
 const STATUS_TONE: Record<PostStatus, BadgeTone> = {
   published: 'success',
@@ -75,7 +73,6 @@ export function BlogsPage() {
   const sel = useRowSelection();
   const [query, setQuery] = useState('');
   const [status, setStatusFilter] = useState('all');
-  const [page, setPage] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const publish = useButtonFeedback();
@@ -106,13 +103,16 @@ export function BlogsPage() {
     return posts.filter((p) => (status === 'all' || p.status === status) && (!q || p.searchText.includes(q)));
   }, [posts, query, status]);
 
-  // A new view resets paging and selection, so bulk actions never touch hidden rows.
+  // A new view clears selection, so bulk actions never touch hidden rows. Paging resets in the hook.
   useEffect(() => {
-    setPage(1);
     sel.clear();
   }, [query, status]);
 
-  const { pageItems, pageCount } = paginate(filtered ?? [], page, PAGE_SIZE);
+  const { pageItems, pageCount, page, pageSize, setPage, setPageSize, summary } = useClientPages(
+    filtered,
+    'blogs',
+    JSON.stringify([query, status]),
+  );
   const selectedIds = sel.ids as Id<'blogPosts'>[];
 
   const bulkStatus = (fb: ReturnType<typeof useButtonFeedback>, next: PostStatus) =>
@@ -187,7 +187,7 @@ export function BlogsPage() {
         </FilterBar>
         <DataTable
           columns={columns}
-          rows={filtered === undefined ? undefined : pageItems}
+          rows={pageItems}
           getRowId={(p) => p.id}
           selection={sel}
           onRowClick={(p) => navigate(`/blogs/${p.id}`)}
@@ -207,12 +207,14 @@ export function BlogsPage() {
             />
           }
         />
-        {filtered !== undefined && pageCount > 1 && (
+        {filtered !== undefined && filtered.length > 0 && (
           <Pagination
             page={page}
             pageCount={pageCount}
             onPageChange={setPage}
-            summary={`${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            summary={summary}
           />
         )}
       </Card>

@@ -6,6 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import { requireOrgAdminBySlug } from "./lib/org";
 import { requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
+import { clampPaginationOpts } from "./lib/pagination";
 import { SMOKESHOP_SEED_REDIRECTS } from "./lib/smokeshopRedirects";
 import {
   normalizeFromPath,
@@ -317,7 +318,7 @@ export const list = query({
               .lt("fromPath", prefix + "￿")
           : q.eq("orgId", orgId),
       )
-      .paginate(paginationOpts);
+      .paginate(clampPaginationOpts(paginationOpts));
     return {
       page: page.page.map(toRow),
       isDone: page.isDone,

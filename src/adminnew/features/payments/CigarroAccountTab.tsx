@@ -5,6 +5,7 @@ import type { FunctionReturnType } from 'convex/server';
 import { api } from '../../../../convex/_generated/api';
 import { useOrg } from '../../../lib/convex/useOrg';
 import { adminPath } from '../../lib/paths';
+import { usePageSize, useCursorPages } from '../../hooks/usePagination';
 import { PlatformPaymentSheet } from '../setup/PlatformPaymentSheet';
 import {
   Button,
@@ -22,8 +23,6 @@ import { cleanNote, feeRateLabel, moneyPaise } from './platformFeeFormat';
 type Statement = FunctionReturnType<typeof api.platformFees.listStatement>;
 type Row = Statement['rows'][number];
 
-const PAGE_SIZE = 25;
-
 /**
  * "Cigarro account": the store's bank-style account with the platform. Dues
  * (marketplace fees not yet paid), the security deposit held, and every entry
@@ -36,22 +35,20 @@ export function CigarroAccountTab() {
 
   const summary = useQuery(api.platformFees.getAccountSummary, orgId ? { orgId } : 'skip');
 
-  // Cursor stack: the last entry is the page on screen. null = first page.
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const [pageSize, setPageSize] = usePageSize('cigarroAccount');
+  const pages = useCursorPages(JSON.stringify({ orgId, pageSize }));
   const [paying, setPaying] = useState(false);
-  const cursor = cursors[cursors.length - 1];
-  const pageNo = cursors.length;
 
   const statement = useQuery(
     api.platformFees.listStatement,
-    orgId ? { orgId, cursor, limit: PAGE_SIZE } : 'skip',
+    orgId ? { orgId, cursor: pages.cursor, limit: pageSize } : 'skip',
   );
   const rows = statement?.rows;
   const nextCursor = statement?.nextCursor ?? null;
 
   const onPageChange = (target: number) => {
-    if (target > pageNo && nextCursor) setCursors((c) => [...c, nextCursor]);
-    if (target < pageNo) setCursors((c) => c.slice(0, -1));
+    if (target > pages.page && nextCursor) pages.next(nextCursor);
+    else if (target < pages.page) pages.prev();
   };
 
   const duesPaise = summary?.duesPaise ?? 0;
@@ -134,12 +131,13 @@ export function CigarroAccountTab() {
           )}
         </div>
 
-        {statement !== undefined && (pageNo > 1 || nextCursor) && (
+        {rows && rows.length > 0 && (
           <Pagination
-            page={pageNo}
+            page={pages.page}
             hasNext={!!nextCursor}
             onPageChange={onPageChange}
-            summary={`Page ${pageNo} · ${PAGE_SIZE} per page`}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         )}
       </Card>
