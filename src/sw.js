@@ -52,14 +52,33 @@ registerRoute(
 );
 
 // Build assets (hashed JS and CSS under /assets/), cached on first use rather than
-// precached. Hashed names never change, so CacheFirst is safe.
+// precached. Hashed names never change, so CacheFirst is safe. Only real JS/CSS
+// 200s are stored: an HTML body under an asset URL (the old SPA fallback for a
+// missing file) must never be cached as a script.
+const ASSET_CACHE = 'assets-v2';
 registerRoute(
   ({ url }) => url.pathname.startsWith('/assets/'),
   new CacheFirst({
-    cacheName: 'assets',
-    plugins: [new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 })],
+    cacheName: ASSET_CACHE,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      {
+        cacheWillUpdate: async ({ response }) => {
+          const type = response.headers.get('content-type') || '';
+          if (type.includes('text/html')) return null;
+          const head = (await response.clone().text()).slice(0, 64).trimStart().toLowerCase();
+          return head.startsWith('<!doctype') || head.startsWith('<html') ? null : response;
+        },
+      },
+      new ExpirationPlugin({ maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 30 }),
+    ],
   }),
 );
+
+// The first asset cache could hold HTML stored under script URLs; drop it.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.delete('assets'));
+});
 
 // API catalogue responses: stale-while-revalidate, never on the admin host.
 registerRoute(

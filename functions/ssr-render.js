@@ -162,9 +162,23 @@ function renderQueryFor(url) {
   return query ? `?${query}` : '';
 }
 
-// Cache key: host + path + the render query (see renderQueryFor).
-function ssrCacheKey(url) {
-  return new Request(`https://${url.host}${url.pathname}${renderQueryFor(url)}`);
+// Cache key: deploy + host + path + the render query (see renderQueryFor). The
+// deploy part means a new deploy never serves a page whose script tags point at
+// the previous deploy's hashed files (those no longer exist and 404).
+function ssrCacheKey(url, build) {
+  return new Request(`https://${url.host}/__ssr/${build}${url.pathname}${renderQueryFor(url)}`);
+}
+
+// This deploy's id: the hashed entry script named in the built shell. Read once
+// per isolate (an isolate never outlives its deploy).
+let buildIdPromise = null;
+function currentBuildId(context) {
+  if (!buildIdPromise) {
+    buildIdPromise = loadShell(context)
+      .then((shell) => (shell.match(/\/assets\/index-([\w-]+)\.js/) || [])[1] || 'unknown')
+      .catch((error) => { buildIdPromise = null; throw error; });
+  }
+  return buildIdPromise;
 }
 
 // Path the page is rendered for: the same pathname + query the cache key holds.
@@ -244,7 +258,7 @@ export async function ssrRender(context) {
     return pageResponse(request.method, page, 'bypass');
   }
 
-  const key = ssrCacheKey(url);
+  const key = ssrCacheKey(url, await currentBuildId(context));
   const cached = await cache.match(key).catch(() => undefined);
   if (cached) {
     const storedAt = Number(cached.headers.get(STORED_AT_HEADER) || 0);

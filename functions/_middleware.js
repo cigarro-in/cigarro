@@ -47,9 +47,35 @@ function withHeader(res, name, value) {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
+// Passes a real asset through. When the body is HTML (the SPA fallback for a
+// file that is not in this deploy), returns an uncacheable 404 instead.
+async function assetOr404(res) {
+  if (res.status !== 200 || !res.body) return res;
+  const [probe, body] = res.body.tee();
+  const reader = probe.getReader();
+  const { value } = await reader.read();
+  reader.cancel().catch(() => {});
+  const head = value ? new TextDecoder().decode(value.slice(0, 64)).trimStart().toLowerCase() : '';
+  if (head.startsWith('<!doctype') || head.startsWith('<html')) {
+    return new Response('Not found', {
+      status: 404,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+    });
+  }
+  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
 async function handleRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
+
+  // Build assets: a missing hashed file must be a real 404. Pages otherwise
+  // answers with the SPA's index.html, which _headers labels as JavaScript with
+  // a one-year immutable cache, so a page from an older deploy loads HTML as a
+  // script ("Unexpected token '<'") and the browser keeps the broken copy.
+  if (url.pathname.startsWith('/assets/')) {
+    return assetOr404(await context.next());
+  }
 
   // Citadel super-admin app (admin host /sa/*): serve the SPA with no store.
   // Checked before store resolution so /sa is never looked up as a slug.
