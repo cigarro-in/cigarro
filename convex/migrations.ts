@@ -223,6 +223,11 @@ const MIGRATIONS: Migration[] = [
     name: "restructureOrderImages-v1",
     run: async (ctx) => await runRestructureStorageKeys(ctx, ["orders"], ["items"]),
   },
+  {
+    // Tables v1 missed (RESTRUCTURE_V2_TABLES). Same copied map; every field of those rows.
+    name: "restructureStorageKeys-v2",
+    run: async (ctx) => await runRestructureStorageKeys(ctx, RESTRUCTURE_V2_TABLES),
+  },
 ];
 
 // Never throws: each migration is isolated, and failures are recorded.
@@ -519,7 +524,12 @@ async function runMoveOldsmokeshopImages(ctx: ActionCtx) {
 
 export const RESTRUCTURE_STORAGE_KEYS_MIGRATION = "restructureStorageKeys-v1";
 // Every table that stores image references (orders excluded on purpose).
-const RESTRUCTURE_TABLES = [...IMAGE_TABLES, "organizations", "carts"] as const;
+export const RESTRUCTURE_TABLES = [...IMAGE_TABLES, "organizations", "carts"] as const;
+// restructureStorageKeys-v2: the tables v1 did not cover (checked against convex/schema.ts).
+// Skipped on purpose: payments, wallet and platform ledgers, audit/consent/crash logs,
+// SMS and bank-email evidence, invoices (issued documents), gmail and SA tokens,
+// marketingCampaigns (snapshots of messages already sent), and tables with no URL or key fields.
+export const RESTRUCTURE_V2_TABLES = ["productReviews", "marketingTemplates", "invoiceSettings", "orgRedirects"] as const;
 const RESTRUCTURE_BATCH_SIZE = 100;
 
 export const restructureStorageKeysBatch = internalMutation({

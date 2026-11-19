@@ -278,3 +278,19 @@ export interface StorageSummaryRow {
 export const storageSummaryRef = makeFunctionReference<'query', { saToken: string }, StorageSummaryRow[]>(
   'storageKeyMoves:summary',
 );
+
+// Cleanup check (convex/storageKeyMoves.ts leftoverRefs): stored strings still holding an old key.
+export interface StorageLeftoverExample {
+  table: string;
+  field: string;
+  id: string;
+  value: string;
+}
+export interface StorageLeftover {
+  count: number;
+  examples: StorageLeftoverExample[];
+  truncated: string[];
+}
+export const storageLeftoverRef = makeFunctionReference<'query', { saToken: string }, StorageLeftover>(
+  'storageKeyMoves:leftoverRefs',
+);

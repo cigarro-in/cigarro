@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react';
 import { Banner, Button, Card, Checkbox, Skeleton } from '../adminnew/ui';
 import { InlineStatus, useInlineStatus } from '../components/common/InlineStatus';
 import { formatCount } from './saUi';
-import { listStoresRef, storageSummaryRef, type StoreRow, type StorageSummaryRow } from './refs';
+import { listStoresRef, storageLeftoverRef, storageSummaryRef, type StoreRow, type StorageSummaryRow } from './refs';
 
 // Copy batch size. Each batch lists this many raw R2 keys and copies the images
 // among them, so one request stays well inside the Pages Functions limits.
@@ -85,6 +85,7 @@ function errorText(err: unknown): string {
 export function StorageRestructureCard({ token, writeOpen }: { token: string; writeOpen: boolean }) {
   const stores = useQuery(listStoresRef, { saToken: token });
   const summary = useQuery(storageSummaryRef, { saToken: token });
+  const leftover = useQuery(storageLeftoverRef, { saToken: token });
   const { status, setError, setOk, clear } = useInlineStatus();
   const [picked, setPicked] = useState<Record<string, boolean> | null>(null);
   const [running, setRunning] = useState(false);
@@ -191,6 +192,36 @@ export function StorageRestructureCard({ token, writeOpen }: { token: string; wr
           {progress.slug}: batch {progress.batches} · {formatCount(progress.totals.copied)} copied · {formatCount(progress.totals.exists)} already in place ·{' '}
           {formatCount(progress.totals.conflicts)} conflicts · {formatCount(progress.totals.failed)} failed
         </p>
+      )}
+
+      {leftover && (
+        <div className="mt-4 text-[13px]">
+          <p className="font-medium">
+            {formatCount(leftover.count)} old link{leftover.count === 1 ? '' : 's'} left
+          </p>
+          {leftover.count > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-[var(--admin-text-muted)]">Examples</summary>
+              <ul className="mt-2 space-y-1 font-mono text-xs text-[var(--admin-text-muted)]">
+                {leftover.examples.map((e, i) => (
+                  <li key={`${e.table}-${e.id}-${e.field}-${i}`} className="break-all">
+                    {e.table} · {e.field} · {e.id}: {e.value}
+                  </li>
+                ))}
+              </ul>
+              {leftover.count > leftover.examples.length && (
+                <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
+                  Showing {leftover.examples.length} of {formatCount(leftover.count)}.
+                </p>
+              )}
+            </details>
+          )}
+          {leftover.truncated.length > 0 && (
+            <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
+              Scan capped at 500 rows for {leftover.truncated.join(', ')}: the count may be incomplete.
+            </p>
+          )}
+        </div>
       )}
 
       {!writeOpen && (

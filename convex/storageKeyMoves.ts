@@ -7,6 +7,8 @@ import { ConvexError, v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server";
 import { requireSaSession, requireSaWrite } from "./lib/auth";
 import { audit } from "./lib/audit";
+import { LEGACY_PREFIX } from "./lib/storageKeys";
+import { RESTRUCTURE_TABLES, RESTRUCTURE_V2_TABLES } from "./migrations";
 
 const MAX_RESULTS_PER_CALL = 100;
 
@@ -91,5 +93,67 @@ export const loadCopiedMap = internalQuery({
     const out: Record<string, string> = {};
     for (const r of rows) if (r.status === "copied") out[r.fromKey] = r.toKey;
     return out;
+  },
+});
+
+// Cleanup check: stored strings that still hold a pre-restructure key. Scans the
+// tables the storage migrations rewrite (plus orders, whose items they rewrite).
+// Each table is read up to LEFTOVER_ROWS_PER_TABLE rows; tables that hit the cap are
+// listed in `truncated`, so a zero count there is not proof on its own.
+const LEFTOVER_ROWS_PER_TABLE = 500;
+const LEFTOVER_EXAMPLES = 50;
+const LEFTOVER_TABLES: string[] = [
+  ...new Set([...RESTRUCTURE_TABLES, "orders", ...RESTRUCTURE_V2_TABLES]),
+];
+
+interface LeftoverHit {
+  path: string;
+  value: string;
+}
+
+function findLegacyStrings(value: unknown, path: string, out: LeftoverHit[]): void {
+  if (typeof value === "string") {
+    if (value.includes(LEGACY_PREFIX)) out.push({ path, value });
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => findLegacyStrings(item, `${path}[${i}]`, out));
+    return;
+  }
+  if (value && typeof value === "object" && !(value instanceof ArrayBuffer)) {
+    for (const [k, v] of Object.entries(value)) findLegacyStrings(v, path ? `${path}.${k}` : k, out);
+  }
+}
+
+// Window of the string around the first old key, so long HTML bodies stay readable.
+function snippetAround(text: string): string {
+  const at = text.indexOf(LEGACY_PREFIX);
+  const from = Math.max(0, at - 40);
+  return text.slice(from, from + 200);
+}
+
+export const leftoverRefs = query({
+  args: { saToken: v.string() },
+  handler: async (ctx, { saToken }) => {
+    await requireSaSession(ctx, saToken);
+    let count = 0;
+    const examples: { table: string; field: string; id: string; value: string }[] = [];
+    const truncated: string[] = [];
+    for (const table of LEFTOVER_TABLES) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: Record<string, unknown>[] = await (ctx.db.query(table as any) as any).take(LEFTOVER_ROWS_PER_TABLE + 1);
+      if (rows.length > LEFTOVER_ROWS_PER_TABLE) truncated.push(table);
+      for (const row of rows.slice(0, LEFTOVER_ROWS_PER_TABLE)) {
+        const hits: LeftoverHit[] = [];
+        findLegacyStrings(row, "", hits);
+        for (const hit of hits) {
+          count += 1;
+          if (examples.length < LEFTOVER_EXAMPLES) {
+            examples.push({ table, field: hit.path, id: String(row._id), value: snippetAround(hit.value) });
+          }
+        }
+      }
+    }
+    return { count, examples, truncated };
   },
 });
